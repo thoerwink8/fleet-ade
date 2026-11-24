@@ -517,3 +517,168 @@ export function applyScheduledTaskTemplate(
     weekdays,
   };
 }
+
+export type ScheduledTaskDraftKey = string;
+
+export interface SavedScheduledTaskDraft {
+  readonly environmentId: EnvironmentId;
+  readonly draft: DraftState;
+  readonly taskUpdatedAt: string | null;
+}
+
+export function scheduledTaskDraftKey(target: {
+  readonly environmentId: EnvironmentId;
+  readonly taskId: ScheduledTaskId | null;
+}): ScheduledTaskDraftKey {
+  return target.taskId === null ? "new" : `edit:${target.environmentId}:${target.taskId}`;
+}
+
+function setsEqual(left: ReadonlySet<number>, right: ReadonlySet<number>): boolean {
+  if (left.size !== right.size) return false;
+  for (const item of left) {
+    if (!right.has(item)) return false;
+  }
+  return true;
+}
+
+export function areScheduledTaskDraftsEqual(left: DraftState, right: DraftState): boolean {
+  if (
+    left.editingId !== right.editingId ||
+    left.title !== right.title ||
+    left.prompt !== right.prompt ||
+    left.enabled !== right.enabled ||
+    left.scheduleMode !== right.scheduleMode ||
+    left.projectId !== right.projectId ||
+    left.threadId !== right.threadId ||
+    left.threadMode !== right.threadMode ||
+    left.workspaceMode !== right.workspaceMode ||
+    left.baseRef !== right.baseRef ||
+    left.startFromOrigin !== right.startFromOrigin ||
+    left.existingWorktreePath !== right.existingWorktreePath ||
+    left.modelKey !== right.modelKey ||
+    left.runtimeMode !== right.runtimeMode ||
+    left.interactionMode !== right.interactionMode
+  ) {
+    return false;
+  }
+  if (left.scheduleMode === "fixed") {
+    return left.timeOfDay === right.timeOfDay && setsEqual(left.weekdays, right.weekdays);
+  }
+  if (left.scheduleMode === "once") {
+    return left.runAt === right.runAt;
+  }
+  if (left.scheduleMode === "interval") {
+    return left.intervalMinutes === right.intervalMinutes;
+  }
+  return (
+    left.signatureEnabled === right.signatureEnabled &&
+    left.signatureHeader === right.signatureHeader &&
+    left.signatureEncoding === right.signatureEncoding &&
+    left.signaturePrefix === right.signaturePrefix &&
+    left.signatureSecret === right.signatureSecret &&
+    left.maxDeliveryAgeMinutes === right.maxDeliveryAgeMinutes &&
+    left.replayKey === right.replayKey &&
+    left.coalesceKey === right.coalesceKey &&
+    left.coalesceWindowSeconds === right.coalesceWindowSeconds &&
+    !webhookFilterDraftsChanged(left.filters, right.filters)
+  );
+}
+
+export function isScheduledTaskDraftDirty(input: {
+  readonly baseline: DraftState;
+  readonly current: DraftState;
+  readonly baselineEnvironmentId: EnvironmentId;
+  readonly currentEnvironmentId: EnvironmentId;
+}): boolean {
+  return (
+    input.baselineEnvironmentId !== input.currentEnvironmentId ||
+    !areScheduledTaskDraftsEqual(input.baseline, input.current)
+  );
+}
+
+export function resolveScheduledTaskDraftOnClose(input: {
+  readonly existingDrafts: ReadonlyMap<ScheduledTaskDraftKey, SavedScheduledTaskDraft>;
+  readonly key: ScheduledTaskDraftKey;
+  readonly baseline: DraftState;
+  readonly current: DraftState;
+  readonly baselineEnvironmentId: EnvironmentId;
+  readonly currentEnvironmentId: EnvironmentId;
+  readonly taskUpdatedAt: string | null;
+}): {
+  readonly nextDrafts: Map<ScheduledTaskDraftKey, SavedScheduledTaskDraft>;
+  readonly saved: boolean;
+} {
+  const nextDrafts = new Map(input.existingDrafts);
+  if (
+    !isScheduledTaskDraftDirty({
+      baseline: input.baseline,
+      current: input.current,
+      baselineEnvironmentId: input.baselineEnvironmentId,
+      currentEnvironmentId: input.currentEnvironmentId,
+    })
+  ) {
+    nextDrafts.delete(input.key);
+    return { nextDrafts, saved: false };
+  }
+  nextDrafts.set(input.key, {
+    environmentId: input.currentEnvironmentId,
+    draft: input.current,
+    taskUpdatedAt: input.taskUpdatedAt,
+  });
+  return { nextDrafts, saved: true };
+}
+
+export function clearScheduledTaskDraft(
+  existingDrafts: ReadonlyMap<ScheduledTaskDraftKey, SavedScheduledTaskDraft>,
+  key: ScheduledTaskDraftKey,
+): Map<ScheduledTaskDraftKey, SavedScheduledTaskDraft> {
+  if (!existingDrafts.has(key)) return new Map(existingDrafts);
+  const nextDrafts = new Map(existingDrafts);
+  nextDrafts.delete(key);
+  return nextDrafts;
+}
+
+export function initialScheduledTaskEditorState(input: {
+  readonly savedDraft: SavedScheduledTaskDraft | undefined;
+  readonly initialEnvironmentId: EnvironmentId;
+  readonly connectedEnvironmentIds: ReadonlySet<EnvironmentId>;
+  readonly baseline: DraftState;
+  readonly currentTaskUpdatedAt: string | null;
+}): {
+  readonly environmentId: EnvironmentId;
+  readonly draft: DraftState;
+  readonly restoredFromDraft: boolean;
+  readonly taskChangedSinceDraft: boolean;
+} {
+  if (input.savedDraft === undefined) {
+    return {
+      environmentId: input.initialEnvironmentId,
+      draft: input.baseline,
+      restoredFromDraft: false,
+      taskChangedSinceDraft: false,
+    };
+  }
+  const resolvedEnvironmentId = input.connectedEnvironmentIds.has(input.savedDraft.environmentId)
+    ? input.savedDraft.environmentId
+    : input.initialEnvironmentId;
+  if (
+    resolvedEnvironmentId === input.initialEnvironmentId &&
+    areScheduledTaskDraftsEqual(input.baseline, input.savedDraft.draft)
+  ) {
+    return {
+      environmentId: input.initialEnvironmentId,
+      draft: input.baseline,
+      restoredFromDraft: false,
+      taskChangedSinceDraft: false,
+    };
+  }
+  return {
+    environmentId: resolvedEnvironmentId,
+    draft: input.savedDraft.draft,
+    restoredFromDraft: true,
+    taskChangedSinceDraft:
+      input.currentTaskUpdatedAt !== null &&
+      input.savedDraft.taskUpdatedAt !== null &&
+      input.currentTaskUpdatedAt !== input.savedDraft.taskUpdatedAt,
+  };
+}

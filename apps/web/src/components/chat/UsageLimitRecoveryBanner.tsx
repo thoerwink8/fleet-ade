@@ -108,7 +108,7 @@ export function getUsageLimitRecoveryButtonsState(input: {
     },
     snooze: {
       disabled: snoozePending || (!input.snoozed && input.resetPassed),
-      label: snoozePending ? "正在保存…" : input.snoozed ? "立即唤醒" : "暂缓到重置时",
+      label: snoozePending ? "正在保存…" : input.snoozed ? "取消暂缓" : "暂缓到重置时",
     },
   };
 }

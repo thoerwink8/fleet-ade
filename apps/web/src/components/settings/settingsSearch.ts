@@ -370,7 +370,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "tool-call-visibility",
-    title: "聊天中的工具调用",
+    title: "会话中的工具调用",
     to: "/settings/threads",
     searchTerms: [
       "hide tool calls commands edits searches work log activity quiet chat zen final answers only",
@@ -394,7 +394,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "auto-settle-inactive-threads",
-    title: "自动收尾不活跃会话",
+    title: "不活跃会话自动标为完成",
     to: "/settings/threads",
     searchTerms: ["sidebar inactivity days no activity automatically"],
     requiresThreadAutoSettlement: true,
@@ -425,7 +425,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "auto-settle-merged-threads",
-    title: "合并后自动收尾会话",
+    title: "合并后自动标为完成",
     to: "/settings/threads",
     searchTerms: ["pull request merge closed automatically sidebar"],
     requiresThreadAutoSettlement: true,
@@ -442,7 +442,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "days-before-auto-settle",
-    title: "自动收尾前的闲置天数",
+    title: "自动标为完成前的闲置天数",
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
     searchTerms: ["thread timeout activity sidebar"],
@@ -527,7 +527,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "provider-update-checks",
-    title: "提供方更新检查",
+    title: "智能体更新检查",
     to: "/settings/maintenance",
     searchTerms: ["installed cli versions newer available codex claude grok antigravity"],
     scope: "environment-defaults",
@@ -543,7 +543,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "keep-awake-while-agents-work",
-    title: "智能体工作时保持唤醒",
+    title: "智能体工作时保持不休眠",
     to: "/settings/maintenance",
     scope: "environment-defaults",
     searchTerms: ["caffeinate sleep prevent stay awake power laptop lid inhibit"],
@@ -587,7 +587,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "ghq-clone-layout",
-    title: "克隆到主机文件夹",
+    title: "克隆到托管平台文件夹",
     to: "/settings/threads",
     scope: "environment-defaults",
     searchTerms: ["ghq clone destination host owner repository root layout"],

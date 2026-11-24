@@ -19,7 +19,6 @@ const SIZES = {
 
 const TAG_VARIANTS = new Set<BadgeVariant>(["secondary", "outline", "chip", "label"]);
 
-// warning uses the needs dot: fleet-design 0.3.1 has no warning dot.
 const DOT_CLASS = {
   secondary: null,
   outline: null,
@@ -29,7 +28,7 @@ const DOT_CLASS = {
   error: "fa-dot--error",
   info: "fa-dot--needs",
   success: "fa-dot--running",
-  warning: "fa-dot--needs",
+  warning: "fa-dot--warning",
   "dot-attention": "fa-dot--needs",
   "dot-active": "fa-dot--running",
   "dot-blocked": "fa-dot--error",
@@ -239,6 +238,20 @@ describe("Badge", () => {
                 expectOnGrid(dotStyle.height, `${label} dot height grid`);
               }
             }
+
+            const warningDotColor = getComputedStyle(
+              screen.getByTestId("warning-default").element().querySelector(".fa-dot")!,
+            ).backgroundColor;
+            const needsDotColor = getComputedStyle(
+              screen.getByTestId("dot-attention-default").element().querySelector(".fa-dot")!,
+            ).backgroundColor;
+            expect(warningDotColor, `${width}px ${themeId} ${mode} warning dot token`).toBe(
+              resolved("backgroundColor", "var(--fa-warning)"),
+            );
+            expect(
+              warningDotColor,
+              `${width}px ${themeId} ${mode} warning dot distinct from needs`,
+            ).not.toBe(needsDotColor);
 
             const chip = getComputedStyle(screen.getByTestId("chip-default").element());
             expect(chip.fontVariantNumeric, `${width}px ${themeId} ${mode} chip figures`).toContain(

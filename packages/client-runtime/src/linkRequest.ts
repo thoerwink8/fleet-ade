@@ -270,7 +270,7 @@ export function linkRequestDisplay(
       return {
         kind: "answered",
         outcome: "failed",
-        label: `无法关联：${item.failure ?? "另一个环境已拒绝"}`,
+        label: `无法关联：${item.failure ?? "另一台电脑已拒绝"}`,
       };
     case "cancelled":
       return { kind: "answered", outcome: "ended", label: "请求已结束" };

@@ -830,7 +830,7 @@ describe("RpcSessionFactory", () => {
       const error = yield* Fiber.join(readyFiber);
       expect(error).toMatchObject({
         reason: "configuration",
-        message: "已连接的环境 environment-2 与 environment-1 不一致。",
+        message: "已连接的电脑 environment-2 与 environment-1 不一致。",
       });
       expect((yield* Fiber.join(configFiber))._tag).toBe("RpcClientError");
       expect((yield* Fiber.join(customConfigFiber))._tag).toBe("RpcClientError");

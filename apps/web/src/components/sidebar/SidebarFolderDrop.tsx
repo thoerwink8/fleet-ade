@@ -48,7 +48,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "这台电脑的服务器尚未连接",
+          title: "这台电脑的后台服务尚未连接",
           description: "等它连上后再试。",
         }),
       );

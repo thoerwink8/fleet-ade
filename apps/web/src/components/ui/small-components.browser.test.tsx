@@ -134,10 +134,15 @@ describe("Empty, Label, and NumberField", () => {
             `${themeId} description weight`,
           ).toBeLessThanOrEqual(500);
           expect(descriptionStyle.color, `${themeId} description color`).toBe(muted);
+          expect(media.classList.contains("fa-empty__media"), `${themeId} media class`).toBe(true);
           expect(getComputedStyle(media).color, `${themeId} media color`).toBe(muted);
           const warningMedia = screen.container.querySelector('[data-testid="warning-media"]')!;
+          expect(
+            warningMedia.classList.contains("fa-empty__media--warning"),
+            `${themeId} warning media class`,
+          ).toBe(true);
           expect(getComputedStyle(warningMedia).color, `${themeId} warning media color`).toBe(
-            resolvedColor("--warning"),
+            resolvedColor("--fa-warning"),
           );
           expect(getComputedStyle(warningMedia).color).not.toBe(muted);
           expect(getComputedStyle(normalLabel).color, `${themeId} label color`).toBe(fg);

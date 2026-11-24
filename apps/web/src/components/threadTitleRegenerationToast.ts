@@ -32,8 +32,8 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
       type: "error",
       title:
         results.length === 1
-          ? "重新生成会话标题失败"
-          : `${results.length} 个会话中有 ${failures.length} 个标题重新生成失败`,
+          ? "无法重新生成会话标题"
+          : `无法重新生成 ${results.length} 个中的 ${failures.length} 个会话标题`,
       description: failures[0],
     });
   }

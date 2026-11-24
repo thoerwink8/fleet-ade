@@ -22,8 +22,8 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
 }> = [
   {
     scope: AuthOrchestrationReadScope,
-    title: "查看环境",
-    description: "读取会话、状态、检查点和配置。",
+    title: "查看会话",
+    description: "读取会话、状态、回退点和配置。",
   },
   {
     scope: AuthOrchestrationOperateScope,
@@ -32,18 +32,18 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
   },
   {
     scope: AuthSettingsWriteScope,
-    title: "修改环境设置",
-    description: "编辑环境偏好和快捷键。",
+    title: "修改设置",
+    description: "编辑偏好和快捷键。",
   },
   {
     scope: AuthProvidersManageScope,
-    title: "管理提供方",
-    description: "配置、安装、登录和更新提供方与用量来源。",
+    title: "管理智能体",
+    description: "配置、安装、登录和更新智能体与用量来源。",
   },
   {
     scope: AuthEnvironmentMaintainScope,
-    title: "维护环境",
-    description: "更新服务器并控制环境进程。",
+    title: "维护后台服务",
+    description: "更新后台服务并控制其进程。",
   },
   {
     scope: AuthDiagnosticsReadScope,
@@ -68,12 +68,12 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
   {
     scope: AuthFilesystemReadScope,
     title: "读取文件",
-    description: "浏览主机文件、搜索工作区、查看本地改动。",
+    description: "浏览文件、搜索项目、查看本地改动。",
   },
   {
     scope: AuthFilesystemWriteScope,
     title: "写入文件",
-    description: "编辑工作区文件并将计划保存到磁盘。",
+    description: "编辑项目文件并将计划保存到磁盘。",
   },
   {
     scope: AuthAccessReadScope,
@@ -95,7 +95,7 @@ export function sessionPermissionsUnavailableMessage(input: {
   /** The environment answered that this session is not signed in; retrying will not change that. */
   readonly rejected: boolean;
 }): string {
-  if (!input.connected) return "连接到此环境后，才能查看此会话的权限。";
-  if (input.rejected) return "此环境没有接受你的会话。请重新连接后重试。";
+  if (!input.connected) return "连接到这台电脑后，才能查看此会话的权限。";
+  if (input.rejected) return "这台电脑没有接受你的会话。请重新连接后重试。";
   return input.failed ? "无法验证你的权限，正在自动重试。" : "正在检查权限…";
 }

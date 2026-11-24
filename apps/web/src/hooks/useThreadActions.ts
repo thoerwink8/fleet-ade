@@ -80,7 +80,7 @@ export class ThreadArchiveBlockedError extends Schema.TaggedError<ThreadArchiveB
   },
 ) {
   override get message(): string {
-    return "提供方仍在运行时无法归档。";
+    return "智能体仍在运行时无法归档。";
   }
 }
 
@@ -92,7 +92,7 @@ export class ThreadSettlementUnsupportedError extends Schema.TaggedError<ThreadS
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持收尾。请更新服务器后再使用“收尾”。";
+    return "这台电脑的后台服务尚不支持标为完成。请更新后台服务后再使用“标为完成”。";
   }
 }
 
@@ -104,7 +104,7 @@ export class ThreadSnoozeUnsupportedError extends Schema.TaggedError<ThreadSnooz
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持暂缓。请更新服务器后再使用“暂缓”。";
+    return "这台电脑的后台服务尚不支持暂缓。请更新后台服务后再使用“暂缓”。";
   }
 }
 
@@ -137,7 +137,7 @@ export class ThreadAutoSettleOptOutUnsupportedError extends Schema.TaggedError<T
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持按会话关闭自动收尾。请更新服务器后再使用该功能。";
+    return "这台电脑的后台服务尚不支持按会话关闭自动标为完成。请更新后台服务后再使用该功能。";
   }
 }
 
@@ -149,7 +149,7 @@ export class ThreadPinningUnsupportedError extends Schema.TaggedError<ThreadPinn
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持置顶。请更新服务器后再使用“置顶”。";
+    return "这台电脑的后台服务尚不支持置顶。请更新后台服务后再使用“置顶”。";
   }
 }
 
@@ -161,7 +161,7 @@ export class ThreadCommanderUnsupportedError extends Schema.TaggedError<ThreadCo
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持指挥会话标记。请更新服务器后再使用“标成指挥”。";
+    return "这台电脑的后台服务尚不支持指挥会话标记。请更新后台服务后再使用“标成指挥”。";
   }
 }
 
@@ -173,7 +173,7 @@ export class ThreadPinReorderUnsupportedError extends Schema.TaggedError<ThreadP
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持重新排列置顶会话。请更新服务器后再调整置顶顺序。";
+    return "这台电脑的后台服务尚不支持重新排列置顶会话。请更新后台服务后再调整置顶顺序。";
   }
 }
 
@@ -185,7 +185,7 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
   },
 ) {
   override get message(): string {
-    return "请更新此环境的服务器，以重新排列活动会话。";
+    return "请更新这台电脑的后台服务，以重新排列活动会话。";
   }
 }
 
@@ -210,7 +210,7 @@ export async function navigateAfterThreadDeletion(navigate: () => Promise<void>)
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "会话已删除，但跳转失败",
+        title: "会话已删除，但无法跳转页面",
         description: error instanceof Error ? error.message : "发生错误。",
       }),
     );
@@ -705,7 +705,7 @@ export function useThreadActions() {
       : AsyncResult.failure(
           Cause.fail(
             new EnvironmentAuthorizationError({
-              message: "此连接已无法移除工作树。",
+              message: "此连接已无法删除工作树。",
               requiredScope: AuthSourceControlWriteScope,
             }),
           ),
@@ -736,9 +736,9 @@ export function useThreadActions() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: removalFailed ? "无法删除工作树" : "工作树已删除，但刷新 Git 状态失败",
+          title: removalFailed ? "无法删除工作树" : "工作树已删除，但无法刷新 Git 状态",
           description: removalFailed
-            ? `无法移除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
+            ? `无法删除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
             : message,
         }),
       );
@@ -947,7 +947,7 @@ export function useThreadActions() {
         : AsyncResult.failure(
             Cause.fail(
               new EnvironmentAuthorizationError({
-                message: "此连接已无法移除工作树。",
+                message: "此连接已无法删除工作树。",
                 requiredScope: AuthSourceControlWriteScope,
               }),
             ),
@@ -974,7 +974,7 @@ export function useThreadActions() {
             title:
               removeResult._tag === "Failure"
                 ? "无法删除工作树"
-                : "工作树已删除，但刷新 Git 状态失败",
+                : "工作树已删除，但无法刷新 Git 状态",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1194,7 +1194,7 @@ export function useThreadActions() {
       action: "Settled",
       claim: action,
       undo: () => runUndoPlan(target, undoPlan),
-      failureTitle: "无法撤销收尾",
+      failureTitle: "无法撤销标为完成",
     });
     return result;
   };
@@ -1307,7 +1307,7 @@ export function useThreadActions() {
       action: "Snoozed",
       claim: action,
       undo: () => runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
-      failureTitle: "唤醒会话失败",
+      failureTitle: "无法取消暂缓",
     });
     return result;
   };

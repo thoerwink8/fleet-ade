@@ -171,7 +171,7 @@ export async function runAttachmentUploadCycle<E, RE>(input: {
       status: "failed",
       step: "resolve-url",
       attachmentId,
-      error: new Error("环境未连接。"),
+      error: new Error("电脑未连接。"),
     };
   }
 

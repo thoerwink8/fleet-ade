@@ -96,7 +96,7 @@ export function HtmlRenderFrame(props: {
                         toastManager.add({
                           type: "error",
                           title: "页面不可用",
-                          description: "请重新连接环境后重试。",
+                          description: "请重新连接电脑后重试。",
                         });
                     }}
                   />

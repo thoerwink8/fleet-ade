@@ -22,7 +22,7 @@ export function EnvironmentContextChip(props: {
           <ContextChip
             kind="environment"
             tabIndex={0}
-            aria-label={`机器，${label}`}
+            aria-label={`电脑，${label}`}
             data-markdown-copy={props.copyMarkdown}
           >
             <EnvironmentMachineIcon
@@ -33,7 +33,7 @@ export function EnvironmentContextChip(props: {
         }
       />
       <TooltipPopup side="top">
-        {environment ? "Fleet ADE 环境" : "此应用中没有的机器"}
+        {environment ? "Fleet ADE 电脑" : "此应用中没有的电脑"}
       </TooltipPopup>
     </Tooltip>
   );

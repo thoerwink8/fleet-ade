@@ -102,7 +102,7 @@ it.each([
   );
 
   if (action === "merge") {
-    await screen.getByRole("button", { name: "合并回原对话" }).click();
+    await screen.getByRole("button", { name: "合并回原会话" }).click();
   } else {
     await screen.getByRole("button", { name: "更多会话操作" }).click();
     await page.getByRole("menuitem", { name: "断开智能体会话" }).click();
@@ -112,7 +112,7 @@ it.each([
   await expect
     .element(
       screen.getByRole("button", {
-        name: action === "merge" ? "合并回原对话" : "更多会话操作",
+        name: action === "merge" ? "合并回原会话" : "更多会话操作",
       }),
     )
     .toBeEnabled();
@@ -137,7 +137,7 @@ it.each([
 
   const runAction = async () => {
     if (action === "merge") {
-      await screen.getByRole("button", { name: "合并回原对话" }).click();
+      await screen.getByRole("button", { name: "合并回原会话" }).click();
     } else {
       await screen.getByRole("button", { name: "更多会话操作" }).click();
       await page.getByRole("menuitem", { name: "断开智能体会话" }).click();
@@ -366,7 +366,7 @@ it("shows a delegated-from thread's full title in its tooltip even when its envi
     expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(longTitle),
   );
   expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(
-    "由 已关联的环境 委派。连接后即可打开父会话。",
+    "由 已关联的电脑 委派。连接后即可打开父会话。",
   );
 
   await row.click({ force: true });

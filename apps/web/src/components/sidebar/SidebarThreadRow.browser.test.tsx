@@ -335,7 +335,7 @@ describe("sidebar thread row density", () => {
         probeColor("--fa-success"),
       );
       expect(unreadRow.querySelector(".fa-dot")?.className).toContain("fa-dot--new");
-      expect(approval.querySelector(".s")?.textContent).toBe("等待批准，点开处理");
+      expect(approval.querySelector(".s")?.textContent).toBe("等你批准，点开处理");
       expect(approval.querySelector(".fa-dot")?.className).toContain("fa-dot--needs");
     };
 

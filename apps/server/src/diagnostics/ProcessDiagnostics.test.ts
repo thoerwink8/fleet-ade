@@ -88,9 +88,7 @@ describe("ProcessDiagnostics", () => {
         pid: CHILD_PID,
         signal: "SIGINT",
         signaled: false,
-        message: Option.some(
-          `Process ${CHILD_PID} no longer matches the selected process identity.`,
-        ),
+        message: Option.some(`进程 ${CHILD_PID} 与选中的进程标识不再匹配。`),
       });
     }),
   );
@@ -153,7 +151,7 @@ describe("ProcessDiagnostics", () => {
         signal: "SIGINT",
         signaled: false,
         message: Option.some(
-          `Could not refresh process ${CHILD_PID}; refusing to signal a stale identity.`,
+          `无法刷新进程 ${CHILD_PID} 的进程信息；拒绝向过期的进程标识发送信号。`,
         ),
       });
     }),
@@ -232,7 +230,9 @@ describe("ProcessDiagnostics", () => {
         pid: CHILD_PID,
         signal: "SIGKILL",
         signaled: false,
-        message: Option.some(`Process ${CHILD_PID} is not a signalable T3 backend descendant.`),
+        message: Option.some(
+          `进程 ${CHILD_PID} 不是 Fleet ADE 后台服务的子进程，不能向它发送信号。`,
+        ),
       });
 
       const diagnostics = yield* Effect.service(ProcessDiagnostics.ProcessDiagnostics).pipe(

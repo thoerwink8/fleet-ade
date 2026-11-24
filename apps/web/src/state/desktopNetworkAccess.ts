@@ -35,7 +35,7 @@ class DesktopServerExposureStateLoadError extends Schema.TaggedError<DesktopServ
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "无法加载桌面服务器开放状态。";
+    return "无法加载桌面后台服务开放状态。";
   }
 }
 

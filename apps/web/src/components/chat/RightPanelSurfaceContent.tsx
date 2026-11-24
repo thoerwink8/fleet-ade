@@ -102,7 +102,7 @@ export function RightPanelSurfaceContent(props: {
         return (
           <PullRequestsUnavailableState
             title="PR 不可用"
-            error="请更新此环境的 Fleet ADE 服务器后再浏览 pull request。"
+            error="请更新这台电脑的 Fleet ADE 后台服务后再浏览 PR。"
           />
         );
       }

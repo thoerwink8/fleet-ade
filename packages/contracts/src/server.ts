@@ -872,7 +872,7 @@ export class ServerProviderUpdateError extends Schema.TaggedError<ServerProvider
   },
 ) {
   override get message(): string {
-    return `Provider update failed for ${this.provider}: ${this.reason}`;
+    return `无法更新智能体 ${this.provider}：${this.reason}`;
   }
 }
 
@@ -895,7 +895,7 @@ export class ServerNpmReleaseError extends Schema.TaggedError<ServerNpmReleaseEr
   { reason: Schema.String },
 ) {
   override get message(): string {
-    return `Could not check the configured npm registry: ${this.reason}`;
+    return `无法检查配置的 npm registry：${this.reason}`;
   }
 }
 
@@ -937,6 +937,6 @@ export class ServerSelfUpdateError extends Schema.TaggedError<ServerSelfUpdateEr
   },
 ) {
   override get message(): string {
-    return `Server update failed: ${this.reason}`;
+    return `无法更新后台服务：${this.reason}`;
   }
 }

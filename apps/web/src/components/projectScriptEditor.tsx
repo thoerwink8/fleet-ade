@@ -472,7 +472,7 @@ function ProjectScriptEditorForm({
                 onKeyDown={captureKeybinding}
               />
               <p className="text-xs text-muted-foreground">
-                按下快捷键。按退格键清除。快捷键在整个环境中生效。使用同一操作的项目共用该快捷键。
+                按下快捷键。按退格键清除。快捷键在整台电脑中生效。使用同一操作的项目共用该快捷键。
               </p>
             </div>
             <div className="space-y-1.5">
@@ -504,14 +504,14 @@ function ProjectScriptEditorForm({
               />
             </label>
             <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
-              <span>会话收尾时在该会话的工作树中运行</span>
+              <span>会话标为完成时在该会话的工作树中运行</span>
               <Switch
                 checked={runOnSettle}
                 onCheckedChange={(checked) => setRunOnSettle(Boolean(checked))}
               />
             </label>
             <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
-              <span>会话收尾时停止此操作</span>
+              <span>会话标为完成时停止此操作</span>
               <Switch
                 checked={stopOnSettle}
                 onCheckedChange={(checked) => setStopOnSettle(Boolean(checked))}

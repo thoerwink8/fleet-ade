@@ -723,7 +723,9 @@ const WsServerRunStorageCleanupRpc = Rpc.make(WS_METHODS.serverRunStorageCleanup
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
 });
 const WsServerPreviewStorageCleanupRpc = Rpc.make(WS_METHODS.serverPreviewStorageCleanup, {
-  payload: Schema.Struct({}),
+  payload: Schema.Struct({
+    patch: Schema.optionalKey(ServerSettingsPatch),
+  }),
   success: StorageCleanupPreview,
   error: Schema.Union([ServerSettingsError, EnvironmentAuthorizationError]),
 });

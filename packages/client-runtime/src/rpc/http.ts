@@ -126,7 +126,7 @@ const failRemoteRequest = (
   if (Schema.isSchemaError(cause)) {
     return Effect.fail(
       new RemoteEnvironmentAuthInvalidJsonError({
-        message: `远程环境端点从 ${requestUrl} 返回了无效响应。`,
+        message: `远程电脑端点从 ${requestUrl} 返回了无效响应。`,
         cause,
       }),
     );
@@ -140,14 +140,14 @@ const failRemoteRequest = (
     }
     return Effect.fail(
       new RemoteEnvironmentAuthInvalidJsonError({
-        message: `远程环境端点从 ${requestUrl} 返回了无效响应。`,
+        message: `远程电脑端点从 ${requestUrl} 返回了无效响应。`,
         cause,
       }),
     );
   }
   return Effect.fail(
     new RemoteEnvironmentAuthFetchError({
-      message: `无法访问远程环境端点 ${requestUrl}（${String(cause)}）。`,
+      message: `无法访问远程电脑端点 ${requestUrl}（${String(cause)}）。`,
       cause,
     }),
   );

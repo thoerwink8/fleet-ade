@@ -181,7 +181,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   const submit = async () => {
     if (!project || !target || submitting) return;
     if (destinationPath.trim().length === 0) {
-      setError("请选择另一台机器上的文件夹。");
+      setError("请选择另一台电脑上的文件夹。");
       return;
     }
     setSubmitting(true);
@@ -224,7 +224,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           }}
         >
           <DialogHeader>
-            <DialogTitle>添加到另一台机器</DialogTitle>
+            <DialogTitle>添加到另一台电脑</DialogTitle>
             <DialogDescription>
               克隆 {project?.repositoryIdentity?.displayName ?? project?.title}，并带上 Git
               不跟踪的本地文件。
@@ -263,7 +263,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     }}
                     items={targets.map((t) => ({ value: t.environmentId, label: t.label }))}
                   >
-                    <SelectTrigger size="sm" aria-label="要添加项目的目标机器">
+                    <SelectTrigger size="sm" aria-label="要添加项目的目标电脑">
                       {target ? (
                         <EnvironmentMachineIcon kind={target.machine} className="size-3.5" />
                       ) : null}
@@ -285,7 +285,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     {target ? (
                       <EnvironmentMachineIcon kind={target.machine} className="size-3.5 shrink-0" />
                     ) : null}
-                    <span className="truncate">{target?.label ?? "没有可用的机器"}</span>
+                    <span className="truncate">{target?.label ?? "没有可用的电脑"}</span>
                   </span>
                 )}
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
@@ -313,7 +313,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${id}-path`}>{target?.label ?? "另一台机器"}上的文件夹</Label>
+              <Label htmlFor={`${id}-path`}>{target?.label ?? "另一台电脑"}上的文件夹</Label>
               <Input
                 id={`${id}-path`}
                 value={destinationPath}

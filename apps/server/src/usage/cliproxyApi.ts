@@ -146,19 +146,19 @@ const nodeErrorCode = (cause: unknown) => {
 
 // Hub responses can contain credentials; expose only failure kind, HTTP status or Node code.
 const describeManagementFailure = (error: unknown) => {
-  if (Cause.isTimeoutError(error)) return "The hub did not answer within 15 seconds.";
+  if (Cause.isTimeoutError(error)) return "中转站在 15 秒内没有回应。";
   if (HttpClientError.isHttpClientError(error)) {
     const reason = error.reason;
     if (reason._tag === "StatusCodeError") {
-      return `The hub answered with HTTP ${reason.response.status}.`;
+      return `中转站回应了 HTTP ${reason.response.status}。`;
     }
     const code = reason._tag === "TransportError" ? nodeErrorCode(reason.cause) : undefined;
     if (code !== undefined && UNTRUSTED_CERTIFICATE_CODES.has(code)) {
-      return `The hub's TLS certificate is not trusted (${code}). If it comes from a private CA, add that CA to NODE_EXTRA_CA_CERTS.`;
+      return `中转站的 TLS 证书不受信任（${code}）。如果它来自私有 CA，请把该 CA 加到 NODE_EXTRA_CA_CERTS。`;
     }
-    if (code !== undefined) return `The hub request failed (${code}).`;
+    if (code !== undefined) return `中转站请求失败（${code}）。`;
   }
-  return "The hub management request failed.";
+  return "中转站管理请求失败。";
 };
 const decodeConsumeResponse = Schema.decodeUnknownEffect(
   Schema.fromJsonString(
@@ -371,13 +371,13 @@ const HUB_PROVIDERS = new Map<string, HubProvider>([
       read: Effect.fnUntraced(function* ({ account, call, checkedAt }) {
         const project = account.project_id?.trim();
         if (!project) {
-          return yield* new UsageLimitSourceError({ detail: "No Antigravity project reported." });
+          return yield* new UsageLimitSourceError({ detail: "没有上报 Antigravity 项目。" });
         }
         const requestedAt = DateTime.toEpochMillis(yield* DateTime.now);
         const summary = yield* call(ANTIGRAVITY_SUMMARY_URL, { project });
         const windows = yield* antigravitySummaryWindows(yield* decodeJson(summary), requestedAt);
         if (windows.length === 0) {
-          return yield* new UsageLimitSourceError({ detail: "No Antigravity quota reported." });
+          return yield* new UsageLimitSourceError({ detail: "没有上报 Antigravity 额度。" });
         }
         // Local Antigravity reports no e-mail, so the Google account fingerprint is what pools the two.
         const fingerprint = yield* call("https://www.googleapis.com/oauth2/v2/userinfo").pipe(
@@ -415,7 +415,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
         base.pathname = base.pathname.replace(/(\/management\.html)?\/?$/i, "/");
         return new URL(`v0/management/${path}`, base).toString();
       },
-      catch: () => new UsageLimitSourceError({ detail: "The hub URL is not valid." }),
+      catch: () => new UsageLimitSourceError({ detail: "中转站地址无效。" }),
     });
     const request = (
       body === undefined ? HttpClientRequest.get(url) : HttpClientRequest.post(url)
@@ -455,7 +455,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
     const response = yield* decodeApiResponse(raw);
     if (response.status_code < 200 || response.status_code >= 300) {
       return yield* new UsageLimitSourceError({
-        detail: `The provider refused the hub request (HTTP ${response.status_code}).`,
+        detail: `中转方拒绝了请求（HTTP ${response.status_code}）。`,
       });
     }
     return response.body;
@@ -476,7 +476,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
         usageLimits: makeUnavailableUsageLimits({
           checkedAt,
           reason: "probeFailed",
-          message: "The hub could not read this account's usage.",
+          message: "中转站无法读取这个账号的用量。",
         }),
       })),
     );
@@ -490,7 +490,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
       Effect.mapError((error) =>
         isUsageLimitSourceError(error)
           ? error
-          : new UsageLimitSourceError({ detail: "The hub could not list accounts." }),
+          : new UsageLimitSourceError({ detail: "中转站无法列出账号。" }),
       ),
     );
     return yield* Effect.forEach(
@@ -512,7 +512,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
       const account = (yield* authFiles(hub)).find((account) => account.id === accountId);
       if (!account || account.disabled || account.provider !== "codex") {
         return yield* new UsageLimitSourceError({
-          detail: "The Codex hub account is missing or disabled.",
+          detail: "Codex 中转站账号不存在或已停用。",
         });
       }
       const body = yield* apiCall(
@@ -545,8 +545,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
         outcome,
         ...(cleared._tag === "Failure"
           ? {
-              warning:
-                "Credit redeemed, but the hub cooldown could not be cleared. Routing may resume after its cooldown expires.",
+              warning: "额度已兑换，但无法清除中转站冷却。冷却结束后路由可能会恢复。",
             }
           : {}),
       } as const;
@@ -556,7 +555,7 @@ export const makeCliproxyApi = Effect.gen(function* () {
         isUsageLimitSourceError(error)
           ? error
           : new UsageLimitSourceError({
-              detail: "The hub returned an unexpected reset-credit response.",
+              detail: "中转站返回了意外的重置额度响应。",
             }),
       ),
     );

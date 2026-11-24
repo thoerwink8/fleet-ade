@@ -17,7 +17,7 @@ export function subagentGroupSummary(
     ({ status }) => status === "pending" || status === "running" || status === "waiting",
   );
   return {
-    label: `${active ? "启动了" : "运行了"} ${members.length} 个子代理`,
+    label: `${active ? "启动了" : "运行了"} ${members.length} 个子智能体`,
     active,
     failed: members.some(({ status }) => status === "failed"),
   };
@@ -26,7 +26,7 @@ export function subagentGroupSummary(
 const SUBAGENT_SUMMARY_LABELS = {
   working: "运行中",
   done: "已完成",
-  failed: "失败",
+  failed: "出错了",
   stopped: "已停止",
   idle: "空闲",
 } as const;
@@ -112,7 +112,7 @@ export function resolveSubagentMetadata(input: {
               ? "分支"
               : input.childThread?.worktreePath
                 ? "工作树"
-                : "工作区",
+                : "目录",
             value: input.childThread?.branch ?? fileBasename(childWorkspace),
           },
         ]

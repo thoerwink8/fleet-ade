@@ -182,7 +182,7 @@ export function validateServerUpdateReadyEvent(
     new ServerUpdateTerminalError({
       targetVersion: result.targetVersion,
       status: outcome?.status ?? "failed",
-      reason: outcome?.reason ?? "服务启动器已恢复，但未应用请求的服务器版本。",
+      reason: outcome?.reason ?? "服务启动器已恢复，但未应用请求的后台服务版本。",
     }),
   );
 }
@@ -256,7 +256,7 @@ export function serverUpdateStateForServerVersion(
 }
 
 export function serverUpdateFailureMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "服务器更新失败。";
+  return error instanceof Error ? error.message : "后台服务更新失败。";
 }
 
 function isRpcSocketError(error: unknown): boolean {
@@ -1037,7 +1037,7 @@ export function createServerEnvironmentAtoms<R, E>(
           return yield* new ServerUpdateTerminalError({
             targetVersion: result.targetVersion,
             status: "failed",
-            reason: "桌面应用不再自动更新。请在那台机器上手动安装。",
+            reason: "桌面应用不再自动更新。请在那台电脑上手动安装。",
           });
         }
 
@@ -1232,7 +1232,10 @@ export function createServerEnvironmentAtoms<R, E>(
     previewStorageCleanup: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:preview-storage-cleanup",
       tag: WS_METHODS.serverPreviewStorageCleanup,
-      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId, input }) => JSON.stringify([environmentId, input]),
+      },
     }),
     databaseStorage,
     databaseCompactionRecommendations,

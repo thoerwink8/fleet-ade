@@ -68,7 +68,7 @@ export class ScratchProjectNotLoadedError extends Schema.TaggedError<ScratchProj
   { projectId: ProjectId },
 ) {
   override get message(): string {
-    return "无项目会话的文件夹尚未同步到此设备。请重试。";
+    return "无项目会话的文件夹尚未同步到本机。请重试。";
   }
 }
 

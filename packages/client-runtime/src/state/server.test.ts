@@ -153,7 +153,7 @@ describe("update restart reconnect nudges", () => {
             phase: "blocked",
             lastFailure: {
               reason: "authentication",
-              detail: "环境凭据无效。",
+              detail: "电脑配对信息无效。",
             },
           },
           { phase: "blocked", lastFailure: { reason: "configuration" } },
@@ -803,7 +803,7 @@ describe("server state projection", () => {
       );
       expect(foreignRollback).toMatchObject({
         status: "failed",
-        reason: "服务启动器已恢复，但未应用请求的服务器版本。",
+        reason: "服务启动器已恢复，但未应用请求的后台服务版本。",
       });
     }),
   );
@@ -1476,7 +1476,7 @@ describe("launcher update resume", () => {
     stage: "resuming",
     fromVersion: "0.0.30",
     targetVersion: "0.0.31",
-    message: "服务启动器已恢复，但未应用请求的服务器版本。",
+    message: "服务启动器已恢复，但未应用请求的后台服务版本。",
   };
 
   it.effect("fails promptly when a server the launcher did not start comes back", () =>

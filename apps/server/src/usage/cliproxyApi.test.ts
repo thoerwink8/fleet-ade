@@ -172,7 +172,7 @@ describe("CLIProxyAPI hub failures", () => {
           }),
       );
       const error = yield* Effect.flip(api.readAccounts(config));
-      expect(error.detail).toBe("The hub management request failed.");
+      expect(error.detail).toBe("中转站管理请求失败。");
     }),
   );
 
@@ -649,7 +649,7 @@ describe("CLIProxyAPI built-in management API", () => {
       const api = yield* fixture({ cooldownStatus: 404 }).api;
       const result = yield* api.consume(config, "first.json", "credit");
       expect(result.outcome).toBe("reset");
-      expect(result.warning).toContain("cooldown");
+      expect(result.warning).toContain("冷却");
     }),
   );
 

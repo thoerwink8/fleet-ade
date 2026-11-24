@@ -16,7 +16,7 @@ or a project override. Click it to see that chain on every selected environment.
 be reset to inherit again. Settings that cannot be overridden by a project are shown read-only
 while a project is selected.
 
-When the selected environments disagree, the control shows **Mixed** in place of a value and the
+When the selected environments disagree, the control shows **Multiple values differ** in place of a value and the
 layers icon turns amber. Picking a value applies it to every selected environment.
 
 Changing an environment value never touches a project's own override. When projects override the
@@ -27,7 +27,7 @@ again.
 Providers and diagnostics are per machine: they show one environment at a time, the primary
 one until you pick another. Every other setting fans out to the selection.
 
-With a project selected, a provider's switch in **Settings → Providers** turns it on or off for
+With a project selected, a provider's switch in **Settings → Agents** turns it on or off for
 that project only, in either direction: a provider off on the machine can be used in one project,
 and one on everywhere can be kept out of another. That project's model pickers follow the switch,
 and no new turn there can start on a provider it turned off, including queued messages and
@@ -97,7 +97,7 @@ Leaving an edited form asks before discarding unsaved changes.
 
 In **Settings → Scheduled tasks**, choose **On webhook**
 as a task's schedule to run it whenever another service calls its URL, such as
-GitHub on a new pull request or a CI job that failed. The URL is reachable over
+GitHub on a new PR or a CI job that failed. The URL is reachable over
 the routes configured for the environment; without a reachable route, the editor
 shows only the URL's path. **Rotate** replaces the URL and the old one stops working.
 
@@ -105,7 +105,7 @@ The prompt decides what the agent sees. Placeholders pull values out of the
 request: `{{body.path}}` for a JSON or form field, `{{headers.name}}`,
 `{{query.name}}`, `{{body}}` for the raw body, and `{{request}}` for everything.
 For example, `Review this PR: {{body.pull_request.html_url}}` sends only the
-pull request link. A placeholder with no value is left empty.
+PR link. A placeholder with no value is left empty.
 
 Each value reaches the agent wrapped in `<webhook-data-…>` tags and marked as
 untrusted request data. This helps the agent tell it apart from your
@@ -156,8 +156,8 @@ than** on the task.
 
 ## Defaults and inheritance
 
-Threads contains the model and workspace for new threads. Source control contains automatic pull,
-the default pull request merge method, and text generation. The same rows edit environment defaults or project overrides depending on the
+Threads contains the model and directory mode for new threads. Source control contains automatic pull,
+the default PR merge method, and text generation. The same rows edit environment defaults or project overrides depending on the
 project crumb.
 
 The Projects category, under Code, holds the project's name, icon, actions,
@@ -166,7 +166,7 @@ on each selected environment, and reset returns to the environment's shared list
 `t3.json` actions can be imported there. When a project has several checkouts on one environment,
 choose one in the scope line at the top to see or change only that checkout's settings.
 
-Settings a repository can also declare in `t3.json`, such as the workspace for new threads,
+Settings a repository can also declare in `t3.json`, such as the directory mode for new threads,
 resolve in one order: a project override, then the environment setting, then `t3.json`, then the
 built-in default. Leave a setting on **Inherit** to let the next tier decide.
 
@@ -195,20 +195,20 @@ Inherit follows each machine's rules; Off keeps that project's worktrees until y
 manually. Custom applies separate worktree rules to the selected project or checkout. Log
 retention remains machine-wide.
 
-Worktrees can be removed after a chosen number of inactive days, after a thread settles, after
-merging, or when they have no commits beyond the default branch and their thread is settled or
-archived. Set settled retention to 0 days to remove a worktree at the next cleanup after
-settlement. In repositories without remotes,
-unchanged-worktree cleanup compares against the branch checked out in the project workspace;
+Worktrees can be removed after a chosen number of inactive days, after a thread is marked complete, after
+merging, or when they have no commits beyond the default branch and their thread is completed or
+archived. Set completed retention to 0 days to remove a worktree at the next cleanup after
+completion. In repositories without remotes,
+unchanged-worktree cleanup compares against the branch checked out in the project directory;
 if that checkout has a detached HEAD, the worktree is kept. Only T3-managed worktrees are eligible.
 Active sessions and shared worktrees prevent removal. **Keep worktrees with local changes** defaults
 to **Uncommitted changes**, which protects tracked edits and untracked files but deletes ignored
 files such as `.env` and build output. **Any local files** also protects ignored files other than
 `node_modules`. **Edited tracked files** protects only tracked edits and allows untracked and
 ignored files to be deleted. Branches and thread history stay; starting another turn recreates the checkout.
-Merge cleanup requires a merged pull request whose commits are included in the remote default
-branch. A squash or rebase merge on GitHub also counts when the pull request targeted the default
-branch and the worktree is still at the pull request's last commit.
+Merge cleanup requires a merged PR whose commits are included in the remote default
+branch. A squash or rebase merge on GitHub also counts when the PR targeted the default
+branch and the worktree is still at the PR's last commit.
 
 Enable **Delete worktrees with deleted threads** to remove safe worktrees after their last
 thread is deleted, including archived threads and worktrees left by earlier deletions. The
@@ -226,7 +226,7 @@ Current logs and message attachments are kept.
 
 Select the project and open Project to choose an icon, emoji, monogram, or image. The choice applies to
 every checkout in the project group and appears on connected clients. Choose **Automatic** to let
-T3 Code detect an icon again.
+Fleet ADE detect an icon again.
 
 Choose **Monogram** in the icon picker to set one or two letters or numbers and a color.
 
@@ -239,6 +239,6 @@ from the icon palette, derived from the saved project name. For example, `Nebula
 In Source control, enable **Automatically pull** to keep the default-branch checkout up to date
 with its configured upstream. Choose an environment to set the default or a project to override it.
 
-T3 Code only pulls when it can fast-forward and the checkout has no changed files, untracked files,
+Fleet ADE only pulls when it can fast-forward and the checkout has no changed files, untracked files,
 or local commits. It skips checkouts on another branch or without an upstream. If a checkout has
 local work, resolve it yourself before automatic pulls can resume.

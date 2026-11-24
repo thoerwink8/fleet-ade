@@ -9658,7 +9658,7 @@ it.layer(layerScratchPromotionTest)("turning a No project thread into a project"
 
       const error = yield* promotion.promote({ threadId }).pipe(Effect.flip);
 
-      assert.equal(error.message, '"busy delegate" is still working. Finish or stop it first.');
+      assert.equal(error.message, "「busy delegate」仍在工作。请先结束或停止它。");
       assert.isTrue(Option.isNone(yield* projects.getByWorkspaceRoot(folder)));
       assert.equal((yield* shellOf(threadId))?.projectId, SCRATCH_PROJECT_ID);
     }),
@@ -9720,10 +9720,7 @@ it.layer(layerScratchPromotionTest)("turning a No project thread into a project"
 
       const error = yield* promotion.promote({ threadId }).pipe(Effect.flip);
 
-      assert.equal(
-        error.message,
-        "Only a No project thread with its own folder can become a project.",
-      );
+      assert.equal(error.message, "只有拥有独立目录的「无项目」会话才能变成项目。");
     }),
   );
 });

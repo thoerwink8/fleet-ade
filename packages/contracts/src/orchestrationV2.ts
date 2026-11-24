@@ -1544,7 +1544,7 @@ export class OrchestrationV2CheckpointUnavailableError extends Schema.TaggedErro
   },
 ) {
   override get message(): string {
-    return `Rollback target ${this.target} is unavailable for thread ${this.threadId}.`;
+    return `会话 ${this.threadId} 的回退目标 ${this.target} 不可用。`;
   }
 }
 
@@ -4606,7 +4606,7 @@ export class OrchestrationV2SearchThreadError extends Schema.TaggedError<Orchest
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not search this thread. Please retry.";
+    return "无法搜索此会话。请重试。";
   }
 }
 
@@ -4648,7 +4648,7 @@ export class OrchestrationV2CheckCheckpointRestoreError extends Schema.TaggedErr
   },
 ) {
   override get message(): string {
-    return "Failed to check checkpoint restore safety.";
+    return "无法检查回退安全性。";
   }
 }
 

@@ -1023,7 +1023,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "复制路径失败",
+          title: "无法复制路径",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -1042,7 +1042,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "复制分支名失败",
+          title: "无法复制分支名",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -1060,7 +1060,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "复制会话 ID 失败",
+          title: "无法复制会话 ID",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -1624,7 +1624,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "重命名会话失败",
+            title: "无法重命名会话",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1690,7 +1690,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "收尾会话失败",
+            title: "无法标为完成",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1714,7 +1714,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "取消会话收尾失败",
+            title: "无法取消完成",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1729,7 +1729,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "唤醒会话失败",
+            title: "无法取消暂缓",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1928,7 +1928,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "置顶会话失败",
+            title: "无法置顶会话",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1943,7 +1943,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "取消置顶会话失败",
+            title: "无法取消置顶会话",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1958,7 +1958,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "标成指挥失败",
+            title: "无法标成指挥",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1973,7 +1973,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "取消指挥失败",
+            title: "无法取消指挥",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -2252,21 +2252,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       switch (plan.kind) {
         case "settle": {
           settlingThreadKeysRef.current.add(activeKey);
-          await run(settleThread(threadRef), "收尾会话失败").finally(() =>
+          await run(settleThread(threadRef), "无法标为完成").finally(() =>
             settlingThreadKeysRef.current.delete(activeKey),
           );
           return;
         }
         case "move-active":
-          if (plan.unpin && !(await run(unpinThread(threadRef), "取消置顶会话失败"))) return;
-          if (plan.unsettle && !(await run(unsettleThread(threadRef), "取消会话收尾失败"))) return;
-          if (plan.unsnooze && !(await run(unsnoozeThread(threadRef), "唤醒会话失败"))) return;
+          if (plan.unpin && !(await run(unpinThread(threadRef), "无法取消置顶会话"))) return;
+          if (plan.unsettle && !(await run(unsettleThread(threadRef), "无法取消完成"))) return;
+          if (plan.unsnooze && !(await run(unsnoozeThread(threadRef), "无法取消暂缓"))) return;
           break;
         case "pin":
           if (
             !(await run(
               pinThread(threadRef, plan.orderKey === undefined ? {} : { orderKey: plan.orderKey }),
-              "置顶会话失败",
+              "无法置顶会话",
             ))
           )
             return;
@@ -2284,7 +2284,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               scopeThreadRef(thread.environmentId, thread.id),
               assignment.orderKey,
             ),
-            plan.kind === "move-active" ? "调整活跃会话顺序失败" : "调整置顶会话顺序失败",
+            plan.kind === "move-active" ? "无法调整活跃会话顺序" : "无法调整置顶会话顺序",
           ))
         )
           return;
@@ -2333,7 +2333,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "暂缓会话失败",
+              title: "无法暂缓会话",
               description: outcome.error instanceof Error ? outcome.error.message : "发生错误。",
             }),
           );
@@ -2397,7 +2397,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               : []),
             {
               id: "settle",
-              label: `收尾（${count}）`,
+              label: `标为完成（${count}）`,
               disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads),
             },
             ...(canSnoozeSelection
@@ -2505,8 +2505,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 type: "error",
                 title:
                   snoozedThreadRefs.length > 0
-                    ? `暂缓 ${failures.length} 个会话失败`
-                    : "暂缓会话失败",
+                    ? `无法暂缓 ${failures.length} 个会话`
+                    : "无法暂缓会话",
                 description: firstError instanceof Error ? firstError.message : "发生错误。",
               }),
             );
@@ -2568,7 +2568,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "有会话未能标为未读",
+              title: "无法将部分会话标为未读",
               description: failures.join("\n"),
             }),
           );
@@ -2589,7 +2589,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "有会话未处理",
+              title: "无法处理部分会话",
               description: failures.join("\n"),
             }),
           );
@@ -2629,7 +2629,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "有会话未能删除",
+            title: "无法删除部分会话",
             description: failures.join("\n"),
           }),
         );
@@ -2873,7 +2873,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "更新自动收尾设置失败",
+                  title: "无法更新自动标为完成设置",
                   description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
@@ -2933,7 +2933,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 stackedThreadToast({
                   type: "error",
                   title: "路径不可用",
-                  description: "此会话没有可复制的工作区路径。",
+                  description: "此会话没有可复制的目录路径。",
                 }),
               );
               return;
@@ -2970,7 +2970,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: didArchive ? "会话已归档，但页面跳转失败" : "归档会话失败",
+                  title: didArchive ? "会话已归档，但无法跳转页面" : "无法归档会话",
                   description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
@@ -2987,7 +2987,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "删除会话失败",
+                  title: "无法删除会话",
                   description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
@@ -3710,7 +3710,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="settled-shelf-header"
                                 marker="settled-header"
-                                label="最近"
+                                label="已完成"
                                 count={settledCount}
                                 dragging={from !== null}
                                 isDropTarget={dragTargetSection === "settled"}
@@ -3726,7 +3726,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="settled-placeholder"
                                 marker="settled-placeholder"
-                                label="最近"
+                                label="已完成"
                                 showHint={
                                   from !== null &&
                                   (renderedSettledThreads.length === 0 ||

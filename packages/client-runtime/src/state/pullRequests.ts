@@ -585,7 +585,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
     const prepared = yield* SubscriptionRef.get(supervisor.prepared);
     if (Option.isNone(prepared)) {
       return yield* new EnvironmentHttpConnectionNotReadyError({
-        message: "环境 HTTP 连接尚未就绪。",
+        message: "电脑 HTTP 连接尚未就绪。",
       });
     }
     return yield* loader.load(prepared.value, input);
@@ -610,7 +610,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       ) {
         return yield* new PullRequestOperationError({
           operation: "runAction",
-          detail: "无法合并此 pull request。",
+          detail: "无法合并此 PR。",
         });
       }
       if (detail.capabilities.stackActions) {
@@ -618,7 +618,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         if (stack !== null) {
           return yield* new PullRequestOperationError({
             operation: "runAction",
-            detail: "请打开此 pull request 以合并其堆栈。",
+            detail: "请打开此 PR 以合并其堆栈。",
           });
         }
       }

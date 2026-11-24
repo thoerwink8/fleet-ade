@@ -151,14 +151,14 @@ export function buildThreadActionMenuItems(
     ...(state.supports.settlement
       ? [
           state.isSettled
-            ? { id: "unsettle" as const, label: "取消会话收尾", icon: "circle-check" }
-            : { id: "settle" as const, label: "收尾会话", icon: "circle-check" },
+            ? { id: "unsettle" as const, label: "取消完成", icon: "circle-check" }
+            : { id: "settle" as const, label: "标为完成", icon: "circle-check" },
         ]
       : []),
     ...(state.supports.snooze
       ? [
           state.isSnoozed
-            ? { id: "unsnooze" as const, label: "唤醒会话", icon: "clock" }
+            ? { id: "unsnooze" as const, label: "取消暂缓", icon: "clock" }
             : {
                 id: "snooze" as const,
                 label: "暂缓",
@@ -219,7 +219,7 @@ export function buildThreadActionMenuItems(
       ? [
           {
             id: "auto-settle" as const,
-            label: "自动收尾行为",
+            label: "自动标为完成",
             icon: "timer",
             children: [
               {

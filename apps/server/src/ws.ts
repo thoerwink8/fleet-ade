@@ -519,21 +519,21 @@ const persistChatAttachments = Effect.fn("ws.assets.persistChatAttachments")(fun
       const parsed = parseBase64DataUrl(attachment.dataUrl);
       if (parsed === null || parsed.mimeType !== attachment.mimeType.toLowerCase()) {
         return yield* new PersistChatAttachmentsError({
-          message: `Attachment ${attachment.name} has an invalid image payload.`,
+          message: `附件 ${attachment.name} 的图片内容无效。`,
         });
       }
       const bytes = yield* Effect.fromResult(Base64.decode(parsed.base64)).pipe(
         Effect.mapError(
           (cause) =>
             new PersistChatAttachmentsError({
-              message: `Attachment ${attachment.name} is not valid base64.`,
+              message: `附件 ${attachment.name} 不是有效的 base64。`,
               cause,
             }),
         ),
       );
       if (bytes.byteLength !== attachment.sizeBytes) {
         return yield* new PersistChatAttachmentsError({
-          message: `Attachment ${attachment.name} size does not match its payload.`,
+          message: `附件 ${attachment.name} 的大小与其内容不符。`,
         });
       }
       const rawId = createDeterministicAttachmentId(
@@ -542,7 +542,7 @@ const persistChatAttachments = Effect.fn("ws.assets.persistChatAttachments")(fun
       );
       if (rawId === null) {
         return yield* new PersistChatAttachmentsError({
-          message: "Could not allocate an attachment identifier.",
+          message: "无法分配附件标识符。",
         });
       }
       const persisted = {
@@ -558,7 +558,7 @@ const persistChatAttachments = Effect.fn("ws.assets.persistChatAttachments")(fun
           Effect.mapError(
             (cause) =>
               new PersistChatAttachmentsError({
-                message: `Could not persist attachment ${attachment.name}.`,
+                message: `无法保存附件 ${attachment.name}。`,
                 cause,
               }),
           ),
@@ -821,7 +821,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
         (cause) =>
           new OrchestrationV2GetThreadProjectionError({
             threadId: input.threadId,
-            message: `Failed to hydrate migrated thread ${input.threadId}`,
+            message: `无法补齐迁移过来的会话 ${input.threadId}`,
             cause,
           }),
       ),
@@ -840,7 +840,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
             (cause) =>
               new OrchestrationV2GetThreadProjectionError({
                 threadId: input.threadId,
-                message: `Failed while streaming orchestration V2 thread ${input.threadId}`,
+                message: `无法推送会话 ${input.threadId} 的实时更新`,
                 cause,
               }),
           ),
@@ -868,7 +868,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
             (cause) =>
               new OrchestrationV2GetThreadProjectionError({
                 threadId: input.threadId,
-                message: `Failed while replaying orchestration V2 thread ${input.threadId}`,
+                message: `无法回放会话 ${input.threadId}`,
                 cause,
               }),
           ),
@@ -894,7 +894,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
           (cause) =>
             new OrchestrationV2GetThreadProjectionError({
               threadId: input.threadId,
-              message: `Failed to load orchestration V2 thread ${input.threadId}`,
+              message: `无法加载会话 ${input.threadId}`,
               cause,
             }),
         ),
@@ -929,7 +929,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
           (cause) =>
             new OrchestrationV2GetThreadProjectionError({
               threadId: input.threadId,
-              message: `Failed to prepare orchestration V2 thread ${input.threadId} replay`,
+              message: `无法准备会话 ${input.threadId} 的回放`,
               cause,
             }),
         ),
@@ -939,7 +939,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
           (cause) =>
             new OrchestrationV2GetThreadProjectionError({
               threadId: input.threadId,
-              message: `Failed to prepare orchestration V2 thread ${input.threadId} replay`,
+              message: `无法准备会话 ${input.threadId} 的回放`,
               cause,
             }),
         ),
@@ -963,7 +963,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
             (cause) =>
               new OrchestrationV2GetThreadProjectionError({
                 threadId: input.threadId,
-                message: `Failed to measure orchestration V2 thread ${input.threadId} replay`,
+                message: `无法估算会话 ${input.threadId} 的回放量`,
                 cause,
               }),
           ),
@@ -981,7 +981,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
             (cause) =>
               new OrchestrationV2GetThreadProjectionError({
                 threadId: input.threadId,
-                message: `Failed to locate recreated orchestration V2 thread ${input.threadId}`,
+                message: `无法定位重建后的会话 ${input.threadId}`,
                 cause,
               }),
           ),
@@ -999,7 +999,7 @@ export const subscribeOrchestrationV2Thread = Effect.fn("ws.orchestrationV2.subs
               (cause) =>
                 new OrchestrationV2GetThreadProjectionError({
                   threadId: input.threadId,
-                  message: `Failed to prepare orchestration V2 thread ${input.threadId} replay`,
+                  message: `无法准备会话 ${input.threadId} 的回放`,
                   cause,
                 }),
             ),
@@ -1300,7 +1300,7 @@ export const subscribeOrchestrationV2Shell = Effect.fn("ws.orchestrationV2.subsc
       Effect.mapError(
         (cause) =>
           new OrchestrationV2GetShellSnapshotError({
-            message: "Failed to prepare the application shell stream",
+            message: "无法准备面板数据流",
             cause,
           }),
       ),
@@ -1311,7 +1311,7 @@ export const subscribeOrchestrationV2Shell = Effect.fn("ws.orchestrationV2.subsc
       Stream.mapError(
         (cause) =>
           new OrchestrationV2GetShellSnapshotError({
-            message: "Failed while streaming the application shell",
+            message: "无法推送面板实时更新",
             cause,
           }),
       ),
@@ -1497,7 +1497,7 @@ export const layerWsRpc = (
                 (cause) =>
                   new AcpRegistryOperationError({
                     reason: "session_import_failed",
-                    message: "Could not inspect existing imported ACP sessions.",
+                    message: "无法检查已导入的 ACP 会话。",
                     cause,
                   }),
               ),
@@ -1521,7 +1521,7 @@ export const layerWsRpc = (
             if (snapshot.nativeSessions?.canDelete !== true) {
               return yield* new AcpRegistryOperationError({
                 reason: "session_delete_unsupported",
-                message: "The ACP agent does not advertise session deletion.",
+                message: "这个 ACP 智能体不提供删除会话的功能。",
               });
             }
             const threadId = AcpRegistrySessions.importedThreadId({
@@ -1534,7 +1534,7 @@ export const layerWsRpc = (
                 (cause) =>
                   new AcpRegistryOperationError({
                     reason: "session_delete_failed",
-                    message: "Could not inspect the imported ACP session mapping.",
+                    message: "无法检查已导入的 ACP 会话对应关系。",
                     cause,
                   }),
               ),
@@ -1542,7 +1542,7 @@ export const layerWsRpc = (
             if (importedThread !== null) {
               return yield* new AcpRegistryOperationError({
                 reason: "session_delete_failed",
-                message: "Delete the imported T3 thread before deleting its native ACP session.",
+                message: "删除原生 ACP 会话前，请先删除导入的 Fleet ADE 会话。",
               });
             }
             yield* manager.deleteSession({
@@ -1563,7 +1563,7 @@ export const layerWsRpc = (
         if (snapshot.configurableProviders !== true) {
           return yield* new AcpRegistryOperationError({
             reason: "providers_unsupported",
-            message: "The ACP agent does not advertise provider configuration.",
+            message: "这个 ACP 智能体不提供配置功能。",
           });
         }
         return yield* manager.listProviders(project.workspaceRoot);
@@ -1577,7 +1577,7 @@ export const layerWsRpc = (
         if (input.headers !== undefined && Object.keys(input.headers).length > 32) {
           return yield* new AcpRegistryOperationError({
             reason: "provider_configuration_failed",
-            message: "ACP provider configuration accepts at most 32 headers.",
+            message: "ACP 配置最多接受 32 个请求头。",
           });
         }
         const listed = yield* manager.listProviders(project.workspaceRoot);
@@ -1587,7 +1587,7 @@ export const layerWsRpc = (
         if (provider === undefined || !provider.supported.includes(input.apiType)) {
           return yield* new AcpRegistryOperationError({
             reason: "provider_configuration_failed",
-            message: `Provider ${input.providerId} does not support ${input.apiType}.`,
+            message: `智能体 ${input.providerId} 不支持 ${input.apiType}。`,
           });
         }
         yield* providerSessionManager.closeInstance(input.instanceId).pipe(
@@ -1595,7 +1595,7 @@ export const layerWsRpc = (
             (cause) =>
               new AcpRegistryOperationError({
                 reason: "provider_configuration_failed",
-                message: "Could not stop live sessions before updating the ACP provider.",
+                message: "无法在更新 ACP 配置前停止正在运行的会话。",
                 cause,
               }),
           ),
@@ -1625,8 +1625,8 @@ export const layerWsRpc = (
             reason: "provider_configuration_failed",
             message:
               provider === undefined
-                ? `Provider ${input.providerId} was not advertised by the ACP agent.`
-                : `Provider ${input.providerId} is required and cannot be disabled.`,
+                ? `ACP 智能体没有声明智能体 ${input.providerId}。`
+                : `智能体 ${input.providerId} 是必需的，无法停用。`,
           });
         }
         yield* providerSessionManager.closeInstance(input.instanceId).pipe(
@@ -1634,7 +1634,7 @@ export const layerWsRpc = (
             (cause) =>
               new AcpRegistryOperationError({
                 reason: "provider_configuration_failed",
-                message: "Could not stop live sessions before disabling the ACP provider.",
+                message: "无法在停用 ACP 配置前停止正在运行的会话。",
                 cause,
               }),
           ),
@@ -1786,7 +1786,7 @@ export const layerWsRpc = (
         Effect.mapError(
           (cause) =>
             new OrchestrationV2GetShellSnapshotError({
-              message: "Failed to load archived thread snapshot",
+              message: "无法加载已归档会话的快照",
               cause,
             }),
         ),
@@ -1884,7 +1884,7 @@ export const layerWsRpc = (
               (cause) =>
                 new OrchestrationV2GetThreadProjectionError({
                   threadId: input.threadId,
-                  message: "Failed to load turn item",
+                  message: "无法加载这条回复",
                   cause,
                 }),
             ),
@@ -1905,7 +1905,7 @@ export const layerWsRpc = (
             Effect.mapError(
               (cause) =>
                 new OrchestrationGetTurnDiffError({
-                  message: "Failed to load turn diff",
+                  message: "无法加载这一轮的差异",
                   cause,
                 }),
             ),
@@ -1915,7 +1915,7 @@ export const layerWsRpc = (
             Effect.mapError(
               (cause) =>
                 new OrchestrationGetFullThreadDiffError({
-                  message: "Failed to load full thread diff",
+                  message: "无法加载整个会话的差异",
                   cause,
                 }),
             ),
@@ -1941,7 +1941,7 @@ export const layerWsRpc = (
             Effect.mapError(
               (cause) =>
                 new OrchestrationSearchThreadsError({
-                  message: "Failed to search threads",
+                  message: "无法搜索会话",
                   cause,
                 }),
             ),
@@ -1963,13 +1963,13 @@ export const layerWsRpc = (
             ),
           ),
         [ORCHESTRATION_V2_WS_METHODS.getThreadFamily]: (input) =>
-          readOmittableShellRows({ familyOf: input.threadId }, "Failed to load the thread family"),
+          readOmittableShellRows({ familyOf: input.threadId }, "无法加载这个会话的关联会话"),
         [ORCHESTRATION_V2_WS_METHODS.getThreadLinkMetadata]: (input) =>
           threadManagement.getThreadLinkMetadata(input.threadIds).pipe(
             Effect.mapError(
               (cause) =>
                 new OrchestrationV2GetShellSnapshotError({
-                  message: "Failed to load thread link metadata",
+                  message: "无法加载会话的关联信息",
                   cause,
                 }),
             ),
@@ -1979,7 +1979,7 @@ export const layerWsRpc = (
             Effect.mapError(
               (cause) =>
                 new OrchestrationV2GetShellSnapshotError({
-                  message: "Failed to load thread titles",
+                  message: "无法加载会话标题",
                   cause,
                 }),
             ),
@@ -1995,7 +1995,7 @@ export const layerWsRpc = (
             Effect.mapError(
               (cause) =>
                 new OrchestrationV2GetShellSnapshotError({
-                  message: "Failed to load older settled threads",
+                  message: "无法加载更早的已结束会话",
                   cause,
                 }),
             ),
@@ -2003,7 +2003,7 @@ export const layerWsRpc = (
         [ORCHESTRATION_V2_WS_METHODS.getWorktreeThreadIds]: (input) =>
           readOmittableShellRows(
             { worktreePath: input.worktreePath },
-            "Failed to load the worktree's threads",
+            "无法加载这个工作树的会话",
           ).pipe(Effect.map(({ threads }) => ({ threadIds: threads.map((thread) => thread.id) }))),
         [ORCHESTRATION_V2_WS_METHODS.getThreadProjection]: (input) =>
           Effect.annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId }).pipe(
@@ -2025,7 +2025,7 @@ export const layerWsRpc = (
                     (cause) =>
                       new OrchestrationV2GetThreadProjectionError({
                         threadId: input.threadId,
-                        message: `Failed to load orchestration V2 thread ${input.threadId}`,
+                        message: `无法加载会话 ${input.threadId}`,
                         cause,
                       }),
                   ),
@@ -2101,14 +2101,14 @@ export const layerWsRpc = (
                       new OrchestrationV2ThreadLaunchError({
                         commandId: input.commandId,
                         projectId: input.projectId,
-                        message: "Failed to launch thread",
+                        message: "无法创建会话",
                         cause,
                       }),
                     ServerRuntimeStartupError: (cause) =>
                       new OrchestrationV2ThreadLaunchError({
                         commandId: input.commandId,
                         projectId: input.projectId,
-                        message: "Failed to launch thread",
+                        message: "无法创建会话",
                         cause,
                       }),
                     ThreadManagementProviderInstanceDisabledError: (cause) =>
@@ -2281,7 +2281,7 @@ export const layerWsRpc = (
                 if (snapshot.auth.canLogout !== true) {
                   return yield* new AcpRegistryOperationError({
                     reason: "logout_unsupported",
-                    message: "The ACP agent does not advertise logout.",
+                    message: "这个 ACP 智能体不提供退出登录的功能。",
                   });
                 }
                 if (instance.auth) {
@@ -2290,7 +2290,7 @@ export const layerWsRpc = (
                       (cause) =>
                         new AcpRegistryOperationError({
                           reason: "logout_failed",
-                          message: "Could not sign out of the ACP agent.",
+                          message: "无法退出 ACP 智能体的登录。",
                           cause,
                         }),
                     ),
@@ -2301,7 +2301,7 @@ export const layerWsRpc = (
                       (cause) =>
                         new AcpRegistryOperationError({
                           reason: "logout_failed",
-                          message: "Could not stop live sessions before ACP logout.",
+                          message: "无法在退出 ACP 登录前停止正在运行的会话。",
                           cause,
                         }),
                     ),
@@ -2471,14 +2471,14 @@ export const layerWsRpc = (
               return yield* new ProviderSetupError({
                 instanceId: input.instanceId,
                 operation: "consume-reset-credit",
-                detail: instance ? "This provider is disabled." : "Provider instance not found.",
+                detail: instance ? "这个智能体已停用。" : "找不到这个智能体。",
               });
             }
             if (instance.consumeResetCredit === undefined) {
               return yield* new ProviderSetupError({
                 instanceId: input.instanceId,
                 operation: "consume-reset-credit",
-                detail: "This provider does not bank reset credits.",
+                detail: "这个智能体不积累重置额度。",
               });
             }
             const outcome = yield* instance.consumeResetCredit(input.creditId).pipe(
@@ -2528,7 +2528,8 @@ export const layerWsRpc = (
             return yield* keybindings.removeKeybindingRule(rule);
           }),
         [WS_METHODS.serverRunStorageCleanup]: () => storageCleanup.runNow,
-        [WS_METHODS.serverPreviewStorageCleanup]: () => storageCleanup.preview,
+        [WS_METHODS.serverPreviewStorageCleanup]: ({ patch }) =>
+          patch === undefined ? storageCleanup.preview : storageCleanup.previewWithPatch(patch),
         [WS_METHODS.serverGetStorageCleanupReport]: () => storageCleanup.reports,
         [WS_METHODS.serverGetDatabaseStorage]: () => databaseStorage.status,
         [WS_METHODS.serverReclaimDatabaseSpace]: () => databaseStorage.requestReclaim,
@@ -2670,7 +2671,7 @@ export const layerWsRpc = (
                     cause._tag === "ProjectConflictError"
                       ? cause
                       : new OrchestrationDispatchCommandError({
-                          message: "Failed to create clone project.",
+                          message: "无法创建克隆项目。",
                           cause,
                         }),
                   ),
@@ -2804,10 +2805,7 @@ export const layerWsRpc = (
               (cause) =>
                 new ProjectMutationError({
                   commandId: mutation.commandId,
-                  message:
-                    cause._tag === "ProjectNotEmptyError"
-                      ? cause.message
-                      : "Failed to mutate project.",
+                  message: cause._tag === "ProjectNotEmptyError" ? cause.message : "无法更新项目。",
                   cause,
                 }),
             ),
@@ -3283,7 +3281,7 @@ export const layer = Layer.unwrap(
           return HttpServerResponse.jsonUnsafe(
             {
               code: "orchestration_protocol_incompatible",
-              message: `Update this client to one that supports orchestration protocol ${ORCHESTRATION_PROTOCOL_VERSION}.`,
+              message: `请把这个客户端更新到支持编排协议 ${ORCHESTRATION_PROTOCOL_VERSION} 的版本。`,
               orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
             },
             { status: 426 },

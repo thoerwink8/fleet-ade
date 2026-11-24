@@ -105,7 +105,7 @@ export function BranchPicker({
       {children}
       <ComboboxPopup {...popupProps}>
         <ComboboxSearchInput
-          placeholder="搜索引用…"
+          placeholder="搜索分支…"
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value);
@@ -126,7 +126,7 @@ export function BranchPicker({
           }}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ComboboxEmpty>未找到引用。</ComboboxEmpty>
+          <ComboboxEmpty>未找到分支。</ComboboxEmpty>
           <div className="relative flex min-h-0 w-full max-h-56 flex-1 flex-col overflow-hidden">
             <ComboboxListVirtualized className="flex size-full min-h-0 min-w-0 flex-col">
               <LegendList<string>

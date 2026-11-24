@@ -12,6 +12,7 @@ import type {
   ProjectId,
   ServerSettings,
   ServerSettingsError,
+  ServerSettingsPatch,
   TerminalSummary,
   WorktreeCleanupRules,
   StorageCleanupPreview,
@@ -20,6 +21,7 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
+import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 import * as Context from "effect/Context";
@@ -347,6 +349,9 @@ export class StorageCleanup extends Context.Service<
   {
     readonly runNow: Effect.Effect<StorageCleanupReport, ServerSettingsError>;
     readonly preview: Effect.Effect<StorageCleanupPreview, ServerSettingsError>;
+    readonly previewWithPatch: (
+      patch: ServerSettingsPatch,
+    ) => Effect.Effect<StorageCleanupPreview, ServerSettingsError>;
     readonly latestReport: Effect.Effect<StorageCleanupReport | null>;
     readonly reports: Stream.Stream<StorageCleanupReport | null>;
     readonly drain: Effect.Effect<void>;
@@ -1376,6 +1381,7 @@ const make = Effect.gen(function* () {
           if (yield* hasTerminal(worktreePaths)) return waitForStop("open terminal");
           if (deleted) {
             if (
+              commit &&
               !resolveWorktreeCleanup(yield* settingsService.getSettings, thread.projectId)
                 .worktreeOnDelete
             )
@@ -1568,10 +1574,14 @@ const make = Effect.gen(function* () {
         } else if (stat.type === "File" && (!rotatedLogs || /\.(?:log|ndjson)\.\d+$/.test(name))) {
           const modified = Option.getOrNull(stat.mtime);
           if (modified !== null && modified.getTime() < now - days * DAY_MS) {
-            const current = (yield* settingsService.getSettings).storageCleanup;
-            if ((rotatedLogs ? current.logsAfterDays : current.browserArtifactsAfterDays) !== days)
-              return;
-            if (commit) yield* fs.remove(target);
+            if (commit) {
+              const current = (yield* settingsService.getSettings).storageCleanup;
+              if (
+                (rotatedLogs ? current.logsAfterDays : current.browserArtifactsAfterDays) !== days
+              )
+                return;
+              yield* fs.remove(target);
+            }
             removed.files++;
             removed.bytes += Number(stat.size);
           }
@@ -1592,10 +1602,13 @@ const make = Effect.gen(function* () {
   const sweep = Effect.fn("StorageCleanup.sweep")(function* (
     trigger: StorageCleanupReport["trigger"],
     commit: boolean,
+    patch?: ServerSettingsPatch,
   ) {
     const purgesAtStart = purges;
     const now = yield* Clock.currentTimeMillis;
-    const serverSettings = yield* settingsService.getSettings;
+    const savedSettings = yield* settingsService.getSettings;
+    const serverSettings =
+      patch === undefined ? savedSettings : applyServerSettingsPatch(savedSettings, patch);
     const settings = serverSettings.storageCleanup;
     const entries: StorageCleanupReportEntry[] = [];
     const deletedWorktrees = yield* cleanWorktrees(serverSettings, now, entries, commit).pipe(
@@ -1707,11 +1720,16 @@ const make = Effect.gen(function* () {
   type SweepRequest = {
     readonly completion: Deferred.Deferred<StorageCleanupReport, ServerSettingsError>;
     readonly commit: boolean;
+    readonly patch?: ServerSettingsPatch | undefined;
   };
   const worker = yield* makeDrainableWorker((request: SweepRequest | undefined) =>
     (request === undefined ? Ref.set(automaticSweepQueued, false) : Effect.void).pipe(
       Effect.andThen(
-        sweep(request === undefined ? "automatic" : "manual", request?.commit ?? true),
+        sweep(
+          request === undefined ? "automatic" : "manual",
+          request?.commit ?? true,
+          request?.patch,
+        ),
       ),
       Effect.exit,
       Effect.flatMap((exit) =>
@@ -1727,15 +1745,23 @@ const make = Effect.gen(function* () {
   const requestSweep = Ref.getAndSet(automaticSweepQueued, true).pipe(
     Effect.flatMap((queued) => (queued ? Effect.void : worker.enqueue(undefined))),
   );
-  const runSweep = Effect.fn("StorageCleanup.runSweep")(function* (commit: boolean) {
+  const runSweep = Effect.fn("StorageCleanup.runSweep")(function* (
+    commit: boolean,
+    patch?: ServerSettingsPatch,
+  ) {
     const completion = yield* Deferred.make<StorageCleanupReport, ServerSettingsError>();
-    yield* worker.enqueue({ completion, commit });
+    yield* worker.enqueue({ completion, commit, ...(patch === undefined ? {} : { patch }) });
     return yield* Deferred.await(completion);
   });
   const runNow = runSweep(true);
   const preview = Effect.gen(function* () {
     return summarizeStorageCleanupPreview((yield* runSweep(false)).entries);
   }).pipe(Effect.withSpan("StorageCleanup.preview"));
+  const previewWithPatch = Effect.fn("StorageCleanup.previewWithPatch")(function* (
+    patch: ServerSettingsPatch,
+  ) {
+    return summarizeStorageCleanupPreview((yield* runSweep(false, patch)).entries);
+  });
 
   const start = Effect.fn("StorageCleanup.start")(function* () {
     const unsubscribe = yield* terminals.subscribeMetadata((event) =>
@@ -1809,6 +1835,7 @@ const make = Effect.gen(function* () {
   return StorageCleanup.of({
     runNow,
     preview,
+    previewWithPatch,
     latestReport: SubscriptionRef.get(reportRef),
     reports: SubscriptionRef.changes(reportRef),
     drain: worker.drain,

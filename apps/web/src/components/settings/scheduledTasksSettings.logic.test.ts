@@ -23,11 +23,16 @@ import { deriveProviderInstanceEntries } from "../../providerInstances";
 import {
   SCHEDULED_TASK_TEMPLATES,
   applyScheduledTaskTemplate,
+  clearScheduledTaskDraft,
+  initialScheduledTaskEditorState,
+  isScheduledTaskDraftDirty,
+  resolveScheduledTaskDraftOnClose,
   scheduledTaskDefaultModel,
   defaultScheduledTaskProjectId,
   matchesScheduledTaskScope,
   scheduleFromDraft,
   scheduleLabel,
+  scheduledTaskDraftKey,
   taskToDraft,
   unbindDraftFromThread,
 } from "./scheduledTasksSettings.logic";
@@ -462,5 +467,175 @@ describe("scheduled task templates", () => {
     expect(appliedWeekly.modelKey).toBe(baseDraft.modelKey);
     expect(appliedWeekly.baseModelSelection).toBe(baseDraft.baseModelSelection);
     expect(scheduleFromDraft(appliedWeekly)).toEqual(weeklyTemplate.schedule);
+  });
+});
+
+describe("scheduled task editor draft preservation", () => {
+  it("treats unchanged drafts and reverted edits as clean", () => {
+    const baseline = taskToDraft(legacyTask);
+    expect(
+      isScheduledTaskDraftDirty({
+        baseline,
+        current: taskToDraft(legacyTask),
+        baselineEnvironmentId: laptopId,
+        currentEnvironmentId: laptopId,
+      }),
+    ).toBe(false);
+    expect(
+      isScheduledTaskDraftDirty({
+        baseline,
+        current: { ...baseline, title: "Updated title" },
+        baselineEnvironmentId: laptopId,
+        currentEnvironmentId: laptopId,
+      }),
+    ).toBe(true);
+    expect(
+      isScheduledTaskDraftDirty({
+        baseline,
+        current: baseline,
+        baselineEnvironmentId: laptopId,
+        currentEnvironmentId: serverId,
+      }),
+    ).toBe(true);
+
+    const fixedBaseline = taskToDraft({
+      ...legacyTask,
+      schedule: { type: "fixed_time", timeOfDay: "09:00", weekdays: [1, 3, 5] },
+    });
+    expect(
+      isScheduledTaskDraftDirty({
+        baseline: fixedBaseline,
+        current: { ...fixedBaseline, weekdays: new Set([5, 1, 3]) },
+        baselineEnvironmentId: laptopId,
+        currentEnvironmentId: laptopId,
+      }),
+    ).toBe(false);
+    expect(
+      isScheduledTaskDraftDirty({
+        baseline: fixedBaseline,
+        current: { ...fixedBaseline, weekdays: new Set([1, 3]) },
+        baselineEnvironmentId: laptopId,
+        currentEnvironmentId: laptopId,
+      }),
+    ).toBe(true);
+  });
+
+  it("saves dirty drafts on close per task without clobbering other drafts, and drops clean closes", () => {
+    const key1 = scheduledTaskDraftKey({
+      environmentId: laptopId,
+      taskId: legacyTask.id,
+    });
+    const otherTaskId = ScheduledTaskId.make("other-task");
+    const key2 = scheduledTaskDraftKey({
+      environmentId: serverId,
+      taskId: otherTaskId,
+    });
+    const baseline1 = taskToDraft(legacyTask);
+    const baseline2 = taskToDraft({ ...legacyTask, id: otherTaskId, title: "Other" });
+
+    const cleanClose = resolveScheduledTaskDraftOnClose({
+      existingDrafts: new Map(),
+      key: key1,
+      baseline: baseline1,
+      current: baseline1,
+      baselineEnvironmentId: laptopId,
+      currentEnvironmentId: laptopId,
+      taskUpdatedAt: legacyTask.updatedAt,
+    });
+    expect(cleanClose.saved).toBe(false);
+    expect(cleanClose.nextDrafts.size).toBe(0);
+
+    const firstEdit = resolveScheduledTaskDraftOnClose({
+      existingDrafts: cleanClose.nextDrafts,
+      key: key1,
+      baseline: baseline1,
+      current: { ...baseline1, prompt: "Half-written prompt" },
+      baselineEnvironmentId: laptopId,
+      currentEnvironmentId: laptopId,
+      taskUpdatedAt: legacyTask.updatedAt,
+    });
+    expect(firstEdit.saved).toBe(true);
+
+    const secondEdit = resolveScheduledTaskDraftOnClose({
+      existingDrafts: firstEdit.nextDrafts,
+      key: key2,
+      baseline: baseline2,
+      current: { ...baseline2, title: "Second draft" },
+      baselineEnvironmentId: serverId,
+      currentEnvironmentId: serverId,
+      taskUpdatedAt: legacyTask.updatedAt,
+    });
+    expect(secondEdit.saved).toBe(true);
+    expect(secondEdit.nextDrafts.size).toBe(2);
+    expect(secondEdit.nextDrafts.get(key1)?.draft.prompt).toBe("Half-written prompt");
+    expect(secondEdit.nextDrafts.get(key2)?.draft.title).toBe("Second draft");
+
+    const reverted = resolveScheduledTaskDraftOnClose({
+      existingDrafts: secondEdit.nextDrafts,
+      key: key1,
+      baseline: baseline1,
+      current: baseline1,
+      baselineEnvironmentId: laptopId,
+      currentEnvironmentId: laptopId,
+      taskUpdatedAt: legacyTask.updatedAt,
+    });
+    expect(reverted.saved).toBe(false);
+    expect(reverted.nextDrafts.has(key1)).toBe(false);
+    expect(reverted.nextDrafts.has(key2)).toBe(true);
+
+    const cleared = clearScheduledTaskDraft(secondEdit.nextDrafts, key1);
+    expect(cleared.has(key1)).toBe(false);
+    expect(cleared.has(key2)).toBe(true);
+  });
+
+  it("restores saved drafts on reopen and flags when the saved task changed meanwhile", () => {
+    const key = scheduledTaskDraftKey({ environmentId: laptopId, taskId: legacyTask.id });
+    const baseline = taskToDraft(legacyTask);
+    const { nextDrafts } = resolveScheduledTaskDraftOnClose({
+      existingDrafts: new Map(),
+      key,
+      baseline,
+      current: { ...baseline, prompt: "Edited prompt" },
+      baselineEnvironmentId: laptopId,
+      currentEnvironmentId: laptopId,
+      taskUpdatedAt: "2026-09-17T00:00:00.000Z",
+    });
+
+    expect(
+      initialScheduledTaskEditorState({
+        savedDraft: undefined,
+        initialEnvironmentId: laptopId,
+        connectedEnvironmentIds: new Set([laptopId]),
+        baseline,
+        currentTaskUpdatedAt: "2026-09-17T00:00:00.000Z",
+      }),
+    ).toMatchObject({ restoredFromDraft: false, taskChangedSinceDraft: false });
+
+    expect(
+      initialScheduledTaskEditorState({
+        savedDraft: nextDrafts.get(key),
+        initialEnvironmentId: laptopId,
+        connectedEnvironmentIds: new Set([laptopId]),
+        baseline,
+        currentTaskUpdatedAt: "2026-09-17T00:00:00.000Z",
+      }),
+    ).toMatchObject({
+      restoredFromDraft: true,
+      taskChangedSinceDraft: false,
+      draft: { prompt: "Edited prompt" },
+    });
+
+    expect(
+      initialScheduledTaskEditorState({
+        savedDraft: nextDrafts.get(key),
+        initialEnvironmentId: laptopId,
+        connectedEnvironmentIds: new Set([laptopId]),
+        baseline,
+        currentTaskUpdatedAt: "2026-09-18T00:00:00.000Z",
+      }),
+    ).toMatchObject({
+      restoredFromDraft: true,
+      taskChangedSinceDraft: true,
+    });
   });
 });

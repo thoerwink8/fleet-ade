@@ -453,7 +453,12 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       yield* copy("package.json");
       yield* copy("pnpm-workspace.yaml");
       for (const pkg of packages) yield* copy(`${pkg.dir}/package.json`);
-      for (const extra of ["pnpm-lock.yaml", "patches", ".pnpmfile.cjs"]) {
+      for (const extra of [
+        "pnpm-lock.yaml",
+        "patches",
+        ".pnpmfile.cjs",
+        "scripts/node-version-check.cjs",
+      ]) {
         if (yield* fs.exists(inRoot(extra))) yield* copy(extra);
       }
       const result = yield* vp(["install", "--lockfile-only", "--ignore-scripts"], temp);
@@ -523,6 +528,14 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   };
   const compilerFiles = compilerApps.reduce((count, app) => count + app.names.length, 0);
 
+  // Guard with fs.exists so isolated launcher fixtures in check-changed.test.ts do not require extra script files.
+  const runUiOldTerms =
+    (code.length > 0 ||
+      files.some(
+        (file) =>
+          file.startsWith("scripts/ui-no-old-terms") || file === "scripts/lib/ui-copy-scan.ts",
+      )) &&
+    (yield* fs.exists(inRoot("scripts/ui-no-old-terms.ts")));
   const steps: Array<Step<never>> = [
     ...(runPatchCheck ? [{ name: "unused patches", run: checkPatches }] : []),
     ...(present.length > 0
@@ -530,6 +543,9 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       : []),
     ...(code.length > 0
       ? [command("lint", ["lint", "--no-error-on-unmatched-pattern", ...code])]
+      : []),
+    ...(runUiOldTerms
+      ? [command("ui-no-old-terms", ["exec", "node", "scripts/ui-no-old-terms.ts"])]
       : []),
     ...(runKnip
       ? knipPasses.map((args, index) => command(`knip ${index + 1}/${knipPasses.length}`, args))

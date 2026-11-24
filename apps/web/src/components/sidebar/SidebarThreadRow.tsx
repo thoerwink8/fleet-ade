@@ -192,20 +192,20 @@ function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowS
   switch (status) {
     case "preparing":
     case "working":
-      return { variant: "dot-active", label: "在做" };
+      return { variant: "dot-active", label: "运行中" };
     case "queued":
-      return { variant: "dot-waiting", label: "排队" };
+      return { variant: "dot-waiting", label: "等空位" };
     case "waiting":
       return { variant: "dot-waiting", label: "等待中" };
     case "approval":
-      return { variant: "dot-attention", label: "待批准" };
+      return { variant: "dot-attention", label: "等你批准" };
     case "input":
-      return { variant: "dot-attention", label: "待输入" };
+      return { variant: "dot-attention", label: "等你回答" };
     case "limited":
     case "failed":
-      return { variant: "dot-blocked", label: "卡住" };
+      return { variant: "dot-blocked", label: "出错了" };
     case "ready":
-      return { variant: "dot-done", label: hasRun ? "做完" : "空闲" };
+      return { variant: "dot-done", label: hasRun ? "空闲" : "新会话" };
   }
 }
 
@@ -372,34 +372,34 @@ function resolveRowMark(
   runtimeStatus: string | null,
   attention: ThreadAttention["category"] | null,
 ): RowMark | null {
-  if (attention === "approval") return { dot: "fa-dot--needs", label: "待批准" };
-  if (attention === "input") return { dot: "fa-dot--needs", label: "待输入" };
-  if (attention === "failed") return { dot: "fa-dot--error", label: "失败" };
-  if (attention === "limited") return { dot: "fa-dot--error", label: "受限" };
-  if (attention === "completed") return { dot: "fa-dot--new", label: "未读" };
+  if (attention === "approval") return { dot: "fa-dot--needs", label: "等你批准" };
+  if (attention === "input") return { dot: "fa-dot--needs", label: "等你回答" };
+  if (attention === "failed") return { dot: "fa-dot--error", label: "出错了" };
+  if (attention === "limited") return { dot: "fa-dot--error", label: "用量受限" };
+  if (attention === "completed") return { dot: "fa-dot--new", label: "有新结果" };
   switch (status) {
     case "failed":
-      return { dot: "fa-dot--error", label: "失败" };
+      return { dot: "fa-dot--error", label: "出错了" };
     case "limited":
-      return { dot: "fa-dot--error", label: "受限" };
+      return { dot: "fa-dot--error", label: "用量受限" };
     case "approval":
-      return { dot: "fa-dot--needs", label: "待批准" };
+      return { dot: "fa-dot--needs", label: "等你批准" };
     case "input":
-      return { dot: "fa-dot--needs", label: "待输入" };
+      return { dot: "fa-dot--needs", label: "等你回答" };
     case "preparing":
       return { dot: "fa-dot--running", label: "正在设置" };
     case "working":
       return { dot: "fa-dot--running", label: "运行中" };
     case "queued":
-      return { dot: "fa-dot--ring", label: "排队" };
+      return { dot: "fa-dot--ring", label: "等空位" };
     case "waiting":
-      if (isUnread) return { dot: "fa-dot--new", label: "未读" };
+      if (isUnread) return { dot: "fa-dot--new", label: "有新结果" };
       // Idle runtime is a finished session. The hollow ring is only for a live wait.
       return runtimeStatus !== null && runtimeStatus !== "idle"
         ? { dot: "fa-dot--ring", label: "等待中" }
         : null;
     case "ready":
-      return isUnread ? { dot: "fa-dot--new", label: "未读" } : null;
+      return isUnread ? { dot: "fa-dot--new", label: "有新结果" } : null;
   }
 }
 
@@ -705,19 +705,19 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
   settle: (
     <>
       <CircleCheckIcon aria-hidden className="size-3" />
-      收尾
+      标为完成
     </>
   ),
   unsettle: (
     <>
       <Undo2Icon aria-hidden className="size-3" />
-      取消收尾
+      取消完成
     </>
   ),
   wake: (
     <>
       <AlarmClockOffIcon aria-hidden className="size-3" />
-      唤醒
+      取消暂缓
     </>
   ),
 };
@@ -898,7 +898,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     thread.settledOverride !== "settled";
   const topStatus =
     status === "queued"
-      ? { label: "排队", icon: "waiting" as const, className: "text-muted-foreground" }
+      ? { label: "等空位", icon: "waiting" as const, className: "text-muted-foreground" }
       : status === "preparing" || status === "working"
         ? {
             label:
@@ -918,37 +918,37 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             }
           : status === "approval"
             ? {
-                label: "待批准",
+                label: "等你批准",
                 icon: "approval" as const,
                 className: "text-warning-foreground",
               }
             : status === "input"
               ? {
-                  label: "待输入",
+                  label: "等你回答",
                   icon: "input" as const,
                   className: "text-indigo-600 dark:text-indigo-300",
                 }
               : status === "limited"
                 ? {
-                    label: "受限",
+                    label: "用量受限",
                     icon: "failed" as const,
                     className: "text-warning-foreground",
                   }
                 : status === "failed"
                   ? {
-                      label: "失败",
+                      label: "出错了",
                       icon: "failed" as const,
                       className: "text-error-foreground",
                     }
                   : isWoke
                     ? {
-                        label: "已唤醒",
+                        label: "暂缓结束",
                         icon: "woke" as const,
                         className: "text-warning-foreground",
                       }
                     : isUnread
                       ? {
-                          label: "完成",
+                          label: "有新结果",
                           icon: "done" as const,
                           className: "text-success-foreground",
                         }
@@ -1272,7 +1272,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             {props.snoozeWakeLabelText}
           </>
         ) : isWokeStatus ? (
-          "已唤醒"
+          "暂缓结束"
         ) : (
           <SidebarRelativeTimeLabel timestamp={activityTimestamp} />
         )
@@ -1299,8 +1299,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           ) : null}
           {isWokeStatus ? (
             <SidebarRowIconButton
-              label="忽略已唤醒通知"
-              tooltip="忽略已唤醒通知"
+              label="忽略暂缓结束提示"
+              tooltip="忽略暂缓结束提示"
               onClick={handleAcknowledgeWokeClick}
             >
               <AlarmClockIcon className="size-4" />
@@ -1317,8 +1317,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           ) : null}
           {showUnsnooze ? (
             <SidebarRowIconButton
-              label="立即唤醒会话"
-              tooltip="立即唤醒会话"
+              label="取消暂缓"
+              tooltip="取消暂缓"
               onClick={handleUnsnoozeClick}
               onPointerDown={handleActionPointerDown}
             >
@@ -1328,8 +1328,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           {showSettle ? (
             variantAction === "unsettle" ? (
               <SidebarRowIconButton
-                label="取消会话收尾"
-                tooltip="取消会话收尾"
+                label="取消完成"
+                tooltip="取消完成"
                 onClick={handleUnsettleClick}
                 onPointerDown={handleActionPointerDown}
               >
@@ -1337,8 +1337,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               </SidebarRowIconButton>
             ) : (
               <SidebarRowIconButton
-                label="收尾会话"
-                tooltip="收尾会话"
+                label="标为完成"
+                tooltip="标为完成"
                 onClick={handleSettleClick}
                 onPointerDown={handleActionPointerDown}
               >

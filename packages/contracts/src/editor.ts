@@ -260,7 +260,7 @@ export class ExternalLauncherUnknownEditorError extends Schema.TaggedError<Exter
   },
 ) {
   override get message(): string {
-    return `Unknown editor: ${this.editor}`;
+    return `未知编辑器：${this.editor}`;
   }
 }
 
@@ -271,7 +271,7 @@ export class ExternalLauncherUnsupportedEditorError extends Schema.TaggedError<E
   },
 ) {
   override get message(): string {
-    return `Unsupported editor: ${this.editor}`;
+    return `不支持的编辑器：${this.editor}`;
   }
 }
 
@@ -283,7 +283,7 @@ export class ExternalLauncherCommandNotFoundError extends Schema.TaggedError<Ext
   },
 ) {
   override get message(): string {
-    return `Editor command not found: ${this.command}`;
+    return `找不到编辑器启动命令：${this.command}`;
   }
 }
 
@@ -294,7 +294,7 @@ export class ExternalLauncherUnsupportedTargetError extends Schema.TaggedError<E
   },
 ) {
   override get message(): string {
-    return `${this.editor} cannot open a path containing line breaks or double quotes`;
+    return `${this.editor} 无法打开包含换行符或双引号的路径`;
   }
 }
 
@@ -312,7 +312,7 @@ export class ExternalLauncherBrowserSpawnError extends Schema.TaggedError<Extern
   },
 ) {
   override get message(): string {
-    return `Failed to launch browser target '${this.target}' with '${[this.command, ...this.args].join(" ")}'`;
+    return `无法用命令“${[this.command, ...this.args].join(" ")}”启动浏览器目标“${this.target}”`;
   }
 }
 
@@ -325,7 +325,7 @@ export class ExternalLauncherEditorSpawnError extends Schema.TaggedError<Externa
   },
 ) {
   override get message(): string {
-    return `Failed to launch '${this.target}' in ${this.editor} with '${[this.command, ...this.args].join(" ")}'`;
+    return `无法用命令“${[this.command, ...this.args].join(" ")}”在 ${this.editor} 中启动“${this.target}”`;
   }
 }
 

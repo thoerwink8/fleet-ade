@@ -191,7 +191,7 @@ export function summarizeT3ToolCalls(
       label = phrase("已列出", "列出", `会话 ${times}`);
       break;
     case "thread-interrupt":
-      label = phrase("已请求中断", "中断", quantity(countEntities(threadIds), "个", "会话"));
+      label = phrase("已请求停止", "停止", quantity(countEntities(threadIds), "个", "会话"));
       break;
     case "workflow-stop":
       label = phrase(
@@ -330,7 +330,7 @@ export function summarizeT3ToolCalls(
       );
       break;
     case "worktree-list":
-      label = phrase("已列出", "列出", `工作区分支 ${times}`);
+      label = phrase("已列出", "列出", `工作树分支 ${times}`);
       break;
     case "worktree-status":
       label = phrase("已查看", "查看", `工作树状态 ${times}`);
@@ -348,28 +348,28 @@ export function summarizeT3ToolCalls(
       label = phrase("已更新", "更新", quantity(countEntities(projectIds), "个", "项目"));
       break;
     case "project-delete":
-      label = phrase("已删除", "删除", quantity(countEntities(projectIds), "个", "项目"));
+      label = phrase("已移除", "移除", quantity(countEntities(projectIds), "个", "项目"));
       break;
     case "project-clone":
       label = phrase("已克隆", "克隆", quantity(countEntities(entityIds("cwd")), "个", "仓库"));
       break;
     case "environment-read":
-      label = phrase("已查看", "查看", `环境偏好设置 ${times}`);
+      label = phrase("已查看", "查看", `电脑偏好设置 ${times}`);
       break;
     case "environment-update":
-      label = phrase("已更新", "更新", `环境偏好设置 ${times}`);
+      label = phrase("已更新", "更新", `电脑偏好设置 ${times}`);
       break;
     case "environment-links":
-      label = phrase("已列出", "列出", `已关联环境 ${times}`);
+      label = phrase("已列出", "列出", `已关联电脑 ${times}`);
       break;
     case "environment-link":
-      label = phrase("已请求关联", "请求关联", quantity(selected.length, "个", "环境"));
+      label = phrase("已请求关联", "请求关联", quantity(selected.length, "台", "电脑"));
       break;
     case "environment-unlink":
       label = phrase(
         "已移除",
         "移除",
-        quantity(countEntities(entityIds("environmentId")), "个", "已关联环境"),
+        quantity(countEntities(entityIds("environmentId")), "台", "已关联电脑"),
       );
       break;
     case "attachment-prepare":

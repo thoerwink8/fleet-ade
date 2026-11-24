@@ -353,7 +353,7 @@ export function McpAppFrame(props: {
       },
       downloadFile: async (files) => {
         const names = files.map((file) => file.name).join(", ");
-        const approved = await ask(`${app.server} 想把 ${names} 保存到这台设备。`, {
+        const approved = await ask(`${app.server} 想把 ${names} 保存到本机。`, {
           title: "保存应用提供的文件？",
           confirmLabel: "保存",
         });

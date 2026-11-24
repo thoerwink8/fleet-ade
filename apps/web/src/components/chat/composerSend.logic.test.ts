@@ -33,7 +33,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread, remoteThread],
         candidateEnvironmentIds: [],
       }).title,
-    ).toBe("正在检查机器资源");
+    ).toBe("正在检查电脑资源");
   });
 
   it("blames the attached threads when no machine can read all of them", () => {
@@ -43,7 +43,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread, remoteThread],
         candidateEnvironmentIds: [local, remote],
       }).description,
-    ).toContain("没有一台机器能读取全部附加的会话。请在输入框中选择机器，或移除这些会话。");
+    ).toContain("没有一台电脑能读取全部附加的会话。请在输入框中选择电脑，或移除这些会话。");
   });
 
   it("blames resources when one machine can read every attached thread", () => {
@@ -53,7 +53,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread],
         candidateEnvironmentIds: [remote, local],
       }).description,
-    ).toContain("没有符合条件且资源充足的机器。请在输入框中手动选择机器。");
+    ).toContain("没有符合条件且资源充足的电脑。请在输入框中手动选择电脑。");
   });
 });
 

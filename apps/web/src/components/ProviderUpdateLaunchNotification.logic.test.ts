@@ -271,7 +271,7 @@ describe("provider update launch notification logic", () => {
     expect(failureView).toMatchObject({
       key: "failed:claudeAgent:2026-04-23T10:00:00.000Z:Update command exited with code 1.",
       tone: "error",
-      title: "Claude v1.1.0 更新失败",
+      title: "无法更新 Claude v1.1.0",
     });
   });
 });
@@ -350,7 +350,7 @@ describe("getProviderUpdateRunToastView", () => {
       getProviderUpdateRunToastView([
         run("Linux", "opencode", AsyncResult.success({ providers: [restarted] })),
       ]),
-    ).toMatchObject({ description: "新会话将使用更新后的提供方。" });
+    ).toMatchObject({ description: "新会话将使用更新后的智能体。" });
   });
 
   it("lists every failed update and ignores interrupted ones", () => {
@@ -385,7 +385,7 @@ describe("getProviderUpdateRunToastView", () => {
 
     expect(view).toEqual({
       type: "error",
-      title: "2 个提供方中有 3 个更新失败",
+      title: "无法更新 3 个中的 2 个智能体",
       description: "Mac Studio · Claude: npm exited with code 1.\nLaptop · Codex: WebSocket closed",
     });
   });

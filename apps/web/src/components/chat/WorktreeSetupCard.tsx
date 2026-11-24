@@ -115,10 +115,10 @@ function headerLabel(snapshot: WorktreeSetupSnapshot): string {
       return "正在设置工作树…";
     case "done":
       return snapshot.stages.some((stage) => stage.status === "failed")
-        ? "工作树已就绪，但设置脚本失败"
+        ? "工作树已就绪，但无法运行设置脚本"
         : "工作树已就绪";
     case "failed":
-      return "工作树设置失败";
+      return "无法设置工作树";
     case "cancelled":
       return "工作树设置已取消";
   }

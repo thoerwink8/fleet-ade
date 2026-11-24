@@ -1,6 +1,6 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
-import { AsyncResult } from "effect/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import {
   ChevronDownIcon,
   Clock3Icon,
@@ -92,9 +92,13 @@ import {
   WEBHOOK_SIGNATURE_DEFAULTS,
   applyScheduledTaskTemplate,
   changeDraftProject,
+  clearScheduledTaskDraft,
+  initialScheduledTaskEditorState,
   moveDraftToThread,
+  resolveScheduledTaskDraftOnClose,
   scheduleDraftErrors,
   scheduledTaskDestinationThreads,
+  scheduledTaskDraftKey,
   toDateTimeLocalValue,
   webhookDeliveryLabel,
   defaultScheduledTaskProjectId,
@@ -106,6 +110,8 @@ import {
   taskToDraft,
   unbindDraftFromThread,
   type DraftState,
+  type SavedScheduledTaskDraft,
+  type ScheduledTaskDraftKey,
   type ScheduledTaskTemplate,
   type ScheduleMode,
   type WorkspaceMode,
@@ -345,13 +351,12 @@ export function ScheduledRelativeLabel(props: { value: string | null }) {
 
 function deliveryOutcomeVariant(outcome: string) {
   if (outcome === "accepted") return "success";
-  if (
-    outcome === "duplicate" ||
-    outcome === "coalesced" ||
-    outcome === "disabled" ||
-    outcome === "rate_limited" ||
-    outcome === "expired"
-  ) {
+  // coalesced: the delivery is waiting for its window to close, not a problem.
+  if (outcome === "coalesced") return "info";
+  // duplicate: a repeat that was dropped on purpose; nothing to act on.
+  if (outcome === "duplicate") return "outline";
+  // disabled, rate_limited, expired: the delivery was blocked and the owner may need to act.
+  if (outcome === "disabled" || outcome === "rate_limited" || outcome === "expired") {
     return "warning";
   }
   if (outcome === "dispatch_failed" || outcome === "rejected_signature") return "error";
@@ -540,6 +545,10 @@ const scheduledTaskCreatePermissionsAtom = environmentAtomList(
 const scheduledTasksListAtom = environmentAtomList("web-scheduled-tasks-list", (environmentId) =>
   serverEnvironment.scheduledTasksLive({ environmentId, input: {} }),
 );
+
+const scheduledTaskEditorDraftsAtom = Atom.make<
+  ReadonlyMap<ScheduledTaskDraftKey, SavedScheduledTaskDraft>
+>(new Map()).pipe(Atom.keepAlive, Atom.withLabel("web-scheduled-task-editor-drafts"));
 
 function ScheduledTaskEnvironmentList({
   environmentId,
@@ -790,6 +799,9 @@ function ScheduledTaskRow({
   const canUndoDelete =
     useEnvironment(environmentId)?.serverConfig?.environment.capabilities
       .scheduledTaskUndoDelete === true;
+  const hasUnsavedDraft = useAtomValue(scheduledTaskEditorDraftsAtom).has(
+    scheduledTaskDraftKey({ environmentId, taskId: task.id }),
+  );
   const [busy, setBusy] = useState(false);
   const [deliveriesOpen, setDeliveriesOpen] = useState(false);
   const isWebhook = task.schedule.type === "webhook";
@@ -840,6 +852,7 @@ function ScheduledTaskRow({
           {task.lastRunStatus !== "never" ? (
             <Badge variant={statusVariant(task.lastRunStatus)}>{task.lastRunStatus}</Badge>
           ) : null}
+          {hasUnsavedDraft ? <Badge variant="outline">未保存的修改</Badge> : null}
           {task.threadId !== null && scheduledTaskThreadMode(task) !== "new_thread" ? (
             <ScheduledTaskThreadLink environmentId={environmentId} threadId={task.threadId} />
           ) : null}
@@ -1178,40 +1191,6 @@ function WebhookEndpointField({
   );
 }
 
-function ScheduledTaskEditorDialog({
-  initialEnvironmentId,
-  task,
-  initialTemplate,
-  onClose,
-}: {
-  readonly initialEnvironmentId: EnvironmentId;
-  readonly task: ScheduledTask | null;
-  readonly initialTemplate?: ScheduledTaskTemplate | undefined;
-  readonly onClose: () => void;
-}) {
-  const [saving, setSaving] = useState(false);
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !saving) onClose();
-      }}
-    >
-      {/* The form owns the draft so a keystroke re-renders it, not the dialog chrome. */}
-      <DialogPopup className="max-w-xl">
-        <ScheduledTaskEditorForm
-          initialEnvironmentId={initialEnvironmentId}
-          task={task}
-          initialTemplate={initialTemplate}
-          saving={saving}
-          onSavingChange={setSaving}
-          onClose={onClose}
-        />
-      </DialogPopup>
-    </Dialog>
-  );
-}
-
 const THREAD_MODE_LABELS: Record<ScheduledTaskThreadMode, string> = {
   new_thread: "每次运行新建会话",
   continue: "在同一会话中继续对话",
@@ -1371,23 +1350,58 @@ function ScheduledTaskDestination({
   );
 }
 
-function ScheduledTaskEditorForm({
+function ScheduledTaskEditorDialog({
   initialEnvironmentId,
   task,
   initialTemplate,
-  saving,
-  onSavingChange: setSaving,
   onClose,
 }: {
   readonly initialEnvironmentId: EnvironmentId;
   readonly task: ScheduledTask | null;
   readonly initialTemplate?: ScheduledTaskTemplate | undefined;
-  readonly saving: boolean;
-  readonly onSavingChange: (saving: boolean) => void;
   readonly onClose: () => void;
 }) {
   const { scope, connectedEnvironments } = useSettingsScope();
-  const [environmentId, setEnvironmentId] = useState(initialEnvironmentId);
+  const allProjects = useProjects();
+  const projectsOn = (id: EnvironmentId) =>
+    allProjects.filter(
+      (project) => project.environmentId === id && matchesScheduledTaskScope(scope, id, project.id),
+    );
+  const drafts = useAtomValue(scheduledTaskEditorDraftsAtom);
+  const setDrafts = useAtomSet(scheduledTaskEditorDraftsAtom);
+  const draftKey = scheduledTaskDraftKey({
+    environmentId: initialEnvironmentId,
+    taskId: task?.id ?? null,
+  });
+  const computeBaseline = (sourceTask: ScheduledTask | null) => {
+    if (sourceTask) return taskToDraft(sourceTask);
+    const base: DraftState = {
+      ...EMPTY_DRAFT,
+      projectId: defaultScheduledTaskProjectId(projectsOn(initialEnvironmentId), scope),
+    };
+    return initialTemplate ? applyScheduledTaskTemplate(base, initialTemplate) : base;
+  };
+  const [saving, setSaving] = useState(false);
+  const [initialSetup] = useState(() => {
+    const initialBaseline = computeBaseline(task);
+    return {
+      baseline: initialBaseline,
+      ...initialScheduledTaskEditorState({
+        savedDraft: drafts.get(draftKey),
+        initialEnvironmentId,
+        connectedEnvironmentIds: new Set(connectedEnvironments.map((entry) => entry.environmentId)),
+        baseline: initialBaseline,
+        currentTaskUpdatedAt: task?.updatedAt ?? null,
+      }),
+    };
+  });
+  const [baseline, setBaseline] = useState<DraftState>(initialSetup.baseline);
+  const [environmentId, setEnvironmentId] = useState(initialSetup.environmentId);
+  const [draft, setDraft] = useState<DraftState>(initialSetup.draft);
+  const [restoredFromDraft, setRestoredFromDraft] = useState(initialSetup.restoredFromDraft);
+  const [taskChangedSinceDraft, setTaskChangedSinceDraft] = useState(
+    initialSetup.taskChangedSinceDraft,
+  );
   const environment = useEnvironment(environmentId);
   // Older servers reject one-time schedules, so offer Once only where it can save.
   const offersOnce =
@@ -1400,11 +1414,6 @@ function ScheduledTaskEditorForm({
   const tasksQuery = useEnvironmentQuery(
     connected ? serverEnvironment.scheduledTasksLive({ environmentId, input: {} }) : null,
   );
-  const allProjects = useProjects();
-  const projectsOn = (id: EnvironmentId) =>
-    allProjects.filter(
-      (project) => project.environmentId === id && matchesScheduledTaskScope(scope, id, project.id),
-    );
   const scopedProjects = projectsOn(environmentId);
   const settings = useEnvironmentSettings(environmentId);
   const providers =
@@ -1414,14 +1423,6 @@ function ScheduledTaskEditorForm({
   );
   const upsertTask = useAtomCommand(serverEnvironment.upsertScheduledTask, {
     label: "scheduled task upsert",
-  });
-  const [draft, setDraft] = useState<DraftState>(() => {
-    if (task) return taskToDraft(task);
-    const base: DraftState = {
-      ...EMPTY_DRAFT,
-      projectId: defaultScheduledTaskProjectId(scopedProjects, scope),
-    };
-    return initialTemplate ? applyScheduledTaskTemplate(base, initialTemplate) : base;
   });
   // Pinned first. The chosen project stays listed after it is archived.
   const projects = scopedProjects
@@ -1433,6 +1434,7 @@ function ScheduledTaskEditorForm({
     )
     .sort((left, right) => Number(right.pinnedAt != null) - Number(left.pinnedAt != null));
   const submissionPending = useRef(false);
+  const fieldsRef = useRef<HTMLFieldSetElement>(null);
   const editingTaskMissing =
     draft.editingId !== null &&
     tasksQuery.data !== null &&
@@ -1465,6 +1467,37 @@ function ScheduledTaskEditorForm({
     activeInstanceId,
     activeModel,
   );
+
+  const handleDismiss = () => {
+    const { nextDrafts, saved } = resolveScheduledTaskDraftOnClose({
+      existingDrafts: drafts,
+      key: draftKey,
+      baseline,
+      current: draft,
+      baselineEnvironmentId: initialEnvironmentId,
+      currentEnvironmentId: environmentId,
+      taskUpdatedAt: task?.updatedAt ?? null,
+    });
+    setDrafts(nextDrafts);
+    if (saved) {
+      toastManager.add({
+        type: "info",
+        title: "未保存的修改已保留",
+        description: "刷新或关闭页面前，再次打开这个编辑框可以继续编辑。",
+      });
+    }
+    onClose();
+  };
+
+  const discardDraft = () => {
+    const freshBaseline = computeBaseline(liveTask ?? task);
+    setDrafts((current) => clearScheduledTaskDraft(current, draftKey));
+    setBaseline(freshBaseline);
+    setEnvironmentId(initialEnvironmentId);
+    setDraft(freshBaseline);
+    setRestoredFromDraft(false);
+    setTaskChangedSinceDraft(false);
+  };
 
   const applyTemplate = async (template: ScheduledTaskTemplate) => {
     if (saving || !canOperate) return;
@@ -1591,574 +1624,620 @@ function ScheduledTaskEditorForm({
       }
       return;
     }
+    setDrafts((current) => clearScheduledTaskDraft(current, draftKey));
     onClose();
   };
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{draft.editingId ? "编辑任务" : "新建任务"}</DialogTitle>
-        <DialogDescription>
-          按间隔、固定时间、指定日期（仅一次）或收到 webhook 时自动运行提示词。
-        </DialogDescription>
-      </DialogHeader>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !saving) handleDismiss();
+      }}
+    >
+      <DialogPopup
+        className="max-w-xl"
+        initialFocus={(openType) =>
+          // A restored draft shows a Discard button first in tab order; keep Enter and Space away from it.
+          restoredFromDraft && openType !== "touch"
+            ? (fieldsRef.current?.querySelector<HTMLElement>(
+                "#scheduled-task-title:not(:disabled)",
+              ) ?? true)
+            : true
+        }
+      >
+        <DialogHeader>
+          <DialogTitle>{draft.editingId ? "编辑任务" : "新建任务"}</DialogTitle>
+          <DialogDescription>
+            按间隔、固定时间、指定日期（仅一次）或收到 webhook 时自动运行提示词。
+          </DialogDescription>
+        </DialogHeader>
 
-      <DialogPanel>
-        {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
-        <fieldset disabled={saving} className="min-w-0 space-y-5">
-          {!connected ? (
-            <p className="text-sm text-destructive">请重新连接此环境后再保存。</p>
-          ) : null}
-          {task === null ? (
-            <Field label="从模板开始">
-              <ScheduledTaskTemplates
-                disabled={saving || !canOperate}
-                onSelect={(template) => void applyTemplate(template)}
-              />
-            </Field>
-          ) : null}
-          <Field label="运行环境" htmlFor="scheduled-task-environment">
-            <Select
-              value={environmentId}
-              disabled={task !== null || saving}
-              onValueChange={(id) => {
-                const next = connectedEnvironments.find((entry) => entry.environmentId === id);
-                if (!next) return;
-                setEnvironmentId(next.environmentId);
-                setDraft((current) => ({
-                  ...unbindDraftFromThread(current),
-                  projectId: defaultScheduledTaskProjectId(projectsOn(next.environmentId), scope),
-                  modelKey: "",
-                  baseModelSelection: null,
-                  baseRef: "main",
-                  startFromOrigin: true,
-                  existingWorktreePath: "",
-                }));
-              }}
+        <DialogPanel>
+          {restoredFromDraft ? (
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
             >
-              <SelectTrigger id="scheduled-task-environment" size="sm">
-                <SelectValue>
-                  <span className="flex items-center gap-2">
-                    <EnvironmentMachineIcon
-                      kind={resolveEnvironmentMachineKind(environment?.serverConfig ?? null)}
-                      className="size-4"
-                    />
-                    {environment?.label ?? "环境不可用"}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup>
-                {connectedEnvironments.map((entry) => {
-                  const { secondary } = settingsScopeEnvironmentLabels(
-                    entry,
-                    connectedEnvironments,
-                  );
-                  return (
-                    <SelectItem
-                      key={entry.environmentId}
-                      value={entry.environmentId}
-                      label={entry.label}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <EnvironmentMachineIcon
-                          kind={resolveEnvironmentMachineKind(entry.serverConfig)}
-                          className="size-4"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate">{entry.label}</span>
-                          {secondary ? (
-                            <span className="block max-w-72 truncate text-xs text-muted-foreground">
-                              {secondary}
-                            </span>
-                          ) : null}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectPopup>
-            </Select>
-          </Field>
-          {tasksQuery.error ? (
-            <p className="text-sm text-destructive" role="status">
-              {tasksQuery.error}
-            </p>
-          ) : null}
-          {editingTaskMissing ? (
-            <p className="text-xs text-destructive" role="status">
-              此定时任务已不存在。
-            </p>
-          ) : null}
-          <Field label="名称" htmlFor="scheduled-task-title">
-            <Input
-              id="scheduled-task-title"
-              placeholder="例如：检查 Sentry issue"
-              value={draft.title}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, title: event.target.value }))
-              }
-            />
-          </Field>
-
-          <ScheduledTaskDestination
-            environmentId={environmentId}
-            projectId={selectedProjectId}
-            threadId={draft.threadId ? (draft.threadId as ThreadId) : null}
-            threadMode={draft.threadMode}
-            disabled={saving || !connected}
-            onSelect={(thread) =>
-              setDraft((current) =>
-                thread === null
-                  ? { ...unbindDraftFromThread(current), threadMode: "new_thread" }
-                  : moveDraftToThread(current, thread),
-              )
-            }
-            onThreadModeChange={
-              offersThreadModes
-                ? (threadMode) =>
-                    setDraft((current) => ({
-                      ...(threadMode === "new_thread" ? unbindDraftFromThread(current) : current),
-                      threadMode,
-                    }))
-                : undefined
-            }
-          />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="项目" htmlFor="scheduled-task-project">
-              <Select
-                value={selectedProjectId}
-                onValueChange={(projectId) =>
-                  setDraft((current) => changeDraftProject(current, projectId ?? ""))
-                }
+              <span className="min-w-0">
+                {taskChangedSinceDraft
+                  ? "已恢复上次未保存的修改（此任务之后有新改动）。"
+                  : "已恢复上次未保存的修改。"}
+              </span>
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                disabled={saving}
+                onClick={discardDraft}
               >
-                <SelectTrigger size="sm" id="scheduled-task-project">
-                  <SelectValue placeholder="选择项目">{selectedProject?.title}</SelectValue>
-                </SelectTrigger>
-                <SelectPopup>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id} label={project.title}>
-                      <span className="block truncate">{project.title}</span>
-                      {allProjects.some(
-                        (other) =>
-                          other.title === project.title &&
-                          (other.environmentId !== project.environmentId ||
-                            other.id !== project.id),
-                      ) ? (
-                        <span className="block max-w-72 truncate text-xs text-muted-foreground">
-                          {project.workspaceRoot}
-                        </span>
-                      ) : null}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
-            </Field>
-
-            <Field label="工作区" htmlFor="scheduled-task-workspace">
-              <Select
-                value={draft.workspaceMode}
-                onValueChange={(value) =>
-                  setDraft((current) => ({ ...current, workspaceMode: value as WorkspaceMode }))
-                }
-              >
-                <SelectTrigger size="sm" id="scheduled-task-workspace">
-                  <SelectValue>{WORKSPACE_MODE_LABELS[draft.workspaceMode]}</SelectValue>
-                </SelectTrigger>
-                <SelectPopup>
-                  <SelectItem value="worktree">创建新工作树</SelectItem>
-                  <SelectItem value="root">使用项目工作副本</SelectItem>
-                  <SelectItem value="existing_worktree">使用指定工作副本</SelectItem>
-                </SelectPopup>
-              </Select>
-            </Field>
-          </div>
-
-          {draft.workspaceMode === "worktree" ? (
-            <Field label="基础分支" htmlFor="scheduled-task-base-ref">
-              <WorktreeBaseBranchPicker
-                key={`${environmentId}:${selectedProjectId}`}
-                id="scheduled-task-base-ref"
-                environmentId={environmentId}
-                cwd={selectedProject?.workspaceRoot ?? null}
-                value={draft.baseRef}
-                onValueChange={(baseRef) => setDraft((current) => ({ ...current, baseRef }))}
-                startFromOrigin={draft.startFromOrigin}
-                onStartFromOriginChange={(startFromOrigin) =>
-                  setDraft((current) => ({ ...current, startFromOrigin }))
-                }
-                disabled={saving || !connected}
-              />
-            </Field>
-          ) : null}
-          {draft.workspaceMode === "existing_worktree" ? (
-            <Field label="工作副本路径" htmlFor="scheduled-task-checkout">
-              <Input
-                id="scheduled-task-checkout"
-                value={draft.existingWorktreePath}
-                placeholder="/path/to/checkout"
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    existingWorktreePath: resolvePastedPath(
-                      current.existingWorktreePath,
-                      event.target.value,
-                    ),
-                  }))
-                }
-              />
-            </Field>
-          ) : null}
-
-          <Field label="提示词" htmlFor="scheduled-task-prompt">
-            <Textarea
-              id="scheduled-task-prompt"
-              className="max-h-64 overflow-y-auto"
-              placeholder="每次运行时，智能体应该做什么？"
-              value={draft.prompt}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, prompt: event.target.value }))
-              }
-            />
-          </Field>
-
-          <Field label="模型">
-            <div>
-              <ProviderModelPicker
-                environmentId={environmentId}
-                disabled={saving || !connected}
-                activeInstanceId={activeInstanceId}
-                model={activeModel}
-                lockedProvider={null}
-                instanceEntries={instanceEntries}
-                modelOptionsByInstance={modelOptionsByInstance}
-                isComposerOwned={false}
-                triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                onInstanceModelChange={(instanceId, model) =>
-                  setDraft((current) => ({ ...current, modelKey: `${instanceId}:${model}` }))
-                }
-              />
+                丢弃
+              </Button>
             </div>
-          </Field>
-
-          <div className="space-y-3">
-            {task?.schedule.type === "interval" &&
-            task.schedule.everyMs < MIN_SCHEDULED_TASK_INTERVAL_MS ? (
-              <p className="text-sm text-muted-foreground" role="status">
-                此任务使用旧版间隔，不到一分钟。保存后会调整为至少一分钟。
-              </p>
+          ) : null}
+          {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
+          <fieldset ref={fieldsRef} disabled={saving} className="min-w-0 space-y-5">
+            {!connected ? (
+              <p className="text-sm text-destructive">请重新连接此环境后再保存。</p>
             ) : null}
-            {/* Wraps the toggle below the label when both don't fit, as on phones. */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label>定时规则</Label>
-              <ToggleGroup
-                aria-label="定时方式"
-                value={[draft.scheduleMode]}
-                onValueChange={(values) => {
-                  const mode = values[0] as ScheduleMode | undefined;
-                  if (
-                    mode === "fixed" ||
-                    mode === "once" ||
-                    mode === "interval" ||
-                    mode === "webhook"
-                  )
-                    setDraft((current) => {
-                      const suggested =
-                        mode === "once" && !current.runAt
-                          ? new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000)
-                          : null;
-                      return {
-                        ...current,
-                        scheduleMode: mode,
-                        // Keep the instant too, so an hour that repeats when clocks go back stays exact.
-                        ...(suggested === null
-                          ? {}
-                          : {
-                              runAt: toDateTimeLocalValue(suggested),
-                              savedRunAt: suggested.toISOString(),
-                            }),
-                        prompt:
-                          mode === "webhook" && !current.prompt.trim()
-                            ? DEFAULT_WEBHOOK_PROMPT
-                            : current.prompt,
-                      };
-                    });
+            {task === null ? (
+              <Field label="从模板开始">
+                <ScheduledTaskTemplates
+                  disabled={saving || !canOperate}
+                  onSelect={(template) => void applyTemplate(template)}
+                />
+              </Field>
+            ) : null}
+            <Field label="运行环境" htmlFor="scheduled-task-environment">
+              <Select
+                value={environmentId}
+                disabled={task !== null || saving}
+                onValueChange={(id) => {
+                  const next = connectedEnvironments.find((entry) => entry.environmentId === id);
+                  if (!next) return;
+                  setEnvironmentId(next.environmentId);
+                  setDraft((current) => ({
+                    ...unbindDraftFromThread(current),
+                    projectId: defaultScheduledTaskProjectId(projectsOn(next.environmentId), scope),
+                    modelKey: "",
+                    baseModelSelection: null,
+                    baseRef: "main",
+                    startFromOrigin: true,
+                    existingWorktreePath: "",
+                  }));
                 }}
               >
-                <Toggle value="fixed">固定时间</Toggle>
-                {offersOnce || draft.scheduleMode === "once" ? (
-                  <Toggle value="once">单次</Toggle>
-                ) : null}
-                <Toggle value="interval">按间隔</Toggle>
-                <Toggle value="webhook">收到 webhook 时</Toggle>
-              </ToggleGroup>
+                <SelectTrigger id="scheduled-task-environment" size="sm">
+                  <SelectValue>
+                    <span className="flex items-center gap-2">
+                      <EnvironmentMachineIcon
+                        kind={resolveEnvironmentMachineKind(environment?.serverConfig ?? null)}
+                        className="size-4"
+                      />
+                      {environment?.label ?? "环境不可用"}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup>
+                  {connectedEnvironments.map((entry) => {
+                    const { secondary } = settingsScopeEnvironmentLabels(
+                      entry,
+                      connectedEnvironments,
+                    );
+                    return (
+                      <SelectItem
+                        key={entry.environmentId}
+                        value={entry.environmentId}
+                        label={entry.label}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <EnvironmentMachineIcon
+                            kind={resolveEnvironmentMachineKind(entry.serverConfig)}
+                            className="size-4"
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate">{entry.label}</span>
+                            {secondary ? (
+                              <span className="block max-w-72 truncate text-xs text-muted-foreground">
+                                {secondary}
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectPopup>
+              </Select>
+            </Field>
+            {tasksQuery.error ? (
+              <p className="text-sm text-destructive" role="status">
+                {tasksQuery.error}
+              </p>
+            ) : null}
+            {editingTaskMissing ? (
+              <p className="text-xs text-destructive" role="status">
+                此定时任务已不存在。
+              </p>
+            ) : null}
+            <Field label="名称" htmlFor="scheduled-task-title">
+              <Input
+                id="scheduled-task-title"
+                placeholder="例如：检查 Sentry issue"
+                value={draft.title}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, title: event.target.value }))
+                }
+              />
+            </Field>
+
+            <ScheduledTaskDestination
+              environmentId={environmentId}
+              projectId={selectedProjectId}
+              threadId={draft.threadId ? (draft.threadId as ThreadId) : null}
+              threadMode={draft.threadMode}
+              disabled={saving || !connected}
+              onSelect={(thread) =>
+                setDraft((current) =>
+                  thread === null
+                    ? { ...unbindDraftFromThread(current), threadMode: "new_thread" }
+                    : moveDraftToThread(current, thread),
+                )
+              }
+              onThreadModeChange={
+                offersThreadModes
+                  ? (threadMode) =>
+                      setDraft((current) => ({
+                        ...(threadMode === "new_thread" ? unbindDraftFromThread(current) : current),
+                        threadMode,
+                      }))
+                  : undefined
+              }
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="项目" htmlFor="scheduled-task-project">
+                <Select
+                  value={selectedProjectId}
+                  onValueChange={(projectId) =>
+                    setDraft((current) => changeDraftProject(current, projectId ?? ""))
+                  }
+                >
+                  <SelectTrigger size="sm" id="scheduled-task-project">
+                    <SelectValue placeholder="选择项目">{selectedProject?.title}</SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id} label={project.title}>
+                        <span className="block truncate">{project.title}</span>
+                        {allProjects.some(
+                          (other) =>
+                            other.title === project.title &&
+                            (other.environmentId !== project.environmentId ||
+                              other.id !== project.id),
+                        ) ? (
+                          <span className="block max-w-72 truncate text-xs text-muted-foreground">
+                            {project.workspaceRoot}
+                          </span>
+                        ) : null}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </Field>
+
+              <Field label="工作区" htmlFor="scheduled-task-workspace">
+                <Select
+                  value={draft.workspaceMode}
+                  onValueChange={(value) =>
+                    setDraft((current) => ({ ...current, workspaceMode: value as WorkspaceMode }))
+                  }
+                >
+                  <SelectTrigger size="sm" id="scheduled-task-workspace">
+                    <SelectValue>{WORKSPACE_MODE_LABELS[draft.workspaceMode]}</SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    <SelectItem value="worktree">创建新工作树</SelectItem>
+                    <SelectItem value="root">使用项目工作副本</SelectItem>
+                    <SelectItem value="existing_worktree">使用指定工作副本</SelectItem>
+                  </SelectPopup>
+                </Select>
+              </Field>
             </div>
 
-            {draft.scheduleMode === "webhook" ? (
-              <div className="space-y-4">
-                <WebhookEndpointField environmentId={environmentId} task={liveTask} />
-                <p className="text-xs text-muted-foreground">
-                  {
-                    "每个请求都会运行提示词。在提示词中使用 {{body.path}}、{{headers.name}}、{{query.name}}、{{body}} 或 {{request}}，只有引用的内容会发给智能体。"
+            {draft.workspaceMode === "worktree" ? (
+              <Field label="基础分支" htmlFor="scheduled-task-base-ref">
+                <WorktreeBaseBranchPicker
+                  key={`${environmentId}:${selectedProjectId}`}
+                  id="scheduled-task-base-ref"
+                  environmentId={environmentId}
+                  cwd={selectedProject?.workspaceRoot ?? null}
+                  value={draft.baseRef}
+                  onValueChange={(baseRef) => setDraft((current) => ({ ...current, baseRef }))}
+                  startFromOrigin={draft.startFromOrigin}
+                  onStartFromOriginChange={(startFromOrigin) =>
+                    setDraft((current) => ({ ...current, startFromOrigin }))
                   }
-                </p>
-                <Field
-                  label="跳过超过此时长的请求"
-                  hint="分钟，可选"
-                  htmlFor="scheduled-task-max-age"
-                >
-                  <Input
-                    id="scheduled-task-max-age"
-                    type="number"
-                    nativeInput
-                    min={1}
-                    max={MAX_WEBHOOK_DELIVERY_AGE_MINUTES}
-                    placeholder="运行每个请求"
-                    value={draft.maxDeliveryAgeMinutes}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        maxDeliveryAgeMinutes: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-                <WebhookFiltersField
-                  filters={draft.filters}
-                  onChange={(filters) => setDraft((current) => ({ ...current, filters }))}
+                  disabled={saving || !connected}
                 />
-                <Field label="重复请求键" hint="模板，可选" htmlFor="scheduled-task-replay-key">
-                  <Input
-                    id="scheduled-task-replay-key"
-                    placeholder="{{headers.delivery-id}}"
-                    value={draft.replayKey}
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, replayKey: event.target.value }))
-                    }
-                  />
-                </Field>
-                <p className="text-xs text-muted-foreground">键相同的请求在 7 天内只运行一次。</p>
-                <Field label="合并键" hint="模板，可选" htmlFor="scheduled-task-coalesce-key">
-                  <Input
-                    id="scheduled-task-coalesce-key"
-                    placeholder="{{body.id}}"
-                    value={draft.coalesceKey}
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, coalesceKey: event.target.value }))
-                    }
-                  />
-                </Field>
-                <Field label="合并窗口" hint="秒，10–3600" htmlFor="scheduled-task-coalesce-window">
-                  <Input
-                    id="scheduled-task-coalesce-window"
-                    type="number"
-                    nativeInput
-                    min={10}
-                    max={3600}
-                    placeholder="120"
-                    value={draft.coalesceWindowSeconds}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        coalesceWindowSeconds: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-                <p className="text-xs text-muted-foreground">
-                  从首次投递开始计算合并窗口，窗口结束时仅使用最新请求内容运行一次。键为空时正常运行。
-                </p>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0 space-y-1">
-                    <Label htmlFor="scheduled-task-signature">要求签名</Label>
-                    <p className="text-sm text-muted-foreground">
-                      拒绝请求体缺少有效HMAC-SHA256签名的请求。
-                    </p>
-                  </div>
-                  <Switch
-                    id="scheduled-task-signature"
-                    checked={draft.signatureEnabled}
-                    onCheckedChange={(signatureEnabled) =>
-                      setDraft((current) => ({ ...current, signatureEnabled }))
-                    }
-                  />
-                </div>
-                {draft.signatureEnabled ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="请求头" htmlFor="scheduled-task-signature-header">
-                      <Input
-                        id="scheduled-task-signature-header"
-                        value={draft.signatureHeader}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            signatureHeader: event.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Field label="前缀" htmlFor="scheduled-task-signature-prefix">
-                      <Input
-                        id="scheduled-task-signature-prefix"
-                        value={draft.signaturePrefix}
-                        placeholder="无"
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            signaturePrefix: event.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Field label="编码" htmlFor="scheduled-task-signature-encoding">
-                      <Select
-                        value={draft.signatureEncoding}
-                        onValueChange={(value) =>
-                          setDraft((current) => ({
-                            ...current,
-                            signatureEncoding: value === "base64" ? "base64" : "hex",
-                          }))
-                        }
-                      >
-                        <SelectTrigger size="sm" id="scheduled-task-signature-encoding">
-                          <SelectValue>{draft.signatureEncoding}</SelectValue>
-                        </SelectTrigger>
-                        <SelectPopup>
-                          <SelectItem value="hex">十六进制</SelectItem>
-                          <SelectItem value="base64">base64</SelectItem>
-                        </SelectPopup>
-                      </Select>
-                    </Field>
-                    <Field label="凭据" htmlFor="scheduled-task-signature-secret">
-                      <Input
-                        id="scheduled-task-signature-secret"
-                        type="password"
-                        autoComplete="off"
-                        value={draft.signatureSecret}
-                        placeholder={
-                          liveTask?.schedule.type === "webhook" && liveTask.webhook?.hasSecret
-                            ? "保持不变"
-                            : "共享凭据"
-                        }
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            signatureSecret: event.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                  </div>
-                ) : null}
-              </div>
-            ) : draft.scheduleMode === "once" ? (
-              <div className="flex items-center gap-2">
-                <Label htmlFor="scheduled-task-run-at">运行日期</Label>
+              </Field>
+            ) : null}
+            {draft.workspaceMode === "existing_worktree" ? (
+              <Field label="工作副本路径" htmlFor="scheduled-task-checkout">
                 <Input
-                  type="datetime-local"
-                  id="scheduled-task-run-at"
-                  nativeInput
-                  className="w-56"
-                  value={draft.runAt}
+                  id="scheduled-task-checkout"
+                  value={draft.existingWorktreePath}
+                  placeholder="/path/to/checkout"
                   onChange={(event) =>
-                    setDraft((current) => ({ ...current, runAt: event.target.value }))
-                  }
-                />
-              </div>
-            ) : draft.scheduleMode === "fixed" ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="scheduled-task-time">运行时间</Label>
-                  <Input
-                    type="time"
-                    id="scheduled-task-time"
-                    aria-describedby={
-                      runAtZone === undefined ? undefined : "scheduled-task-time-zone"
-                    }
-                    nativeInput
-                    className="w-32"
-                    value={draft.timeOfDay}
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, timeOfDay: event.target.value }))
-                    }
-                  />
-                  {runAtZone === undefined ? null : (
-                    <span id="scheduled-task-time-zone" className="text-xs text-muted-foreground">
-                      {runAtZone}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground">星期</span>
-                </div>
-                <ToggleGroup
-                  multiple
-                  variant="outline"
-                  size="sm"
-                  aria-label="运行日期"
-                  value={[...draft.weekdays].map(String)}
-                  onValueChange={(values) => {
-                    if (values.length === 0) return;
                     setDraft((current) => ({
                       ...current,
-                      weekdays: new Set(values.map(Number)),
-                    }));
-                  }}
-                >
-                  {WEEKDAY_ORDER.map((day) => (
-                    <Toggle key={day} value={String(day)} aria-label={WEEKDAY_LABELS[day]}>
-                      {WEEKDAY_SHORT[day]}
-                    </Toggle>
-                  ))}
-                </ToggleGroup>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Label htmlFor="scheduled-task-interval">运行间隔</Label>
-                <Input
-                  type="number"
-                  id="scheduled-task-interval"
-                  nativeInput
-                  min={1}
-                  step="any"
-                  className="w-24"
-                  value={draft.intervalMinutes}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, intervalMinutes: event.target.value }))
+                      existingWorktreePath: resolvePastedPath(
+                        current.existingWorktreePath,
+                        event.target.value,
+                      ),
+                    }))
                   }
                 />
-                <span className="text-xs text-muted-foreground">分钟</span>
+              </Field>
+            ) : null}
+
+            <Field label="提示词" htmlFor="scheduled-task-prompt">
+              <Textarea
+                id="scheduled-task-prompt"
+                className="max-h-64 overflow-y-auto"
+                placeholder="每次运行时，智能体应该做什么？"
+                value={draft.prompt}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, prompt: event.target.value }))
+                }
+              />
+            </Field>
+
+            <Field label="模型">
+              <div>
+                <ProviderModelPicker
+                  environmentId={environmentId}
+                  disabled={saving || !connected}
+                  activeInstanceId={activeInstanceId}
+                  model={activeModel}
+                  lockedProvider={null}
+                  instanceEntries={instanceEntries}
+                  modelOptionsByInstance={modelOptionsByInstance}
+                  isComposerOwned={false}
+                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  onInstanceModelChange={(instanceId, model) =>
+                    setDraft((current) => ({ ...current, modelKey: `${instanceId}:${model}` }))
+                  }
+                />
               </div>
-            )}
-          </div>
+            </Field>
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0 space-y-1">
-              <Label htmlFor="scheduled-task-enabled">启用</Label>
-              <p id="scheduled-task-enabled-description" className="text-sm text-muted-foreground">
-                已停用的任务仍会保存，但不会运行。
-              </p>
+            <div className="space-y-3">
+              {task?.schedule.type === "interval" &&
+              task.schedule.everyMs < MIN_SCHEDULED_TASK_INTERVAL_MS ? (
+                <p className="text-sm text-muted-foreground" role="status">
+                  此任务使用旧版间隔，不到一分钟。保存后会调整为至少一分钟。
+                </p>
+              ) : null}
+              {/* Wraps the toggle below the label when both don't fit, as on phones. */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label>定时规则</Label>
+                <ToggleGroup
+                  aria-label="定时方式"
+                  value={[draft.scheduleMode]}
+                  onValueChange={(values) => {
+                    const mode = values[0] as ScheduleMode | undefined;
+                    if (
+                      mode === "fixed" ||
+                      mode === "once" ||
+                      mode === "interval" ||
+                      mode === "webhook"
+                    )
+                      setDraft((current) => {
+                        const suggested =
+                          mode === "once" && !current.runAt
+                            ? new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000)
+                            : null;
+                        return {
+                          ...current,
+                          scheduleMode: mode,
+                          // Keep the instant too, so an hour that repeats when clocks go back stays exact.
+                          ...(suggested === null
+                            ? {}
+                            : {
+                                runAt: toDateTimeLocalValue(suggested),
+                                savedRunAt: suggested.toISOString(),
+                              }),
+                          prompt:
+                            mode === "webhook" && !current.prompt.trim()
+                              ? DEFAULT_WEBHOOK_PROMPT
+                              : current.prompt,
+                        };
+                      });
+                  }}
+                >
+                  <Toggle value="fixed">固定时间</Toggle>
+                  {offersOnce || draft.scheduleMode === "once" ? (
+                    <Toggle value="once">单次</Toggle>
+                  ) : null}
+                  <Toggle value="interval">按间隔</Toggle>
+                  <Toggle value="webhook">收到 webhook 时</Toggle>
+                </ToggleGroup>
+              </div>
+
+              {draft.scheduleMode === "webhook" ? (
+                <div className="space-y-4">
+                  <WebhookEndpointField environmentId={environmentId} task={liveTask} />
+                  <p className="text-xs text-muted-foreground">
+                    {
+                      "每个请求都会运行提示词。在提示词中使用 {{body.path}}、{{headers.name}}、{{query.name}}、{{body}} 或 {{request}}，只有引用的内容会发给智能体。"
+                    }
+                  </p>
+                  <Field
+                    label="跳过超过此时长的请求"
+                    hint="分钟，可选"
+                    htmlFor="scheduled-task-max-age"
+                  >
+                    <Input
+                      id="scheduled-task-max-age"
+                      type="number"
+                      nativeInput
+                      min={1}
+                      max={MAX_WEBHOOK_DELIVERY_AGE_MINUTES}
+                      placeholder="运行每个请求"
+                      value={draft.maxDeliveryAgeMinutes}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          maxDeliveryAgeMinutes: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <WebhookFiltersField
+                    filters={draft.filters}
+                    onChange={(filters) => setDraft((current) => ({ ...current, filters }))}
+                  />
+                  <Field label="重复请求键" hint="模板，可选" htmlFor="scheduled-task-replay-key">
+                    <Input
+                      id="scheduled-task-replay-key"
+                      placeholder="{{headers.delivery-id}}"
+                      value={draft.replayKey}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, replayKey: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <p className="text-xs text-muted-foreground">键相同的请求在 7 天内只运行一次。</p>
+                  <Field label="合并键" hint="模板，可选" htmlFor="scheduled-task-coalesce-key">
+                    <Input
+                      id="scheduled-task-coalesce-key"
+                      placeholder="{{body.id}}"
+                      value={draft.coalesceKey}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, coalesceKey: event.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field
+                    label="合并窗口"
+                    hint="秒，10–3600"
+                    htmlFor="scheduled-task-coalesce-window"
+                  >
+                    <Input
+                      id="scheduled-task-coalesce-window"
+                      type="number"
+                      nativeInput
+                      min={10}
+                      max={3600}
+                      placeholder="120"
+                      value={draft.coalesceWindowSeconds}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          coalesceWindowSeconds: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <p className="text-xs text-muted-foreground">
+                    从首次投递开始计算合并窗口，窗口结束时仅使用最新请求内容运行一次。键为空时正常运行。
+                  </p>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 space-y-1">
+                      <Label htmlFor="scheduled-task-signature">要求签名</Label>
+                      <p className="text-sm text-muted-foreground">
+                        拒绝请求体缺少有效HMAC-SHA256签名的请求。
+                      </p>
+                    </div>
+                    <Switch
+                      id="scheduled-task-signature"
+                      checked={draft.signatureEnabled}
+                      onCheckedChange={(signatureEnabled) =>
+                        setDraft((current) => ({ ...current, signatureEnabled }))
+                      }
+                    />
+                  </div>
+                  {draft.signatureEnabled ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="请求头" htmlFor="scheduled-task-signature-header">
+                        <Input
+                          id="scheduled-task-signature-header"
+                          value={draft.signatureHeader}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              signatureHeader: event.target.value,
+                            }))
+                          }
+                        />
+                      </Field>
+                      <Field label="前缀" htmlFor="scheduled-task-signature-prefix">
+                        <Input
+                          id="scheduled-task-signature-prefix"
+                          value={draft.signaturePrefix}
+                          placeholder="无"
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              signaturePrefix: event.target.value,
+                            }))
+                          }
+                        />
+                      </Field>
+                      <Field label="编码" htmlFor="scheduled-task-signature-encoding">
+                        <Select
+                          value={draft.signatureEncoding}
+                          onValueChange={(value) =>
+                            setDraft((current) => ({
+                              ...current,
+                              signatureEncoding: value === "base64" ? "base64" : "hex",
+                            }))
+                          }
+                        >
+                          <SelectTrigger size="sm" id="scheduled-task-signature-encoding">
+                            <SelectValue>{draft.signatureEncoding}</SelectValue>
+                          </SelectTrigger>
+                          <SelectPopup>
+                            <SelectItem value="hex">十六进制</SelectItem>
+                            <SelectItem value="base64">base64</SelectItem>
+                          </SelectPopup>
+                        </Select>
+                      </Field>
+                      <Field label="凭据" htmlFor="scheduled-task-signature-secret">
+                        <Input
+                          id="scheduled-task-signature-secret"
+                          type="password"
+                          autoComplete="off"
+                          value={draft.signatureSecret}
+                          placeholder={
+                            liveTask?.schedule.type === "webhook" && liveTask.webhook?.hasSecret
+                              ? "保持不变"
+                              : "共享凭据"
+                          }
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              signatureSecret: event.target.value,
+                            }))
+                          }
+                        />
+                      </Field>
+                    </div>
+                  ) : null}
+                </div>
+              ) : draft.scheduleMode === "once" ? (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="scheduled-task-run-at">运行日期</Label>
+                  <Input
+                    type="datetime-local"
+                    id="scheduled-task-run-at"
+                    nativeInput
+                    className="w-56"
+                    value={draft.runAt}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, runAt: event.target.value }))
+                    }
+                  />
+                </div>
+              ) : draft.scheduleMode === "fixed" ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="scheduled-task-time">运行时间</Label>
+                    <Input
+                      type="time"
+                      id="scheduled-task-time"
+                      aria-describedby={
+                        runAtZone === undefined ? undefined : "scheduled-task-time-zone"
+                      }
+                      nativeInput
+                      className="w-32"
+                      value={draft.timeOfDay}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, timeOfDay: event.target.value }))
+                      }
+                    />
+                    {runAtZone === undefined ? null : (
+                      <span id="scheduled-task-time-zone" className="text-xs text-muted-foreground">
+                        {runAtZone}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">星期</span>
+                  </div>
+                  <ToggleGroup
+                    multiple
+                    variant="outline"
+                    size="sm"
+                    aria-label="运行日期"
+                    value={[...draft.weekdays].map(String)}
+                    onValueChange={(values) => {
+                      if (values.length === 0) return;
+                      setDraft((current) => ({
+                        ...current,
+                        weekdays: new Set(values.map(Number)),
+                      }));
+                    }}
+                  >
+                    {WEEKDAY_ORDER.map((day) => (
+                      <Toggle key={day} value={String(day)} aria-label={WEEKDAY_LABELS[day]}>
+                        {WEEKDAY_SHORT[day]}
+                      </Toggle>
+                    ))}
+                  </ToggleGroup>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="scheduled-task-interval">运行间隔</Label>
+                  <Input
+                    type="number"
+                    id="scheduled-task-interval"
+                    nativeInput
+                    min={1}
+                    step="any"
+                    className="w-24"
+                    value={draft.intervalMinutes}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, intervalMinutes: event.target.value }))
+                    }
+                  />
+                  <span className="text-xs text-muted-foreground">分钟</span>
+                </div>
+              )}
             </div>
-            <Switch
-              id="scheduled-task-enabled"
-              aria-describedby="scheduled-task-enabled-description"
-              checked={draft.enabled}
-              onCheckedChange={(enabled) => setDraft((current) => ({ ...current, enabled }))}
-            />
-          </div>
-        </fieldset>
-      </DialogPanel>
 
-      <DialogFooter>
-        <DialogClose render={<Button variant="outline" size="sm" disabled={saving} />}>
-          取消
-        </DialogClose>
-        <Button
-          size="sm"
-          disabled={!canOperate || saving || editingTaskMissing || !connected || !tasksQuery.data}
-          onClick={() => void submit()}
-        >
-          {draft.editingId ? "保存任务" : "创建任务"}
-        </Button>
-      </DialogFooter>
-    </>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 space-y-1">
+                <Label htmlFor="scheduled-task-enabled">启用</Label>
+                <p
+                  id="scheduled-task-enabled-description"
+                  className="text-sm text-muted-foreground"
+                >
+                  已停用的任务仍会保存，但不会运行。
+                </p>
+              </div>
+              <Switch
+                id="scheduled-task-enabled"
+                aria-describedby="scheduled-task-enabled-description"
+                checked={draft.enabled}
+                onCheckedChange={(enabled) => setDraft((current) => ({ ...current, enabled }))}
+              />
+            </div>
+          </fieldset>
+        </DialogPanel>
+
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" size="sm" disabled={saving} />}>
+            取消
+          </DialogClose>
+          <Button
+            size="sm"
+            disabled={!canOperate || saving || editingTaskMissing || !connected || !tasksQuery.data}
+            onClick={() => void submit()}
+          >
+            {draft.editingId ? "保存任务" : "创建任务"}
+          </Button>
+        </DialogFooter>
+      </DialogPopup>
+    </Dialog>
   );
 }
