@@ -139,6 +139,7 @@ interface PendingRevert {
   readonly messageId: MessageId;
   readonly availability: RevertRestoreAvailability;
   readonly removedTurnCount: number;
+  readonly whileRunning?: boolean;
 }
 
 const revertConfirmAtom = makeThreadOverlayAtom<PendingRevert>("revert-confirm");
@@ -158,6 +159,7 @@ export function RevertConfirmHost(props: {
       : describeRevertConfirm({
           availability: pending.availability,
           removedTurnCount: pending.removedTurnCount,
+          whileRunning: pending.whileRunning === true,
         });
   const confirm = (restoreFiles: boolean) => {
     if (pending === null || view === null || (restoreFiles && !view.showRestoreFilesAction)) {

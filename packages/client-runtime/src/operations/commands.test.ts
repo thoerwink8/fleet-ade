@@ -46,6 +46,8 @@ import {
   archiveThread,
   interruptThreadTurn,
   revertThreadCheckpoint,
+  stopAndRollbackThread,
+  cancelPendingRollback,
   resumeThreadQueue,
   startThreadTurn,
 } from "./commands.ts";
@@ -221,6 +223,50 @@ describe("V2 environment commands", () => {
           threadId: v2ThreadId,
           scopeId,
           checkpointId,
+        },
+      ]);
+    }).pipe(Effect.provide(layerTestRandom)),
+  );
+
+  it.effect("sends one stop-and-rollback command for a running thread", () =>
+    Effect.gen(function* () {
+      const commands: OrchestrationV2Command[] = [];
+      const supervisor = yield* makeSupervisor({ commands, projects: [] });
+
+      yield* stopAndRollbackThread({
+        commandId: CommandId.make("stop-and-rollback-1"),
+        threadId: v2ThreadId,
+        turnCount: 2,
+        restoreFiles: false,
+      }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
+
+      expect(commands).toEqual([
+        {
+          type: "thread.stop-and-rollback",
+          commandId: "stop-and-rollback-1",
+          threadId: v2ThreadId,
+          turnCount: 2,
+          restoreFiles: false,
+        },
+      ]);
+    }).pipe(Effect.provide(layerTestRandom)),
+  );
+
+  it.effect("cancels a pending rollback by thread", () =>
+    Effect.gen(function* () {
+      const commands: OrchestrationV2Command[] = [];
+      const supervisor = yield* makeSupervisor({ commands, projects: [] });
+
+      yield* cancelPendingRollback({
+        commandId: CommandId.make("cancel-rollback-1"),
+        threadId: v2ThreadId,
+      }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
+
+      expect(commands).toEqual([
+        {
+          type: "thread.pending-rollback.cancel",
+          commandId: "cancel-rollback-1",
+          threadId: v2ThreadId,
         },
       ]);
     }).pipe(Effect.provide(layerTestRandom)),

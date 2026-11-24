@@ -24,6 +24,7 @@ import {
   TargetIcon,
   TerminalIcon,
   TriangleAlertIcon,
+  Undo2Icon,
 } from "lucide-react";
 import { Fragment } from "react";
 import { tickTextContent } from "~/lib/tickTextContent";
@@ -32,6 +33,7 @@ import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 import type { ThreadNowItem } from "./ThreadNow";
+import type { RollbackProgress } from "./stopAndRewind.logic";
 
 export function extensionStatusBannerItem(
   statuses: NonNullable<OrchestrationV2ProviderSession["extensionStatuses"]>,
@@ -157,6 +159,48 @@ export function runStopNowItem(input: {
           <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
             {input.forceStopping ? "正在强制停止…" : "强制停止"}
           </InlineButton>
+        ) : null}
+      </>
+    ),
+  };
+}
+
+/** A rewind that is stopping the agent or rolling the thread back; any client can cancel it. */
+export function rollbackNowItem(input: {
+  readonly threadId: ThreadId;
+  readonly progress: Exclude<RollbackProgress, { readonly step: "idle" }>;
+  readonly canForceStop: boolean;
+  readonly forceStopping: boolean;
+  readonly canCancel: boolean;
+  readonly onForceStop: () => void;
+  readonly onCancel: () => void;
+}): ThreadNowItem {
+  const { progress } = input;
+  const unanswered = progress.step === "stopping" && progress.forceStop;
+  return {
+    id: `rollback:${input.threadId}`,
+    icon: unanswered ? (
+      <TriangleAlertIcon className="text-warning-foreground" />
+    ) : progress.step === "stopping" ? (
+      <CircleStopIcon />
+    ) : (
+      <Undo2Icon />
+    ),
+    title: unanswered
+      ? "智能体对“停止”没有响应"
+      : progress.step === "stopping"
+        ? "正在停止，随后回退…"
+        : "正在回退…",
+    description: unanswered ? "强制停止会结束它的进程，回退随后接着完成。" : undefined,
+    actions: (
+      <>
+        {unanswered && input.canForceStop ? (
+          <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
+            {input.forceStopping ? "正在强制停止…" : "强制停止"}
+          </InlineButton>
+        ) : null}
+        {progress.canCancel && input.canCancel ? (
+          <InlineButton onClick={input.onCancel}>取消</InlineButton>
         ) : null}
       </>
     ),

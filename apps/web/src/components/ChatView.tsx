@@ -363,7 +363,17 @@ import { ThreadVisitWatermark } from "./chat/ThreadVisitWatermark";
 import { ChatTerminalDrawers } from "./chat/ChatTerminalDrawers";
 import { ChatRightPanel } from "./chat/ChatRightPanel";
 import { useDraftEnvironmentRouting } from "./chat/useDraftEnvironmentRouting";
-import { branchMismatchBannerItem, extensionStatusBannerItem } from "./chat/ThreadActivityBanners";
+import {
+  branchMismatchBannerItem,
+  extensionStatusBannerItem,
+  rollbackNowItem,
+} from "./chat/ThreadActivityBanners";
+import { useForceStopThread } from "./chat/useForceStopThread";
+import {
+  deriveRollbackProgress,
+  hasActiveRun,
+  rollbackSendBlockReason,
+} from "./chat/stopAndRewind.logic";
 import { ThreadNow } from "./chat/ThreadNow";
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import { useDelayedStatus } from "../hooks/useDelayedStatus";
@@ -691,9 +701,18 @@ export default function ChatView(props: ChatViewProps) {
   const [localServerErrorsByThreadKey, setLocalServerErrorsByThreadKey] = useState<
     Record<string, LocalThreadErrorEntry>
   >({});
-  const isRevertingCheckpoint = useComposerDraftStore((store) =>
+  const isLocallyRewinding = useComposerDraftStore((store) =>
     store.rewindingThreadKeys.has(routeThreadKey),
   );
+  // Read from the thread already subscribed, so a second client sees the same rewind.
+  const rollbackProgress = deriveRollbackProgress({
+    pendingRollback: serverProjection?.thread.pendingRollback,
+    rollbackFailure: serverProjection?.thread.rollbackFailure,
+    hasActiveRun: hasActiveRun(serverProjection?.runs ?? []),
+    localRewinding: isLocallyRewinding,
+  });
+  const hasPendingRollback = serverProjection?.thread.pendingRollback != null;
+  const isRevertingCheckpoint = rollbackProgress.step !== "idle";
 
   const workspaceFileDragRouteKey = `${routeThreadKey}:${draftId ?? ""}`;
   const [workspaceFileDragRoute, setWorkspaceFileDragRoute] = useState(workspaceFileDragRouteKey);
@@ -1327,6 +1346,8 @@ export default function ChatView(props: ChatViewProps) {
   const conversationProviderStatus =
     providerStatuses.find((status) => status.instanceId === activeRuntime?.providerInstanceId) ??
     activeProviderStatus;
+  const supportsStopAndRollback =
+    serverConfig?.environment.capabilities.threadStopAndRollback === true;
   const supportsConversationRollback =
     canOperateThread &&
     conversationProviderStatus !== null &&
@@ -2840,26 +2861,33 @@ export default function ChatView(props: ChatViewProps) {
                 : null;
   const openSideChatStable = useStableCallback(() => void sideChat.open());
   const sendSideChatStable = useStableCallback((prompt: string) => sideChat.open(prompt));
-  const { onConfirmRevertStable, onForkFromRunStable, onRevertTimelineTurnStable } =
-    useTimelineRewind({
-      environmentId,
-      routeThreadRef,
-      routeThreadKey,
-      currentRouteThreadKeyRef,
-      serverProjection,
-      activeThread,
-      timelineMessages,
-      phase,
-      isSendBusy,
-      isRevertingCheckpoint,
-      supportsConversationRollback,
-      activeEnvironmentUnavailable,
-      activeEnvironmentUnavailableLabel,
-      promptRef,
-      composerRef,
-      composerDraftTarget,
-      setThreadError,
-    });
+  const {
+    onCancelRollbackStable,
+    onConfirmRevertStable,
+    onForkFromRunStable,
+    onRevertTimelineTurnStable,
+    stopRewindActive,
+  } = useTimelineRewind({
+    environmentId,
+    routeThreadRef,
+    routeThreadKey,
+    currentRouteThreadKeyRef,
+    serverProjection,
+    activeThread,
+    timelineMessages,
+    phase,
+    isSendBusy,
+    isRevertingCheckpoint,
+    supportsConversationRollback,
+    supportsStopAndRollback,
+    hasPendingRollback,
+    activeEnvironmentUnavailable,
+    activeEnvironmentUnavailableLabel,
+    promptRef,
+    composerRef,
+    composerDraftTarget,
+    setThreadError,
+  });
   const onCompactContext = () => {
     if (compactDisabled) return;
     void sendStandaloneCommand("/compact", "无法压缩上下文。");
@@ -3147,8 +3175,28 @@ export default function ChatView(props: ChatViewProps) {
   };
   const onExpandTimelineImageStable = useStableCallback(onExpandTimelineImage);
   const shownThreadSyncPhase = activeEnvironmentUnavailable ? null : delayedThreadSyncPhase;
+  const forceStopRewind = useForceStopThread(environmentId);
+  const rollbackNow =
+    rollbackProgress.step !== "idle" && activeThread
+      ? rollbackNowItem({
+          threadId: activeThread.id,
+          progress: rollbackProgress,
+          canForceStop: forceStopRewind.canForceStop,
+          forceStopping: forceStopRewind.stoppingThreadId === activeThread.id,
+          canCancel: canOperateThread,
+          onForceStop: () => void forceStopRewind.forceStopThread(activeThread.id),
+          onCancel: () => void onCancelRollbackStable(),
+        })
+      : null;
+  // An unanswered Stop needs the person; every other step is the thread's own work.
+  const rollbackNeedsPerson = rollbackProgress.step === "stopping" && rollbackProgress.forceStop;
+  const shownAttentionNow = rollbackNeedsPerson ? rollbackNow : attentionNow;
+  const shownWorkNow = rollbackNow !== null && !rollbackNeedsPerson ? rollbackNow : workNow;
   const hasThreadNow =
-    attentionNow !== null || workNow !== null || goalNow !== null || shownThreadSyncPhase !== null;
+    shownAttentionNow !== null ||
+    shownWorkNow !== null ||
+    goalNow !== null ||
+    shownThreadSyncPhase !== null;
   const queuedRunCount = serverProjection ? getUserQueuedThreadRuns(serverProjection).length : 0;
   // The queue control is mounted for every server thread but joins the footer only while it shows
   // something, by its own rule: an optimistic message stops counting once the server has it.
@@ -3197,8 +3245,8 @@ export default function ChatView(props: ChatViewProps) {
         )}
         <ThreadNow
           key={routeThreadKey}
-          attention={attentionNow}
-          work={workNow}
+          attention={shownAttentionNow}
+          work={shownWorkNow}
           syncPhase={shownThreadSyncPhase}
           goal={goalNow}
         />
@@ -3526,6 +3574,7 @@ export default function ChatView(props: ChatViewProps) {
                   onUseArtifactTemplate={insertArtifactTemplateStable}
                   onSendAppMessage={sendAppMessageStable}
                   isRevertingCheckpoint={isRevertingCheckpoint}
+                  canRewindWhileWorking={supportsStopAndRollback && supportsConversationRollback}
                   onImageExpand={onExpandTimelineImageStable}
                   onFileOpen={openFileAttachmentStable}
                   onFileDownload={downloadFileAttachmentStable}
@@ -3566,7 +3615,7 @@ export default function ChatView(props: ChatViewProps) {
                 setComposerOverlayElement(overlay);
                 attachFollowComposerOverlay(overlay);
               }}
-              inert={isRevertingCheckpoint}
+              inert={isLocallyRewinding && !stopRewindActive}
               data-chat-composer-overlay="true"
               className={
                 isDraftHeroState
@@ -3745,7 +3794,8 @@ export default function ChatView(props: ChatViewProps) {
                                     : isEnvironmentChanging
                                       ? "正在准备电脑"
                                       : isRevertingCheckpoint
-                                        ? "正在回退会话"
+                                        ? (rollbackSendBlockReason(rollbackProgress) ??
+                                          "正在回退会话")
                                         : feedbackUploading
                                           ? "正在发送反馈"
                                           : threadDetailLoading
