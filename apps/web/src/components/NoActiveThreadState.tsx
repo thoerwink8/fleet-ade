@@ -20,12 +20,10 @@ export function NoActiveThreadState() {
         </WorkspacePageHeader>
 
         <Empty className="flex-1">
-          <div className="w-full max-w-lg px-8 py-12">
-            <EmptyHeader className="max-w-none">
-              <EmptyTitle>选择一个会话以继续</EmptyTitle>
-              <EmptyDescription>选择已有会话，或新建一个会话开始。</EmptyDescription>
-            </EmptyHeader>
-          </div>
+          <EmptyHeader className="max-w-lg">
+            <EmptyTitle>选择一个会话以继续</EmptyTitle>
+            <EmptyDescription>选择已有会话，或新建一个会话开始。</EmptyDescription>
+          </EmptyHeader>
         </Empty>
       </div>
     </SidebarInset>

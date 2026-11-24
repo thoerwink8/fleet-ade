@@ -1,0 +1,73 @@
+/* NumberField composes the grouped input frame; its steppers sit inside the frame
+   rather than adding their own boxes. */
+.ade-number-field-group {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+[data-slot="number-field"][data-size="sm"] .ade-number-field-group {
+  min-height: var(--fa-ctrl-sm);
+}
+
+@media (max-width: 639.98px) {
+  [data-slot="number-field"][data-size="sm"] .ade-number-field-group {
+    min-height: var(--fa-ctrl);
+  }
+}
+
+.ade-number-field-step {
+  position: relative;
+  align-self: stretch;
+  border: 0;
+  background: transparent;
+  padding: 0 var(--fa-space-3);
+  cursor: pointer;
+  transition:
+    color var(--fa-dur-fast) var(--fa-ease-out),
+    background-image var(--fa-dur-fast) var(--fa-ease-out);
+}
+
+.ade-number-field-step:first-child {
+  border-radius: calc(var(--fa-radius-md) - var(--fa-bw-1)) 0 0
+    calc(var(--fa-radius-md) - var(--fa-bw-1));
+}
+
+.ade-number-field-step:last-child {
+  border-radius: 0 calc(var(--fa-radius-md) - var(--fa-bw-1))
+    calc(var(--fa-radius-md) - var(--fa-bw-1)) 0;
+}
+
+.ade-number-field-step:hover:not(:disabled):not([data-disabled]) {
+  color: var(--fa-fg);
+  background-image: linear-gradient(var(--fa-hover), var(--fa-hover));
+}
+
+.ade-number-field-step:disabled,
+.ade-number-field-step[data-disabled] {
+  color: var(--fa-fg-muted);
+  cursor: not-allowed;
+}
+
+.ade-number-field-step svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* On touch the visual field stays input-sized; only the steppers' hit area grows. */
+@media (pointer: coarse) {
+  .ade-number-field-step::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+.ade-number-field-input {
+  min-width: 0;
+  text-align: center;
+}

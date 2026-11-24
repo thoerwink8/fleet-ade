@@ -26,32 +26,30 @@ export function NoProjectsHero() {
         {/* The desktop window only moves where CSS opts in, so keep a titlebar strip. */}
         {isElectron ? <WorkspacePageHeader electron /> : null}
         <Empty size="hero" className="flex-1">
-          <div className="w-full max-w-lg px-8 py-12">
-            <EmptyHeader className="max-w-none">
-              <EmptyTitle>我们来做些什么？</EmptyTitle>
-              <EmptyDescription>
-                {scratchTargetEnvironmentId === null
-                  ? "添加项目，开始你的第一个会话。"
-                  : "添加项目，或不关联项目直接开始。"}
-              </EmptyDescription>
-              <div className="mt-6 flex justify-center gap-2">
-                <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
-                  <PlusIcon className="size-4" />
-                  添加项目
+          <EmptyHeader className="max-w-lg">
+            <EmptyTitle>我们来做些什么？</EmptyTitle>
+            <EmptyDescription>
+              {scratchTargetEnvironmentId === null
+                ? "添加项目，开始你的第一个会话。"
+                : "添加项目，或不关联项目直接开始。"}
+            </EmptyDescription>
+            <div className="mt-4 flex justify-center gap-2">
+              <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
+                <PlusIcon className="size-4" />
+                添加项目
+              </Button>
+              {scratchTargetEnvironmentId === null ? null : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void startScratchThread(scratchTargetEnvironmentId)}
+                >
+                  <MessageSquareDashedIcon className="size-4" />
+                  不关联项目开始
                 </Button>
-                {scratchTargetEnvironmentId === null ? null : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void startScratchThread(scratchTargetEnvironmentId)}
-                  >
-                    <MessageSquareDashedIcon className="size-4" />
-                    不关联项目开始
-                  </Button>
-                )}
-              </div>
-            </EmptyHeader>
-          </div>
+              )}
+            </div>
+          </EmptyHeader>
         </Empty>
       </div>
     </SidebarInset>

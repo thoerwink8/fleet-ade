@@ -4,7 +4,7 @@ import { ExternalLinkIcon, TriangleAlertIcon } from "lucide-react";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 
 import { Button } from "../ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import { RefreshIcon } from "../ui/refresh-icon";
 import { describePullRequestDiffError } from "./pullRequestDiffError";
 
@@ -28,9 +28,9 @@ export function PullRequestDiffUnavailableState({
 
   return (
     <Empty size="compact" className="min-h-full" role="status">
-      <div className="flex size-11 items-center justify-center rounded-full bg-warning-surface text-warning">
-        <TriangleAlertIcon aria-hidden className="size-5" />
-      </div>
+      <EmptyMedia variant="icon">
+        <TriangleAlertIcon aria-hidden />
+      </EmptyMedia>
       <EmptyHeader>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
