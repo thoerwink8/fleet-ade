@@ -2,7 +2,7 @@
    Base UI puts data-slot/data-* state on the primitives; keep overrides scoped
    to menu slots so .fa-* stays usable verbatim elsewhere. */
 
-/* Touch keeps the 44px minimum hit area. */
+/* Touch: rows keep their 32px look; ::after stretches the hit area to at least 44px. */
 @media (pointer: coarse) {
   :is(
     [data-slot="menu-item"],
@@ -10,7 +10,18 @@
     [data-slot="menu-radio-item"],
     [data-slot="menu-sub-trigger"]
   ) {
-    min-height: 44px;
+    position: relative;
+  }
+  :is(
+    [data-slot="menu-item"],
+    [data-slot="menu-checkbox-item"],
+    [data-slot="menu-radio-item"],
+    [data-slot="menu-sub-trigger"]
+  )::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block: calc((var(--fa-ctrl) - 44px) / 2);
   }
 }
 
