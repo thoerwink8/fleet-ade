@@ -62,15 +62,15 @@ const make = Effect.gen(function* () {
     "ScratchThreadPromotion.promote",
   )(function* (input) {
     const thread = yield* threads.getThreadShell(input.threadId).pipe(
-      Effect.mapError(fail("Could not read the thread.")),
+      Effect.mapError(fail("无法读取会话。")),
       Effect.filterOrFail(
         (shell) => shell !== null,
-        () => new ScratchThreadPromotionError({ reason: "Thread not found." }),
+        () => new ScratchThreadPromotionError({ reason: "未找到会话。" }),
       ),
     );
     const project = yield* projects
       .getById(thread.projectId)
-      .pipe(Effect.mapError(fail("Could not read the thread's project.")));
+      .pipe(Effect.mapError(fail("无法读取会话所属的项目。")));
     const folder = thread.worktreePath ?? Option.getOrUndefined(project)?.workspaceRoot;
     const scratchRoot = Option.getOrUndefined(yield* managedFolders.scratchRoot);
     const isScratch = yield* managedFolders.isScratchProject(thread.projectId);
@@ -84,13 +84,13 @@ const make = Effect.gen(function* () {
       !(isScratch || alreadyPromoted)
     ) {
       return yield* new ScratchThreadPromotionError({
-        reason: "Only a No project thread with its own folder can become a project.",
+        reason: "只有拥有独立目录的「无项目」会话才能变成项目。",
       });
     }
 
     const snapshot = yield* Effect.flatten(
       threads.readShellSnapshot({ worktreePath: folder }),
-    ).pipe(Effect.mapError(fail("Could not read the threads in this folder.")));
+    ).pipe(Effect.mapError(fail("无法读取此目录中的会话。")));
     const moveSet = new Map<ThreadId, OrchestrationV2ThreadShell>();
     if (isScratch) moveSet.set(thread.id, thread);
     for (const candidate of [...snapshot.threads, ...snapshot.archivedThreads]) {
@@ -102,10 +102,10 @@ const make = Effect.gen(function* () {
     for (const candidate of moveSet.values()) {
       const records = yield* threads
         .getThreadRecords(candidate.id, ["runs", "runtimeRequests"], { turnItemTypes: [] })
-        .pipe(Effect.mapError(fail(`Could not read "${candidate.title}".`)));
+        .pipe(Effect.mapError(fail(`无法读取「${candidate.title}」。`)));
       if (threadHasUnfinishedWork(records)) {
         return yield* new ScratchThreadPromotionError({
-          reason: `"${candidate.title}" is still working. Finish or stop it first.`,
+          reason: `「${candidate.title}」仍在工作。请先结束或停止它。`,
         });
       }
     }
@@ -115,7 +115,7 @@ const make = Effect.gen(function* () {
         const projectId = yield* createProject(thread.title, folder);
         yield* scheduledTasks
           .moveThreadTasks({ threadIds: [...moveSet.keys()], projectId })
-          .pipe(Effect.mapError(fail("Could not move the thread's scheduled tasks.")));
+          .pipe(Effect.mapError(fail("无法移动会话的定时任务。")));
         for (const candidate of moveSet.values()) {
           const commandId = CommandId.make(`scratch-promotion:${yield* randomId}`);
           yield* threads
@@ -125,7 +125,7 @@ const make = Effect.gen(function* () {
               threadId: candidate.id,
               projectId,
             })
-            .pipe(Effect.mapError(fail(`Could not move "${candidate.title}". Try again.`)));
+            .pipe(Effect.mapError(fail(`无法移动「${candidate.title}」。请重试。`)));
         }
         return { projectId };
       }),
@@ -153,7 +153,7 @@ const make = Effect.gen(function* () {
         Effect.catchTags({
           ProjectConflictError: (conflict) => Effect.succeed(conflict.conflictingProjectId),
         }),
-        Effect.mapError(fail("Could not create the project.")),
+        Effect.mapError(fail("无法创建项目。")),
       );
   });
 

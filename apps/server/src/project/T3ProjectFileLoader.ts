@@ -21,7 +21,7 @@ export class T3ProjectFileLoadError extends Schema.TaggedError<T3ProjectFileLoad
   },
 ) {
   override get message(): string {
-    return `Failed to ${this.operation} ${T3_PROJECT_FILE_NAME} at ${this.filePath}.`;
+    return `无法${this.operation === "read" ? "读取" : "解析"} ${T3_PROJECT_FILE_NAME}（${this.filePath}）。`;
   }
 }
 

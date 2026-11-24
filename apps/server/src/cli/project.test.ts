@@ -347,7 +347,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
           }),
         );
 
-        assert.include(error.message, "not empty");
+        assert.include(error.message, "不是空的");
         assert.deepEqual(
           (yield* readProjects(baseDir)).projects.map((entry) => entry.id),
           [project.id],

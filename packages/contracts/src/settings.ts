@@ -428,7 +428,7 @@ export const CodexSettings = makeProviderSettingsSchema(
     binaryPath: makeBinaryPathSetting("codex").pipe(
       Schema.annotateKey({
         title: "可执行文件路径",
-        description: "此实例使用的 Codex 可执行文件路径。",
+        description: "此账号使用的 Codex 可执行文件路径。",
         providerSettingsForm: { placeholder: "codex", clearWhenEmpty: "omit" },
       }),
     ),
@@ -552,7 +552,7 @@ export const ClaudeSettings = makeProviderSettingsSchema(
       Schema.annotateKey({
         title: "压缩空闲会话",
         description:
-          "空闲会话超过 200,000 词元后何时压缩：你回来后、提示缓存即将过期前，或从不压缩。覆盖“提供方 > 高级”中的默认值。",
+          "空闲会话超过 200,000 词元后何时压缩：你回来后、提示缓存即将过期前，或从不压缩。覆盖“智能体 > 高级”中的默认值。",
         providerSettingsForm: {
           control: "select",
           options: INSTANCE_IDLE_COMPACTION_MODES,
@@ -608,7 +608,7 @@ export const AntigravitySettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
         title: "API key",
-        description: "Gemini 或 Vertex AI express key，单独存放在主机上。",
+        description: "Gemini 或 Vertex AI express key，单独存放在本机。",
         providerSettingsForm: {
           control: "password",
           placeholder: "可选",

@@ -375,9 +375,7 @@ export class ProjectSearchEntriesError extends Schema.TaggedError<ProjectSearchE
   ) {
     super({
       ...props,
-      message:
-        decodedProjectErrorMessage(props) ??
-        `Failed to search workspace entries in '${props.cwd}'.`,
+      message: decodedProjectErrorMessage(props) ?? `无法在“${props.cwd}”中搜索项目条目。`,
     } as any);
   }
 }
@@ -406,9 +404,7 @@ export class ProjectSearchContentsError extends Schema.TaggedError<ProjectSearch
   ) {
     super({
       ...props,
-      message:
-        decodedProjectErrorMessage(props) ??
-        `Failed to search workspace contents in '${props.cwd}'.`,
+      message: decodedProjectErrorMessage(props) ?? `无法在“${props.cwd}”中搜索项目内容。`,
     } as any);
   }
 }
@@ -429,8 +425,7 @@ export class ProjectListEntriesError extends Schema.TaggedError<ProjectListEntri
   constructor(props: ProjectEntriesFailureContext & { readonly cwd: string }) {
     super({
       ...props,
-      message:
-        decodedProjectErrorMessage(props) ?? `Failed to list workspace entries in '${props.cwd}'.`,
+      message: decodedProjectErrorMessage(props) ?? `无法在“${props.cwd}”中列出项目条目。`,
     } as any);
   }
 }
@@ -506,7 +501,7 @@ export class ProjectReadFileError extends Schema.TaggedError<ProjectReadFileErro
       ...props,
       message:
         decodedProjectErrorMessage(props) ??
-        `Failed to read workspace file '${props.relativePath}' in '${props.cwd}'.`,
+        `无法读取“${props.cwd}”中的项目文件“${props.relativePath}”。`,
     } as any);
   }
 }
@@ -571,7 +566,7 @@ export class ProjectWriteFileError extends Schema.TaggedError<ProjectWriteFileEr
       ...props,
       message:
         decodedProjectErrorMessage(props) ??
-        `Failed to write workspace file '${props.relativePath}' in '${props.cwd}'.`,
+        `无法写入“${props.cwd}”中的项目文件“${props.relativePath}”。`,
     } as any);
   }
 }

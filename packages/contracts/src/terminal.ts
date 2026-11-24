@@ -268,7 +268,7 @@ export class TerminalCwdNotFoundError extends Schema.TaggedError<TerminalCwdNotF
   },
 ) {
   override get message() {
-    return `Terminal folder does not exist: ${this.cwd}. Restore the folder at this path before retrying.`;
+    return `终端目录不存在：${this.cwd}。请先在该路径还原目录后重试。`;
   }
 }
 
@@ -279,7 +279,7 @@ export class TerminalCwdNotDirectoryError extends Schema.TaggedError<TerminalCwd
   },
 ) {
   override get message() {
-    return `Terminal cwd is not a directory: ${this.cwd}`;
+    return `终端工作目录不是目录：${this.cwd}`;
   }
 }
 
@@ -291,7 +291,7 @@ export class TerminalCwdStatError extends Schema.TaggedError<TerminalCwdStatErro
   },
 ) {
   override get message() {
-    return `Failed to access terminal cwd: ${this.cwd}`;
+    return `无法访问终端工作目录：${this.cwd}`;
   }
 }
 
@@ -312,7 +312,7 @@ export class TerminalHistoryError extends Schema.TaggedError<TerminalHistoryErro
   },
 ) {
   override get message() {
-    return `Failed to ${this.operation} terminal history for thread: ${this.threadId}, terminal: ${this.terminalId}`;
+    return `无法对会话 ${this.threadId} 中终端 ${this.terminalId} 的历史记录执行 ${this.operation} 操作`;
   }
 }
 
@@ -324,7 +324,7 @@ export class TerminalSessionLookupError extends Schema.TaggedError<TerminalSessi
   },
 ) {
   override get message() {
-    return `Unknown terminal thread: ${this.threadId}, terminal: ${this.terminalId}`;
+    return `找不到会话 ${this.threadId} 的终端 ${this.terminalId}`;
   }
 }
 
@@ -335,7 +335,7 @@ export class TerminalProviderInstanceNotFoundError extends Schema.TaggedError<Te
   },
 ) {
   override get message() {
-    return `Provider instance is not available: ${this.providerInstanceId}`;
+    return `智能体不可用：${this.providerInstanceId}`;
   }
 }
 
@@ -347,7 +347,7 @@ export class TerminalProviderEnvironmentError extends Schema.TaggedError<Termina
   },
 ) {
   override get message() {
-    return `Could not prepare the terminal environment for provider instance: ${this.providerInstanceId}`;
+    return `无法为智能体 ${this.providerInstanceId} 准备终端环境`;
   }
 }
 
@@ -359,7 +359,7 @@ export class TerminalNotRunningError extends Schema.TaggedError<TerminalNotRunni
   },
 ) {
   override get message() {
-    return `Terminal is not running for thread: ${this.threadId}, terminal: ${this.terminalId}`;
+    return `会话 ${this.threadId} 的终端 ${this.terminalId} 未在运行`;
   }
 }
 
@@ -373,7 +373,7 @@ export class TerminalWriteError extends Schema.TaggedError<TerminalWriteError>()
   },
 ) {
   override get message() {
-    return `Failed to write to terminal for thread: ${this.threadId}, terminal: ${this.terminalId}, PID: ${this.terminalPid}`;
+    return `无法写入会话 ${this.threadId} 中 PID 为 ${this.terminalPid} 的终端 ${this.terminalId}`;
   }
 }
 
@@ -389,7 +389,7 @@ export class TerminalResizeError extends Schema.TaggedError<TerminalResizeError>
   },
 ) {
   override get message() {
-    return `Failed to resize terminal for thread: ${this.threadId}, terminal: ${this.terminalId}, PID: ${this.terminalPid} to ${this.cols}x${this.rows}`;
+    return `无法将会话 ${this.threadId} 中 PID 为 ${this.terminalPid} 的终端 ${this.terminalId} 调整为 ${this.cols}x${this.rows}`;
   }
 }
 

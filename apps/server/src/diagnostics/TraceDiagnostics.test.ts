@@ -282,7 +282,7 @@ describe("TraceDiagnostics", () => {
       );
       assert.deepStrictEqual(Option.getOrUndefined(diagnostics.error), {
         kind: "trace-file-read-failed",
-        message: `Failed to read local trace file '${traceFilePath}.1'.`,
+        message: `无法读取本地 trace 文件「${traceFilePath}.1」。`,
       });
       assert.deepStrictEqual(diagnostics.scannedFilePaths, [`${traceFilePath}.1`, traceFilePath]);
 

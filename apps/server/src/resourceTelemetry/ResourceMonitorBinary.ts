@@ -17,7 +17,7 @@ export class ResourceMonitorBinaryUnsupported extends Schema.TaggedError<Resourc
   },
 ) {
   override get message(): string {
-    return `Resource monitoring is unsupported on ${this.platform}/${this.architecture}.`;
+    return `${this.platform}/${this.architecture} 不支持资源监测。`;
   }
 }
 
@@ -30,7 +30,7 @@ export class ResourceMonitorBinaryNotFound extends Schema.TaggedError<ResourceMo
   },
 ) {
   override get message(): string {
-    return `Resource monitor binary was not found for ${this.platform}/${this.architecture}.`;
+    return `未找到 ${this.platform}/${this.architecture} 的资源监测器二进制文件。`;
   }
 }
 
@@ -42,7 +42,7 @@ export class ResourceMonitorBinaryNotExecutable extends Schema.TaggedError<Resou
   },
 ) {
   override get message(): string {
-    return `Resource monitor binary at '${this.path}' is not executable.`;
+    return `「${this.path}」处的资源监测器二进制文件不可执行。`;
   }
 }
 
