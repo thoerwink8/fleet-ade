@@ -124,6 +124,7 @@ export function useAutoBalanceUpdateBanner(
       running === 0 && targets.length > 0 ? (
         <ServerUpdatesAction
           targets={targets}
+          size="sm"
           variant="ghost"
           label={
             failed > 0

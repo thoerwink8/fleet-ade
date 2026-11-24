@@ -87,7 +87,7 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     actions: (
       <>
         {recoveryActions}
-        <ChatGptUsageButton size="xs" variant="ghost" />
+        <ChatGptUsageButton size="sm" variant="ghost" />
       </>
     ),
   };

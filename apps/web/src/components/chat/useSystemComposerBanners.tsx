@@ -156,7 +156,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
     const disconnectAction =
       canDisconnectActiveEnvironment && activeEnvironmentUnavailableState ? (
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           disabled={disconnectingEnvironment}
           title="隐藏这个服务器的会话。可在“环境”设置中重新开启。"
@@ -193,7 +193,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
           <>
             {unavailableConnection.phase !== "connecting" ? (
               <Button
-                size="xs"
+                size="sm"
                 variant="ghost"
                 onClick={() =>
                   void handleReconnectActiveEnvironmentStable(
@@ -239,6 +239,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
             desktopAppInstall={serverConfig?.environment.capabilities.desktopAppInstall}
             targetVersion={serverUpdateState.targetVersion}
             label="重试"
+            size="sm"
             variant="ghost"
           />
         ),
