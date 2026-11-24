@@ -1,0 +1,22 @@
+/* fa-dialog is @fleet/design's single padded container. App dialogs are
+   sectioned: the popup itself carries no padding or gaps, and header, panel and
+   footer own their insets so ScrollArea reaches the surface edges and the
+   band-less fa-dialog__foot stays flush. */
+.fa-dialog:is([data-slot="dialog-popup"], [data-slot="alert-dialog-popup"]) {
+  padding: 0;
+  gap: 0;
+  border-radius: var(--fa-radius-lg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  /* No fleet [data-theme] palette exists for Grove/Ember and the app palettes, so
+     dialog surfaces read the active popover roles like menus and sheets do. */
+  --fa-overlay: var(--popover);
+  --fa-fg: var(--popover-foreground);
+  --fa-fg-muted: var(--muted-foreground);
+}
+
+@media (max-width: 639.98px) {
+  .fa-dialog:is([data-slot="dialog-popup"], [data-slot="alert-dialog-popup"]) {
+    border-radius: 0;
+  }
+}

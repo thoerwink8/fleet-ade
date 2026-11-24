@@ -4,12 +4,14 @@
 @import "@fleet/design/tokens.css" layer(fleet-tokens);
 @import "@fleet/design/styles/base.css" layer(fleet);
 @import "@fleet/design/styles/checkbox.css" layer(fleet);
+@import "@fleet/design/styles/confirm-dialog.css" layer(fleet);
 @import "./styles/fleet-overrides/checkbox.css" layer(fleet);
 @import "@fleet/design/styles/tooltip.css" layer(fleet);
 @import "@fleet/design/styles/input.css" layer(fleet);
 @import "./styles/fleet-overrides/input.css" layer(fleet);
 @import "@fleet/design/styles/segmented-control.css" layer(fleet);
 @import "./styles/fleet-overrides/segmented.css" layer(fleet);
+@import "./styles/fleet-overrides/dialog.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
