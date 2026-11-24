@@ -213,7 +213,7 @@ function WorkflowScript(props: { readonly script: string }) {
     <div>
       <div
         ref={revealRef}
-        className={cn("relative", folded && "max-h-44 overflow-hidden")}
+        className={cn(folded && "max-h-44 overflow-hidden")}
         data-thread-find-text="true"
         data-thread-find-fold={folded ? "" : undefined}
         style={
@@ -222,10 +222,10 @@ function WorkflowScript(props: { readonly script: string }) {
             : undefined
         }
       >
-        <div>
+        <div className="relative">
           <ChatMarkdown text={scriptMarkdown(props.script)} cwd={undefined} />
+          <div aria-hidden="true" data-fold-probe="true" {...probeProps} />
         </div>
-        <div aria-hidden="true" data-fold-probe="true" {...probeProps} />
       </div>
       {canFold ? (
         <div className="-ms-1">

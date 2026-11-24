@@ -522,6 +522,94 @@ describe("MessagesTimeline messages", () => {
     expect(long!.offsetHeight).toBeGreaterThanOrEqual(foldedHeight * 2);
   });
 
+  function useRootFont(px: number) {
+    const root = document.documentElement;
+    const previous = root.style.fontSize;
+    root.style.fontSize = `${px}px`;
+    onTestFinished(() => {
+      root.style.fontSize = previous;
+    });
+  }
+
+  function probeBox(container: ParentNode) {
+    const probe = container.querySelector<HTMLElement>("[data-fold-probe]");
+    const box = probe?.parentElement;
+    if (!probe || !box) throw new Error("missing fold probe");
+    return { probe, box };
+  }
+
+  async function resizeProbeParent(container: ParentNode, px: number): Promise<number> {
+    const { probe, box } = probeBox(container);
+    const before = probe.getBoundingClientRect().height;
+    let resolveHeight: (height: number) => void = () => {};
+    const promise = new Promise<number>((resolve) => {
+      resolveHeight = resolve;
+    });
+    const observer = new ResizeObserver((entries) => {
+      const last = entries.at(-1);
+      const height = last?.borderBoxSize?.[0]?.blockSize ?? last?.contentRect.height ?? 0;
+      if (Math.abs(height - before) < 1) return;
+      observer.disconnect();
+      resolveHeight(height);
+    });
+    observer.observe(probe);
+    await act(() => {
+      box.style.height = `${px}px`;
+    });
+    return promise;
+  }
+
+  async function setProbeParentHeight(container: ParentNode, px: number) {
+    const { box } = probeBox(container);
+    await act(() => {
+      box.style.height = `${px}px`;
+    });
+  }
+
+  // 22rem is the fold line: max-h-44 shows 11rem, so anything shorter hides less than it shows.
+  it.each([17, 18])(
+    "does not fold a message one pixel under 22rem at a %ipx root",
+    async (rootPx) => {
+      setup();
+      useRootFont(rootPx);
+      await using screen = await renderTimeline([message("x", {}, `under-${rootPx}`)]);
+      const threshold = 22 * rootPx;
+      const height = await resizeProbeParent(screen.container, threshold - 1);
+      expect(screen.buttons("显示完整消息")).toHaveLength(0);
+      expect(Math.abs(height - (threshold - 1))).toBeLessThan(2);
+    },
+  );
+
+  it.each([17, 18])("folds a message of exactly 22rem at a %ipx root", async (rootPx) => {
+    setup();
+    useRootFont(rootPx);
+    await using screen = await renderTimeline([message("x", {}, `exact-${rootPx}`)]);
+    const threshold = 22 * rootPx;
+    await setProbeParentHeight(screen.container, threshold);
+    await vi.waitFor(() => expect(screen.buttons("显示完整消息")).toHaveLength(1));
+    const body = screen.container.querySelector<HTMLElement>("[data-user-message-body]")!;
+    const foldedHeight = body.offsetHeight;
+    await click(screen.button("显示完整消息"));
+    expect(body.offsetHeight).toBeGreaterThanOrEqual(foldedHeight * 2);
+  });
+
+  it.each([17, 18])(
+    "removes the fold control when the message shrinks below 22rem at a %ipx root",
+    async (rootPx) => {
+      setup();
+      useRootFont(rootPx);
+      await using screen = await renderTimeline([message("x", {}, `shrink-${rootPx}`)]);
+      const threshold = 22 * rootPx;
+      await setProbeParentHeight(screen.container, threshold);
+      await vi.waitFor(() => expect(screen.buttons("显示完整消息")).toHaveLength(1));
+      await setProbeParentHeight(screen.container, threshold - 1);
+      await vi.waitFor(() => {
+        expect(screen.buttons("显示完整消息")).toHaveLength(0);
+        expect(screen.buttons("收起")).toHaveLength(0);
+      });
+    },
+  );
+
   it("folds a workflow script only when the fold hides at least as much as it shows", async () => {
     setup();
     const shortScript = Array.from(

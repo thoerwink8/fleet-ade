@@ -1112,7 +1112,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
       {hasVisibleBody ? (
         <div
           ref={revealRef}
-          className={cn("relative", isCollapsed && "max-h-44 overflow-hidden")}
+          className={cn(isCollapsed && "max-h-44 overflow-hidden")}
           data-user-message-body="true"
           data-thread-find-text="true"
           data-thread-find-fold={isCollapsed ? "" : undefined}
@@ -1128,15 +1128,15 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               : undefined
           }
         >
-          <div>
+          <div className="relative">
             <UserMessageBody
               text={props.text}
               renderContextReference={props.renderContextReference}
               skills={props.skills}
               markdownCwd={props.markdownCwd}
             />
+            <div aria-hidden="true" data-fold-probe="true" {...probeProps} />
           </div>
-          <div aria-hidden="true" data-fold-probe="true" {...probeProps} />
         </div>
       ) : null}
       {showCollapseControl ? (

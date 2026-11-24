@@ -3,13 +3,23 @@ import { type CSSProperties, type Ref, useRef, useState } from "react";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { observeResize } from "~/lib/observeResize";
 
-// The folds clip with `max-h-44`, which is 11rem. A fold only earns its control when it hides at
-// least as much as it shows, so the content has to reach twice that.
-const FOLD_MIN_HEIGHT = "calc(22rem + 1px)";
+// Folds clip with `max-h-44` (11rem). The probe is twice that and clipped to the content, so it
+// reaches this height only when a fold hides at least as much as it shows. Compare in px against
+// the live root font size: the interface scale is 16, 17, or 18.
+const FOLD_MIN_HEIGHT = "22rem";
 
-// The same threshold in px at the 16px root the app renders with. The probe is exactly this tall,
-// so a reported size below it means the content clipped it.
-const FOLD_MIN_HEIGHT_PX = 22 * 16 + 1;
+// One read per inline font-size. A computed-style read per row blows the cold-open budget.
+let cachedRootRem: { readonly key: string; readonly px: number } | null = null;
+
+function rootRemPx(): number {
+  const root = document.documentElement;
+  const key = root.style.fontSize;
+  if (cachedRootRem?.key === key) return cachedRootRem.px;
+  const parsed = Number.parseFloat(getComputedStyle(root).fontSize);
+  const px = Number.isFinite(parsed) && parsed > 0 ? parsed : 16;
+  cachedRootRem = { key, px };
+  return px;
+}
 
 const PROBE_STYLE: CSSProperties = {
   position: "absolute",
@@ -38,7 +48,7 @@ const DISABLED: TallEnoughToFold = {
   probeProps: { ref: NO_REF, style: { display: "none" } },
 };
 
-/** Probe clipped to the content height; it reaches the threshold only when a fold hides at least as much as it shows. */
+/** The probe's box must stay unclipped. Clipping it shrinks the probe and drops the fold. */
 export function useTallEnoughToFold(enabled = true): TallEnoughToFold {
   const [tallEnough, setTallEnough] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
@@ -47,15 +57,11 @@ export function useTallEnoughToFold(enabled = true): TallEnoughToFold {
     stopRef.current?.();
     stopRef.current = null;
     if (node === null) return;
-    const stop = observeResize(node, (entries) => {
+    stopRef.current = observeResize(node, (entries) => {
       const last = entries.at(-1);
       const height = last?.borderBoxSize?.[0]?.blockSize ?? last?.contentRect.height ?? 0;
-      if (height < FOLD_MIN_HEIGHT_PX) return;
-      stop();
-      if (stopRef.current === stop) stopRef.current = null;
-      setTallEnough(true);
+      setTallEnough(height >= 22 * rootRemPx() - 0.5);
     });
-    stopRef.current = stop;
   });
   if (!enabled) return DISABLED;
   return {
