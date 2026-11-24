@@ -1,0 +1,13 @@
+/* fleet-design status text stays 12/16 inside the 20px tag height. */
+.fa-status.ade-badge--status {
+  height: var(--fa-ctrl-2xs);
+}
+
+.fa-tag.ade-badge--chip {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-dot.ade-badge__dot--label {
+  background: var(--label);
+}

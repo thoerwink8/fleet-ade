@@ -1,5 +1,5 @@
 import { converter } from "culori/fn";
-import { createElement } from "react";
+import { createElement, type CSSProperties } from "react";
 import { describe, expect, it } from "vite-plus/test";
 
 import "~/index.css";
@@ -207,33 +207,139 @@ describe("standard painted theme colors", () => {
     }
   });
 
-  it("keeps at least 4.5:1 contrast on destructive Button and Badge in light and dark default themes", async () => {
+  it("keeps at least 4.5:1 contrast on destructive Button in light and dark default themes", async () => {
     const root = document.documentElement;
     try {
       applyThemePalette("system", "light");
       await using screen = await render(
-        createElement(
-          "div",
-          null,
-          createElement(Button, { variant: "destructive" }, "Delete"),
-          createElement(Badge, { variant: "destructive" }, "Danger"),
-        ),
+        createElement(Button, { variant: "destructive" }, "Delete"),
       );
       const buttonEl = screen.getByRole("button").element();
-      const badgeEl = screen.getByText("Danger").element();
       for (const appearance of ["light", "dark"] as const) {
         root.classList.toggle("dark", appearance === "dark");
         root.dataset.theme = appearance;
         const buttonStyle = getComputedStyle(buttonEl);
-        const badgeStyle = getComputedStyle(badgeEl);
         expect(
           contrastRatio(buttonStyle.color, buttonStyle.backgroundColor),
           `${appearance} destructive Button (${buttonStyle.color} on ${buttonStyle.backgroundColor})`,
         ).toBeGreaterThanOrEqual(4.5);
-        expect(
-          contrastRatio(badgeStyle.color, badgeStyle.backgroundColor),
-          `${appearance} destructive Badge (${badgeStyle.color} on ${badgeStyle.backgroundColor})`,
-        ).toBeGreaterThanOrEqual(4.5);
+      }
+    } finally {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      delete root.dataset.theme;
+    }
+  });
+
+  it("renders every Badge variant and size as a fleet-design tag in all painted themes", async () => {
+    const cases = [
+      ["secondary", "tag", null],
+      ["outline", "tag", null],
+      ["chip", "tag", null],
+      ["label", "tag", "label"],
+      ["destructive", "status", "--fa-danger"],
+      ["error", "status", "--fa-danger"],
+      ["info", "status", "--fa-info"],
+      ["success", "status", "--fa-success"],
+      ["warning", "status", "--fa-info"],
+      ["dot-attention", "status", "--fa-info"],
+      ["dot-active", "status", "--fa-success"],
+      ["dot-blocked", "status", "--fa-danger"],
+      ["dot-waiting", "status", "ring"],
+      ["dot-done", "status", "--fa-fg-muted"],
+    ] as const;
+    const sizes = ["default", "sm", "row"] as const;
+    const root = document.documentElement;
+    try {
+      await using screen = await render(
+        createElement(
+          "div",
+          null,
+          cases.flatMap(([variant, kind]) =>
+            sizes.map((size) =>
+              createElement(
+                "div",
+                {
+                  key: `${variant}-${size}`,
+                  "data-testid": `${variant}-${size}`,
+                  "data-kind": kind,
+                },
+                createElement(
+                  Badge,
+                  {
+                    variant,
+                    size,
+                    ...(variant === "label"
+                      ? { style: { "--label": "#ff0000" } as CSSProperties }
+                      : {}),
+                  },
+                  `${variant}-${size}`,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (const theme of [{ id: "system" }, GROVE_THEME, EMBER_THEME]) {
+        for (const appearance of ["light", "dark"] as const) {
+          applyThemePalette(theme.id, appearance);
+          root.classList.toggle("dark", appearance === "dark");
+          root.dataset.theme = appearance;
+
+          for (const [variant, kind, dotColor] of cases) {
+            for (const size of sizes) {
+              const label = `${theme.id} ${appearance} ${variant} ${size}`;
+              const badgeEl = screen
+                .getByTestId(`${variant}-${size}`)
+                .element()
+                .querySelector('[data-slot="badge"]')!;
+              const style = getComputedStyle(badgeEl);
+              expect(style.height, `${label} height`).toBe("20px");
+              expect(style.fontSize, `${label} font size`).toBe("12px");
+              expect(style.fontWeight, `${label} font weight`).toBe("400");
+              expect(style.lineHeight, `${label} line height`).toBe("16px");
+              expect(style.backgroundColor, `${label} background`).toBe("rgba(0, 0, 0, 0)");
+              expect(style.backdropFilter, `${label} backdrop`).toBe("none");
+              expect(style.willChange, `${label} will-change`).toBe("auto");
+              expect(Number.parseFloat(style.paddingLeft) % 4, `${label} padding grid`).toBe(0);
+              expect(Number.parseFloat(style.paddingRight) % 4, `${label} padding grid`).toBe(0);
+              expect(Number.parseFloat(style.columnGap) % 4, `${label} gap grid`).toBe(0);
+              expect(style.paddingLeft, `${label} horizontal padding`).toBe(
+                kind === "tag" ? "8px" : "0px",
+              );
+              expect(style.paddingRight, `${label} horizontal padding`).toBe(style.paddingLeft);
+              expect(style.borderRadius, `${label} radius`).toBe(kind === "tag" ? "4px" : "0px");
+              expectCloseColor(
+                style.color,
+                resolvedCssVariable(kind === "tag" ? "--fa-fg" : "--fa-fg-muted"),
+                `${label} text`,
+              );
+
+              const dot = badgeEl.querySelector(".fa-dot");
+              if (kind === "tag" && variant !== "label") {
+                expect(dot, `${label} has no status dot`).toBeNull();
+                continue;
+              }
+              expect(dot, `${label} dot`).not.toBeNull();
+              const dotStyle = getComputedStyle(dot!);
+              expect(dotStyle.width, `${label} dot width`).toBe("8px");
+              expect(dotStyle.height, `${label} dot height`).toBe("8px");
+              if (dotColor === "ring") {
+                expect(dotStyle.backgroundColor, `${label} ring center`).toBe("rgba(0, 0, 0, 0)");
+                expect(dotStyle.boxShadow, `${label} ring`).toContain(
+                  resolvedCssVariable("--fa-fg-muted"),
+                );
+              } else {
+                expectCloseColor(
+                  dotStyle.backgroundColor,
+                  dotColor === "label" ? "rgb(255, 0, 0)" : resolvedCssVariable(dotColor!),
+                  `${label} dot`,
+                );
+              }
+            }
+          }
+        }
       }
     } finally {
       applyThemePalette("system", "light");

@@ -4,74 +4,80 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "~/lib/utils";
 
-// Status as a 6px dot plus plain text instead of a filled pill, on the 12/16 meta line. The accent color is kept
-// for the one state that needs a person (attention); every other state stays neutral.
-const statusDot =
-  "h-4 min-w-0 gap-1 border-0 bg-transparent px-0 text-meta font-normal sm:h-4 sm:min-w-0 sm:text-meta before:size-1.5 before:shrink-0 before:rounded-full";
-
 const badgeVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm border border-transparent font-medium outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
+  "relative inline-flex shrink-0 items-center justify-center whitespace-nowrap outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",
   {
     defaultVariants: {
       size: "default",
-      variant: "default",
+      variant: "secondary",
     },
     variants: {
       size: {
-        control:
-          "h-7 min-w-7 rounded-[var(--control-radius)] px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:min-w-6 sm:text-xs",
-        default:
-          "h-5.5 min-w-5.5 px-[calc(--spacing(1)-1px)] text-sm sm:h-4.5 sm:min-w-4.5 sm:text-xs",
-        lg: "h-6.5 min-w-6.5 px-[calc(--spacing(1.5)-1px)] text-base sm:h-5.5 sm:min-w-5.5 sm:text-sm",
-        row: "h-6 min-w-6 px-[calc(--spacing(1.5)-1px)] text-row",
-        // Fractional leading rounds font metrics and raises fixed-height labels, especially under zoom.
-        sm: "h-5 min-w-5 rounded-[.25rem] px-[calc(--spacing(1)-1px)] text-xs leading-none sm:h-4 sm:min-w-4",
+        default: "",
+        row: "",
+        sm: "",
       },
       variant: {
-        default: "bg-primary text-primary-foreground [button&,a&]:hover:bg-primary/90",
-        destructive: "bg-destructive text-on-destructive [button&,a&]:hover:bg-destructive/90",
-        error: "bg-destructive/8 text-destructive-foreground dark:bg-destructive/16",
-        info: "bg-info/8 text-info-foreground dark:bg-info/16",
-        outline:
-          "border-input bg-background text-foreground dark:bg-input/32 [button&,a&]:hover:bg-accent/50 dark:[button&,a&]:hover:bg-input/48",
-        secondary: "bg-secondary text-secondary-foreground [button&,a&]:hover:bg-secondary/90",
-        success: "bg-success/8 text-success-foreground dark:bg-success/16",
-        warning: "bg-warning/8 text-warning-foreground dark:bg-warning/16",
-        "dot-attention": `${statusDot} text-warning-foreground before:bg-warning`,
-        "dot-active": `${statusDot} text-secondary-label before:bg-secondary-label`,
-        "dot-blocked": `${statusDot} text-secondary-label before:border-[1.5px] before:border-secondary-label`,
-        "dot-waiting": `${statusDot} text-muted-foreground before:border before:border-muted-foreground`,
-        "dot-done": `${statusDot} text-muted-foreground before:bg-faint-foreground`,
-        // A quiet 1px-outlined tag for identifiers (ticket, branch, PR) that sit beside a title.
-        chip: "h-6 min-w-0 tabular-nums gap-1 rounded-md border-border bg-card px-2 text-meta font-normal text-secondary-label sm:h-6 sm:min-w-0 sm:text-meta [&_svg:not([class*='size-'])]:size-3.5",
-        label:
-          "bg-[color-mix(in_srgb,var(--label)_8%,transparent)] text-[color-mix(in_srgb,var(--label)_30%,var(--color-foreground))] dark:bg-[color-mix(in_srgb,var(--label)_12%,transparent)] dark:text-[color-mix(in_srgb,var(--label)_45%,var(--color-foreground))]",
+        secondary: "fa-tag",
+        outline: "fa-tag",
+        chip: "fa-tag ade-badge--chip",
+        label: "fa-tag",
+        destructive: "fa-status ade-badge--status",
+        error: "fa-status ade-badge--status",
+        info: "fa-status ade-badge--status",
+        success: "fa-status ade-badge--status",
+        warning: "fa-status ade-badge--status",
+        "dot-attention": "fa-status ade-badge--status",
+        "dot-active": "fa-status ade-badge--status",
+        "dot-blocked": "fa-status ade-badge--status",
+        "dot-waiting": "fa-status ade-badge--status",
+        "dot-done": "fa-status ade-badge--status",
       },
     },
-    compoundVariants: [
-      {
-        variant: ["dot-attention", "dot-active", "dot-blocked", "dot-waiting", "dot-done"],
-        size: "row",
-        className: "h-5 min-w-0 text-row sm:h-5 sm:min-w-0 sm:text-row",
-      },
-    ],
   },
 );
+
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
+
+const badgeDotVariants = {
+  label: "ade-badge__dot--label",
+  destructive: "fa-dot--error",
+  error: "fa-dot--error",
+  info: "fa-dot--needs",
+  success: "fa-dot--running",
+  warning: "fa-dot--needs",
+  "dot-attention": "fa-dot--needs",
+  "dot-active": "fa-dot--running",
+  "dot-blocked": "fa-dot--error",
+  "dot-waiting": "fa-dot--ring",
+  "dot-done": "",
+} as const satisfies Partial<Record<BadgeVariant, string>>;
 
 interface BadgeProps extends useRender.ComponentProps<"span"> {
   variant?: VariantProps<typeof badgeVariants>["variant"];
   size?: VariantProps<typeof badgeVariants>["size"];
 }
 
-function Badge({ className, variant, size, render, ...props }: BadgeProps) {
+function Badge({ className, variant, size, render, children, ...props }: BadgeProps) {
+  const resolvedVariant = variant ?? "secondary";
   const defaultProps = {
-    className: cn(badgeVariants({ className, size, variant })),
+    className: cn(badgeVariants({ className, size, variant: resolvedVariant })),
     "data-slot": "badge",
   };
+  const dotClassName = (badgeDotVariants as Partial<Record<BadgeVariant, string>>)[resolvedVariant];
+  const content =
+    dotClassName === undefined ? (
+      children
+    ) : (
+      <>
+        <span aria-hidden="true" className={cn("fa-dot", dotClassName)} />
+        {children}
+      </>
+    );
 
   return useRender({
     defaultTagName: "span",
-    props: mergeProps<"span">(defaultProps, props),
+    props: mergeProps<"span">(defaultProps, { ...props, children: content }),
     render,
   });
 }
