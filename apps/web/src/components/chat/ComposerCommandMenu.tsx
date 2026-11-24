@@ -168,10 +168,10 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             <p className="text-secondary-label text-xs">
               {props.isLoading
                 ? props.triggerKind === "skill" || props.triggerKind === "slash-command"
-                  ? "正在搜索工作区技能…"
+                  ? "正在搜索项目技能…"
                   : props.triggerKind === "pull-request"
                     ? "正在查找 pull request…"
-                    : "正在搜索工作区文件…"
+                    : "正在搜索项目文件…"
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"
                     ? "未找到技能。试试输入 / 浏览提供方命令。"

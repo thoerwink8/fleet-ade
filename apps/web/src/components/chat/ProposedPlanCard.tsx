@@ -101,8 +101,8 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "工作区路径不可用",
-          description: "这个会话没有可保存到的工作区路径。",
+          title: "项目目录不可用",
+          description: "这个会话没有可保存到的项目目录。",
         }),
       );
       return;
@@ -118,7 +118,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
     if (!relativePath) {
       toastManager.add({
         type: "warning",
-        title: "请输入工作区路径",
+        title: "请输入项目路径",
       });
       return;
     }
@@ -139,7 +139,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
         setIsSaveDialogOpen(false);
         toastManager.add({
           type: "success",
-          title: "计划已保存到工作区",
+          title: "计划已保存到项目",
           description: result.value.relativePath,
         });
         return;
@@ -181,7 +181,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
               onClick={openSaveDialog}
               disabled={!canWriteFiles || !workspaceRoot || isSavingToWorkspace}
             >
-              保存到工作区
+              保存到项目
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -276,14 +276,14 @@ function SavePlanToWorkspaceForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>将计划保存到工作区</DialogTitle>
+        <DialogTitle>将计划保存到项目</DialogTitle>
         <DialogDescription>
-          请输入相对于以下位置的路径： <code>{workspaceRoot ?? "工作区"}</code>.
+          请输入相对于以下位置的路径： <code>{workspaceRoot ?? "项目目录"}</code>.
         </DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <label htmlFor={savePathInputId} className="grid gap-1.5">
-          <span className="text-meta font-medium text-foreground">工作区路径</span>
+          <span className="text-meta font-medium text-foreground">项目路径</span>
           <Input
             id={savePathInputId}
             value={savePath}

@@ -208,7 +208,7 @@ export function useOpenChangeRequestLink(
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",
-                title: "此提交不在该会话的工作区中",
+                title: "此提交不在该会话的项目目录中",
                 actionProps: {
                   children: "打开链接",
                   onClick: () => {

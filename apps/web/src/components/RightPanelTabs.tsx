@@ -1030,8 +1030,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
       workspaceLabel={
         focusedSurface
-          ? `工作区面板：${surfaceTitle(focusedSurface, props.terminalLabelsById)}`
-          : "工作区面板"
+          ? `右侧面板：${surfaceTitle(focusedSurface, props.terminalLabelsById)}`
+          : "右侧面板"
       }
       mode={props.mode}
       {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}

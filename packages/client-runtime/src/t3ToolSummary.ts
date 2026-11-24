@@ -330,7 +330,7 @@ export function summarizeT3ToolCalls(
       );
       break;
     case "worktree-list":
-      label = phrase("已列出", "列出", `工作区分支 ${times}`);
+      label = phrase("已列出", "列出", `工作树分支 ${times}`);
       break;
     case "worktree-status":
       label = phrase("已查看", "查看", `工作树状态 ${times}`);

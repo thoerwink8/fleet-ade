@@ -112,7 +112,7 @@ export function resolveSubagentMetadata(input: {
               ? "分支"
               : input.childThread?.worktreePath
                 ? "工作树"
-                : "工作区",
+                : "目录",
             value: input.childThread?.branch ?? fileBasename(childWorkspace),
           },
         ]

@@ -182,7 +182,7 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_thread_transfers: tool(["读取", "正在读取", "已读取", "会话流转记录"], "thread-transfers"),
   t3_thread_organize: tool(["整理", "正在整理", "已整理", "会话"], "thread-organize"),
   t3_thread_update: tool(["更新", "正在更新", "已更新", "会话信息"], "thread-update"),
-  t3_worktree_list: tool(["列出", "正在列出", "已列出", "工作区分支"], "worktree-list"),
+  t3_worktree_list: tool(["列出", "正在列出", "已列出", "工作树分支"], "worktree-list"),
   t3_environment_read: tool(["读取", "正在读取", "已读取", "环境偏好设置"], "environment-read"),
   t3_environment_links: tool(["列出", "正在列出", "已列出", "已关联环境"], "environment-links"),
   t3_environment_link: tool(["请求关联", "正在请求关联", "已请求关联", "环境"], "environment-link"),

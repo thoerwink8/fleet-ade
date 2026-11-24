@@ -2933,7 +2933,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 stackedThreadToast({
                   type: "error",
                   title: "路径不可用",
-                  description: "此会话没有可复制的工作区路径。",
+                  description: "此会话没有可复制的目录路径。",
                 }),
               );
               return;

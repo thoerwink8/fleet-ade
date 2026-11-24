@@ -417,8 +417,8 @@ export function buildKeybindingCommandOptions(
 }
 
 const COMMAND_LABELS: Readonly<Record<string, string>> = {
-  "workspace.focusNext": "聚焦下一个工作区区域",
-  "workspace.focusPrevious": "聚焦上一个工作区区域",
+  "workspace.focusNext": "聚焦下一个面板区域",
+  "workspace.focusPrevious": "聚焦上一个面板区域",
   "sidebar.toggle": "侧边栏：开关",
   "navigation.back": "导航：后退",
   "navigation.forward": "导航：前进",
@@ -452,7 +452,7 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "composer.increaseEffort": "输入框：提高推理强度",
   "composer.decreaseEffort": "输入框：降低推理强度",
   "composer.mode": "输入框：切换模式",
-  "composer.workspace": "输入框：切换工作区",
+  "composer.workspace": "输入框：切换目录",
   "composer.previousWorktree": "输入框：上一个工作树",
   "composer.branch": "输入框：切换分支",
   "chat.new": "新建会话",

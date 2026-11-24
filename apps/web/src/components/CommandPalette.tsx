@@ -1689,7 +1689,7 @@ function OpenCommandPaletteDialog(props: {
   });
 
   for (const direction of [1, -1] as const) {
-    const title = direction === 1 ? "聚焦下一个工作区区域" : "聚焦上一个工作区区域";
+    const title = direction === 1 ? "聚焦下一个面板区域" : "聚焦上一个面板区域";
     actionItems.push({
       kind: "action",
       value: `action:workspace-focus:${direction}`,
