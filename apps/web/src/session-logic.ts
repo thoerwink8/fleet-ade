@@ -469,7 +469,7 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "checkpoint":
       return {
         ...common,
-        label: title ?? "已创建检查点",
+        label: title ?? "已保存文件快照",
         changedFiles: item.files.map((file) => file.path),
         toolData: item,
       };

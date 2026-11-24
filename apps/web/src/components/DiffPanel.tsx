@@ -1369,7 +1369,7 @@ export default function DiffPanel({
                     toolCallSelection
                       ? "正在加载工具调用差异…"
                       : selectedTurn
-                        ? "正在加载检查点差异…"
+                        ? "正在加载文件快照差异…"
                         : selectedGitScope === "unstaged"
                           ? "正在加载未提交的改动…"
                           : selectedGitScope === "commit"
