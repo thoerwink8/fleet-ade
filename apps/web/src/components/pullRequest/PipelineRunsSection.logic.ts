@@ -25,7 +25,7 @@ export const PIPELINE_STATUS_LABEL: Record<PipelineRunStatus, string> = {
   stuck: "卡住",
 };
 
-/** Badge tone for each status. Stuck is the only solid alarm. */
+/** Badge tone for each status. Stuck is the only danger mark. */
 export const PIPELINE_STATUS_BADGE = {
   claimed: "secondary",
   session: "info",

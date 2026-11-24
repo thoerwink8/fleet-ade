@@ -198,8 +198,7 @@ type RowStatusDot = {
   label: string;
 };
 
-// Every card names its state on the second row (在做 / 卡住 / 做完 / 空闲); only
-// a state that needs a person (approval, input) gets the accent dot.
+// The row names its state. The mark is the library dot: running, needs, error, ring, or muted.
 function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowStatusDot {
   switch (status) {
     case "preparing":

@@ -226,13 +226,17 @@ describe("standard painted theme colors", () => {
         root.dataset.theme = appearance;
         const buttonStyle = getComputedStyle(buttonEl);
         const badgeStyle = getComputedStyle(badgeEl);
+        const badgeSurface =
+          badgeStyle.backgroundColor === "rgba(0, 0, 0, 0)"
+            ? getComputedStyle(document.body).backgroundColor
+            : badgeStyle.backgroundColor;
         expect(
           contrastRatio(buttonStyle.color, buttonStyle.backgroundColor),
           `${appearance} destructive Button (${buttonStyle.color} on ${buttonStyle.backgroundColor})`,
         ).toBeGreaterThanOrEqual(4.5);
         expect(
-          contrastRatio(badgeStyle.color, badgeStyle.backgroundColor),
-          `${appearance} destructive Badge (${badgeStyle.color} on ${badgeStyle.backgroundColor})`,
+          contrastRatio(badgeStyle.color, badgeSurface),
+          `${appearance} destructive Badge (${badgeStyle.color} on ${badgeSurface})`,
         ).toBeGreaterThanOrEqual(4.5);
       }
     } finally {

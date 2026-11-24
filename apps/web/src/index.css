@@ -28,6 +28,8 @@
 @import "./styles/fleet-overrides/popup.css" layer(fleet);
 @import "@fleet/design/styles/command-palette.css" layer(fleet);
 @import "./styles/fleet-overrides/command.css" layer(fleet);
+@import "@fleet/design/styles/status-tag.css" layer(fleet);
+@import "./styles/fleet-overrides/badge.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
