@@ -25,6 +25,10 @@ vp run dev
 Open the pairing URL printed by the dev runner. The bare origin does not authenticate
 a new browser.
 
+Entry points (`pnpm` commands via `.pnpmfile.cjs`, `vp test` via `vite.config.ts`, and the
+`scripts/` runners) refuse to run on a Node outside `package.json` `engines.node` and print
+the pinned version instead of failing later on missing APIs.
+
 ## Forge mirror (optional)
 
 GitHub is the source of truth. [source.tanstack.com/@pingdotgg/t3code](https://source.tanstack.com/@pingdotgg/t3code)

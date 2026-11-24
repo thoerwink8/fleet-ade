@@ -389,6 +389,7 @@ function launcherFixture() {
   for (const file of [
     "scripts/check-changed.ts",
     "scripts/check-changed-command.ts",
+    "scripts/node-version-check.cjs",
     ".github/scripts/ci-changes.cjs",
   ]) {
     write(file, NodeFS.readFileSync(NodePath.join(import.meta.dirname, "..", file), "utf8"));
@@ -399,6 +400,7 @@ function launcherFixture() {
     "package.json",
     JSON.stringify({
       type: "module",
+      engines: { node: "26.12.1" },
       scripts: {
         "knip:check:files": "knip --include files",
         "knip:check:exports": "knip --exports",

@@ -1,3 +1,9 @@
+import { assertNodeVersion } from "./scripts/node-version-check.cjs";
+
+// vp loads this config for test/lint runs; pnpmfile covers pnpm itself, so this
+// is the first line a `vp test` under the wrong Node can print.
+assertNodeVersion();
+
 import "vite-plus/test/config";
 import { defineConfig } from "vite-plus";
 import * as NodeURL from "node:url";

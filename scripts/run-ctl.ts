@@ -23,6 +23,10 @@ import {
   takeFlag,
 } from "./run-state.ts";
 
+import { assertNodeVersion } from "./node-version-check.cjs";
+
+assertNodeVersion();
+
 const repoRoot = NodePath.resolve(import.meta.dirname, "..");
 
 function recordPath(kind: RunRecord["kind"]): string {

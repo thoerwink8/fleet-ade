@@ -41,6 +41,10 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { decide, readWorkspace } from "../.github/scripts/ci-changes.cjs";
 import { vitePlusCommand } from "./check-changed-command.ts";
 
+import { assertNodeVersion } from "./node-version-check.cjs";
+
+assertNodeVersion();
+
 const GiB = 1024 ** 3;
 
 // A typecheck or test step can take several cores and gigabytes of memory, so
@@ -453,7 +457,12 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       yield* copy("package.json");
       yield* copy("pnpm-workspace.yaml");
       for (const pkg of packages) yield* copy(`${pkg.dir}/package.json`);
-      for (const extra of ["pnpm-lock.yaml", "patches", ".pnpmfile.cjs"]) {
+      for (const extra of [
+        "pnpm-lock.yaml",
+        "patches",
+        ".pnpmfile.cjs",
+        "scripts/node-version-check.cjs",
+      ]) {
         if (yield* fs.exists(inRoot(extra))) yield* copy(extra);
       }
       const result = yield* vp(["install", "--lockfile-only", "--ignore-scripts"], temp);
