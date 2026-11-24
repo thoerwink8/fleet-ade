@@ -3,17 +3,57 @@
 ## Primitives
 
 Controls come from [`components/ui`](../../apps/web/src/components/ui).
-[AGENTS.md](../../AGENTS.md#taste) says how to use and extend them.
+[AGENTS.md](../../AGENTS.md#taste) says how to use them. [Adoption](#adoption) is the checklist for
+rendering one with `@fleet/design`.
 
-`components/ui` is also the only place that imports `@fleet/design/react`; lint rejects the import
+`components/ui` is the only place that imports `@fleet/design/react`; lint rejects the import
 anywhere else in `apps/web`. The design system's components take data where ours take composed
-parts, so each primitive adapts it once and call sites stay as they are. A generic look that
-fleet-design owns changes there; a look that belongs to one feature stays in that feature.
-Its tokens load in the `fleet-tokens` cascade layer, the lowest one, as `--fa-*` variables.
+parts, so each primitive adapts it once and call sites stay as they are. Tokens load in the
+`fleet-tokens` cascade layer, the lowest one, as `--fa-*` variables.
 
 Don't style a raw `<button>`, `<input>`, `<select>`, or `<textarea>` to look like a control a
 primitive provides. Raw elements are right when the element isn't that control: semantic rows, tabs,
 resize handles, swatches, editor surfaces, anything whose behavior or geometry differs by design.
+
+## Adoption
+
+A slice that paints a control with `@fleet/design` meets every rule here. Numbers come from the
+library's density table and type scale (`--fa-ctrl-*`, `--fa-row-*`, `.fa-caption` through
+`.fa-heading`). Measure the computed value.
+
+- Type is 12, 14, 15, 18, or 20px. Weight is 400, or 500 for button text, a selected nav item, an
+  unread row title, or a block title (menu group label, dialog title, section head). Nothing is
+  600 or above: rank comes from `--fa-fg` against `--fa-fg-muted`. Clickable text is at least 14px.
+  12px is for times, hints, and labels you cannot click. Inputs, menu items, and other controls
+  are 14px. 15px is body text and the composer field.
+- A fixed control is 24, 28, 32, or 40px tall (`--fa-ctrl-xs`, `--fa-ctrl-sm`, `--fa-ctrl`,
+  `--fa-ctrl-lg`), and that height does not change with viewport width. 20px (`--fa-ctrl-2xs`) is
+  a tag, not a click target. A standalone control is 32px. 28px and 24px sit only inside a bar or
+  row that is itself at least 32px. A checkbox or radio mark stays 16px inside that row.
+- Under `pointer: coarse`, stretch the hit area to at least 44px with an `::after` and leave the
+  painted height alone. The library does not do this; growing the control to 44px would change
+  the desktop metrics. Text inputs are the exception: below 640px the box is 36px, on the 4px
+  grid and taller than the library's 32px field. The type stays 14px.
+- A clickable list row is 32, 52, or 72px for one, two, or three lines (`--fa-row-1`, `--fa-row-2`,
+  `--fa-row-3`). A row you cannot click is 24px. A table body row is 40px.
+- Sizes and spacing are multiples of 4. A clickable row keeps a 2px transparent seam
+  (`--fa-space-row-seam`) so two fills stay 4px apart. Borders are 1px. Radius is 4, 8, or 12.
+- A floating surface (menu, dialog, popover, toast) uses opaque `--fa-overlay` and a 1px border.
+  The scrim (`--fa-scrim`) may be translucent. No `backdrop-filter`. No `will-change`.
+- A `.fa-*` class comes from `@fleet/design`. Do not add one in this repo. A look only this app
+  needs is an `ade-` class in `apps/web/src/styles/fleet-overrides/`. A generic variant is added
+  to the library first, then used from the facade. A look that belongs to one feature stays in
+  that feature, not in `components/ui`.
+- A theme override for the default theme, Grove, or Ember does not restyle a disabled control.
+  Disabled stays at full opacity, with `--fa-fg-muted` text and the library's disabled fill. An
+  opacity fade puts the text under the contrast target, and a theme colour on a disabled control
+  makes it look enabled.
+- Status is a coloured mark beside neutral text, not a tinted surface. In the chat view, errors
+  and notices sit in the status strip above the composer.
+- Keeping a `size` or `variant` name so callers do not change does not keep the old metrics. The
+  painted height and type still fall on the sets above.
+- Check the computed style in a browser, or in a browser test, at 390 and 1280 wide, in light and
+  dark, for the default theme, Grove, and Ember. Put before and after screenshots in the PR.
 
 ## Styles
 
