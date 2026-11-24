@@ -2610,7 +2610,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onInsertRejected: () => {
       toastManager.add({
         type: "error",
-        title: "无法添加到对话",
+        title: "无法添加到会话",
         description: "输入框正忙，请在就绪后重试。",
       });
     },
@@ -2953,7 +2953,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           toastManager.add({
             type: "info",
             title: "终端输出无法添加到问题回答中。",
-            description: "先回答或关闭问题，再将其添加到聊天中。",
+            description: "先回答或关闭问题，再将其添加到会话中。",
           });
           return;
         }

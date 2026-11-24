@@ -1880,7 +1880,7 @@ export default function ChatView(props: ChatViewProps) {
     if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
       toastManager.add({
         type: "error",
-        title: "无法添加到对话",
+        title: "无法添加到会话",
         description: "输入框正忙，请在就绪后重试。",
       });
       return;
@@ -3745,7 +3745,7 @@ export default function ChatView(props: ChatViewProps) {
                                     : isEnvironmentChanging
                                       ? "正在准备机器"
                                       : isRevertingCheckpoint
-                                        ? "正在回退对话"
+                                        ? "正在回退会话"
                                         : feedbackUploading
                                           ? "正在发送反馈"
                                           : threadDetailLoading

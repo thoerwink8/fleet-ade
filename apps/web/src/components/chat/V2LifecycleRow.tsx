@@ -98,9 +98,9 @@ export function V2LifecycleRow(props: {
     const relatedThreadId = item.source.type === "run" ? item.source.threadId : item.targetThreadId;
     return (
       <TimelineSystemDivider
-        label={item.source.type === "run" ? "从对话分叉" : "对话分叉"}
+        label={item.source.type === "run" ? "从会话分叉" : "会话分叉"}
         icon={GitForkIcon}
-        actionLabel={item.source.type === "run" ? "打开原对话" : "打开分叉"}
+        actionLabel={item.source.type === "run" ? "打开原会话" : "打开分叉"}
         onAction={() => props.onOpenThread(relatedThreadId)}
       />
     );
@@ -124,7 +124,7 @@ export function V2LifecycleRow(props: {
             aria-label={`打开 ${item.title ?? "已创建会话"}`}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            打开对话
+            打开会话
           </Button>
         </div>
       );
@@ -139,7 +139,7 @@ export function V2LifecycleRow(props: {
             aria-label={`打开 ${item.title ?? "已创建会话"}`}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            打开对话
+            打开会话
           </InlineButton>
         }
       />

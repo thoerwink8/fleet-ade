@@ -145,7 +145,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(appearanceMode !== "system" ? ["跟随系统"] : []),
     ...(settings.fontScale !== DEFAULT_UNIFIED_SETTINGS.fontScale ? ["字号"] : []),
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? ["差异颜色"] : []),
-    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["聊天宽度"] : []),
+    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["会话宽度"] : []),
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled
       ? ["渲染数学公式"]
       : []),
@@ -214,7 +214,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["运行中发送（排队／立即发送）"]
       : []),
     ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
-      ? ["聊天中的工具调用"]
+      ? ["会话中的工具调用"]
       : []),
     ...(settings.screenReaderAnnouncements !== DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements
       ? ["屏幕阅读器播报"]
@@ -588,7 +588,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...setting("delete-confirmation")}
-          description={"删除会话及其聊天记录前询问。"}
+          description={"删除会话及其会话记录前询问。"}
           resetAction={
             settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete ? (
               <SettingResetButton
@@ -890,7 +890,7 @@ function ToolCallVisibilityRow() {
       resetAction={
         settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility ? (
           <SettingResetButton
-            label="聊天中的工具调用"
+            label="会话中的工具调用"
             onClick={() =>
               updateSettings({ toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility })
             }
@@ -904,7 +904,7 @@ function ToolCallVisibilityRow() {
             if (isToolCallVisibility(value)) updateSettings({ toolCallVisibility: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="聊天中的工具调用">
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="会话中的工具调用">
             <SelectValue>{TOOL_CALL_VISIBILITY_LABELS[settings.toolCallVisibility]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
