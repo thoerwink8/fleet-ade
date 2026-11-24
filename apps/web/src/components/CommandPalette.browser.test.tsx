@@ -136,7 +136,9 @@ describe("CommandPalette open intents", () => {
     openCommandPalette({});
     await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
     await userEvent.keyboard("速查");
-    await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: "快捷键速查", exact: true }))
+      .toBeVisible();
     await userEvent.keyboard("{Escape}");
     await expect.element(page.getByRole("dialog", { name: "命令面板" })).not.toBeInTheDocument();
     await expect.element(opener).toHaveFocus();
