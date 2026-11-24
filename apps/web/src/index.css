@@ -30,6 +30,8 @@
 @import "@fleet/design/styles/command-palette.css" layer(fleet);
 @import "./styles/fleet-overrides/command.css" layer(fleet);
 @import "./styles/fleet-overrides/number-field.css" layer(fleet);
+@import "@fleet/design/styles/select.css" layer(fleet);
+@import "./styles/fleet-overrides/select.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
