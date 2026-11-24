@@ -5,6 +5,7 @@
 @import "@fleet/design/styles/base.css" layer(fleet);
 @import "@fleet/design/styles/checkbox.css" layer(fleet);
 @import "./styles/fleet-overrides/checkbox.css" layer(fleet);
+@import "@fleet/design/styles/tooltip.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
@@ -1186,6 +1187,7 @@ html[data-theme-id]:not([data-theme-id=""]) {
      their components read onto the active theme's variables so they follow it. */
   --fa-bg: var(--background);
   --fa-panel: var(--card);
+  --fa-overlay: var(--popover);
   --fa-fg: var(--foreground);
   --fa-fg-muted: var(--muted-foreground);
   --fa-border: var(--border);
