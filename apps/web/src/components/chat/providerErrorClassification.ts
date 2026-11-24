@@ -66,14 +66,14 @@ interface ClassificationRule {
 }
 
 const NOT_INSTALLED_ERROR_PATTERN =
-  /\bENOENT\b|command not found|executable.*not found|cli.*not found|not installed|未安装|未在\s*PATH/i;
+  /\bspawn\s+\S+\s+ENOENT\b|command not found|executable.*not found|cli.*not found|not installed|未安装|未在\s*PATH/i;
 const FORBIDDEN_PATTERN = /\b403\b|\bforbidden\b|permission denied/i;
 const AUTH_ERROR_PATTERN =
-  /\b401\b|\bunauthorized\b|invalid_api_key|invalid api key|token(?:\s+has)?\s+expired|expired\s+token|authentication[_\s]+failed|authentication[_\s]+required|credentials?\s+expired|not signed in|please sign in|run `claude auth login`|重新登录|未登录|需要登录/i;
+  /(?:status(?:\s+code)?|http|code|error)\W{0,3}401\b|\b401\s+(?:unauthorized|error)\b|\bunauthorized\b|invalid_api_key|invalid api key|token(?:\s+has)?\s+expired|expired\s+token|authentication[_\s]+failed|authentication[_\s]+required|credentials?\s+expired|not signed in|please sign in|run `claude auth login`|重新登录|未登录|需要登录/i;
 const USAGE_LIMIT_PATTERN =
-  /\b429\b|rate[_ ]limit|usage[_ ]limit|quota[_ ]exhausted|QUOTA_EXHAUSTED|too many requests|用量(?:已)?到?上限|已达到.*用量上限/i;
+  /(?:status(?:\s+code)?|http|code|error)\W{0,3}429\b|\b429\s+too many|rate[_ ]limit|usage[_ ]limit|quota[_ ]exhausted|QUOTA_EXHAUSTED|too many requests|用量(?:已)?到?上限|已达到.*用量上限/i;
 const NETWORK_ERROR_PATTERN =
-  /\b(?:ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN)\b|fetch failed|network error|connection closed|stream disconnected|\b(?:502|503|504|529)\b|service unavailable|overloaded/i;
+  /\b(?:ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN)\b|fetch failed|network error|connection closed|stream disconnected|(?:status(?:\s+code)?|http|code|error)\W{0,3}(?:502|503|504|529)\b|\((?:502|503|504|529)\)|service unavailable|overloaded/i;
 
 const AUTH_ERROR_CODES = new Set(["api_error_401", "unauthorized", "invalidApiKey", "-32000"]);
 const USAGE_LIMIT_CODES = new Set([
@@ -163,6 +163,17 @@ const PROVIDER_ERROR_CLASSIFICATION_RULES: ReadonlyArray<ClassificationRule> = [
   },
 ];
 
+/**
+ * Joins a name into a sentence. A Latin name (Codex) is set off from Chinese text by a space;
+ * the generic "智能体" is not, so it never reads "智能体 出错了".
+ */
+function nameInSentence(name: string, before: string, after: string): string {
+  const spaceBefore = before.length > 0 && /^[A-Za-z0-9]/.test(name) ? " " : "";
+  const spaceAfter =
+    after.length > 0 && /[A-Za-z0-9]$/.test(name) && !/^[，。、；：]/.test(after) ? " " : "";
+  return `${before}${spaceBefore}${name}${spaceAfter}${after}`;
+}
+
 function formatResetAtLabel(
   resetAt: string | null | undefined,
   timestampFormat: TimestampFormat,
@@ -191,7 +202,7 @@ export function classifyProviderError(input: ClassifyProviderErrorInput): Classi
       return {
         category,
         variant: "error",
-        message: `这台电脑上没装 ${input.agentName}`,
+        message: nameInSentence(input.agentName, "这台电脑上没装", ""),
         rawDetail,
         action: { kind: "install_help", label: "查看安装方法" },
       };
@@ -199,7 +210,7 @@ export function classifyProviderError(input: ClassifyProviderErrorInput): Classi
       return {
         category,
         variant: "error",
-        message: `${input.agentName} 需要重新登录`,
+        message: nameInSentence(input.agentName, "", "需要重新登录"),
         rawDetail,
         action: { kind: "sign_in", label: "去登录" },
       };
@@ -212,8 +223,8 @@ export function classifyProviderError(input: ClassifyProviderErrorInput): Classi
         category,
         variant: "warning",
         message: resetLabel
-          ? `${input.agentName} 用量到上限了，${resetLabel} 恢复`
-          : `${input.agentName} 用量到上限了`,
+          ? nameInSentence(input.agentName, "", `用量到上限了，${resetLabel} 恢复`)
+          : nameInSentence(input.agentName, "", "用量到上限了"),
         rawDetail,
         action: input.alternativeAgent
           ? {
@@ -234,8 +245,8 @@ export function classifyProviderError(input: ClassifyProviderErrorInput): Classi
         variant: "error",
         message:
           retryCount !== null
-            ? `连不上 ${input.agentName}，已重试 ${retryCount} 次`
-            : `连不上 ${input.agentName}`,
+            ? nameInSentence(input.agentName, "连不上", `，已重试 ${retryCount} 次`)
+            : nameInSentence(input.agentName, "连不上", ""),
         rawDetail,
         action: { kind: "retry", label: "再试一次" },
       };
@@ -244,7 +255,7 @@ export function classifyProviderError(input: ClassifyProviderErrorInput): Classi
       return {
         category,
         variant: "error",
-        message: `${input.agentName} 出错了`,
+        message: nameInSentence(input.agentName, "", "出错了"),
         rawDetail,
         action: { kind: "retry", label: "再试一次" },
       };

@@ -29,7 +29,7 @@ function makeEntry(
         slug: `${id}-default`,
         name: `${displayName} Default`,
         isCustom: false,
-        supportsReasoning: false,
+        capabilities: null,
       },
     ],
     skills: [],
@@ -42,11 +42,12 @@ function makeEntry(
     displayName,
     isDefault: id === driver,
     enabled: snapshot.enabled,
+    installed: snapshot.installed,
     isAvailable: snapshot.enabled && snapshot.installed,
     status: snapshot.status,
     snapshot,
     models: snapshot.models,
-    continuationGroupKey: null,
+    continuationGroupKey: undefined,
   };
 }
 

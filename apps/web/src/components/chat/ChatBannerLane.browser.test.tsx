@@ -247,7 +247,7 @@ describe("chat banner lane", () => {
 
   it("takes no space once every banner is dismissed", async () => {
     await using screen = await render(<LaneHarness error="这一轮失败了。" />);
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("智能体 出错了");
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("智能体出错了");
     await userEvent.click(screen.getByRole("button", { name: "关闭错误" }));
     await expect.element(screen.getByTestId("timeline")).toBeVisible();
     expect(screen.container.querySelector('[data-slot="chat-banner-lane"]')).toBeNull();
@@ -266,14 +266,14 @@ describe("chat banner lane", () => {
     const lane = screen.container.querySelector<HTMLElement>('[data-slot="chat-banner-lane"]')!;
     // Engine error appeared first, thread error second, so the thread error leads.
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(1);
-    expect(lane.querySelector('[data-slot="alert"]')!.textContent).toContain("智能体 出错了");
+    expect(lane.querySelector('[data-slot="alert"]')!.textContent).toContain("智能体出错了");
     const summary = screen.getByRole("button", { name: "还有 2 条" });
     await expect.element(summary).toBeVisible();
 
     await userEvent.click(summary);
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(3);
     const text = lane.textContent!;
-    expect(text.indexOf("智能体 出错了")).toBeLessThan(text.indexOf("连不上机群服务"));
+    expect(text.indexOf("智能体出错了")).toBeLessThan(text.indexOf("连不上机群服务"));
     expect(text.indexOf("连不上机群服务")).toBeLessThan(text.indexOf("Codex 出错了"));
     expect(screen.getByRole("button", { name: "收起" })).toBeTruthy();
 

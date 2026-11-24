@@ -3685,7 +3685,7 @@ it.effect(
               payload: providerThread,
             },
             {
-              id: yield* idAllocator.allocate.event({ threadId, runId }),
+              id: yield* idAllocator.allocate.event({ threadId }),
               type: "node.updated",
               threadId,
               runId,
@@ -3711,7 +3711,7 @@ it.effect(
               },
             },
             {
-              id: yield* idAllocator.allocate.event({ threadId, runId }),
+              id: yield* idAllocator.allocate.event({ threadId }),
               type: "run-attempt.updated",
               threadId,
               runId,
@@ -3734,7 +3734,7 @@ it.effect(
               },
             },
             {
-              id: yield* idAllocator.allocate.event({ threadId, runId }),
+              id: yield* idAllocator.allocate.event({ threadId }),
               type: "run.updated",
               threadId,
               runId,

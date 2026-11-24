@@ -1199,7 +1199,7 @@ function isCodexAuthError(
   if (code === "unauthorized" || code === "invalidApiKey") return true;
   const text = message?.trim() ?? "";
   if (text.length === 0 || /\b403\b|\bforbidden\b/i.test(text)) return false;
-  return /\b401\b|\bunauthorized\b|invalid_api_key|invalid api key|token(?:\s+has)?\s+expired|expired\s+token|authentication\s+failed|credentials?\s+expired|not signed in|sign in again/i.test(
+  return /(?:status(?:\s+code)?|http|code|error)\W{0,3}401\b|\b401\s+(?:unauthorized|error)\b|\bunauthorized\b|invalid_api_key|invalid api key|token(?:\s+has)?\s+expired|expired\s+token|authentication\s+failed|credentials?\s+expired|not signed in|sign in again/i.test(
     text,
   );
 }
@@ -5176,7 +5176,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   nativeThreadId: payload.threadId,
                   nativeTurnId: payload.turnId,
                   failure,
-                  ...(payload.error.codexErrorInfo === undefined
+                  ...(payload.error.codexErrorInfo == null
                     ? {}
                     : { failureErrorInfo: payload.error.codexErrorInfo }),
                 });

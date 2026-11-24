@@ -357,7 +357,6 @@ export function providerErrorPresentation(
     rawError: item.failure.message,
     errorClass: item.failure.class,
     errorCode: item.failure.code ?? null,
-    retryCount: item.retry?.attempt ?? null,
     usageLimitResetAt: item.failure.resetAt ?? null,
   });
   if (item.retry === undefined) {

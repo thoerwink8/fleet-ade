@@ -89,8 +89,9 @@ const GROK_DRIVER_KIND = GROK_PROVIDER;
 export const GROK_DEFAULT_INSTANCE_ID = defaultInstanceIdForDriver(GROK_DRIVER_KIND);
 const DEFAULT_GROK_SETTINGS = Schema.decodeSync(GrokSettings)({});
 const isAcpRequestError = Schema.is(EffectAcpErrors.AcpRequestError);
+const isAcpTransportError = Schema.is(EffectAcpErrors.AcpTransportError);
 const GROK_AUTH_MESSAGE_PATTERN =
-  /\b401\b|\bunauthorized\b|invalid_api_key|invalid api key|authentication.*required|authentication.*failed/i;
+  /(?:status(?:\s+code)?|http|code|error)\W{0,3}401\b|\b401\s+(?:unauthorized|error)\b|\bunauthorized\b|invalid_api_key|invalid api key|authentication.*required|authentication.*failed/i;
 const GROK_FORBIDDEN_PATTERN = /\b403\b|forbidden|permission denied/i;
 
 export function grokRequiresSignIn(cause: unknown): boolean {
@@ -126,8 +127,7 @@ export function grokPromptFailure(cause: unknown) {
   }
   return makeProviderFailure({
     cause,
-    class:
-      cause instanceof EffectAcpErrors.AcpTransportError ? "transport_error" : "provider_error",
+    class: isAcpTransportError(cause) ? "transport_error" : "provider_error",
   });
 }
 

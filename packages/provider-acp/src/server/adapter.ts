@@ -1806,7 +1806,7 @@ function acpFailureCauseChain(cause: unknown): ReadonlyArray<unknown> {
 
 export function classifyAcpFailure(
   cause: unknown,
-  flavor?: Pick<AcpAdapterFlavor, "requiresSignIn" | "notInstalled">,
+  flavor?: Pick<AcpAdapterV2Flavor, "requiresSignIn" | "notInstalled">,
 ): {
   readonly class: OrchestrationV2ProviderFailure["class"];
   readonly requiresSignIn: boolean;
@@ -1837,7 +1837,7 @@ export function classifyAcpFailure(
       }
       if (
         !/\b403\b|forbidden/i.test(node.errorMessage) &&
-        /\b401\b|\bunauthorized\b|invalid_api_key|invalid api key|authentication.*required|authentication.*failed|not signed in/i.test(
+        /(?:status(?:\s+code)?|http|code|error)\W{0,3}401\b|\b401\s+(?:unauthorized|error)\b|\bunauthorized\b|invalid_api_key|invalid api key|authentication.*required|authentication.*failed|not signed in/i.test(
           node.errorMessage,
         )
       ) {
