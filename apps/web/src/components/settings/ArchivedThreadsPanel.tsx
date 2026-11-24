@@ -196,7 +196,7 @@ export function ArchivedThreadsPanel() {
     });
     reportFailure(
       result._tag === "Failure" ? result : result.value,
-      action === "unarchive" ? "取消归档失败" : "删除会话失败",
+      action === "unarchive" ? "无法取消归档" : "无法删除会话",
     );
   };
 
@@ -215,7 +215,7 @@ export function ArchivedThreadsPanel() {
       if (clicked === "unarchive" || clicked === "delete")
         await handleThreadAction(clicked, thread);
     });
-    reportFailure(result, "已归档会话操作失败");
+    reportFailure(result, "无法操作已归档会话");
   };
 
   return (
