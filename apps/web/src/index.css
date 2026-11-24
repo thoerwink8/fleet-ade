@@ -20,6 +20,10 @@
 @import "./styles/fleet-overrides/menu.css" layer(fleet);
 @import "@fleet/design/styles/button.css" layer(fleet);
 @import "./styles/fleet-overrides/button.css" layer(fleet);
+@import "@fleet/design/styles/drawer.css" layer(fleet);
+@import "@fleet/design/styles/details-panel.css" layer(fleet);
+@import "@fleet/design/styles/tool-call-fold.css" layer(fleet);
+@import "./styles/fleet-overrides/sheet.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
