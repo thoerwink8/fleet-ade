@@ -13,7 +13,7 @@ export function formatAppDisplayName(input: {
 
 /** Stage label of a web build. vite.config.ts stamps it into index.html's title too. */
 export function resolveWebAppStageLabel(input: { readonly development: boolean }): string {
-  return input.development ? "Dev" : "测试版";
+  return input.development ? "开发版" : "测试版";
 }
 
 export function resolveServerBackedAppStageLabel(input: {

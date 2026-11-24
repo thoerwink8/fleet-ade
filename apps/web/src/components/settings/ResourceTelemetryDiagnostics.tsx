@@ -267,7 +267,7 @@ function AggregateCard({
           {label}
         </div>
         <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-3xs tabular-nums text-muted-foreground/70">
-          {aggregate.processCount} {aggregate.processCount === 1 ? "process" : "processes"}
+          {aggregate.processCount} 个进程
         </div>
       </div>
       <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -1058,7 +1058,7 @@ function ResourceTelemetryDiagnosticsBody({
               icon={<GaugeIcon className="size-3.5" />}
               label="CPU 速度上限"
               value={
-                snapshot ? (speedLimit === null ? "Unknown" : `${speedLimit.toFixed(0)}%`) : "..."
+                snapshot ? (speedLimit === null ? "未知" : `${speedLimit.toFixed(0)}%`) : "..."
               }
               detail={snapshot ? `温度状态：${snapshot.power.thermalState}` : undefined}
               tone={speedLimit !== null && speedLimit < 80 ? "warning" : "default"}
@@ -1117,36 +1117,36 @@ function ResourceTelemetryDiagnosticsBody({
                 <DetailRow
                   label="电源来源"
                   value={booleanStateLabel(snapshot.power.onBattery, {
-                    true: "Battery",
+                    true: "电池",
                     false: "外接电源",
                   })}
                 />
                 <DetailRow
                   label="低电量模式"
                   value={booleanStateLabel(snapshot.power.lowPowerMode, {
-                    true: "Enabled",
-                    false: "Disabled",
+                    true: "已启用",
+                    false: "已关闭",
                   })}
                 />
                 <DetailRow
                   label="闲置"
                   value={`${booleanStateLabel(snapshot.power.idle, {
-                    true: "Idle",
-                    false: "Active",
+                    true: "闲置",
+                    false: "活跃",
                   })}${
                     snapshot.power.idleSeconds === null
                       ? ""
-                      : ` · ${Math.round(snapshot.power.idleSeconds)}s`
+                      : ` · ${Math.round(snapshot.power.idleSeconds)} 秒`
                   }`}
                 />
                 <DetailRow
                   label="会话"
                   value={
                     snapshot.power.suspended
-                      ? "Suspended"
+                      ? "已挂起"
                       : booleanStateLabel(snapshot.power.locked, {
-                          true: "Locked",
-                          false: "Unlocked",
+                          true: "已锁定",
+                          false: "未锁定",
                         })
                   }
                 />
@@ -1187,7 +1187,7 @@ function ResourceTelemetryDiagnosticsBody({
                 />
                 <DetailRow
                   label="进程扫描"
-                  value={`${snapshot.health.retainedProcessCount}/${snapshot.health.scannedProcessCount} retained`}
+                  value={`${snapshot.health.retainedProcessCount}/${snapshot.health.scannedProcessCount} 已保留`}
                 />
                 <DetailRow
                   label="无法访问"

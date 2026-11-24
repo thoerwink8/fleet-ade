@@ -1268,9 +1268,7 @@ export default function DiffPanel({
               <FlaskConicalOffIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {hideTestFiles
-                ? `Show ${testFileCount} hidden test ${testFileCount === 1 ? "file" : "files"}`
-                : "隐藏测试文件"}
+              {hideTestFiles ? `显示 ${testFileCount} 个隐藏的测试文件` : "隐藏测试文件"}
             </TooltipPopup>
           </Tooltip>
         )}

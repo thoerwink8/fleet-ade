@@ -60,7 +60,7 @@ export class PrimaryEnvironmentRequestError extends Schema.TaggedError<PrimaryEn
   }
 
   override get message(): string {
-    return `Primary environment request failed during ${this.operation} (HTTP ${this.status}).`;
+    return `后台服务在 ${this.operation} 期间请求失败（HTTP ${this.status}）。`;
   }
 }
 
@@ -86,7 +86,7 @@ export class PrimaryEnvironmentAuthSessionTimeoutError extends Schema.TaggedErro
   },
 ) {
   override get message(): string {
-    return "Timed out waiting for authenticated session after bootstrap.";
+    return "等待引导后的认证会话超时。";
   }
 }
 

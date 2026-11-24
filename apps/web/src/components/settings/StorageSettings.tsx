@@ -335,7 +335,7 @@ function CleanupResults({
                 <span className="text-xs text-muted-foreground">
                   {[
                     entry.kind !== "worktree" && entry.files !== null
-                      ? `${entry.files.toLocaleString("zh-CN")} ${entry.files === 1 ? "file" : "files"}`
+                      ? `${entry.files.toLocaleString("zh-CN")} 个文件`
                       : null,
                     entry.bytes !== null ? formatBytes(entry.bytes) : null,
                   ]
@@ -349,7 +349,7 @@ function CleanupResults({
       })}
       {report.omittedCount > 0 && (
         <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-          {environmentLabel}: {report.omittedCount.toLocaleString("zh-CN")} more results.
+          {environmentLabel}：还有 {report.omittedCount.toLocaleString("zh-CN")} 条结果。
         </p>
       )}
       {report.entries.length === 0 && report.omittedCount === 0 && (

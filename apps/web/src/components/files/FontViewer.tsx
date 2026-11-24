@@ -8,11 +8,11 @@ const MAX_FONT_BYTES = 10 * 1024 * 1024;
 
 async function readFont(src: string, signal: AbortSignal) {
   const response = await fetch(src, { signal });
-  if (!response.ok) throw new Error("The font could not be loaded.");
+  if (!response.ok) throw new Error("字体加载失败。");
   if (Number(response.headers.get("content-length")) > MAX_FONT_BYTES)
     throw new Error("字体预览最多 10 MB。");
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("The font is unavailable.");
+  if (!reader) throw new Error("字体不可用。");
   const chunks: Uint8Array<ArrayBuffer>[] = [];
   let length = 0;
   try {
@@ -31,7 +31,7 @@ async function readFont(src: string, signal: AbortSignal) {
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => resolve(String(reader.result)), { once: true });
-    reader.addEventListener("error", () => reject(new Error("The font could not be decoded.")), {
+    reader.addEventListener("error", () => reject(new Error("字体解码失败。")), {
       once: true,
     });
     reader.readAsDataURL(blob);

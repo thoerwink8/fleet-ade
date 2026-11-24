@@ -205,7 +205,7 @@ export function AcpRegistrySearchStep({
           : isRefreshing
             ? "正在刷新 ACP Registry 结果。"
             : results
-              ? `${resultCount} compatible ${resultCount === 1 ? "agent" : "agents"} found.`
+              ? `找到 ${resultCount} 个兼容的智能体。`
               : ""}
       </div>
 

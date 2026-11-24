@@ -79,7 +79,7 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
   );
   if (total > LARGE_TEXT_MAX_BYTES) {
     await response.body.cancel();
-    throw new Error("Text previews support files up to 256 MB.");
+    throw new Error("文本预览最多支持 256 MB 的文件。");
   }
   const reader = response.body.getReader();
   let state = 0;
@@ -92,7 +92,7 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
       const { value, done } = await reader.read();
       if (done) break;
       if (size + value.length > LARGE_TEXT_MAX_BYTES)
-        throw new Error("Text previews support files up to 256 MB.");
+        throw new Error("文本预览最多支持 256 MB 的文件。");
       chunks.push({ start: size, blob: new Blob([value]) });
       for (let i = 0; i < value.length; i++) {
         const byte = value[i]!;
@@ -103,9 +103,9 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
           (pos === 2 && byte === 191)
         )
           continue;
-        if (byte === 0) throw new Error("This file contains binary data.");
+        if (byte === 0) throw new Error("这个文件包含二进制数据。");
         if (pos - at(entries - 1) > 1024 * 1024)
-          throw new Error("A line or record exceeds the 1 MB preview limit.");
+          throw new Error("某一行或记录超过 1 MB 预览上限。");
         if (cr) {
           cr = false;
           if (byte === 10) {
@@ -137,8 +137,7 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
           }
         }
         if (byte === 10 || byte === 13) {
-          if (entries > LARGE_TEXT_MAX_ROWS)
-            throw new Error("Text previews support up to 5 million rows.");
+          if (entries > LARGE_TEXT_MAX_ROWS) throw new Error("文本预览最多支持 500 万行。");
           set(entries++, pos + 1);
           columns = Math.min(LARGE_TEXT_MAX_COLUMNS, Math.max(columns, rowColumns));
           rowColumns = 1;
@@ -153,11 +152,9 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
         first = true;
       }
     }
-    if (total > 0 && size !== total)
-      throw new Error("The file download was incomplete. Close it and try again.");
+    if (total > 0 && size !== total) throw new Error("文件下载不完整。请关闭后重试。");
     if (size > at(entries - 1)) {
-      if (entries > LARGE_TEXT_MAX_ROWS)
-        throw new Error("Text previews support up to 5 million rows.");
+      if (entries > LARGE_TEXT_MAX_ROWS) throw new Error("文本预览最多支持 500 万行。");
       set(entries++, size);
       columns = Math.min(LARGE_TEXT_MAX_COLUMNS, Math.max(columns, rowColumns));
     }

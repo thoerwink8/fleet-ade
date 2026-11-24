@@ -12,7 +12,7 @@ const runtime = { Fragment, jsx, jsxs };
 function elementShell(node: Extract<HighlightedNode, { type: "element" }>) {
   const element = toJsxRuntime({ ...node, children: [] }, runtime);
   if (!isValidElement<DOMAttributes<HTMLElement>>(element)) {
-    throw new Error("Expected a highlighted code element");
+    throw new Error("预期是高亮代码元素");
   }
   return element;
 }

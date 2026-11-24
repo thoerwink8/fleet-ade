@@ -152,12 +152,12 @@ function uploadBytes(input: {
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
-        reject(new Error(`Upload rejected (${xhr.status})`));
+        reject(new Error(`上传被拒绝（${xhr.status}）`));
       }
     });
     xhr.addEventListener("error", () => reject(new Error("上传失败")));
-    xhr.addEventListener("timeout", () => reject(new Error("Upload timed out")));
-    xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
+    xhr.addEventListener("timeout", () => reject(new Error("上传超时")));
+    xhr.addEventListener("abort", () => reject(new Error("上传已取消")));
     xhr.send(input.file);
   });
 

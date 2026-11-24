@@ -45,14 +45,14 @@ export function DevReplayHost() {
   const replay = async (scenario?: string): Promise<ThreadId> => {
     const model = scenario ?? scenarios[0]?.slug;
     if (environmentId === null || project === undefined || model === undefined) {
-      throw new Error("Replay needs a dev server with a project and the Replay (dev) provider.");
+      throw new Error("回放需要一个带项目的开发服务器和 Replay（dev）智能体。");
     }
     if (!scenarios.some((candidate) => candidate.slug === model)) {
-      throw new Error(`Unknown replay scenario "${model}".`);
+      throw new Error(`未知的回放场景“${model}”。`);
     }
     const threadId = newThreadId();
     const modelSelection = { instanceId: DEV_REPLAY_INSTANCE_ID, model };
-    const title = `Replay: ${model}`;
+    const title = `回放：${model}`;
     const createdAt = new Date().toISOString();
     const result = await startTurn({
       environmentId,
@@ -130,7 +130,7 @@ export function DevReplayHost() {
         <DialogPanel>
           {scenarios.length === 0 || project === undefined ? (
             <p className="text-sm text-muted-foreground">
-              需要一个项目，以及开发服务器会启动的Replay（dev）提供方。
+              需要一个项目，以及开发服务器会启动的Replay（dev）智能体。
             </p>
           ) : (
             <div className="flex flex-col items-start gap-1">

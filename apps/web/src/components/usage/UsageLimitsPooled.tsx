@@ -189,9 +189,9 @@ function SegmentPopover({
             {resetsIn ? ` · ${resetsIn}` : ""}
           </Row>
         ) : null}
-        {timeLeft !== null ? <Row label="匀速进度">{timeLeft}% left by now</Row> : null}
+        {timeLeft !== null ? <Row label="匀速进度">此刻应还剩 {timeLeft}%</Row> : null}
         {reset && reset.restoresPercent > 0 ? (
-          <Row label="恢复">+{reset.restoresPercent}% of pool</Row>
+          <Row label="恢复">+{reset.restoresPercent}%（占额度池）</Row>
         ) : null}
       </div>
       {choices.length > 0 && redeem ? (
@@ -466,9 +466,7 @@ function LegendRow({
               <TicketIcon className="size-3" aria-hidden />
               {credits}
             </span>
-            <span className="sr-only">
-              {credits} reset {credits === 1 ? "credit" : "credits"} banked
-            </span>
+            <span className="sr-only">攒了 {credits} 次重置额度</span>
           </>
         ) : null}
       </span>

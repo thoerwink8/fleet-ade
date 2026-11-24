@@ -2356,8 +2356,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           variant: "default",
           icon: <ReplyIcon />,
           title: replyTo.subagents
-            ? `Replying to ${replyTo.subagents.map((subagent) => subagent.title).join(", ")}`
-            : "Replying to",
+            ? `正在回复 ${replyTo.subagents.map((subagent) => subagent.title).join("、")}`
+            : "正在回复",
           description: (
             <button
               type="button"
@@ -2373,7 +2373,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               {assistantCitationLabel(replyTo.citation)}
             </button>
           ),
-          dismissLabel: "Cancel reply",
+          dismissLabel: "取消回复",
           onDismiss: () => setComposerDraftReplyTo(composerDraftTarget, null),
         },
       ]

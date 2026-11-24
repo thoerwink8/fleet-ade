@@ -28,7 +28,7 @@ function readDataUrlBlob(src: string): Blob {
   const [mimeType = "", ...parameters] = url.slice("data:".length, comma).split(";");
   const payload = url.slice(comma + 1);
   try {
-    if (comma < 0) throw new Error("Missing data URL payload.");
+    if (comma < 0) throw new Error("data URL 缺少数据内容。");
     const isBase64 = parameters.some((parameter) => parameter.trim().toLowerCase() === "base64");
     // Base64 text is ASCII, so any escape that is not valid UTF-8 is malformed anyway.
     const bytes = isBase64

@@ -1152,7 +1152,7 @@ function ConnectionsSettingsContent({
                       size="sm"
                       environmentId={primaryEnvironmentId}
                       serverLabel={
-                        primaryEnvironment ? `${primaryEnvironment.label} 服务器` : "server"
+                        primaryEnvironment ? `${primaryEnvironment.label} 服务器` : "服务器"
                       }
                       selfUpdate={resolveServerSelfUpdateCapability(primaryServerConfig)}
                       installation={

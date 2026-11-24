@@ -124,7 +124,7 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
           description: projectCloneProgressSummary(clone),
           timeout: 0,
           actionProps: {
-            children: "Cancel",
+            children: "取消",
             onClick: () => {
               void runCloneAction("无法取消克隆", () =>
                 cancelClone({ environmentId, input: { projectId: clone.projectId } }),
@@ -175,7 +175,7 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
         description: cancelled ? clone.destinationPath : (clone.error ?? "克隆失败。"),
         timeout: 0,
         actionProps: {
-          children: "Retry",
+          children: "重试",
           onClick: () => {
             void runCloneAction("无法重试克隆", () =>
               retryClone({ environmentId, input: { projectId: clone.projectId } }),

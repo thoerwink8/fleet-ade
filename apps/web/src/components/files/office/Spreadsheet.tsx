@@ -73,7 +73,7 @@ export default function Spreadsheet(props: {
       .then((value) => {
         if (!value) throw new Error("此工作簿没有可见的工作表。");
         setOpened({ ...value, engine });
-        onDetails(`${value.tabs.length} sheet${value.tabs.length === 1 ? "" : "s"}`);
+        onDetails(`${value.tabs.length} 个工作表`);
       })
       .catch(fail);
     return () => {
@@ -546,7 +546,7 @@ function SpreadsheetGrid(props: {
         schedule();
         if (track.delta === 0) return;
         resizingPending = true;
-        setNotice("Resizing preview...");
+        setNotice("正在调整预览…");
         void engine
           .call(
             "resize",
@@ -568,7 +568,7 @@ function SpreadsheetGrid(props: {
             schedule();
           })
           .catch(() => {
-            if (!controller.signal.aborted) setNotice("This row or column could not be resized.");
+            if (!controller.signal.aborted) setNotice("无法调整这一行或列的尺寸。");
           })
           .finally(() => {
             resizingPending = false;
@@ -619,7 +619,7 @@ function SpreadsheetGrid(props: {
       void engine
         .call("copy", { sheet, range: clipped }, { signal: controller.signal })
         .then((text) => {
-          if (text === undefined) throw new Error("No cells");
+          if (text === undefined) throw new Error("没有单元格");
           return navigator.clipboard.writeText(text);
         })
         .catch(() => {

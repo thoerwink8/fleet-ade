@@ -264,10 +264,8 @@ export function summarizeAuthorizedClients(
   links: ReadonlyArray<ServerPairingLinkRecord>,
 ): string {
   const parts = [
-    `${sessions.length} ${sessions.length === 1 ? "client" : "clients"}`,
-    links.length > 0
-      ? `${links.length} ${links.length === 1 ? "pairing link" : "pairing links"}`
-      : null,
+    `${sessions.length} 个客户端`,
+    links.length > 0 ? `${links.length} 个配对链接` : null,
   ];
   return parts.filter((part): part is string => part !== null).join(" · ");
 }

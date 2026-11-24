@@ -190,7 +190,7 @@ export function PullRequestDetailGhost({
                 changedFiles === null ? (
                   <GhostBar className="h-3 w-10" />
                 ) : (
-                  `${changedFiles.toLocaleString("zh-CN")} ${changedFiles === 1 ? "file" : "files"}`
+                  `${changedFiles.toLocaleString("zh-CN")} 个文件`
                 )
               }
               diffStat={

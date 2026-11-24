@@ -89,7 +89,7 @@ const SidebarInstanceContext = React.createContext<SidebarInstanceContextProps |
 function useSidebar() {
   const context = React.use(SidebarContext);
   if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.");
+    throw new Error("useSidebar 必须在 SidebarProvider 内使用。");
   }
 
   return context;
