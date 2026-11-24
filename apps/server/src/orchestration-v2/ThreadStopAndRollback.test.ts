@@ -1809,3 +1809,109 @@ it.effect("an idle rewind records the client's command id and one metadata event
     ]);
   }).pipe(Effect.provide(layerTest)),
 );
+
+// Starts an idle rewind and leaves its effect queued, so the in-progress marker stays set.
+const startQueuedIdleRewind = (threadId: ThreadId, requestId: CommandId) =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const started = yield* orchestrator.getThreadProjection(threadId);
+    const run = started.runs[0]!;
+    const scope = started.checkpointScopes[0]!;
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make(`${requestId}:seed`),
+      events: [
+        {
+          id: EventId.make(`${requestId}:settle`),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    const checkpointId = yield* seedCheckpoint(threadId, scope, requestId, "ready");
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback",
+      commandId: requestId,
+      threadId,
+      scopeId: scope.id,
+      checkpointId,
+      restoreFiles: false,
+    });
+    assert.equal(
+      (yield* orchestrator.getThreadProjection(threadId)).thread.rollbackInProgressRequestId,
+      requestId,
+    );
+  });
+
+it.effect("a rewind that fails on a deleted thread still clears the in-progress marker", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const threadId = ThreadId.make("thread:rewind-marker-deleted");
+    const requestId = CommandId.make("rewind-marker-deleted");
+    yield* startQueuedIdleRewind(threadId, requestId);
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("rewind-marker-delete"),
+      threadId,
+    });
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback.fail",
+      commandId: CommandId.make("rewind-marker-deleted:rollback-failed"),
+      threadId,
+      requestId,
+      message: "failed",
+    });
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNotNull(projection.thread.deletedAt);
+    // A restored thread must not stay marked as rewinding.
+    assert.isNull(projection.thread.rollbackInProgressRequestId ?? null);
+    assert.isNull(projection.thread.rollbackFailure ?? null);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("a failure of a superseded rewind clears its in-progress marker", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const threadId = ThreadId.make("thread:rewind-marker-superseded");
+    const requestId = CommandId.make("rewind-marker-superseded");
+    yield* startQueuedIdleRewind(threadId, requestId);
+    // A newer request took over `rollbackRequestId` while this one was still queued.
+    const thread = (yield* orchestrator.getThreadProjection(threadId)).thread;
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("rewind-marker-newer"),
+      events: [
+        {
+          id: EventId.make("rewind-marker-newer"),
+          type: "thread.metadata-updated",
+          threadId,
+          occurredAt: now,
+          payload: {
+            ...thread,
+            rollbackRequestId: CommandId.make("rewind-marker-newer"),
+            updatedAt: now,
+          },
+        },
+      ],
+    });
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback.fail",
+      commandId: CommandId.make("rewind-marker-superseded:rollback-failed"),
+      threadId,
+      requestId,
+      message: "failed",
+    });
+    const projection = (yield* orchestrator.getThreadProjection(threadId)).thread;
+    assert.isNull(projection.rollbackInProgressRequestId ?? null);
+    // The newer request's failure slot is not written by an older one.
+    assert.isNull(projection.rollbackFailure ?? null);
+    assert.equal(projection.rollbackRequestId, CommandId.make("rewind-marker-newer"));
+  }).pipe(Effect.provide(layerTest)),
+);
