@@ -172,3 +172,26 @@ describe("RadioGroup", () => {
     expect(onValueChange).toHaveBeenCalledWith("l", expect.anything());
   });
 });
+
+describe("ToggleGroup (outline, non-segmented)", () => {
+  it("keeps the taller touch height on narrow viewports and the compact height from sm up", async () => {
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    await using _viewport = {
+      [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+    };
+    await using screen = await render(
+      <ToggleGroup aria-label="Status" variant="outline" size="xs" value={["a"]}>
+        <Toggle value="a">A</Toggle>
+        <Toggle value="b">B</Toggle>
+      </ToggleGroup>,
+    );
+    const item = screen.getByRole("button", { name: "A" }).element();
+    const ctrlXs = parseFloat(getComputedStyle(item).getPropertyValue("--fa-ctrl-xs"));
+    const ctrlSm = parseFloat(getComputedStyle(item).getPropertyValue("--fa-ctrl-sm"));
+
+    await page.viewport(1280, 800);
+    expect(parseFloat(getComputedStyle(item).height)).toBe(ctrlXs);
+    await page.viewport(375, 800);
+    expect(parseFloat(getComputedStyle(item).height)).toBe(ctrlSm);
+  });
+});
