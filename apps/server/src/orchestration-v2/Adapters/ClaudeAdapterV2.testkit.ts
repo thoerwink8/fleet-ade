@@ -1007,7 +1007,7 @@ const writeReplayTaskOutputFiles = Effect.fn("ClaudeReplay.writeTaskOutputFiles"
     if (frame.task_type !== "local_bash" || frame.is_backgrounded !== false) continue;
     const output =
       typeof frame.tool_use_id === "string" ? outputByToolUseId.get(frame.tool_use_id) : undefined;
-    if (root === undefined || output === undefined || typeof frame.session_id !== "string") {
+    if (output === undefined || typeof frame.session_id !== "string") {
       continue;
     }
     const tasks = path.join(root, "replay-project", frame.session_id, "tasks");
