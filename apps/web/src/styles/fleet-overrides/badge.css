@@ -1,0 +1,14 @@
+/* .fa-status is a 16px line. Tags in this app are the 20px control. */
+.fa-status.ade-badge--status {
+  height: var(--fa-ctrl-2xs);
+}
+
+/* .fa-tag's font shorthand resets figures; ticket and PR numbers stay tabular. */
+.fa-tag.ade-badge--chip {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A label's color belongs to that label, not to a theme role. */
+.fa-dot.ade-badge__dot--label {
+  background: var(--label);
+}
