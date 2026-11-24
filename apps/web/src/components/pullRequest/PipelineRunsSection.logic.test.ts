@@ -97,7 +97,7 @@ describe("groupPipelineRuns", () => {
       "secondary",
       "info",
       "info",
-      "warning",
+      "info",
       "info",
       "success",
       "success",

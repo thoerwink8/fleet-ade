@@ -44,8 +44,8 @@ function EmptyMedia({
   return (
     <div
       className={cn(
-        "mb-4 flex shrink-0 items-center justify-center",
-        variant === "warning" ? "text-warning" : "fa-muted",
+        "fa-empty__media mb-4 flex shrink-0 items-center justify-center",
+        variant === "warning" && "fa-empty__media--warning",
         className,
       )}
       data-slot="empty-media"
