@@ -1,0 +1,148 @@
+/* Menu — @fleet/design overrides.
+   Base UI puts data-slot/data-* state on the primitives; keep overrides scoped
+   to menu slots so .fa-* stays usable verbatim elsewhere. */
+
+/* Touch: rows keep their 32px look; ::after stretches the hit area to at least 44px. */
+@media (pointer: coarse) {
+  :is(
+    [data-slot="menu-item"],
+    [data-slot="menu-checkbox-item"],
+    [data-slot="menu-radio-item"],
+    [data-slot="menu-sub-trigger"]
+  ) {
+    position: relative;
+  }
+  :is(
+    [data-slot="menu-item"],
+    [data-slot="menu-checkbox-item"],
+    [data-slot="menu-radio-item"],
+    [data-slot="menu-sub-trigger"]
+  )::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block: calc((var(--fa-ctrl) - 44px) / 2);
+  }
+}
+
+/* Fleet rows are fixed-height; rows here can carry two-line content, so the
+   control height is a floor, and rows are not selectable text. */
+:is(
+  [data-slot="menu-item"],
+  [data-slot="menu-checkbox-item"],
+  [data-slot="menu-radio-item"],
+  [data-slot="menu-sub-trigger"]
+) {
+  min-height: var(--fa-ctrl);
+  height: auto;
+  user-select: none;
+}
+
+:is([data-slot="menu-item"], [data-slot="menu-sub-trigger"])[data-density="touch"] {
+  --fa-ctrl: var(--fa-ctrl-lg);
+}
+
+/* Non-floating menus (data-side="none") size to their trigger anchor. */
+[data-side="none"]
+  :is(
+    [data-slot="menu-item"],
+    [data-slot="menu-checkbox-item"],
+    [data-slot="menu-radio-item"],
+    [data-slot="menu-sub-trigger"]
+  ) {
+  min-width: calc(var(--anchor-width, 0px) + var(--fa-space-5));
+}
+
+/* The highlight background marks the focused row. fleet-design's focus ring sits 2px outside
+   the row and the popup's scroll container clips it to a line along the bottom edge. */
+:is(
+  [data-slot="menu-item"],
+  [data-slot="menu-checkbox-item"],
+  [data-slot="menu-radio-item"],
+  [data-slot="menu-sub-trigger"]
+):focus-visible {
+  outline: none;
+}
+
+/* Base UI still lets pointer events hit disabled rows; suppress like before. */
+:is(
+  [data-slot="menu-item"],
+  [data-slot="menu-checkbox-item"],
+  [data-slot="menu-radio-item"],
+  [data-slot="menu-sub-trigger"]
+)[data-disabled] {
+  pointer-events: none;
+}
+
+:is([data-slot="menu-item"], [data-slot="menu-sub-trigger"], [data-slot="menu-label"])[data-inset] {
+  padding-inline-start: var(--fa-space-8);
+}
+
+/* Leading icons read muted at 16px unless they set their own color/size. */
+.fa-item > svg:first-child:not(.end, .tick) {
+  flex: none;
+  pointer-events: none;
+}
+.fa-item > svg:first-child:not(.end, .tick):not([class*="size-"]) {
+  width: 16px;
+  height: 16px;
+}
+.fa-item > svg:first-child:not(.end, .tick):not([class*="text-"]) {
+  color: var(--fa-fg-muted);
+}
+.fa-item--danger > svg:first-child:not([class*="text-"]) {
+  color: var(--fa-danger);
+}
+
+/* Radio items without an explicit indicator still show the checked state. */
+[data-slot="menu-radio-item"][data-checked] {
+  background-color: var(--fa-selected);
+}
+
+/* .end trailing content (shortcut, detail, submenu chevron) hugs the right edge. */
+.fa-item .end {
+  margin-inline-start: auto;
+}
+
+/* Switch indicator on MenuCheckboxItem variant="switch" (no @fleet/design switch). */
+.ade-menu-switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  width: 28px;
+  height: 16px;
+  margin-inline-start: auto;
+  padding: 2px;
+  border-radius: var(--fa-radius-full);
+  background: var(--fa-border);
+  transition: background-color var(--fa-dur-fast) var(--fa-ease-out);
+}
+
+[data-slot="menu-checkbox-item"][data-checked] .ade-menu-switch {
+  background: var(--fa-accent);
+}
+
+[data-slot="menu-checkbox-item"][data-disabled] .ade-menu-switch {
+  background: var(--fa-border);
+}
+
+.ade-menu-switch__thumb {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--fa-radius-full);
+  /* Off: a muted thumb so it reads against the track in light and dark. */
+  background: var(--fa-fg-muted);
+  transition: translate var(--fa-dur-fast) var(--fa-ease-out);
+}
+
+[data-slot="menu-checkbox-item"][data-checked] .ade-menu-switch__thumb {
+  translate: 12px 0;
+  background: var(--fa-bg);
+}
+
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  [data-slot="menu-checkbox-item"]:not([data-disabled]):not([aria-disabled="true"])[data-checked]
+  .ade-menu-switch {
+  background: var(--primary);
+}

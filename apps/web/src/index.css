@@ -14,6 +14,8 @@
 @import "./styles/fleet-overrides/dialog.css" layer(fleet);
 @import "@fleet/design/styles/toast.css" layer(fleet);
 @import "./styles/fleet-overrides/toast.css" layer(fleet);
+@import "@fleet/design/styles/menu.css" layer(fleet);
+@import "./styles/fleet-overrides/menu.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
@@ -1212,6 +1214,8 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --fa-warning: var(--warning-foreground);
   --fa-shadow-overlay: 0 8px 24px rgb(0 0 0 / 35%);
   --fa-focus-ring: var(--ring);
+  --fa-hover: var(--accent);
+  --fa-selected: color-mix(in srgb, var(--foreground) 9%, transparent);
   --sidebar: var(--app-theme-sidebar);
   --sidebar-foreground: var(--app-theme-sidebar-foreground);
   --sidebar-muted-foreground: var(--app-theme-sidebar-muted-foreground);
