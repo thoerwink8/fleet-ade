@@ -2516,9 +2516,7 @@ function OpenCommandPaletteDialog(props: {
             ...(isCreatingNewProject ? { disabled: true, disabledReason: "正在创建项目。" } : {}),
             ...(option.environmentId === newProjectFlow.environmentId
               ? {
-                  titleTrailingContent: (
-                    <CheckIcon className="ms-auto size-4 shrink-0 text-muted-foreground/70" />
-                  ),
+                  titleTrailingContent: <CheckIcon className="fa-ic ms-auto" />,
                 }
               : {}),
           })),
@@ -2537,9 +2535,7 @@ function OpenCommandPaletteDialog(props: {
               title: "添加现有项目",
               description: "打开文件夹或克隆仓库",
               icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
-              titleTrailingContent: (
-                <ChevronRightIcon className="-me-0.5 ms-auto size-4 shrink-0 text-muted-foreground/70" />
-              ),
+              titleTrailingContent: <ChevronRightIcon className="fa-ic ms-auto" />,
               keepOpen: true,
               run: async () => {
                 showExistingProjectSources(newProjectFlow.environmentId);
