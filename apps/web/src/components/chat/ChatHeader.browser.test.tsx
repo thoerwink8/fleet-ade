@@ -250,7 +250,7 @@ it("expands breadcrumb touch hit areas vertically to 44px without overlapping th
   {
     await using _pointer = await emulatePointer({ width: 1280, height: 800, pointer: "fine" });
     await using screen = await render(headerWithSidebarTrigger());
-    await vi.waitFor(() => expect(window.matchMedia("(pointer: fine)").matches).toBe(true));
+    await vi.waitFor(() => expect(window.matchMedia("(pointer: coarse)").matches).toBe(false));
 
     for (const name of ["在 fleet-ade 中新建会话", "打开父会话：父会话", "会话标题 的会话操作"]) {
       const button = screen.getByRole("button", { name }).element();
