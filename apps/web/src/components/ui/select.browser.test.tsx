@@ -44,26 +44,6 @@ function resolvedStyle(property: "color" | "backgroundColor" | "borderTopColor",
   return value;
 }
 
-function neutralHighlightImage() {
-  const probe = document.createElement("div");
-  probe.className = "fa-item";
-  probe.style.setProperty("--fa-hover", "color-mix(in srgb, var(--fa-fg) 5%, transparent)");
-  probe.style.backgroundImage = "var(--fa-hv)";
-  document.body.append(probe);
-  const image = getComputedStyle(probe).backgroundImage;
-  probe.remove();
-  return image;
-}
-
-function accentHighlightImage() {
-  const probe = document.createElement("div");
-  probe.style.backgroundImage = "linear-gradient(var(--accent), var(--accent))";
-  document.body.append(probe);
-  const image = getComputedStyle(probe).backgroundImage;
-  probe.remove();
-  return image;
-}
-
 async function emulateCoarsePointer(): Promise<AsyncDisposable> {
   const previous = { width: window.innerWidth, height: window.innerHeight };
   const session = cdp();
@@ -220,10 +200,11 @@ describe("Select", () => {
     await userEvent.keyboard("{ArrowDown}");
     const highlighted = page.getByRole("option", { name: "Bravo" }).element();
     await vi.waitFor(() => expect(highlighted.hasAttribute("data-highlighted")).toBe(true));
-    const highlightImage = getComputedStyle(highlighted).backgroundImage;
-    expect(highlightImage).toBe(neutralHighlightImage());
-    expect(highlightImage).not.toBe(accentHighlightImage());
-    expect(highlightImage).not.toBe("none");
+    // @fleet/design 0.3.3 `.fa-item[data-highlighted]`: the neutral selected fill, no hover wash.
+    const highlightStyle = getComputedStyle(highlighted);
+    expect(highlightStyle.backgroundColor).toBe(resolvedBackground("--fa-selected"));
+    expect(highlightStyle.backgroundColor).not.toBe(resolvedBackground("--accent"));
+    expect(highlightStyle.backgroundImage).toBe("none");
   });
 
   it("reads form, popup, and item colors for default, Grove, and Ember without restyling disabled", async () => {
@@ -317,10 +298,16 @@ describe("Select", () => {
           expect(selectedStyle.backgroundColor, `${label} selected is not accent surface`).not.toBe(
             resolvedBackground("--accent"),
           );
-          const highlightImage = getComputedStyle(highlighted).backgroundImage;
-          expect(highlightImage, `${label} highlight`).toBe(neutralHighlightImage());
-          expect(highlightImage, `${label} highlight is not accent`).not.toBe(
-            accentHighlightImage(),
+          const highlightStyle = getComputedStyle(highlighted);
+          expect(highlightStyle.backgroundColor, `${label} highlight fill`).toBe(
+            resolvedBackground("--fa-selected"),
+          );
+          expect(
+            highlightStyle.backgroundColor,
+            `${label} highlight is not accent surface`,
+          ).not.toBe(resolvedBackground("--accent"));
+          expect(highlightStyle.backgroundImage, `${label} highlight has no hover wash`).toBe(
+            "none",
           );
 
           const disabledStyle = getComputedStyle(disabled);

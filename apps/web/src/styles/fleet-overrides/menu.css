@@ -25,16 +25,13 @@
   }
 }
 
-/* Fleet rows are fixed-height; rows here can carry two-line content, so the
-   control height is a floor, and rows are not selectable text. */
+/* Rows are not selectable text. */
 :is(
   [data-slot="menu-item"],
   [data-slot="menu-checkbox-item"],
   [data-slot="menu-radio-item"],
   [data-slot="menu-sub-trigger"]
 ) {
-  min-height: var(--fa-ctrl);
-  height: auto;
   user-select: none;
 }
 
@@ -94,10 +91,12 @@
   color: var(--fa-danger);
 }
 
-/* Same opaque --fa-hover as the buttons: a danger row keeps a translucent wash. */
+/* Grove and Ember paint muted text and icons at 3.4 to 4.4 on their popup surface, and the library's
+   neutral highlight lowers that to 2.6 to 3.7 (the accent highlight left 3.0 to 4.1). The highlighted
+   row takes the full foreground for them, as a muted button does on hover. */
 :is(html[data-theme-id="grove"], html[data-theme-id="ember"])
-  .fa-item--danger:not([disabled], [data-disabled], [aria-disabled="true"]) {
-  --fa-hover: color-mix(in srgb, var(--fa-fg) 5%, transparent);
+  .fa-item:is([data-highlighted], [data-active="true"], .fa-item--selected) {
+  --fa-fg-muted: var(--fa-fg);
 }
 
 /* Radio items without an explicit indicator still show the checked state. */

@@ -21,6 +21,14 @@ function contrastRatio(foreground: string, background: string) {
   return (sorted[0]! + 0.05) / (sorted[1]! + 0.05);
 }
 
+function flatten(top: string, bottom: string) {
+  const over = toRgb(top)!;
+  const under = toRgb(bottom)!;
+  const alpha = over.alpha ?? 1;
+  const mix = (a: number, b: number) => a * alpha + b * (1 - alpha);
+  return `rgb(${mix(over.r, under.r) * 255} ${mix(over.g, under.g) * 255} ${mix(over.b, under.b) * 255})`;
+}
+
 function BasicMenu({ onSelect }: { onSelect?: (item: string) => void }) {
   return (
     <Menu>
@@ -183,6 +191,51 @@ describe("Menu", () => {
           expect(
             ratio,
             `${themeId} ${appearance} popup text (${style.color} on ${style.backgroundColor})`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    } finally {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      delete root.dataset.theme;
+    }
+  });
+
+  it("keeps the muted part of a highlighted row at 4.5:1 across default, Grove, and Ember in light and dark", async () => {
+    const root = document.documentElement;
+    try {
+      await using screen = await render(
+        <Menu>
+          <MenuTrigger>Open</MenuTrigger>
+          <MenuPopup>
+            <MenuItem>
+              First item <span className="end">Ctrl+K</span>
+            </MenuItem>
+            <MenuItem>Second item</MenuItem>
+          </MenuPopup>
+        </Menu>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Open" }));
+      await expect.element(page.getByRole("menu")).toBeVisible();
+      await userEvent.keyboard("{ArrowDown}");
+      const row = page.getByRole("menuitem", { name: /First item/ }).element();
+      await vi.waitFor(() => expect(row.hasAttribute("data-highlighted")).toBe(true));
+      const popupElement = page.getByRole("menu").element();
+      const muted = row.querySelector(".end")!;
+
+      for (const themeId of ["system", GROVE_THEME.id, EMBER_THEME.id] as const) {
+        for (const appearance of ["light", "dark"] as const) {
+          root.classList.toggle("dark", appearance === "dark");
+          root.dataset.theme = appearance;
+          applyThemePalette(themeId, appearance);
+          const fill = flatten(
+            getComputedStyle(row).backgroundColor,
+            getComputedStyle(popupElement).backgroundColor,
+          );
+          const ratio = contrastRatio(getComputedStyle(muted).color, fill);
+          expect(
+            ratio,
+            `${themeId} ${appearance} highlighted muted text on ${fill}`,
           ).toBeGreaterThanOrEqual(4.5);
         }
       }

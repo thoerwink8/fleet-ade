@@ -23,11 +23,6 @@
   border-color: transparent;
 }
 
-/* Palettes point --fa-hover at the accent surface. Item highlight stays a neutral wash. */
-[data-slot="select-item"] {
-  --fa-hover: color-mix(in srgb, var(--fa-fg) 5%, transparent);
-}
-
 [data-slot="select-item"]:not([data-selected]) .tick {
   visibility: hidden;
 }
