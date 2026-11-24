@@ -69,6 +69,13 @@ button.fa-cmd__row {
   background-image: none;
 }
 
+/* The palette keeps one moving highlight: arrows and pointer movement both set it.
+   The library also paints :hover, so a pointer left still over one row while the
+   keyboard highlights another would tint two rows. Only the highlighted row paints. */
+.fa-cmd__row:hover:not([data-highlighted]):not([data-palette-active]) {
+  background-image: none;
+}
+
 /* The library leaves data-active paintable on a disabled row and only clears
    that one attribute. Arrow keys skip disabled rows; this clears a highlight
    if one still lands. */

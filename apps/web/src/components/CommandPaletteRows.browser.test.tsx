@@ -261,6 +261,25 @@ describe("command palette rows", () => {
     expect(ran).toHaveLength(1);
   });
 
+  it("tints one row when the pointer rests on a row the keyboard has left", async () => {
+    function Harness() {
+      const [highlighted, setHighlighted] = useState<string | null>("one");
+      return (
+        <Groups groups={stateGroups} highlighted={highlighted} onHighlighted={setHighlighted} />
+      );
+    }
+    await using _screen = await render(<Harness />);
+    const plain = page.getByRole("option", { name: /Two line command/ }).element();
+    await userEvent.hover(plain);
+    await userEvent.keyboard("{ArrowUp}");
+    expect(plain.matches(":hover")).toBe(true);
+    expect(getComputedStyle(plain).backgroundImage, "resting pointer").toBe("none");
+    const tinted = [...document.querySelectorAll<HTMLElement>(".fa-cmd__row")].filter(
+      (row) => getComputedStyle(row).backgroundImage !== "none",
+    );
+    expect(tinted).toHaveLength(1);
+  });
+
   it("keeps highlighted text at 4.5:1 and does not restyle disabled rows across themes", async () => {
     const root = document.documentElement;
     try {
