@@ -142,6 +142,15 @@ describe("standard painted theme colors", () => {
               appearance === "dark" ? "oklch(0.765 0.177 163.223)" : "oklch(0.508 0.118 165.612)",
             ],
             ["--error", colors.error],
+            ["--fa-bg", colors.canvas],
+            ["--fa-panel", colors.surface],
+            ["--fa-fg", colors.text],
+            ["--fa-fg-muted", colors.mutedForeground],
+            ["--fa-border", colors.border],
+            ["--fa-accent", colors.messageAction],
+            ["--fa-on-accent", colors.messageActionForeground],
+            ["--fa-danger", colors.error],
+            ["--fa-focus-ring", colors.focus],
           ];
           for (const [variable, expectedColor] of expectedVariables) {
             expectCloseColor(

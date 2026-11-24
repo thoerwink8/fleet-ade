@@ -1,0 +1,28 @@
+/* Narrow viewports (< 640px / sm) keep an 18px box for touch usability regardless of root font size. */
+@media (max-width: 639.98px) {
+  .fa-checkbox {
+    width: 18px;
+    height: 18px;
+  }
+  .fa-checkbox .fa-ic {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Preserve Grove/Ember's --primary checkbox fill without overriding fleet-design's disabled styles. */
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-checkbox:not([data-disabled]):not([aria-disabled="true"]):is(
+    [data-checked],
+    [aria-checked="true"],
+    [data-indeterminate],
+    [aria-checked="mixed"]
+  ) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.fa-checkbox[aria-invalid="true"] {
+  border-color: var(--fa-danger);
+}

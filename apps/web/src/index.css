@@ -1,7 +1,10 @@
 /* fleet-tokens sits lowest so every later layer, and this file's unlayered variables, can override a token. */
-@layer fleet-tokens, theme, base, components, utilities;
+@layer fleet-tokens, theme, base, fleet, components, utilities;
 @import "tailwindcss";
 @import "@fleet/design/tokens.css" layer(fleet-tokens);
+@import "@fleet/design/styles/base.css" layer(fleet);
+@import "@fleet/design/styles/checkbox.css" layer(fleet);
+@import "./styles/fleet-overrides/checkbox.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
@@ -1179,6 +1182,17 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --border: var(--app-theme-border);
   --input: var(--app-theme-input);
   --ring: var(--app-theme-focus);
+  /* Grove/Ember have no fleet-design [data-theme] palette; point the --fa-* roles
+     their components read onto the active theme's variables so they follow it. */
+  --fa-bg: var(--background);
+  --fa-panel: var(--card);
+  --fa-fg: var(--foreground);
+  --fa-fg-muted: var(--muted-foreground);
+  --fa-border: var(--border);
+  --fa-accent: var(--primary);
+  --fa-on-accent: var(--primary-foreground);
+  --fa-danger: var(--error);
+  --fa-focus-ring: var(--ring);
   --sidebar: var(--app-theme-sidebar);
   --sidebar-foreground: var(--app-theme-sidebar-foreground);
   --sidebar-muted-foreground: var(--app-theme-sidebar-muted-foreground);
