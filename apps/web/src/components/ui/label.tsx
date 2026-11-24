@@ -6,7 +6,7 @@ import { cn } from "~/lib/utils";
 function Label({ className, render, ...props }: useRender.ComponentProps<"label">) {
   const defaultProps = {
     className: cn(
-      "inline-flex items-center gap-2 text-base/5 sm:text-row/5 font-semibold text-foreground",
+      "fa-control inline-flex items-center gap-2 text-foreground in-disabled:text-(--fa-fg-muted) group-data-disabled/field:text-(--fa-fg-muted) peer-disabled:text-(--fa-fg-muted) data-disabled:text-(--fa-fg-muted) aria-disabled:text-(--fa-fg-muted)",
       className,
     ),
     "data-slot": "label",
