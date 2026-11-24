@@ -291,7 +291,7 @@ overrides:
 
 packageExtensionsChecksum: sha256-+v8ntounVLrYFu5whiqOiF5wsCM8sIM8cT3HaXVONag=
 
-pnpmfileChecksum: sha256-nBQHZHrxibZ43E781rHt4hvBmP52/DpxVLizQpggTDU=
+pnpmfileChecksum: sha256-SEyX5I8P0+mnQDdDFXJ1bw+VZjmV2cVcZcOJdpGybws=
 
 patchedDependencies:
   '@effect/vitest@4.1.2': 299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7
