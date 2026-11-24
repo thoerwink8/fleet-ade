@@ -30,3 +30,10 @@
   background: transparent;
   box-shadow: none;
 }
+
+/* .fa-cmd__in input sets 14px and outranks the narrow 16px in input.css; iOS Safari zooms under 16px. */
+@media (max-width: 639.98px) {
+  .fa-cmd__in input {
+    font-size: 16px;
+  }
+}
