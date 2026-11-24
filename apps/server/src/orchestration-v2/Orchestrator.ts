@@ -41,6 +41,7 @@ import {
   type ThreadPullRequestWatch,
   type OrchestrationV2BatchThreadResult,
   type OrchestrationV2AppThread,
+  type OrchestrationV2PendingRollback,
   type OrchestrationV2ContextHandoff,
   type OrchestrationV2ContextSourcePoint,
   type OrchestrationV2ContextTransfer,
@@ -89,6 +90,7 @@ import {
   derivePendingBackgroundWork,
   pendingBackgroundTurnItems,
 } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -106,8 +108,12 @@ import {
   isCheckpointRestoreIsolated,
   SHARED_WORKSPACE_RESTORE_MESSAGE,
 } from "./CheckpointRestoreSafety.ts";
+import { ROLLBACK_FAILED_MESSAGE } from "./CheckpointRollbackService.ts";
 import { CheckpointServiceV2 } from "./CheckpointService.ts";
+import { dispatchErrorCode } from "./UserFacingErrors.ts";
+import { GIT_INDEX_LOCKED_DETAIL } from "../vcs/VcsProcess.ts";
 import {
+  CommandPolicyCapabilityUnsupportedError,
   CommandPolicyV2,
   followUpOwnerRun,
   goalCommandStopsActiveRun,
@@ -211,6 +217,11 @@ export class OrchestratorDispatchError extends Schema.TaggedError<OrchestratorDi
   }
 }
 
+const isOrchestratorDispatchError = Schema.is(OrchestratorDispatchError);
+const isCommandPolicyCapabilityUnsupportedError = Schema.is(
+  CommandPolicyCapabilityUnsupportedError,
+);
+
 export class OrchestratorThreadAlreadyExistsError extends Schema.TaggedError<OrchestratorThreadAlreadyExistsError>()(
   "OrchestratorThreadAlreadyExistsError",
   { commandId: CommandId, threadId: ThreadId },
@@ -300,6 +311,112 @@ export class OrchestratorProviderSelectionBusyError extends Schema.TaggedError<O
   }
 }
 
+function threadAfterEvents(
+  thread: OrchestrationV2AppThread,
+  events: ReadonlyArray<OrchestrationV2DomainEvent>,
+): OrchestrationV2AppThread {
+  let current = thread;
+  for (const event of events) {
+    switch (event.type) {
+      case "thread.created":
+      case "thread.archived":
+      case "thread.unarchived":
+      case "thread.deleted":
+      case "thread.settled":
+      case "thread.unsettled":
+      case "thread.snoozed":
+      case "thread.unsnoozed":
+      case "thread.auto-settle-set":
+      case "thread.pinned":
+      case "thread.unpinned":
+      case "thread.pin-reordered":
+      case "thread.active-reordered":
+      case "thread.tags-updated":
+      case "thread.commander-marked":
+      case "thread.commander-unmarked":
+      case "thread.metadata-updated":
+      case "thread.pull-request-synced":
+      case "thread.runtime-mode-updated":
+      case "thread.interaction-mode-updated":
+      case "thread.model-selection-updated":
+      case "thread.provider-switched":
+      case "thread.guest-share-updated":
+        current = event.payload;
+        break;
+      default:
+        break;
+    }
+  }
+  return current;
+}
+
+/** The checkpoint the client would pick for this turn count. `0` is the baseline before the first turn. */
+function checkpointForTurnCount<
+  T extends { readonly ordinalWithinScope: number; readonly appRunOrdinal: number | null },
+>(checkpoints: ReadonlyArray<T>, turnCount: number): T | undefined {
+  return checkpoints.findLast((candidate) =>
+    turnCount === 0
+      ? candidate.ordinalWithinScope === 0 && candidate.appRunOrdinal === null
+      : candidate.appRunOrdinal === turnCount,
+  );
+}
+
+/** The code a rejected rewind carries. `dispatchCheckpointRollback` attaches one to every refusal it raises. */
+function classifyRollbackCause(cause: unknown): OrchestrationV2RollbackFailureCode {
+  if (
+    isCommandPolicyCapabilityUnsupportedError(cause) &&
+    (cause.capability === "rollback" || cause.capability === "rollback_snapshot")
+  ) {
+    return "provider-cannot-rollback";
+  }
+  if (isOrchestratorDispatchError(cause)) {
+    return cause.code ?? classifyRollbackCause(cause.cause);
+  }
+  return dispatchErrorCode(cause) ?? "rollback-failed";
+}
+
+function rollbackCodeMessage(code: OrchestrationV2RollbackFailureCode): string {
+  switch (code) {
+    case "target-invalid":
+      return "That rewind point is no longer available.";
+    case "checkpoint-missing":
+      return "This checkpoint has no saved files, so files cannot be restored.";
+    case "checkpoint-unavailable":
+      return "The checkpoint for that turn is not available.";
+    case "git-index-locked":
+      return GIT_INDEX_LOCKED_DETAIL;
+    case "rollback-failed":
+      return ROLLBACK_FAILED_MESSAGE;
+    case "shared-workspace":
+      return SHARED_WORKSPACE_RESTORE_MESSAGE;
+    case "provider-cannot-rollback":
+      return "This provider cannot roll back the conversation.";
+    case "provider-turn-unavailable":
+      return "The provider turn for that checkpoint is unavailable.";
+    case "provider-turn-active":
+      return "The turn is still winding down. Try the rewind again.";
+    case "interrupt-unresponsive":
+      return "The agent did not stop. Force stop it, then rewind.";
+    case "pending-rollback":
+      return "A rewind is waiting for the turn to stop.";
+    case "rollback-already-pending":
+      return "A rewind is already waiting for the turn to stop.";
+  }
+}
+
+export class OrchestratorRollbackRejectedError extends Schema.TaggedError<OrchestratorRollbackRejectedError>()(
+  "OrchestratorRollbackRejectedError",
+  {
+    commandId: CommandId,
+    threadId: ThreadId,
+    code: OrchestrationV2RollbackFailureCode,
+  },
+) {
+  override get message(): string {
+    return rollbackCodeMessage(this.code);
+  }
+}
+
 export class OrchestratorDispatchConcurrencyLimitError extends Schema.TaggedError<OrchestratorDispatchConcurrencyLimitError>()(
   "OrchestratorDispatchConcurrencyLimitError",
   {
@@ -354,6 +471,7 @@ export const OrchestratorV2Error = Schema.Union([
   OrchestratorThreadAboveModeLimitError,
   OrchestratorProviderSelectionBusyError,
   OrchestratorDispatchConcurrencyLimitError,
+  OrchestratorRollbackRejectedError,
 ]);
 export type OrchestratorV2Error = typeof OrchestratorV2Error.Type;
 
@@ -367,6 +485,8 @@ export interface OrchestratorV2DispatchResult {
 
 export interface OrchestratorV2Shape {
   readonly resumeQueuedRuns: Effect.Effect<number, OrchestratorV2Error>;
+  /** Dispatches `checkpoint.rollback.resume` once for each thread still waiting on a rewind. */
+  readonly resumePendingRollbacks: Effect.Effect<number, OrchestratorV2Error>;
   readonly recoverDelegatedTasks: Effect.Effect<void>;
   readonly recoverDelegatedTask: (
     threadId: ThreadId,
@@ -509,6 +629,8 @@ export interface OrchestratorV2Shape {
     threadId: ThreadId,
   ) => Effect.Effect<number, OrchestratorV2Error>;
   readonly streamStoredEvents: Stream.Stream<OrchestrationV2StoredEvent, OrchestratorV2Error>;
+  /** Events committed after this stream is built. Does not replay older history. */
+  readonly streamLiveStoredEvents: Stream.Stream<OrchestrationV2StoredEvent, OrchestratorV2Error>;
   /** Events arrive projected for the wire and shared by every subscriber; never mutate them. */
   readonly streamStoredEventsFrom: (input?: {
     readonly threadId?: ThreadId;
@@ -646,9 +768,12 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.user-input.dismiss":
     case "checkpoint.rollback":
     case "checkpoint.rollback.fail":
+    case "checkpoint.rollback.resume":
     case "thread.background-work.settle":
     case "thread.interrupt.unresponsive":
     case "thread.stop":
+    case "thread.stop-and-rollback":
+    case "thread.pending-rollback.cancel":
     case "provider.switch":
       return command.threadId;
     case "delegated_task.request":
@@ -1599,6 +1724,20 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         yield* Ref.update(events, (existing) => [...existing, withId]);
         return withId;
       });
+
+  const refusePendingRollback = (
+    command: OrchestrationV2ServerCommand,
+    thread: OrchestrationV2AppThread,
+  ) =>
+    thread.pendingRollback == null
+      ? Effect.void
+      : Effect.fail(
+          new OrchestratorRollbackRejectedError({
+            commandId: command.commandId,
+            threadId: thread.id,
+            code: "pending-rollback",
+          }),
+        );
 
   // Detaching kills background work running inside the provider process.
   // Probe even with an empty roster: Claude's native subagents never reach
@@ -6413,6 +6552,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         : undefined,
     );
+    yield* refusePendingRollback(command, projection.thread);
     if (command.steerFollowUpOfRunId !== undefined) {
       const source = projection.runs.find((run) => run.id === command.steerFollowUpOfRunId);
       if (
@@ -10985,6 +11125,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       // User messages measure a restart's model switch. Steering reads root and live nodes only.
       { turnItemTypes: ["user_message"], messageRoles: ["user"], omitSettledLeafNodes: true },
     );
+    yield* refusePendingRollback(command, projection.thread);
     if (projection.thread.archivedAt !== null || projection.thread.deletedAt !== null) {
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
@@ -11549,6 +11690,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ["runs", "attempts", "nodes", "providerThreads", "turnItems"],
         { turnItemTypes: ["command_execution"], turnItemRunId: command.runId },
       );
+      yield* refusePendingRollback(command, projection.thread);
       const state = preparedRunState(command, projection);
       if (state === null) {
         return yield* new OrchestratorDispatchError({
@@ -13667,6 +13809,25 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           cause: `Rollback ${command.requestId} is no longer the thread's current rollback.`,
         });
       }
+      let code = command.code;
+      let message = command.message;
+      // Settle can mark the provider turn terminal while the adapter still holds the turn.
+      // An interrupt that never got a native stop needs Force stop before another rewind.
+      if (code === "provider-turn-active") {
+        const { turnItems } = yield* projectionStore
+          .getThreadRecords(command.threadId, ["turnItems"], {
+            turnItemTypes: ["run_interrupt_request"],
+          })
+          .pipe(mapDispatchError(command));
+        if (
+          turnItems.some(
+            (item) => item.type === "run_interrupt_request" && item.unresponsiveAt !== undefined,
+          )
+        ) {
+          code = "interrupt-unresponsive";
+          message = rollbackCodeMessage(code);
+        }
+      }
       const now = yield* DateTime.now;
       yield* emit(
         events,
@@ -13680,11 +13841,319 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ...thread,
           rollbackFailure: {
             requestId: command.requestId,
-            message: command.message,
-            ...(command.code === undefined ? {} : { code: command.code }),
+            message,
+            ...(code === undefined ? {} : { code }),
+          },
+          // A failed rewind must not leave sends blocked. Absent when this was not a pending rewind.
+          ...(thread.pendingRollback == null ? {} : { pendingRollback: null }),
+          updatedAt: now,
+        },
+      });
+    },
+  );
+
+  const ensureProviderCanRollback = Effect.fn("Orchestrator.ensureProviderCanRollback")(function* (
+    command: OrchestrationV2ServerCommand,
+    thread: OrchestrationV2AppThread,
+  ) {
+    const capabilities = yield* providerAdapters.get(thread.modelSelection.instanceId).pipe(
+      Effect.flatMap((adapter) => adapter.getCapabilities()),
+      Effect.mapError(
+        (cause) =>
+          new OrchestratorProviderAdapterError({
+            commandId: command.commandId,
+            providerInstanceId: thread.modelSelection.instanceId,
+            cause,
+          }),
+      ),
+    );
+    yield* commandPolicy
+      .ensureRollback({
+        commandId: command.commandId,
+        threadId: thread.id,
+        providerInstanceId: thread.modelSelection.instanceId,
+        capabilities,
+      })
+      .pipe(
+        Effect.mapError(
+          () =>
+            new OrchestratorRollbackRejectedError({
+              commandId: command.commandId,
+              threadId: thread.id,
+              code: "provider-cannot-rollback",
+            }),
+        ),
+      );
+  });
+
+  const dispatchThreadStopAndRollback = Effect.fn("Orchestrator.dispatchThreadStopAndRollback")(
+    function* (
+      command: Extract<OrchestrationV2ServerCommand, { readonly type: "thread.stop-and-rollback" }>,
+      events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+      effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    ) {
+      const projection = yield* loadProjectionForCommand(command, [
+        "runs",
+        "checkpoints",
+        "checkpointScopes",
+        "nodes",
+      ]);
+      if (projection.thread.deletedAt !== null) return;
+      if (projection.thread.pendingRollback != null) {
+        return yield* new OrchestratorRollbackRejectedError({
+          commandId: command.commandId,
+          threadId: command.threadId,
+          code: "rollback-already-pending",
+        });
+      }
+      const activeRun = projection.runs
+        .filter(isActiveRun)
+        .toSorted((left, right) => right.ordinal - left.ordinal)[0];
+      if (activeRun !== undefined) {
+        // The target checkpoint may not exist until the stopped turn's capture runs.
+        if (command.turnCount > activeRun.ordinal - 1) {
+          return yield* new OrchestratorRollbackRejectedError({
+            commandId: command.commandId,
+            threadId: command.threadId,
+            code: "target-invalid",
+          });
+        }
+        yield* ensureProviderCanRollback(command, projection.thread);
+        if (command.restoreFiles !== false) {
+          const root = projection.nodes.find((node) => node.id === activeRun.rootNodeId);
+          const scope = projection.checkpointScopes.find(
+            (candidate) => candidate.id === root?.checkpointScopeId,
+          ) ??
+            projection.checkpointScopes.at(-1) ?? { cwd: projection.thread.worktreePath ?? "" };
+          const isolated = yield* isCheckpointRestoreIsolated(projection.thread, scope, {
+            projects,
+            path,
+            fileSystem,
+            projections: projectionStore,
+          }).pipe(
+            Effect.mapError(
+              (cause) =>
+                new OrchestratorDispatchError({
+                  commandId: command.commandId,
+                  commandType: command.type,
+                  cause,
+                }),
+            ),
+          );
+          if (!isolated) {
+            return yield* new OrchestratorRollbackRejectedError({
+              commandId: command.commandId,
+              threadId: command.threadId,
+              code: "shared-workspace",
+            });
+          }
+        }
+        // Same interrupt and held queue as thread.stop. The rollback waits for a later command.
+        yield* dispatchThreadStop(
+          { type: "thread.stop", commandId: command.commandId, threadId: command.threadId },
+          events,
+          effects,
+        );
+        const now = yield* DateTime.now;
+        const pendingRollback: OrchestrationV2PendingRollback = {
+          requestId: command.commandId,
+          turnCount: command.turnCount,
+          restoreFiles: command.restoreFiles !== false,
+          requestedAt: now,
+        };
+        yield* emit(
+          events,
+          command,
+        )({
+          type: "thread.metadata-updated",
+          threadId: command.threadId,
+          providerInstanceId: projection.thread.providerInstanceId,
+          occurredAt: now,
+          payload: {
+            ...threadAfterEvents(projection.thread, yield* Ref.get(events)),
+            pendingRollback,
+            rollbackRequestId: command.commandId,
+            rollbackFailure: null,
+            updatedAt: now,
+          },
+        });
+        return;
+      }
+      const checkpoint = checkpointForTurnCount(projection.checkpoints, command.turnCount);
+      if (checkpoint === undefined) {
+        return yield* new OrchestratorRollbackRejectedError({
+          commandId: command.commandId,
+          threadId: command.threadId,
+          code: "target-invalid",
+        });
+      }
+      if (
+        checkpoint.status !== "ready" &&
+        !(command.restoreFiles === false && checkpoint.status === "missing")
+      ) {
+        return yield* new OrchestratorRollbackRejectedError({
+          commandId: command.commandId,
+          threadId: command.threadId,
+          code: checkpoint.status === "missing" ? "checkpoint-missing" : "checkpoint-unavailable",
+        });
+      }
+      yield* dispatchCheckpointRollback(
+        {
+          type: "checkpoint.rollback",
+          commandId: command.commandId,
+          threadId: command.threadId,
+          scopeId: checkpoint.scopeId,
+          checkpointId: checkpoint.id,
+          ...(command.restoreFiles === undefined ? {} : { restoreFiles: command.restoreFiles }),
+        },
+        events,
+        effects,
+      );
+    },
+  );
+
+  const writePendingRollbackFailure = Effect.fn("Orchestrator.writePendingRollbackFailure")(
+    function* (
+      command: Extract<
+        OrchestrationV2ServerCommand,
+        { readonly type: "checkpoint.rollback.resume" }
+      >,
+      events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+      thread: OrchestrationV2AppThread,
+      code: OrchestrationV2RollbackFailureCode,
+      options?: { readonly keepPending?: boolean },
+    ) {
+      const now = yield* DateTime.now;
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "thread.metadata-updated",
+        threadId: command.threadId,
+        providerInstanceId: thread.providerInstanceId,
+        occurredAt: now,
+        payload: {
+          ...thread,
+          ...(options?.keepPending === true ? {} : { pendingRollback: null }),
+          rollbackFailure: {
+            requestId: thread.pendingRollback?.requestId ?? command.requestId,
+            message: rollbackCodeMessage(code),
+            code,
           },
           updatedAt: now,
         },
+      });
+    },
+  );
+
+  const dispatchCheckpointRollbackResume = Effect.fn(
+    "Orchestrator.dispatchCheckpointRollbackResume",
+  )(function* (
+    command: Extract<OrchestrationV2ServerCommand, { readonly type: "checkpoint.rollback.resume" }>,
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+  ) {
+    const projection = yield* projectionStore
+      .getThreadRecords(command.threadId, ["runs", "checkpoints", "providerTurns", "turnItems"], {
+        turnItemTypes: ["run_interrupt_request"],
+      })
+      .pipe(mapDispatchError(command));
+    const pending = projection.thread.pendingRollback;
+    if (pending == null || pending.requestId !== command.requestId) return;
+    // `waiting` still has a capture in flight. A rollback enqueued now would run before it.
+    if (projection.runs.some(isActiveRun)) return;
+    const unresponsive = projection.turnItems.some(
+      (item) => item.type === "run_interrupt_request" && item.unresponsiveAt !== undefined,
+    );
+    const nativeTurnStillRunning = projection.providerTurns.some(
+      (turn) => turn.status === "running",
+    );
+    if (unresponsive && nativeTurnStillRunning) {
+      yield* writePendingRollbackFailure(
+        command,
+        events,
+        projection.thread,
+        "interrupt-unresponsive",
+        { keepPending: true },
+      );
+      return;
+    }
+    const checkpoint = checkpointForTurnCount(projection.checkpoints, pending.turnCount);
+    if (checkpoint === undefined) {
+      // The stopped turn's capture materializes checkpoint 0. It is queued ahead of this
+      // command, so a missing row is not a failed target until that capture has finished.
+      const capturePending = yield* Effect.gen(function* () {
+        for (const run of projection.runs) {
+          const effect = yield* effectOutbox.get(`effect:checkpoint.capture:${run.id}`);
+          if (
+            Option.isSome(effect) &&
+            (effect.value.status === "pending" || effect.value.status === "running")
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }).pipe(mapDispatchError(command));
+      if (capturePending) return;
+      yield* writePendingRollbackFailure(command, events, projection.thread, "target-invalid");
+      return;
+    }
+    const requested = yield* Effect.exit(
+      dispatchCheckpointRollback(
+        {
+          type: "checkpoint.rollback",
+          // The client waits on the id it sent, so the rewind runs under that id.
+          commandId: pending.requestId,
+          threadId: command.threadId,
+          scopeId: checkpoint.scopeId,
+          checkpointId: checkpoint.id,
+          restoreFiles: pending.restoreFiles,
+        },
+        events,
+        effects,
+      ),
+    );
+    if (Exit.isSuccess(requested)) {
+      const now = yield* DateTime.now;
+      const thread = threadAfterEvents(projection.thread, yield* Ref.get(events));
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "thread.metadata-updated",
+        threadId: command.threadId,
+        providerInstanceId: thread.providerInstanceId,
+        occurredAt: now,
+        payload: { ...thread, pendingRollback: null, updatedAt: now },
+      });
+      return;
+    }
+    const reason = classifyRollbackCause(Cause.squash(requested.cause));
+    yield* writePendingRollbackFailure(command, events, projection.thread, reason);
+  });
+
+  const dispatchPendingRollbackCancel = Effect.fn("Orchestrator.dispatchPendingRollbackCancel")(
+    function* (
+      command: Extract<
+        OrchestrationV2ServerCommand,
+        { readonly type: "thread.pending-rollback.cancel" }
+      >,
+      events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+    ) {
+      const thread = yield* projectionStore
+        .getThread(command.threadId)
+        .pipe(mapDispatchError(command));
+      if (thread.deletedAt !== null || thread.pendingRollback == null) return;
+      const now = yield* DateTime.now;
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "thread.metadata-updated",
+        threadId: command.threadId,
+        providerInstanceId: thread.providerInstanceId,
+        occurredAt: now,
+        payload: { ...thread, pendingRollback: null, updatedAt: now },
       });
     },
   );
@@ -14962,6 +15431,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.stop":
         cancelUnsettledEffects = yield* dispatchThreadStop(command, events, effects);
         break;
+      case "thread.stop-and-rollback":
+        yield* dispatchThreadStopAndRollback(command, events, effects);
+        break;
+      case "thread.pending-rollback.cancel":
+        yield* dispatchPendingRollbackCancel(command, events);
+        break;
       case "queued-message.promote-to-steer":
         cancelUnsettledEffects = yield* dispatchQueuedMessagePromoteToSteer(
           command,
@@ -14983,6 +15458,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             cause: `Thread ${command.threadId} is not active.`,
           });
         }
+        yield* refusePendingRollback(command, projection.thread);
         const selectedRunId = command.type === "queued-run.start" ? command.runId : undefined;
         const selectedRun =
           selectedRunId === undefined
@@ -15063,6 +15539,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         break;
       case "checkpoint.rollback.fail":
         yield* dispatchCheckpointRollbackFail(command, events);
+        break;
+      case "checkpoint.rollback.resume":
+        yield* dispatchCheckpointRollbackResume(command, events, effects);
         break;
       case "runtime-request.delivery.fail":
         yield* dispatchRuntimeRequestDeliveryFail(command, events);
@@ -15226,6 +15705,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           command.type === "thread.pull-request-watch.checks-reopen" ||
           command.type === "thread.interrupt.unresponsive" ||
           command.type === "thread.stop" ||
+          command.type === "thread.pending-rollback.cancel" ||
+          command.type === "checkpoint.rollback.resume" ||
           command.type === "subagent.stop" ||
           // Marking or unmarking again leaves the thread as it is.
           command.type === "thread.commander.mark" ||
@@ -15945,8 +16426,49 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const shellProjectionError = (cause: unknown) =>
     new OrchestratorProjectionError({ threadId: ThreadId.make("thread:shell"), cause });
 
+  const resumePendingRollbacks = Effect.gen(function* () {
+    const threadIds = yield* projectionStore.getRecoveryThreadIds("pending-rollbacks");
+    let resumed = 0;
+    for (const threadId of threadIds) {
+      const resumedThread = yield* Effect.gen(function* () {
+        const thread = yield* projectionStore.getThread(threadId);
+        const pending = thread.pendingRollback;
+        if (pending == null) return false;
+        const result = yield* dispatchWithReceipt({
+          type: "checkpoint.rollback.resume",
+          commandId: CommandId.make(
+            `server:checkpoint.rollback.resume:${threadId}:${pending.requestId}:startup`,
+          ),
+          threadId,
+          requestId: pending.requestId,
+        });
+        return result.replayed !== true;
+      }).pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning("Failed to resume a pending rewind after startup", {
+            threadId,
+            cause,
+          }).pipe(Effect.as(false)),
+        ),
+      );
+      if (resumedThread) resumed += 1;
+    }
+    return resumed;
+  }).pipe(
+    Effect.mapError(
+      (cause) =>
+        new OrchestratorDispatchError({
+          commandId: CommandId.make("command:system:resume-pending-rollbacks"),
+          commandType: "checkpoint.rollback.resume",
+          cause,
+        }),
+    ),
+    Effect.withSpan("Orchestrator.resumePendingRollbacks"),
+  );
+
   return OrchestratorV2.of({
     resumeQueuedRuns,
+    resumePendingRollbacks,
     recoverDelegatedTasks,
     recoverDelegatedTask,
     cancelDelegatedTask,
@@ -16147,6 +16669,26 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           new OrchestratorDomainEventStreamError({
             cause,
           }),
+      ),
+    ),
+    streamLiveStoredEvents: Stream.unwrap(
+      eventSink.latestSequence().pipe(
+        Effect.map((afterSequence) =>
+          eventSink.stream({ afterSequence }).pipe(
+            Stream.mapError(
+              (cause) =>
+                new OrchestratorDomainEventStreamError({
+                  cause,
+                }),
+            ),
+          ),
+        ),
+        Effect.mapError(
+          (cause) =>
+            new OrchestratorDomainEventStreamError({
+              cause,
+            }),
+        ),
       ),
     ),
     streamStoredEventsFrom: (input) =>

@@ -462,13 +462,36 @@ const OrchestrationV2LastTitleRegeneration = Schema.Struct({
   completedAt: Schema.DateTimeUtc,
 });
 
+/**
+ * Why a rewind was refused or recorded as `rollbackFailure`. Clients match this code, not the message.
+ * `pending-rollback` and `rollback-already-pending` are command rejections, never a stored failure.
+ * `provider-turn-active` can be retried. `interrupt-unresponsive` means force stop first.
+ */
 export const OrchestrationV2RollbackFailureCode = Schema.Literals([
   "shared-workspace",
   "checkpoint-unavailable",
   "git-index-locked",
   "rollback-failed",
+  "target-invalid",
+  "checkpoint-missing",
+  "provider-cannot-rollback",
+  "provider-turn-unavailable",
+  "provider-turn-active",
+  "interrupt-unresponsive",
+  "pending-rollback",
+  "rollback-already-pending",
 ]);
 export type OrchestrationV2RollbackFailureCode = typeof OrchestrationV2RollbackFailureCode.Type;
+
+/** A rewind that is waiting until no run is active (`preparing`, `starting`, `running`, or `waiting`). */
+export const OrchestrationV2PendingRollback = Schema.Struct({
+  requestId: CommandId,
+  /** Target app run ordinal. `0` is the checkpoint before the first turn. */
+  turnCount: NonNegativeInt,
+  restoreFiles: Schema.Boolean,
+  requestedAt: Schema.DateTimeUtc,
+});
+export type OrchestrationV2PendingRollback = typeof OrchestrationV2PendingRollback.Type;
 
 export const OrchestrationV2AppThread = Schema.Struct({
   ...OrchestrationV2CreationFields,
@@ -547,6 +570,13 @@ export const OrchestrationV2AppThread = Schema.Struct({
       }),
     ),
   ),
+  /**
+   * A rewind requested while a turn was running. Absent on threads written before stop-and-rewind.
+   * Cleared when the rewind is requested for real, fails closed, or is cancelled.
+   */
+  pendingRollback: Schema.optional(Schema.NullOr(OrchestrationV2PendingRollback)),
+  /** The rollback effect's command id, set in the same transaction that marks runs rolled back. */
+  rollbackCompletedRequestId: Schema.optional(CommandId),
   deletedAt: Schema.NullOr(Schema.DateTimeUtc),
 });
 export type OrchestrationV2AppThread = typeof OrchestrationV2AppThread.Type;
@@ -2461,6 +2491,14 @@ export const OrchestrationV2AppThreadJson = OrchestrationV2AppThread.mapFields((
       })),
     ),
   ),
+  pendingRollback: Schema.optional(
+    Schema.NullOr(
+      OrchestrationV2PendingRollback.mapFields((fields) => ({
+        ...fields,
+        requestedAt: Schema.DateTimeUtcFromString,
+      })),
+    ),
+  ),
   deletedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 }));
 export type OrchestrationV2AppThreadJson = typeof OrchestrationV2AppThreadJson.Type;
@@ -3089,6 +3127,19 @@ export const OrchestrationV2Command = Schema.Union([
     stopDelegatedTasks: Schema.optional(Schema.Boolean),
   }),
   Schema.Struct({
+    type: Schema.Literal("thread.stop-and-rollback"),
+    commandId: CommandId,
+    threadId: ThreadId,
+    /** Target app run ordinal, resolved to a checkpoint after the thread has no active run. */
+    turnCount: NonNegativeInt,
+    restoreFiles: Schema.optional(Schema.Boolean),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.pending-rollback.cancel"),
+    commandId: CommandId,
+    threadId: ThreadId,
+  }),
+  Schema.Struct({
     type: Schema.Literal("thread.create"),
     ...OrchestrationV2CreationFields,
     commandId: CommandId,
@@ -3698,6 +3749,16 @@ const OrchestrationV2InternalCommand = Schema.Union([
     requestId: CommandId,
     message: TrimmedNonEmptyString,
     code: Schema.optional(OrchestrationV2RollbackFailureCode),
+  }),
+  /**
+   * Continues a `thread.stop-and-rollback` once no run is active. The command id includes the
+   * triggering event sequence so an earlier no-op receipt cannot swallow the real one.
+   */
+  Schema.Struct({
+    type: Schema.Literal("checkpoint.rollback.resume"),
+    commandId: CommandId,
+    threadId: ThreadId,
+    requestId: CommandId,
   }),
   /** Delivering the answer to request `requestId` failed on its last attempt. */
   Schema.Struct({
