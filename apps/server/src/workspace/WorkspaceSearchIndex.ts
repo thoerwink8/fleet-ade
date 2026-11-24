@@ -48,7 +48,7 @@ export class WorkspaceSearchIndexCreateFailed extends Schema.TaggedError<Workspa
   },
 ) {
   override get message(): string {
-    return `Failed to create the workspace search index for '${this.cwd}'.`;
+    return `无法为 '${this.cwd}' 创建项目搜索索引。`;
   }
 }
 
@@ -60,7 +60,7 @@ export class WorkspaceSearchIndexScanTimedOut extends Schema.TaggedError<Workspa
   },
 ) {
   override get message(): string {
-    return `Workspace search index for '${this.cwd}' did not finish scanning within ${this.timeout}`;
+    return `'${this.cwd}' 的项目搜索索引未在 ${this.timeout} 内扫描完成`;
   }
 }
 
@@ -75,7 +75,7 @@ export class WorkspaceSearchIndexSearchFailed extends Schema.TaggedError<Workspa
   },
 ) {
   override get message(): string {
-    return `Workspace search failed for '${this.cwd}'.`;
+    return `无法在 '${this.cwd}' 中搜索项目。`;
   }
 }
 
@@ -88,7 +88,7 @@ export class WorkspaceSearchIndexRefreshFailed extends Schema.TaggedError<Worksp
   },
 ) {
   override get message(): string {
-    return `Failed to refresh the workspace search index for '${this.cwd}'.`;
+    return `无法刷新 '${this.cwd}' 的项目搜索索引。`;
   }
 }
 
@@ -100,7 +100,7 @@ export class WorkspaceSearchIndexDestroyFailed extends Schema.TaggedError<Worksp
   },
 ) {
   override get message(): string {
-    return `Failed to destroy the workspace search index for '${this.cwd}'.`;
+    return `无法销毁 '${this.cwd}' 的项目搜索索引。`;
   }
 }
 
@@ -361,7 +361,7 @@ const createFinder = Effect.fn("WorkspaceSearchIndex.createFinder")(function* (
     catch: (cause) =>
       new WorkspaceSearchIndexCreateFailed({
         cwd,
-        reason: "FileFinder.create threw unexpectedly.",
+        reason: "FileFinder.create 意外抛出错误。",
         cause,
       }),
   });
@@ -381,7 +381,7 @@ const waitForIndexReady = Effect.fn("WorkspaceSearchIndex.waitForIndexReady")(fu
     try: () => finder.waitForIndexReady(WORKSPACE_INDEX_SCAN_TIMEOUT_MS),
     catch: (cause) =>
       onFailure({
-        reason: "FileFinder.waitForIndexReady rejected unexpectedly.",
+        reason: "FileFinder.waitForIndexReady 意外被拒绝。",
         cause,
       }),
   });
@@ -445,7 +445,7 @@ export const make = Effect.fn("WorkspaceSearchIndex.make")(function* (
           cwd,
           queryLength: query.length,
           pageSize,
-          reason: `FileFinder.${operation} threw unexpectedly.`,
+          reason: `FileFinder.${operation} 意外抛出错误。`,
           cause,
         }),
     });
@@ -499,7 +499,7 @@ export const make = Effect.fn("WorkspaceSearchIndex.make")(function* (
       catch: (cause) =>
         new WorkspaceSearchIndexRefreshFailed({
           cwd,
-          reason: "FileFinder.scanFilesAsync rejected unexpectedly.",
+          reason: "FileFinder.scanFilesAsync 意外被拒绝。",
           cause,
         }),
     });

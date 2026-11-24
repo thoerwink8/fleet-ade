@@ -619,7 +619,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       command: "git rev-parse",
       cwd,
       exitCode: result.exitCode,
-      detail: result.stderr.trim() || "git rev-parse failed",
+      detail: result.stderr.trim() || "git rev-parse 失败",
     });
   });
 
@@ -719,7 +719,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                 command: "git ls-files",
                 cwd,
                 exitCode: result.exitCode,
-                detail: result.stderr.trim() || "git ls-files failed",
+                detail: result.stderr.trim() || "git ls-files 失败",
               }),
             ),
       ),
@@ -745,7 +745,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           command: "git remote -v",
           cwd,
           exitCode: result.exitCode,
-          detail: result.stderr.trim() || "git remote -v failed",
+          detail: result.stderr.trim() || "git remote -v 失败",
         });
       }
 
@@ -802,7 +802,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           command: "git check-ignore",
           cwd,
           exitCode: result.exitCode,
-          detail: result.stderr.trim() || "git check-ignore failed",
+          detail: result.stderr.trim() || "git check-ignore 失败",
         });
       }
 
@@ -870,7 +870,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               command: "git rev-parse",
               cwd,
               exitCode: result.exitCode,
-              detail: result.stderr.trim() || "git rev-parse failed",
+              detail: result.stderr.trim() || "git rev-parse 失败",
             }),
           );
         }
@@ -1152,7 +1152,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                   command: "git read-tree",
                   cwd: input.cwd,
                   exitCode: 1,
-                  detail: "Cannot rebuild a checkpoint index for non-cone sparse checkout.",
+                  detail: "无法为非 cone 模式的稀疏检出重建回退索引。",
                 });
               }
             }
@@ -1226,7 +1226,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             return yield* new VcsUnsupportedOperationError({
               operation,
               kind: "git",
-              detail: "The workspace directory is ignored by its Git repository.",
+              detail: "项目目录被它的 Git 仓库忽略了。",
             });
           }
         }
@@ -1322,7 +1322,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             command: "git write-tree",
             cwd: input.cwd,
             exitCode: 0,
-            detail: "git write-tree returned an empty tree oid.",
+            detail: "git write-tree 返回了空的树 oid。",
           });
         }
 
@@ -1348,7 +1348,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             command: "git commit-tree",
             cwd: input.cwd,
             exitCode: 0,
-            detail: "git commit-tree returned an empty commit oid.",
+            detail: "git commit-tree 返回了空的提交 oid。",
           });
         }
 
@@ -1409,7 +1409,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               command: "git restore",
               cwd: input.cwd,
               exitCode: 0,
-              detail: `Could not recreate the checkpoint workspace: ${cause.message}`,
+              detail: `无法重建回退目录：${cause.message}`,
             }),
         ),
       );
@@ -1455,7 +1455,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             command: "git clean",
             cwd: input.cwd,
             exitCode: 0,
-            detail: "Could not clean the checkpoint workspace: untracked files remain.",
+            detail: "无法清理回退目录：仍有未跟踪文件。",
           });
         }
       }
@@ -1475,7 +1475,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             command: "git clean",
             cwd: input.cwd,
             exitCode: cleaned.exitCode,
-            detail: cleaned.stderr.trim() || "Could not clean the checkpoint workspace.",
+            detail: cleaned.stderr.trim() || "无法清理回退目录。",
           });
         }
       }
@@ -1512,7 +1512,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               command: "git diff",
               cwd: input.cwd,
               exitCode: 1,
-              detail: "Checkpoint ref is unavailable for diff operation.",
+              detail: "回退引用不可用，无法比较差异。",
             });
           }
           fromRevision = headCommit;
@@ -1554,7 +1554,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           command: "git diff",
           cwd: input.cwd,
           exitCode: result.exitCode,
-          detail: result.stderr.trim() || "Checkpoint ref is unavailable for diff operation.",
+          detail: result.stderr.trim() || "回退引用不可用，无法比较差异。",
         });
       }
 

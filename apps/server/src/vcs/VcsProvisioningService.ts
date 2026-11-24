@@ -28,7 +28,7 @@ function resolveRequestedKind(
       new VcsUnsupportedOperationError({
         operation: "VcsProvisioningService.resolveRequestedKind",
         kind,
-        detail: "A concrete VCS driver kind is required for repository provisioning.",
+        detail: "创建仓库需要指定具体的版本控制驱动种类。",
       }),
     );
   }

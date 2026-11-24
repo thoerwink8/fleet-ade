@@ -499,7 +499,7 @@ function summarizeGitActionResult(
 } {
   if (result.pr.status === "created" || result.pr.status === "opened_existing") {
     const prNumber = result.pr.number ? ` #${result.pr.number}` : "";
-    const title = `${result.pr.status === "created" ? "Created" : "Opened"} ${terms.shortLabel}${prNumber}`;
+    const title = `${result.pr.status === "created" ? "已创建" : "已打开"} ${terms.shortLabel}${prNumber}`;
     return withDescription(title, truncateText(result.pr.title));
   }
 
@@ -507,16 +507,16 @@ function summarizeGitActionResult(
     const shortSha = shortenSha(result.commit.commitSha);
     const branch = result.push.upstreamBranch ?? result.push.branch;
     const pushedCommitPart = shortSha ? ` ${shortSha}` : "";
-    const branchPart = branch ? ` to ${branch}` : "";
+    const branchPart = branch ? `到 ${branch}` : "";
     return withDescription(
-      `Pushed${pushedCommitPart}${branchPart}`,
+      `已推送${pushedCommitPart}${branchPart}`,
       truncateText(result.commit.subject),
     );
   }
 
   if (result.commit.status === "created") {
     const shortSha = shortenSha(result.commit.commitSha);
-    const title = shortSha ? `Committed ${shortSha}` : "Committed changes";
+    const title = shortSha ? `已提交 ${shortSha}` : "已提交更改";
     return withDescription(title, truncateText(result.commit.subject));
   }
 
@@ -534,7 +534,7 @@ function sanitizeCommitMessage(generated: {
 } {
   const rawSubject = generated.subject.trim().split(/\r?\n/g)[0]?.trim() ?? "";
   const subject = rawSubject.replace(/[.]+$/g, "").trim();
-  const safeSubject = subject.length > 0 ? subject.slice(0, 72).trimEnd() : "Update project files";
+  const safeSubject = subject.length > 0 ? subject.slice(0, 72).trimEnd() : "更新项目文件";
   return {
     subject: safeSubject,
     body: generated.body.trim(),
@@ -901,7 +901,7 @@ export const make = Effect.gen(function* () {
           new GitManagerError({
             operation: "randomUUIDv4",
             cwd,
-            detail: "Failed to generate Git operation identifier.",
+            detail: "无法生成 Git 操作标识符。",
             cause,
           }),
       ),
@@ -1025,7 +1025,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "changeRequestHeadRef",
         cwd,
-        detail: "This host publishes no ref for a change request's head.",
+        detail: "此托管方没有发布改动的 head 引用。",
       });
     }
     return ref;
@@ -1800,7 +1800,7 @@ export const make = Effect.gen(function* () {
                   command: "git merge-base --is-ancestor",
                   cwd,
                   exitCode: result.exitCode,
-                  detail: "Ancestry probe failed; rejecting ancestry inference.",
+                  detail: "无法探测祖先关系，已放弃推断祖先。",
                 });
               }),
             ),
@@ -2049,7 +2049,7 @@ export const make = Effect.gen(function* () {
               result.pr.status === "opened_existing")
           ? {
               kind: "open_pr" as const,
-              label: `View ${terms.shortLabel}`,
+              label: `查看 ${terms.shortLabel}`,
               url: openPr.url,
             }
           : (result.action === "push" || result.action === "commit_push") &&
@@ -2235,7 +2235,7 @@ export const make = Effect.gen(function* () {
         yield* emit({
           kind: "phase_started",
           phase: "commit",
-          label: "Generating commit message...",
+          label: "正在生成提交说明…",
         });
       }
       suggestion = yield* resolveCommitAndBranchSuggestion({
@@ -2253,7 +2253,7 @@ export const make = Effect.gen(function* () {
     yield* emit({
       kind: "phase_started",
       phase: "commit",
-      label: "Committing...",
+      label: "正在提交…",
     });
 
     let currentHookName: string | null = null;
@@ -2345,7 +2345,7 @@ export const make = Effect.gen(function* () {
     return yield* new GitManagerError({
       operation: "runStackedAction",
       cwd,
-      detail: `${baseBranch} is the base branch. Check out a feature branch to create ${changeRequestLabel}.`,
+      detail: `${baseBranch} 是基线分支。请先检出功能分支，再创建${changeRequestLabel}。`,
     });
   });
 
@@ -2364,14 +2364,14 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "runPrStep",
         cwd,
-        detail: "Cannot create a pull request from detached HEAD.",
+        detail: "当前处于游离 HEAD，无法创建拉取请求。",
       });
     }
     if (!details.hasUpstream) {
       return yield* new GitManagerError({
         operation: "runPrStep",
         cwd,
-        detail: "Current branch has not been pushed. Push before creating a PR.",
+        detail: "当前分支还没有推送。请先推送，再创建 PR。",
       });
     }
 
@@ -2401,7 +2401,7 @@ export const make = Effect.gen(function* () {
     yield* emit({
       kind: "phase_started",
       phase: "pr",
-      label: `Generating ${terms.shortLabel} content...`,
+      label: `正在生成${terms.shortLabel}内容…`,
     });
     const baseRangeRef = yield* resolveBaseRangeRef(cwd, baseRef);
     const rangeContext = yield* gitCore.readRangeContext(cwd, baseRangeRef);
@@ -2438,7 +2438,7 @@ export const make = Effect.gen(function* () {
           new GitManagerError({
             operation: "runPrStep",
             cwd,
-            detail: "Failed to write pull request body temp file.",
+            detail: "无法写入拉取请求正文的临时文件。",
             cause,
           }),
       ),
@@ -2446,7 +2446,7 @@ export const make = Effect.gen(function* () {
     yield* emit({
       kind: "phase_started",
       phase: "pr",
-      label: `Creating ${terms.singular}...`,
+      label: `正在创建${terms.singular}…`,
     });
     yield* provider
       .createChangeRequest({
@@ -2667,7 +2667,7 @@ export const make = Effect.gen(function* () {
         return yield* new GitManagerError({
           operation: "branchPullRequest",
           cwd: cacheCwd,
-          detail: `Saved upstream for ${branch} is incomplete.`,
+          detail: `为 ${branch} 保存的上游不完整。`,
         });
       }
       remoteName = savedRemoteName;
@@ -2703,7 +2703,7 @@ export const make = Effect.gen(function* () {
         return yield* new GitManagerError({
           operation: "branchPullRequest",
           cwd: cacheCwd,
-          detail: `Multiple remotes track ${branch}. Its pull request is ambiguous.`,
+          detail: `有多个远程同时跟踪 ${branch}，它的拉取请求无法确定。`,
         });
       }
       remoteName = matchingRemoteNames[0] ?? null;
@@ -2751,7 +2751,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "branchPullRequest",
         cwd: cacheCwd,
-        detail: `Repository identity for ${branch} could not be verified.`,
+        detail: `无法核验 ${branch} 的仓库身份。`,
       });
     }
     if (!hasSameIdentity(cached.headContext, currentIdentity)) {
@@ -2770,7 +2770,7 @@ export const make = Effect.gen(function* () {
         return yield* new GitManagerError({
           operation: "branchPullRequest",
           cwd: cacheCwd,
-          detail: `Repository identity for ${branch} changed during pull request lookup.`,
+          detail: `查找拉取请求期间，${branch} 的仓库身份发生了变化。`,
         });
       }
     }
@@ -2904,7 +2904,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "preparePullRequestThread",
         cwd,
-        detail: `This repository has uncommitted changes. Commit or stash them before checking out pull request #${pullRequestNumber} here, or check it out in its own folder.`,
+        detail: `这个仓库有未提交的更改。请先提交或贮藏，再在这里检出拉取请求 #${pullRequestNumber}，或者把它检出到自己的目录里。`,
       });
     }
   });
@@ -3056,7 +3056,7 @@ export const make = Effect.gen(function* () {
                 return yield* new GitManagerError({
                   operation: "preparePullRequestThread",
                   cwd: worktreePath,
-                  detail: "The pull request head could not be resolved for this checkout.",
+                  detail: "无法为这次检出解析拉取请求的 head。",
                 });
               }
               return yield* gitCore.resolveCommit({
@@ -3154,7 +3154,7 @@ export const make = Effect.gen(function* () {
               new GitManagerError({
                 operation: "preparePullRequestThread",
                 cwd,
-                detail: "The fetched ref does not match the pull request head.",
+                detail: "获取到的引用与拉取请求的 head 不一致。",
               }),
           ),
           Effect.catch(() =>
@@ -3165,7 +3165,7 @@ export const make = Effect.gen(function* () {
                   new GitManagerError({
                     operation: "preparePullRequestThread",
                     cwd,
-                    detail: "The configured upstream does not match the pull request head.",
+                    detail: "配置的上游与拉取请求的 head 不一致。",
                   }),
               ),
             ),
@@ -3240,7 +3240,7 @@ export const make = Effect.gen(function* () {
           operation: "preparePullRequestThread",
           cwd: input.cwd,
           detail:
-            "This PR branch is already checked out in the main repo. Use Local, or switch the main repo off that branch before creating a worktree thread.",
+            "这个 PR 分支已经在主仓库检出。请改用本机，或先让主仓库离开该分支，再创建工作树会话。",
         });
       }
       // Materializing would force this branch onto the head.
@@ -3298,7 +3298,7 @@ export const make = Effect.gen(function* () {
           operation: "preparePullRequestThread",
           cwd: input.cwd,
           detail:
-            "This PR branch is already checked out in the main repo. Use Local, or switch the main repo off that branch before creating a worktree thread.",
+            "这个 PR 分支已经在主仓库检出。请改用本机，或先让主仓库离开该分支，再创建工作树会话。",
         });
       }
 
@@ -3352,7 +3352,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "runFeatureBranchStep",
         cwd,
-        detail: "Cannot create a feature branch because there are no changes to commit.",
+        detail: "没有可提交的更改，无法创建功能分支。",
       });
     }
 
@@ -3393,7 +3393,7 @@ export const make = Effect.gen(function* () {
           return yield* new GitManagerError({
             operation: "runStackedAction",
             cwd: input.cwd,
-            detail: "Feature-branch checkout is only supported for commit actions.",
+            detail: "功能分支检出只支持提交类操作。",
           });
         }
         const phases: GitActionProgressPhase[] = [
@@ -3412,14 +3412,14 @@ export const make = Effect.gen(function* () {
           return yield* new GitManagerError({
             operation: "runStackedAction",
             cwd: input.cwd,
-            detail: "Cannot push from detached HEAD.",
+            detail: "当前处于游离 HEAD，无法推送。",
           });
         }
         if (!input.featureBranch && wantsPr && !initialStatus.branch) {
           return yield* new GitManagerError({
             operation: "runStackedAction",
             cwd: input.cwd,
-            detail: "Cannot create a pull request from detached HEAD.",
+            detail: "当前处于游离 HEAD，无法创建拉取请求。",
           });
         }
 
@@ -3452,7 +3452,7 @@ export const make = Effect.gen(function* () {
               new GitManagerError({
                 operation: "runStackedAction",
                 cwd: input.cwd,
-                detail: "Failed to get server settings.",
+                detail: "无法读取后台服务设置。",
                 cause,
               }),
           ),
@@ -3463,7 +3463,7 @@ export const make = Effect.gen(function* () {
           yield* progress.emit({
             kind: "phase_started",
             phase: "branch",
-            label: "Preparing feature branch...",
+            label: "正在准备功能分支…",
           });
           const result = yield* runFeatureBranchStep(
             textGenerationSettings,
@@ -3515,7 +3515,7 @@ export const make = Effect.gen(function* () {
               .emit({
                 kind: "phase_started",
                 phase: "push",
-                label: "Pushing...",
+                label: "正在推送…",
               })
               .pipe(
                 Effect.tap(() => Ref.set(currentPhase, Option.some("push"))),
@@ -3528,7 +3528,7 @@ export const make = Effect.gen(function* () {
               .emit({
                 kind: "phase_started",
                 phase: "pr",
-                label: `Preparing ${changeRequestTerms?.shortLabel ?? "PR"}...`,
+                label: `正在准备${changeRequestTerms?.shortLabel ?? "PR"}…`,
               })
               .pipe(
                 Effect.tap(() => Ref.set(currentPhase, Option.some("pr"))),

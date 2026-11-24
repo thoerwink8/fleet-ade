@@ -31,7 +31,7 @@ export class PullRequestWatchFailedError extends Schema.TaggedError<PullRequestW
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not change whether the pull request is watched.";
+    return "无法更改是否监视这个拉取请求。";
   }
 }
 
@@ -40,7 +40,9 @@ export class PullRequestNotOpenError extends Schema.TaggedError<PullRequestNotOp
   { state: Schema.String },
 ) {
   override get message(): string {
-    return `The pull request is ${this.state}, so there is nothing to watch.`;
+    const stateLabel =
+      this.state === "merged" ? "已合并" : this.state === "closed" ? "已关闭" : this.state;
+    return `这个拉取请求${stateLabel}，没有可监视的内容。`;
   }
 }
 
@@ -49,7 +51,7 @@ export class PullRequestWatchFromSubagentError extends Schema.TaggedError<PullRe
   {},
 ) {
   override get message(): string {
-    return "This thread is a subagent, so it cannot watch pull requests. Its parent thread owns the pull request: finish your task and report back instead.";
+    return "这个会话是子智能体，不能监视拉取请求。拉取请求归它的父会话所有：请完成你的任务并回报。";
   }
 }
 
@@ -58,7 +60,7 @@ export class PullRequestWatchThreadNotFoundError extends Schema.TaggedError<Pull
   { threadId: ThreadId },
 ) {
   override get message(): string {
-    return `Thread ${this.threadId} was not found.`;
+    return `找不到会话 ${this.threadId}。`;
   }
 }
 

@@ -294,8 +294,7 @@ const make = Effect.gen(function* () {
                 Effect.fail(
                   new PeerLinkError({
                     reason: "unknown_link",
-                    message:
-                      "That environment is no longer linked here, or its link expired. Link it again.",
+                    message: "该电脑在这里已不再关联，或其关联已过期。请重新关联。",
                   }),
                 ),
               onSome: (linked) => Effect.succeed(linkedOutcome(linked)),
@@ -354,7 +353,7 @@ const make = Effect.gen(function* () {
         input.answer.environmentId !== undefined
           ? {
               linkStatus: "failed",
-              failure: "This request is from before an update. Ask for the link again.",
+              failure: "此请求来自更新之前。请重新请求关联。",
             }
           : yield* answerOutcome(input.answer);
       // If Stop closed the card while linking, the card keeps that; the link
@@ -408,7 +407,7 @@ const resultOf = (card: LinkRequestItem): OrchestratorMcpEnvironmentLinkResult =
         access: card.linkedAccess!,
       };
     case "failed":
-      return { status: "failed", message: card.failure ?? "The link could not be made." };
+      return { status: "failed", message: card.failure ?? "无法建立关联。" };
     case "declined":
     case "cancelled":
       return { status: card.linkStatus };
@@ -417,7 +416,7 @@ const resultOf = (card: LinkRequestItem): OrchestratorMcpEnvironmentLinkResult =
 
 /** What the agent's words call the target: its address, its id, or the user's pick. */
 const linkTarget = (card: Pick<LinkRequestItem, "url" | "environmentId">) =>
-  card.url ?? card.environmentId ?? "a machine";
+  card.url ?? card.environmentId ?? "一台电脑";
 
 /**
  * The notification an answer sends the agent: what the card says, and what
@@ -446,7 +445,7 @@ const outcomeNotice = (
         notification: {
           source: { kind: "background_task" },
           outcome: "failed",
-          summary: `Could not link ${target}`,
+          summary: `无法关联 ${target}`,
         },
       };
     default:
@@ -455,7 +454,7 @@ const outcomeNotice = (
         notification: {
           source: { kind: "background_task" },
           outcome: "cancelled",
-          summary: `Declined to link ${target}`,
+          summary: `已拒绝关联 ${target}`,
         },
       };
   }

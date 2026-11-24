@@ -67,7 +67,7 @@ export class AgentSessionImportProjectNotFoundError extends Schema.TaggedError<A
   { projectId: ProjectId },
 ) {
   override get message(): string {
-    return `Project '${this.projectId}' does not exist.`;
+    return `项目“${this.projectId}”不存在。`;
   }
 }
 
@@ -76,7 +76,7 @@ export class AgentSessionImportProjectChangedError extends Schema.TaggedError<Ag
   { projectId: ProjectId },
 ) {
   override get message(): string {
-    return `Project '${this.projectId}' changed directories. Scan for projects again before importing history.`;
+    return `项目“${this.projectId}”的目录已变更。请先重新扫描项目，再导入历史记录。`;
   }
 }
 
@@ -94,6 +94,6 @@ export class AgentSessionScanError extends Schema.TaggedError<AgentSessionScanEr
   },
 ) {
   override get message(): string {
-    return `Failed to scan agent sessions during ${this.operation}.`;
+    return `扫描智能体会话时出错（${this.operation}）。`;
   }
 }

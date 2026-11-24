@@ -344,7 +344,7 @@ const refuseOptionLikeRefName = (operation: string, cwd: string, refName: string
           operation,
           command: "git",
           cwd,
-          detail: "Ref names cannot start with '-'.",
+          detail: "引用名不能以 '-' 开头。",
         }),
       )
     : Effect.void;
@@ -489,18 +489,15 @@ const GIT_FAILURE_REASON_PATTERNS: ReadonlyArray<readonly [RegExp, GitCommandFai
 
 // Reasons the user can act on get a sentence in place of the generic detail.
 const GIT_FAILURE_REASON_DETAILS: Partial<Record<GitCommandFailureReason, string>> = {
-  push_rejected_by_remote:
-    "The remote rejected the push. Push this branch from a terminal to see the server's message.",
-  push_rejected_non_fast_forward:
-    "The remote has commits this branch doesn't have. Pull or rebase, then push again.",
-  config_locked:
-    "Another Git process kept the repository's config locked. Wait for it to finish, then retry.",
+  push_rejected_by_remote: "远程拒绝了这次推送。请在终端里推送这个分支，查看后台服务给出的说明。",
+  push_rejected_non_fast_forward: "远程上有这个分支没有的提交。请先拉取或变基，再重新推送。",
+  config_locked: "另一个 Git 进程一直锁着仓库的配置。请等它结束后再重试。",
 };
 
 function gitFailureDetail(reason: GitCommandFailureReason | null): string {
   return (
     (reason === null ? undefined : GIT_FAILURE_REASON_DETAILS[reason]) ??
-    "Git command exited with a non-zero status."
+    "Git 命令以非零状态码退出。"
   );
 }
 
@@ -611,7 +608,7 @@ function fetchFailureDetail(stderr: string): string | undefined {
       ),
     )
   ) {
-    return "Git could not authenticate with the remote. Check Git credentials or SSH access on the server, then retry.";
+    return "Git 无法向远程完成身份验证。请检查本机的 Git 凭据或 SSH 访问，然后重试。";
   }
   if (
     lines.some((line) =>
@@ -620,7 +617,7 @@ function fetchFailureDetail(stderr: string): string | undefined {
       ),
     )
   ) {
-    return "Git could not reach the remote. Check the server's network connection and remote host, then retry.";
+    return "Git 无法连接远程。请检查本机的网络连接和远程地址，然后重试。";
   }
   if (
     lines.some((line) =>
@@ -629,10 +626,10 @@ function fetchFailureDetail(stderr: string): string | undefined {
       ),
     )
   ) {
-    return "Git could not access the remote repository. Check the remote URL and repository permissions on the server.";
+    return "Git 无法访问远程仓库。请检查远程地址和本机上的仓库权限。";
   }
   if (isRefLockFailure(stderr)) {
-    return "Git could not update a local reference. Another Git operation or a stale lock may be blocking the fetch; check the repository on the server, then retry.";
+    return "Git 无法更新本地引用。可能有另一个 Git 操作或残留的锁挡住了获取；请检查本机上的仓库，然后重试。";
   }
   return undefined;
 }
@@ -910,7 +907,7 @@ const collectOutput = Effect.fnUntraced(function* (
     if (!appendTruncationMarker && nextBytes > maxOutputBytes) {
       return yield* new GitCommandError({
         ...gitCommandContext(input),
-        detail: `Git output exceeded ${maxOutputBytes} bytes and was truncated.`,
+        detail: `Git 输出超过了 ${maxOutputBytes} 字节，已被截断。`,
         outputLength: nextBytes,
       });
     }
@@ -935,7 +932,7 @@ const collectOutput = Effect.fnUntraced(function* (
       PlatformError: (cause) =>
         new GitCommandError({
           ...gitCommandContext(input),
-          detail: "Failed to read Git process output.",
+          detail: "无法读取 Git 进程输出。",
           cause,
         }),
     }),
@@ -991,7 +988,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             (cause) =>
               new GitCommandError({
                 ...gitCommandContext(commandInput),
-                detail: "Failed to create Git trace monitor.",
+                detail: "无法创建 Git 跟踪监视。",
                 cause,
               }),
           ),
@@ -1011,7 +1008,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         const spawnError = (cause: unknown) =>
           new GitCommandError({
             ...gitCommandContext(commandInput),
-            detail: "Failed to spawn Git process.",
+            detail: "无法启动 Git 进程。",
             cause,
           });
         // cmd wrappers truncate multiline commits; leave git.cmd handling to Node lookup.
@@ -1057,7 +1054,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                 (cause) =>
                   new GitCommandError({
                     ...gitCommandContext(commandInput),
-                    detail: "Failed to read Git process exit code.",
+                    detail: "无法读取 Git 进程退出码。",
                     cause,
                   }),
               ),
@@ -1069,7 +1066,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                     (cause) =>
                       new GitCommandError({
                         ...gitCommandContext(commandInput),
-                        detail: "Failed to write Git process input.",
+                        detail: "无法写入 Git 进程输入。",
                         cause,
                       }),
                   ),
@@ -1113,7 +1110,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             () =>
               new GitCommandError({
                 ...gitCommandContext(commandInput),
-                detail: "Git command timed out.",
+                detail: "Git 命令超时。",
               }),
           ),
         ),
@@ -1326,7 +1323,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         cwd,
         args: ["branch", "-m", "--", desiredBranch],
       }),
-      detail: `Could not find an available branch name for '${desiredBranch}'.`,
+      detail: `找不到可用于 '${desiredBranch}' 的分支名。`,
     });
   });
 
@@ -1398,7 +1395,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         // occupying its worker slot indefinitely.
         const started = yield* executeGit("GitVcsDriver.fetchRemoteForStatus", fetchCwd, args, {
           env: STATUS_UPSTREAM_REFRESH_ENV,
-          fallbackErrorDetail: "Background Git fetch exited with a non-zero status.",
+          fallbackErrorDetail: "后台 Git 获取以非零状态码退出。",
           timeoutMs: Duration.toMillis(STATUS_UPSTREAM_FETCH_TIMEOUT),
         }).pipe(
           Effect.asVoid,
@@ -1453,7 +1450,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           cwd,
           args: ["rev-parse", "--git-common-dir"],
         }),
-        detail: "Failed to resolve the Git common directory.",
+        detail: "无法解析 Git 公共目录。",
         exitCode: commonDirResult.exitCode,
         stdoutLength: commonDirResult.stdout.length,
         stderrLength: commonDirResult.stderr.length,
@@ -1630,7 +1627,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         cwd,
         args: ["rev-parse", "--git-common-dir"],
       }),
-      detail: "Cannot resolve a Git common directory outside a repository.",
+      detail: "仓库之外无法解析 Git 公共目录。",
     });
   });
 
@@ -1799,7 +1796,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               cwd,
               args: ["remote"],
             }),
-            detail: "No git remote is configured for this repository.",
+            detail: "这个仓库没有配置 git 远程。",
           }),
       ),
     );
@@ -2075,7 +2072,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             cwd,
             args: ["rev-parse", "--symbolic-full-name", "HEAD"],
           }),
-          detail: "Git branch lookup failed.",
+          detail: "无法查找 Git 分支。",
           exitCode: branchResult.exitCode,
           stdoutLength: branchResult.stdout.length,
           stderrLength: branchResult.stderr.length,
@@ -2177,7 +2174,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         operation: "GitVcsDriver.statusDetails.indexPath",
         command: "git",
         cwd,
-        detail: "Git index is locked. Status will resume when the index lock is removed.",
+        detail: "Git 索引已被锁定。索引锁解除后会恢复状态。",
       });
       // Status can succeed while locked, repeatedly running LFS clean filters without caching.
       if (
@@ -2186,7 +2183,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             (cause) =>
               new GitCommandError({
                 ...lockError,
-                detail: "Failed to check the Git index lock.",
+                detail: "无法检查 Git 索引锁。",
                 cause,
               }),
           ),
@@ -2255,7 +2252,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                   cwd,
                   args: ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"],
                 }),
-                detail: "git diff-index HEAD --numstat failed.",
+                detail: "git diff-index HEAD --numstat 失败。",
                 exitCode: result.exitCode,
                 stdoutLength: result.stdout.length,
                 stderrLength: result.stderr.length,
@@ -2292,7 +2289,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           cwd,
           args: statusArgs,
         }),
-        detail: "Git status failed.",
+        detail: "无法读取 Git 状态。",
         exitCode: statusResult.exitCode,
         stdoutLength: statusResult.stdout.length,
         stderrLength: statusResult.stderr.length,
@@ -2514,7 +2511,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                 operation: "GitVcsDriver.commit.mergeHead",
                 command: "git commit",
                 cwd,
-                detail: "Could not check whether a merge, cherry-pick or revert is in progress.",
+                detail: "无法检查是否正在进行合并、cherry-pick 或还原。",
                 cause,
               }),
           ),
@@ -2526,7 +2523,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             operation: "GitVcsDriver.commit",
             command: "git commit",
             cwd,
-            detail: `Cannot commit selected files during a ${operation}. Commit all files to finish the ${operation}.`,
+            detail: `正在进行${operation}，不能只提交选中的文件。请提交全部文件以完成${operation}。`,
           });
         }
         yield* runGit("GitVcsDriver.commit.reset", cwd, ["reset", "--quiet"]);
@@ -2595,7 +2592,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                   operation: "GitVcsDriver.commit.conflictMarkers",
                   command: "git commit",
                   cwd,
-                  detail: `Could not check ${file} for conflict markers.`,
+                  detail: `无法检查 ${file} 中的冲突标记。`,
                   cause,
                 }),
             ),
@@ -2610,7 +2607,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             operation: "GitVcsDriver.commit",
             command: "git commit",
             cwd,
-            detail: `Cannot commit with unresolved merge conflicts in ${conflicted.join(", ")}. Resolve them, then commit.`,
+            detail: `${conflicted.join(", ")} 中有未解决的合并冲突，无法提交。请先解决冲突再提交。`,
           });
         }
       }
@@ -2752,7 +2749,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               operation: "GitVcsDriver.prepareCommitContext",
               command: "git",
               cwd,
-              detail: "Failed to prepare the temporary commit index.",
+              detail: "无法准备临时提交索引。",
               cause,
             }),
         }),
@@ -2899,7 +2896,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           cwd,
           args: ["push"],
         }),
-        detail: "Cannot push from detached HEAD.",
+        detail: "当前处于游离 HEAD，无法推送。",
       });
     }
 
@@ -2976,7 +2973,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           cwd,
           args: ["push"],
         }),
-        detail: "Cannot push because no git remote is configured for this repository.",
+        detail: "这个仓库没有配置 git 远程，无法推送。",
       });
     }
 
@@ -3054,7 +3051,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           cwd,
           args: ["pull", "--ff-only"],
         }),
-        detail: "Cannot pull from detached HEAD.",
+        detail: "当前处于游离 HEAD，无法拉取。",
       });
     }
     if (!details.hasUpstream) {
@@ -3064,7 +3061,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           cwd,
           args: ["pull", "--ff-only"],
         }),
-        detail: "Current branch has no upstream configured. Push with upstream first.",
+        detail: "当前分支没有配置上游。请先带上游推送。",
       });
     }
     const remote = yield* readConfigValue(cwd, `branch.${refName}.remote`);
@@ -3140,7 +3137,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       return yield* new GitCommandError({
         ...gitCommandContext({ operation: "GitVcsDriver.pullCurrentBranch.pull", cwd, args }),
         ...(reason === null ? {} : { reason }),
-        detail: fetchFailureDetail(result.stderr) ?? "git pull failed",
+        detail: fetchFailureDetail(result.stderr) ?? "git pull 失败",
         exitCode: result.exitCode,
         stdoutLength: result.stdout.length,
         stderrLength: result.stderr.length,
@@ -3358,7 +3355,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     ).pipe(
       Effect.catchTags({
         GitCommandError: (error) =>
-          Effect.succeed({ unavailable: `Could not list untracked files: ${error.detail}` }),
+          Effect.succeed({ unavailable: `无法列出未跟踪文件：${error.detail}` }),
       }),
     );
     if ("unavailable" in untracked) return untracked;
@@ -3369,7 +3366,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     );
     if (paths.length === 0) return { env: undefined };
     if (paths.length > REVIEW_UNTRACKED_MAX_FILES)
-      return { unavailable: "Too many untracked files to count." };
+      return { unavailable: "未跟踪文件太多，无法统计。" };
     const env = yield* prepareReviewIndex(cwd, paths, maxBytes).pipe(
       Effect.catchTags({
         PlatformError: (cause) =>
@@ -3378,13 +3375,13 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               operation: "GitVcsDriver.prepareReviewIndex",
               cwd,
               command: "git diff",
-              detail: "Could not prepare the review index.",
+              detail: "无法准备审查索引。",
               cause,
             }),
           ),
       }),
     );
-    if (env === null) return { unavailable: "Untracked files are too large to count." };
+    if (env === null) return { unavailable: "未跟踪文件太大，无法统计。" };
     return { env };
   });
   const prepareUntrackedReviewIndex = (
@@ -3436,7 +3433,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }
       return yield* new GitCommandError({
         ...gitCommandContext({ operation: "GitVcsDriver.resolveReviewMergeBase", cwd, args }),
-        detail: `Could not find a common commit between '${baseRef}' and HEAD.`,
+        detail: `找不到 '${baseRef}' 与 HEAD 之间的共同提交。`,
         exitCode: result.exitCode,
       });
     }
@@ -3534,7 +3531,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         operation: "GitVcsDriver.readBranchChangeTotals",
         command: "git diff --numstat",
         cwd,
-        detail: "Could not read Changes totals.",
+        detail: "无法读取改动合计。",
         exitCode: result.exitCode,
       });
     }
@@ -3560,7 +3557,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     sha: string,
   ) {
     if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(sha)) {
-      return yield* reviewCommitError(cwd, "Selected commit is invalid or no longer available.");
+      return yield* reviewCommitError(cwd, "所选提交无效或已不存在。");
     }
     const present = yield* executeGit(
       "GitVcsDriver.reviewCommit.present",
@@ -3569,7 +3566,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       { allowNonZeroExit: true, env: { GIT_NO_LAZY_FETCH: "1" } },
     );
     if (present.exitCode !== 0) {
-      return yield* reviewCommitError(cwd, "Selected commit is invalid or no longer available.");
+      return yield* reviewCommitError(cwd, "所选提交无效或已不存在。");
     }
     // The raw object keeps the parents a shallow clone grafts away, so a boundary is not a root.
     const object = yield* runGitStdout("GitVcsDriver.reviewCommit.parents", cwd, [
@@ -3587,7 +3584,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         { allowNonZeroExit: true, env: { GIT_NO_LAZY_FETCH: "1" } },
       );
       if (parent.exitCode !== 0) {
-        return yield* reviewCommitError(cwd, "Selected commit's parent is not available locally.");
+        return yield* reviewCommitError(cwd, "所选提交的父提交在本地不可用。");
       }
     }
     return { sha: sha.toLowerCase(), parent: firstParent ?? (yield* readEmptyTreeHash(cwd)) };
@@ -3625,7 +3622,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       if (head.exitCode === 1 && head.stderr.trim() === "") {
         return { commits: [], truncated: false };
       }
-      return yield* reviewCommitError(cwd, "Could not resolve the current branch commit.");
+      return yield* reviewCommitError(cwd, "无法解析当前分支的提交。");
     }
     const { mergeBase } = yield* resolveReviewMergeBase(
       cwd,
@@ -3650,7 +3647,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       },
     );
     if (!result.stdoutTruncated && result.stdout.length > 0 && !result.stdout.endsWith("\0")) {
-      return yield* reviewCommitError(cwd, "Could not read branch commit metadata.");
+      return yield* reviewCommitError(cwd, "无法读取分支提交的元数据。");
     }
     const fields = result.stdout.split("\0");
     const completeFieldCount = fields.length - 1;
@@ -3669,12 +3666,12 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         !committedAt ||
         !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(sha)
       ) {
-        return yield* reviewCommitError(cwd, "Could not read branch commit metadata.");
+        return yield* reviewCommitError(cwd, "无法读取分支提交的元数据。");
       }
       commits.push({ sha, subject: subject.slice(0, REVIEW_BRANCH_SUBJECT_LIMIT), committedAt });
     }
     if (result.stdoutTruncated && commits.length === 0) {
-      return yield* reviewCommitError(cwd, "Branch commit metadata exceeds the response limit.");
+      return yield* reviewCommitError(cwd, "分支提交的元数据超过了响应上限。");
     }
     return {
       commits: commits.slice(0, REVIEW_BRANCH_COMMIT_LIMIT),
@@ -3726,14 +3723,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               operation: "GitVcsDriver.getReviewDiffPreview.hash",
               command: "crypto.digest SHA-256",
               cwd,
-              detail: "Failed to hash review diff.",
+              detail: "无法计算审查差异的哈希。",
               cause,
             }),
         ),
       );
     if (input.commitSha !== undefined || input.file?.sourceKind === "commit") {
       if (!input.commitSha || (input.file && input.file.sourceKind !== "commit")) {
-        return yield* reviewCommitError(cwd, "Selected commit request is invalid.");
+        return yield* reviewCommitError(cwd, "所选提交的请求无效。");
       }
       const commit = yield* resolveReviewCommit(cwd, input.commitSha);
       const { subject } = yield* readReviewCommitMessage(cwd, commit.sha);
@@ -3816,7 +3813,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         operation: "GitVcsDriver.getReviewDiffPreview.stat",
         cwd,
         command: "git diff --numstat",
-        detail: "Could not read complete diff statistics.",
+        detail: "无法读取完整的差异统计。",
         exitCode: result.exitCode,
       });
     });
@@ -3887,7 +3884,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       {
         id: "branch-range",
         kind: "branch-range",
-        title: review.baseRef ? `Changes vs ${review.baseRef}` : "改动",
+        title: review.baseRef ? `相对 ${review.baseRef} 的改动` : "改动",
         baseRef: review.baseRef,
         headRef: repository.currentBranch ?? "HEAD",
         diff: baseDiff,
@@ -4025,18 +4022,15 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       ["rev-parse", "--show-toplevel"],
     ).pipe(Effect.map((value) => value.trim()));
     if (repositoryRoot.length === 0) {
-      return yield* reviewDiffFileError(input, "Could not resolve the Git repository root.");
+      return yield* reviewDiffFileError(input, "无法解析 Git 仓库根目录。");
     }
     if (input.sourceKind === "commit") {
       if (!input.headRef) {
-        return yield* reviewDiffFileError(input, "Selected commit is no longer available.");
+        return yield* reviewDiffFileError(input, "所选提交已不存在。");
       }
       const commit = yield* resolveReviewCommit(input.cwd, input.headRef);
       if (input.baseRef !== commit.parent) {
-        return yield* reviewDiffFileError(
-          input,
-          "Selected commit changed. Refresh the comparison.",
-        );
+        return yield* reviewDiffFileError(input, "所选提交已变化。请刷新比较。");
       }
       const [oldContents, newContents] = yield* Effect.all(
         [
@@ -4136,7 +4130,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     "createBranch",
   )(function* (input) {
     yield* refuseOptionLikeRefName("GitVcsDriver.createBranch", input.cwd, input.startPoint);
-    yield* createBranchAt("GitVcsDriver.createBranch", input, "git branch create failed");
+    yield* createBranchAt("GitVcsDriver.createBranch", input, "git branch create 失败");
   });
 
   const readBranchBase: GitVcsDriver.GitVcsDriver["Service"]["readBranchBase"] = Effect.fn(
@@ -4205,7 +4199,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           {
             timeoutMs: 30_000,
             maxOutputBytes: 16 * 1024 * 1024,
-            fallbackErrorDetail: "Git ref snapshot enumeration failed.",
+            fallbackErrorDetail: "无法枚举 Git 引用快照。",
           },
         ),
         executeGit(
@@ -4558,7 +4552,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           operation: "GitVcsDriver.createWorktree",
           command: "git worktree add",
           cwd: input.cwd,
-          detail: `The worktree location "${options?.worktreesDirectory}" must be an absolute folder on this machine, not a drive root. Change it in Settings → Code → Worktree location.`,
+          detail: `工作树位置“${options?.worktreesDirectory}”必须是本机上的绝对目录，不能是盘符根目录。请在设置 → 代码 → 工作树位置中修改。`,
         });
       }
       const identity = `${yield* readGitCommonDir(input.cwd)}\0${targetBranch}`;
@@ -4586,7 +4580,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       yield* createBranchAt(
         "GitVcsDriver.createWorktree.createBranch",
         { cwd: input.cwd, branch: newRefName, startPoint: input.refName },
-        "git branch failed",
+        "git branch 失败",
       );
     }
     const checkoutRef = newRefName ?? input.refName;
@@ -4617,7 +4611,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         checkoutRef,
       ],
       {
-        fallbackErrorDetail: "git worktree add failed",
+        fallbackErrorDetail: "git worktree add 失败",
         // Large checkouts and post-checkout hooks can legitimately run for many
         // minutes; a fixed deadline kills them and leaves an orphaned worktree.
         timeoutMs: null,
@@ -4800,7 +4794,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         `+${input.ref}:refs/heads/${input.branch}`,
       ],
       {
-        fallbackErrorDetail: "git fetch ref into branch failed",
+        fallbackErrorDetail: "无法把 git 引用获取到分支",
       },
     );
   });
@@ -4828,7 +4822,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       input.cwd,
       ["fetch", "--quiet", "--no-tags", "--", remoteName, input.ref],
       {
-        fallbackErrorDetail: "git fetch ref failed",
+        fallbackErrorDetail: "git 引用获取失败",
       },
     );
 
@@ -4868,7 +4862,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           "GitVcsDriver.refreshCheckedOutBranch.keepPrevious",
           input.cwd,
           ["update-ref", "refs/t3code/pre-refresh", headCommit],
-          { fallbackErrorDetail: "git failed to record the previous checkout commit" },
+          { fallbackErrorDetail: "git 无法记录上一次检出的提交" },
         );
       }
 
@@ -4882,7 +4876,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         {
           // Killing a slow checkout partway through strands a half-updated working tree.
           timeoutMs: null,
-          fallbackErrorDetail: "git failed to move the checkout onto the pull request head",
+          fallbackErrorDetail: "git 无法把检出移动到拉取请求的 head",
         },
       );
 
@@ -4893,7 +4887,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     const args = ["fetch", "--quiet", "--", input.remoteName];
     const options = {
       env: STATUS_UPSTREAM_REFRESH_ENV,
-      fallbackErrorDetail: `git fetch ${input.remoteName} failed`,
+      fallbackErrorDetail: `git fetch ${input.remoteName} 失败`,
     };
     // Another fetch in the same repository, such as the background status
     // poll, can win the race for a remote-tracking ref. The loser fails, but
@@ -5177,7 +5171,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         cwd: input.cwd,
         args: result.args,
       }),
-      detail: "git worktree remove failed",
+      detail: "git worktree remove 失败",
       ...(result.exitCode === null ? {} : { exitCode: result.exitCode }),
       stdoutLength: result.stdout.length,
       stderrLength: result.stderr.length,
@@ -5189,7 +5183,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   )(function* (input) {
     yield* executeGit("GitVcsDriver.pruneWorktrees", input.cwd, ["worktree", "prune"], {
       timeoutMs: 15_000,
-      fallbackErrorDetail: "git worktree prune failed",
+      fallbackErrorDetail: "git worktree prune 失败",
     });
   });
 
@@ -5202,7 +5196,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       ["branch", input.force === true ? "-D" : "-d", "--", input.refName],
       {
         timeoutMs: 10_000,
-        fallbackErrorDetail: "git branch delete failed",
+        fallbackErrorDetail: "git branch delete 失败",
         // Under contention Git deletes the ref but keeps its config section.
         writesSharedConfig: true,
       },
@@ -5225,7 +5219,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       ["branch", "-m", "--", input.oldBranch, targetBranch],
       {
         timeoutMs: 10_000,
-        fallbackErrorDetail: "git branch rename failed",
+        fallbackErrorDetail: "git branch rename 失败",
         writesSharedConfig: true,
       },
     );
@@ -5318,7 +5312,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           "GitVcsDriver.switchRef.createTrackingBranch",
           input.cwd,
           ["branch", "--no-track", "--", newTrackingBranch, startRef],
-          { fallbackErrorDetail: "git branch create failed" },
+          { fallbackErrorDetail: "git branch create 失败" },
         );
         // An untracked branch of this name would make every later switch to the remote detach.
         yield* executeGitWithStableDiagnostics(
@@ -5347,7 +5341,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         {
           // Killing a checkout midway (large or LFS repos) leaves a half-updated working tree.
           timeoutMs: null,
-          fallbackErrorDetail: "git checkout failed",
+          fallbackErrorDetail: "git checkout 失败",
           // Creating a branch writes its upstream; Git also guesses a remote branch for a missing name.
           writesSharedConfig: checkoutArgs[1] === "--track" || (!localInputExists && !remoteExists),
         },
@@ -5366,7 +5360,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     function* (input) {
       yield* executeGit("GitVcsDriver.createRef", input.cwd, ["branch", "--", input.refName], {
         timeoutMs: 10_000,
-        fallbackErrorDetail: "git branch create failed",
+        fallbackErrorDetail: "git branch create 失败",
         // `branch.autoSetupMerge=always` records HEAD's branch as the upstream.
         writesSharedConfig: true,
       });
@@ -5381,7 +5375,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const initRepo: GitVcsDriver.GitVcsDriver["Service"]["initRepo"] = (input) =>
     executeGit("GitVcsDriver.initRepo", input.cwd, ["init"], {
       timeoutMs: 10_000,
-      fallbackErrorDetail: "git init failed",
+      fallbackErrorDetail: "git init 失败",
     }).pipe(Effect.asVoid);
 
   const listLocalBranchNames: GitVcsDriver.GitVcsDriver["Service"]["listLocalBranchNames"] = (

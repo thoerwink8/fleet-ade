@@ -21,7 +21,7 @@ export class PullRequestUrlInvalidError extends Schema.TaggedError<PullRequestUr
   {},
 ) {
   override get message(): string {
-    return "This is not a recognised pull request URL. Pass repository and number instead.";
+    return "这不是可识别的拉取请求地址。请改为传入仓库和编号。";
   }
 }
 
@@ -30,7 +30,7 @@ export class PullRequestTargetIncompleteError extends Schema.TaggedError<PullReq
   {},
 ) {
   override get message(): string {
-    return "Pass either url, or both repository and number.";
+    return "请传入 url，或同时传入仓库和编号。";
   }
 }
 
@@ -39,7 +39,7 @@ export class PullRequestHostRequiredError extends Schema.TaggedError<PullRequest
   {},
 ) {
   override get message(): string {
-    return "This thread's project has no recognised remote. Pass host or url.";
+    return "这个会话的项目没有可识别的远程。请传入托管方或 url。";
   }
 }
 
@@ -48,7 +48,7 @@ export class PullRequestUrlUnavailableError extends Schema.TaggedError<PullReque
   {},
 ) {
   override get message(): string {
-    return "This thread's project is on a host with no known pull request URL shape. Pass url.";
+    return "这个会话的项目所在托管方没有已知的拉取请求地址格式。请传入 url。";
   }
 }
 

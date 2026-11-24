@@ -121,7 +121,7 @@ const runProviderMaintenanceCommandWithSpawner = Effect.fn("ProviderMaintenanceR
             Effect.mapError(
               (cause) =>
                 new ProviderMaintenanceCommandError({
-                  message: `Failed to run update command ${input.command}: ${cause.message}`,
+                  message: `无法运行更新命令 ${input.command}：${cause.message}`,
                   cause,
                 }),
             ),
@@ -172,7 +172,7 @@ const runProviderMaintenanceCommandWithSpawner = Effect.fn("ProviderMaintenanceR
           Effect.mapError(
             (cause) =>
               new ProviderMaintenanceCommandError({
-                message: cause instanceof Error ? cause.message : "Update command failed to run.",
+                message: cause instanceof Error ? cause.message : "无法运行更新命令。",
                 cause,
               }),
           ),
@@ -271,12 +271,12 @@ function failureReason(result: ProviderMaintenanceCommandResult): string | null 
 
 function failureMessage(result: ProviderMaintenanceCommandResult): string {
   if (result.timedOut) {
-    return `Update timed out after ${UPDATE_TIMEOUT_MINUTES} minutes.`;
+    return `更新在 ${UPDATE_TIMEOUT_MINUTES} 分钟后超时。`;
   }
   const summary =
     result.exitCode !== null && result.exitCode !== 0
-      ? `Update command exited with code ${result.exitCode}`
-      : "Update command failed";
+      ? `更新命令以退出码 ${result.exitCode} 退出`
+      : "更新命令执行失败";
   const reason = failureReason(result);
   return reason ? `${summary}: ${reason}` : `${summary}.`;
 }
@@ -350,7 +350,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
     makeAlreadyRunningError: () =>
       new ServerProviderUpdateError({
         provider: ProviderDriverKind.make("unknown"),
-        reason: "An update is already running for this provider.",
+        reason: "此智能体已有更新正在运行。",
       }),
   });
 
@@ -427,7 +427,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
     if (!update) {
       return yield* new ServerProviderUpdateError({
         provider,
-        reason: "This provider does not support one-click updates.",
+        reason: "此智能体不支持一键更新。",
       });
     }
 
@@ -445,7 +445,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
         status: "queued",
         startedAt: null,
         finishedAt: null,
-        message: "Waiting for another provider update to finish.",
+        message: "正在等待另一个智能体更新完成。",
       }),
     ).pipe(Effect.asVoid);
 
@@ -472,7 +472,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                   message,
                 }),
               ).pipe(Effect.asVoid);
-            yield* setRunningMessage("Checking for the latest version");
+            yield* setRunningMessage("正在检查最新版本");
 
             // Recheck ownership after acquiring the cached lock in case the executable changed.
             const fresh = yield* providerRegistry.getProviderMaintenanceCapabilitiesForInstance(
@@ -486,7 +486,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                   status: "failed",
                   startedAt,
                   finishedAt: yield* nowIso,
-                  message: "Provider installation changed. Refresh and try again.",
+                  message: "智能体安装已变化，请刷新后重试。",
                 }),
               );
             }
@@ -528,8 +528,8 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                   finishedAt: yield* nowIso,
                   message:
                     targetVersion !== undefined
-                      ? "This version is no longer recommended or this installer cannot install a specific version. Refresh provider settings."
-                      : "The latest provider version is incompatible with this Fleet ADE release. Review provider settings.",
+                      ? "此版本已不再被推荐，或该安装器无法安装指定版本。请刷新智能体设置。"
+                      : "最新的智能体版本与此 Fleet ADE 版本不兼容。请检查智能体设置。",
                 }),
               );
             }
@@ -562,7 +562,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                     status: "succeeded",
                     startedAt,
                     finishedAt: yield* nowIso,
-                    message: "Already up to date.",
+                    message: "已是最新版本。",
                   }),
                 );
               }
@@ -573,7 +573,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               provider,
               update.lockKey,
             );
-            yield* setRunningMessage("Waiting for running provider work to finish.");
+            yield* setRunningMessage("正在等待运行中的智能体任务完成。");
             const result = yield* installationGate.update(
               sharingInstances,
               setRunningMessage(`正在运行 ${describeCommand(command)}`).pipe(
@@ -600,7 +600,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               );
             }
 
-            yield* setRunningMessage("Verifying the installed version");
+            yield* setRunningMessage("正在验证已安装的版本");
             const verified = yield* providerRegistry.getProviderMaintenanceCapabilitiesForInstance(
               instanceId,
               provider,
@@ -642,10 +642,10 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                 startedAt,
                 finishedAt,
                 message: couldNotVerify
-                  ? "Update command completed, but Fleet ADE could not verify the provider version."
+                  ? "更新命令已完成，但 Fleet ADE 无法验证智能体版本。"
                   : stillOutdated
-                    ? "Update command completed, but Fleet ADE still detects an outdated provider version."
-                    : "Provider updated.",
+                    ? "更新命令已完成，但 Fleet ADE 仍检测到智能体版本过旧。"
+                    : "智能体已更新。",
                 output: commandOutput(result),
               }),
             );
@@ -661,7 +661,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                 status: "failed",
                 startedAt,
                 finishedAt: yield* nowIso,
-                message: failure instanceof Error ? failure.message : "Update command failed.",
+                message: failure instanceof Error ? failure.message : "更新命令执行失败。",
                 output: null,
               }),
             );
@@ -690,7 +690,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                 status: "failed",
                 startedAt: yield* Ref.get(startedAtRef),
                 finishedAt: yield* nowIso,
-                message: "Update stopped before it finished.",
+                message: "更新在完成前已停止。",
               }),
             );
           }).pipe(Effect.ignore),

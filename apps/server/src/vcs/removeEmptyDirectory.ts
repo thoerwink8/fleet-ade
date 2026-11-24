@@ -9,7 +9,7 @@ export class RemoveEmptyDirectoryError extends Schema.TaggedError<RemoveEmptyDir
   { path: Schema.String, cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return `Could not remove the directory ${this.path}.`;
+    return `无法删除目录 ${this.path}。`;
   }
 }
 

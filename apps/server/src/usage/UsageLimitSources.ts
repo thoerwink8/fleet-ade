@@ -42,7 +42,7 @@ export class UsageLimitSources extends Context.Service<
 
 function sourceLabel(id: string, config: UsageLimitSourceConfig): string {
   if (config.label) return config.label;
-  const fallback = id.trim() || "Usage limit source";
+  const fallback = id.trim() || "用量上限来源";
   try {
     return new URL(config.url).host || fallback;
   } catch {
@@ -52,8 +52,8 @@ function sourceLabel(id: string, config: UsageLimitSourceConfig): string {
 
 function missingManagementKey(config: UsageLimitSourceConfig): string {
   return typeof config.managementKey === "string"
-    ? "No management key configured."
-    : "Could not read the management key from its secret provider.";
+    ? "没有配置管理密钥。"
+    : "无法从凭据存储读取管理密钥。";
 }
 
 /** @public */
@@ -125,12 +125,12 @@ export const make = Effect.gen(function* () {
     input: UsageLimitSourceConsumeResetCreditInput,
   ) {
     const settings = yield* settingsService.getSettings.pipe(
-      Effect.mapError(() => new UsageLimitSourceError({ detail: "Could not read hub settings." })),
+      Effect.mapError(() => new UsageLimitSourceError({ detail: "无法读取中转站设置。" })),
     );
     const config = settings.usageLimitSources[input.sourceId];
     if (!config?.enabled) {
       return yield* new UsageLimitSourceError({
-        detail: "The usage limit source is missing or disabled.",
+        detail: "用量上限来源不存在或已停用。",
       });
     }
     const managementKey = yield* readManagementKey(config);

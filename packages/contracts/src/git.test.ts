@@ -26,7 +26,7 @@ describe("GitCommandError", () => {
 
     expect(error.reason).toBeUndefined();
     expect(error.message).toBe(
-      "Git command failed in GitVcsDriver.createWorktree (/repo): git worktree add failed",
+      "Git 命令在 GitVcsDriver.createWorktree 中失败（/repo）：git worktree add failed",
     );
   });
 });

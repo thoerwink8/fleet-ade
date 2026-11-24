@@ -22,7 +22,7 @@ export class ProcessSignalFailed extends Schema.TaggedError<ProcessSignalFailed>
   },
 ) {
   override get message(): string {
-    return `Failed to signal process ${this.pid} with ${this.signal}.`;
+    return `无法向进程 ${this.pid} 发送信号 ${this.signal}。`;
   }
 }
 
@@ -94,7 +94,7 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           pid: input.pid,
           signal: input.signal,
           signaled: false,
-          message: Option.some("Refusing to signal the T3 server process."),
+          message: Option.some("拒绝向 Fleet ADE 后台服务进程发送信号。"),
         };
       }
       const current = yield* telemetry.refresh.pipe(Effect.option);
@@ -104,7 +104,7 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           signal: input.signal,
           signaled: false,
           message: Option.some(
-            `Could not refresh process ${input.pid}; refusing to signal a stale identity.`,
+            `无法刷新进程 ${input.pid} 的进程信息；拒绝向过期的进程标识发送信号。`,
           ),
         };
       }
@@ -117,9 +117,7 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           pid: input.pid,
           signal: input.signal,
           signaled: false,
-          message: Option.some(
-            `Process ${input.pid} no longer matches the selected process identity.`,
-          ),
+          message: Option.some(`进程 ${input.pid} 与选中的进程标识不再匹配。`),
         };
       }
       if (!canSignalCategory(selected.category)) {
@@ -127,7 +125,7 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           pid: input.pid,
           signal: input.signal,
           signaled: false,
-          message: Option.some(`Process ${input.pid} is not a signalable T3 backend descendant.`),
+          message: Option.some(`进程 ${input.pid} 不是可发送信号的 Fleet ADE 后台服务后代进程。`),
         };
       }
       return yield* Effect.try({
@@ -152,9 +150,7 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
             pid: input.pid,
             signal: input.signal,
             signaled: false,
-            message: Option.some(
-              error instanceof Error ? error.message : "Failed to signal process.",
-            ),
+            message: Option.some(error instanceof Error ? error.message : "无法向进程发送信号。"),
           }),
         ),
       );

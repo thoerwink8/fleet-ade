@@ -253,25 +253,17 @@ export class PullRequestService extends Context.Service<
   }
 >()("t3/pullRequest/PullRequestService") {}
 const ACTION_ACCESS_REFUSALS: Record<PullRequestAction, string> = {
-  merge: "You need write access on this repository to merge.",
-  ready:
-    "You need write access on this repository, or to have opened this change request, to mark it ready for review.",
-  draft:
-    "You need write access on this repository, or to have opened this change request, to return it to a draft.",
-  close:
-    "You need write access on this repository, or to have opened this change request, to close it.",
-  "update-branch":
-    "You need write access on this repository, or to have opened this change request, to update its branch.",
-  reopen:
-    "You need write access on this repository, or to have opened this change request, to reopen it.",
-  "enable-auto-merge":
-    "Auto-merge needs write access on this repository, and the repository has to allow it.",
-  "disable-auto-merge":
-    "You need write access on this repository to stop it being merged for you once it is ready.",
-  revert: "You need write access on this repository to open a revert pull request.",
-  "delete-branch": "You need write access on the source repository to delete its branch.",
-  "approve-workflows":
-    "You need write access on this repository to approve workflows from a fork pull request.",
+  merge: "合并需要你对这个仓库有写入权限。",
+  ready: "要把改动标为可审查，你需要这个仓库的写入权限，或由你本人发起这次改动。",
+  draft: "要把改动退回草稿，你需要这个仓库的写入权限，或由你本人发起这次改动。",
+  close: "要关闭改动，你需要这个仓库的写入权限，或由你本人发起这次改动。",
+  "update-branch": "要更新改动的分支，你需要这个仓库的写入权限，或由你本人发起这次改动。",
+  reopen: "要重新打开改动，你需要这个仓库的写入权限，或由你本人发起这次改动。",
+  "enable-auto-merge": "自动合并需要这个仓库的写入权限，并且仓库必须允许自动合并。",
+  "disable-auto-merge": "要停止在就绪后替你合并，你需要这个仓库的写入权限。",
+  revert: "要发起还原拉取请求，你需要这个仓库的写入权限。",
+  "delete-branch": "要删除源仓库的分支，你需要源仓库的写入权限。",
+  "approve-workflows": "要批准来自分支拉取请求的工作流，你需要这个仓库的写入权限。",
 };
 
 export interface SupportedProject {
@@ -832,7 +824,7 @@ export const make = Effect.gen(function* () {
         (error) =>
           new PullRequestOperationError({
             operation: "listProjects",
-            detail: "The project list could not be read.",
+            detail: "无法读取项目列表。",
             cause: error,
           }),
       ),
@@ -940,7 +932,7 @@ export const make = Effect.gen(function* () {
           return Effect.fail(
             new PullRequestOperationError({
               operation: "resolveRepository",
-              detail: "The change request does not belong to the selected project.",
+              detail: "这次改动不属于所选项目。",
             }),
           );
         }
@@ -975,7 +967,7 @@ export const make = Effect.gen(function* () {
                       (cause) =>
                         new PullRequestOperationError({
                           operation: "resolveRepository",
-                          detail: "The selected project could not be read.",
+                          detail: "无法读取所选项目。",
                           cause,
                         }),
                     ),
@@ -1071,7 +1063,7 @@ export const make = Effect.gen(function* () {
         return Effect.fail(
           new PullRequestOperationError({
             operation: "list",
-            detail: "The list could not be carried on from where it left off.",
+            detail: "无法从上次停下的位置继续这个列表。",
           }),
         );
       }
@@ -1283,7 +1275,7 @@ export const make = Effect.gen(function* () {
         projectCount,
         projectIds: refinedProjectIdsByHost.get(host),
         configured: false,
-        detail: "This host cannot be browsed here yet.",
+        detail: "这里还不能浏览这个托管方。",
       })),
     ];
 
@@ -1297,7 +1289,7 @@ export const make = Effect.gen(function* () {
       .map(({ project, repository }) => ({
         projectId: project.id,
         projectTitle: project.title,
-        message: `${repository} could not be read.`,
+        message: `无法读取 ${repository}。`,
       }));
     if (readable.length === 0) {
       const listResult: PullRequestListResult = {
@@ -1400,8 +1392,8 @@ export const make = Effect.gen(function* () {
                     projectTitle: project.project.title,
                     message:
                       error.accessHint === undefined
-                        ? `${project.repository} could not be read.`
-                        : `${project.repository} could not be read. ${error.accessHint}`,
+                        ? `无法读取 ${project.repository}。`
+                        : `无法读取 ${project.repository}。${error.accessHint}`,
                   },
                 ],
                 truncated: false,
@@ -1604,7 +1596,7 @@ export const make = Effect.gen(function* () {
     const rejected = () =>
       new PullRequestOperationError({
         operation: "routeIdentity",
-        detail: "The signed-in account could not be verified before starting the operation.",
+        detail: "开始操作前无法核验已登录账号。",
       });
     const project = yield* requireProject(input).pipe(Effect.mapError(rejected));
     const api = registry.get(project.api.kind);
@@ -1641,7 +1633,7 @@ export const make = Effect.gen(function* () {
     if (!identity.viewer.trim() || !identity.accountId.trim()) {
       return yield* new PullRequestOperationError({
         operation: "routeIdentity",
-        detail: "The signed-in account could not be verified.",
+        detail: "无法核验已登录账号。",
       });
     }
     return {
@@ -1907,7 +1899,7 @@ export const make = Effect.gen(function* () {
             return Effect.fail(
               new PullRequestOperationError({
                 operation: "threadComments",
-                detail: "This host does not page review thread comments.",
+                detail: "这个托管方不能分页读取审查评论。",
               }),
             );
           }
@@ -1940,7 +1932,7 @@ export const make = Effect.gen(function* () {
           : Effect.fail(
               new PullRequestOperationError({
                 operation: "diff",
-                detail: "This host cannot provide a diff for a change request.",
+                detail: "这个托管方不能提供改动的差异。",
               }),
             ),
       ),
@@ -1964,7 +1956,7 @@ export const make = Effect.gen(function* () {
           : Effect.fail(
               new PullRequestOperationError({
                 operation: "diffFileContents",
-                detail: "This host cannot expand unchanged pull request lines.",
+                detail: "这个托管方不能展开拉取请求中未改动的行。",
               }),
             );
       }),
@@ -1986,7 +1978,7 @@ export const make = Effect.gen(function* () {
           return Effect.fail(
             new PullRequestOperationError({
               operation: "runAction",
-              detail: "This host cannot delete a change request's source branch.",
+              detail: "这个托管方不能删除改动的源分支。",
             }),
           );
         }
@@ -2000,7 +1992,7 @@ export const make = Effect.gen(function* () {
           return Effect.fail(
             new PullRequestOperationError({
               operation: "runAction",
-              detail: "This stack action is not supported or has no expected head revision.",
+              detail: "不支持这个栈操作，或没有预期的 head 版本。",
             }),
           );
         }
@@ -2008,7 +2000,7 @@ export const make = Effect.gen(function* () {
           return Effect.fail(
             new PullRequestOperationError({
               operation: "runAction",
-              detail: `This host cannot ${input.action} a change request.`,
+              detail: `这个托管方不能对改动执行 ${input.action}。`,
             }),
           );
         }
@@ -2020,7 +2012,7 @@ export const make = Effect.gen(function* () {
           return Effect.fail(
             new PullRequestOperationError({
               operation: "runAction",
-              detail: `This host cannot merge with the ${input.mergeMethod} strategy.`,
+              detail: `这个托管方不能用 ${input.mergeMethod} 策略合并。`,
             }),
           );
         }
@@ -2031,7 +2023,7 @@ export const make = Effect.gen(function* () {
           return Effect.fail(
             new PullRequestOperationError({
               operation: "runAction",
-              detail: `This host cannot update a branch by ${input.updateMethod}.`,
+              detail: `这个托管方不能用 ${input.updateMethod} 更新分支。`,
             }),
           );
         }
@@ -2079,7 +2071,7 @@ export const make = Effect.gen(function* () {
                       () =>
                         new PullRequestOperationError({
                           operation: "runAction",
-                          detail: "Could not read merge settings.",
+                          detail: "无法读取合并设置。",
                         }),
                     ),
                   )
@@ -2502,7 +2494,7 @@ export const make = Effect.gen(function* () {
             (cause) =>
               new PullRequestOperationError({
                 operation: "cache",
-                detail: "Could not encode PR cache data.",
+                detail: "无法编码 PR 缓存数据。",
                 cause,
               }),
           ),
@@ -3224,7 +3216,7 @@ export const make = Effect.gen(function* () {
           : Effect.fail(
               new PullRequestOperationError({
                 operation: "diffFileContents",
-                detail: "This file is not part of the change request.",
+                detail: "这个文件不属于这次改动。",
                 reason: "not-found",
               }),
             ),

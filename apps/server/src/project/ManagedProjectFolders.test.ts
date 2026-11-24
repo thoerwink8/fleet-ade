@@ -467,7 +467,7 @@ it.effect("keeps a named project and reports why when Git cannot commit", () =>
 
         const result = yield* folders.createNamedProject({ name: "No Identity" });
 
-        assert.include(result.commitError ?? "", "no name or email");
+        assert.include(result.commitError ?? "", "没有设置名字或邮箱");
         assert.isTrue(Option.isSome(yield* projects.getById(result.projectId)));
         assert.isTrue(yield* fileSystem.exists(path.join(result.workspaceRoot, "README.md")));
         assert.isTrue(yield* fileSystem.exists(path.join(result.workspaceRoot, ".git")));
@@ -484,10 +484,7 @@ it.effect("says Git is not installed when a named project cannot start Git", () 
 
         const failure = yield* Effect.flip(folders.createNamedProject({ name: "T3Code Test" }));
 
-        assert.strictEqual(
-          failure.message,
-          "Git isn't installed on this machine. Install Git to create a project.",
-        );
+        assert.strictEqual(failure.message, "这台电脑没有安装 Git。安装 Git 后才能创建项目。");
       }),
     {
       git: GitVcsDriver.layer.pipe(
@@ -533,7 +530,7 @@ it.effect("keeps a folder that another project owns when the create conflicts", 
         const failure = yield* Effect.flip(folders.createNamedProject({ name: "Taken" }));
 
         assert.equal(failure._tag, "NamedProjectCreateError");
-        assert.equal(failure.message, "Failed to create the project.");
+        assert.equal(failure.message, "无法创建项目。");
         assert.isTrue(yield* fileSystem.exists(path.join(taken, "README.md")));
         const owner = yield* projects.getByWorkspaceRoot(taken);
         assert.equal(Option.getOrThrow(owner).id, ProjectId.make("project:owner"));

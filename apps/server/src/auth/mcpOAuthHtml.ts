@@ -18,7 +18,7 @@ const STYLES = `
 `;
 
 const shell = (title: string, body: string) => `<!doctype html>
-<html lang="en">
+<html lang="zh">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -33,9 +33,9 @@ const shell = (title: string, body: string) => `<!doctype html>
 
 export function renderErrorPage(description: string): string {
   return shell(
-    "Sign-in failed",
-    `<h1>This sign-in cannot continue</h1>
+    "无法登录",
+    `<h1>这次登录无法继续</h1>
     <p>${escapeHtml(description)}</p>
-    <p>Close this page and start the sign-in again from your agent.</p>`,
+    <p>关闭此页面，然后从你的智能体重新开始登录。</p>`,
   );
 }

@@ -24,7 +24,7 @@ it.effect("keeps malformed source URLs encodable for config subscribers", () =>
       "opaque-hub",
       "Named hub",
       "hub.test:8317",
-      "Usage limit source",
+      "用量上限来源",
     ]);
     expect(() =>
       encodeConfigEvent({
@@ -33,9 +33,7 @@ it.effect("keeps malformed source URLs encodable for config subscribers", () =>
         payload: { sources: snapshots },
       }),
     ).not.toThrow();
-    expect(snapshots.every((source) => source.error === "No management key configured.")).toBe(
-      true,
-    );
+    expect(snapshots.every((source) => source.error === "没有配置管理密钥。")).toBe(true);
   }).pipe(
     Effect.provide([
       Layer.succeed(SecretResolver.SecretResolver, {
@@ -107,7 +105,7 @@ it.effect("reads a management key from its secret provider", () => {
       { id: "resolved-hub", error: undefined },
       {
         id: "unresolved-hub",
-        error: "Could not read the management key from its secret provider.",
+        error: "无法从凭据存储读取管理密钥。",
       },
     ]);
     expect(authorizations).toEqual(["Bearer resolved-key"]);

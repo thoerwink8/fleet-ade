@@ -73,7 +73,7 @@ export const make = Effect.gen(function* () {
         new VcsUnsupportedOperationError({
           operation: "VcsDriverRegistry.get",
           kind,
-          detail: `No ${kind} VCS driver is registered.`,
+          detail: `没有注册 ${kind} 版本控制驱动。`,
         }),
       );
     }
@@ -198,8 +198,8 @@ export const make = Effect.gen(function* () {
         kind: requestedKind === "auto" ? "unknown" : requestedKind,
         detail:
           requestedKind === "auto"
-            ? `No supported VCS repository was detected at ${input.cwd}.`
-            : `No ${requestedKind} repository was detected at ${input.cwd}.`,
+            ? `在 ${input.cwd} 没有检测到受支持的版本控制仓库。`
+            : `在 ${input.cwd} 没有检测到 ${requestedKind} 仓库。`,
       });
     },
   );

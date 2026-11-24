@@ -83,7 +83,7 @@ describe("VcsProcess.run", () => {
       expect(error).toMatchObject({
         exitCode: 128,
         failureKind: "command-failed",
-        detail: "Git's index is locked. Wait for other Git operations to finish, then try again.",
+        detail: "Git 索引已被锁定。请等其他 Git 操作结束后再试。",
       });
       expect(error.message).not.toContain("index.lock");
       expect(yield* fs.readFileString(file)).toBe("after\n");
@@ -99,12 +99,12 @@ describe("VcsProcess.run", () => {
     {
       stderr: "fatal: Unable to create '/private/repo/index.lock': File exists",
       retryable: true,
-      detail: "Git's index is locked. Wait for other Git operations to finish, then try again.",
+      detail: "Git 索引已被锁定。请等其他 Git 操作结束后再试。",
     },
     {
       stderr: "fatal: Unable to create 'C:\\private\\repo\\.git\\index.lock': File exists.",
       retryable: true,
-      detail: "Git's index is locked. Wait for other Git operations to finish, then try again.",
+      detail: "Git 索引已被锁定。请等其他 Git 操作结束后再试。",
     },
     {
       stderr: "fatal: Unable to create '/private/repo/.git/config.lock': File exists.",
@@ -127,7 +127,7 @@ describe("VcsProcess.run", () => {
     { stderr: "fatal: index file corrupt", retryable: false },
   ])(
     "classifies Git exit retryability and safe detail without retaining stderr: $stderr",
-    ({ stderr, retryable, detail = "Process exited with a non-zero status." }) =>
+    ({ stderr, retryable, detail = "进程以非零状态码退出。" }) =>
       Effect.gen(function* () {
         const error = yield* captureProcessResult(
           Effect.succeed({
@@ -487,7 +487,7 @@ describe("VcsProcess.run", () => {
       expect(error).toMatchObject({
         command: "node",
         exitCode: 1,
-        detail: "API rate limit exceeded.",
+        detail: "超出 API 速率限制。",
         failureKind: "rate-limited",
         stderrLength: providerStderr.length,
         stderrTruncated: false,
@@ -510,14 +510,14 @@ describe("VcsProcess.run", () => {
 
       expect(yield* fail({})).toMatchObject({
         failureKind: "command-failed",
-        detail: "Process exited with a non-zero status.",
+        detail: "进程以非零状态码退出。",
       });
       expect(
         yield* fail({
           classifyFailure: (stderr) => (stderr.includes("404") ? "not-found" : null),
-          notFoundDetail: "Merge request not found.",
+          notFoundDetail: "找不到合并请求。",
         }),
-      ).toMatchObject({ failureKind: "not-found", detail: "Merge request not found." });
+      ).toMatchObject({ failureKind: "not-found", detail: "找不到合并请求。" });
     }).pipe(provideLive),
   );
 

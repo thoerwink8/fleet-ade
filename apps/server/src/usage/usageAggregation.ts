@@ -200,7 +200,7 @@ export class UsageAggregator {
     this.#toDay = makeDayFormatter(options.timeZone);
     if (options.resolution === "hour") {
       if (options.sinceTimeMs === undefined || options.untilTimeMs === undefined) {
-        throw new Error("Hourly usage aggregation requires exact time bounds");
+        throw new Error("按小时汇总用量需要精确的时间边界");
       }
       this.#hourlyWindow = {
         sinceTimeMs: options.sinceTimeMs,

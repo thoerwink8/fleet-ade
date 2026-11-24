@@ -205,7 +205,7 @@ export const make = Effect.gen(function* () {
           new GitManagerError({
             operation,
             cwd,
-            detail: "Failed to resolve the VCS driver for this Git workflow.",
+            detail: "无法解析这个 Git 流程的版本控制驱动。",
             cause,
           }),
       ),
@@ -224,7 +224,7 @@ export const make = Effect.gen(function* () {
             operation,
             command: "vcs-route",
             cwd,
-            detail: "Failed to resolve the VCS driver for this Git command.",
+            detail: "无法解析这个 Git 命令的版本控制驱动。",
             cause,
           }),
       ),
@@ -240,7 +240,7 @@ export const make = Effect.gen(function* () {
             new GitManagerError({
               operation,
               cwd,
-              detail: "Failed to detect a VCS repository for this Git workflow.",
+              detail: "无法为这个 Git 流程检测版本控制仓库。",
               cause,
             }),
         ),
@@ -262,7 +262,7 @@ export const make = Effect.gen(function* () {
             operation,
             command: "vcs-route",
             cwd,
-            detail: "Failed to detect a VCS repository for this Git command.",
+            detail: "无法为这个 Git 命令检测版本控制仓库。",
             cause,
           }),
       ),
@@ -290,7 +290,7 @@ export const make = Effect.gen(function* () {
             new GitManagerError({
               operation: "GitWorkflowService.repositoryRoot",
               cwd,
-              detail: "Failed to detect a VCS repository for this Git workflow.",
+              detail: "无法为这个 Git 流程检测版本控制仓库。",
               cause,
             }),
         ),
@@ -368,7 +368,7 @@ export const make = Effect.gen(function* () {
         ...(result.exitCode === null ? {} : { exitCode: result.exitCode }),
         stdoutLength: result.stdout.length,
         stderrLength: result.stderr.length,
-        detail: "Failed to read the checked-out branch.",
+        detail: "无法读取当前检出的分支。",
       });
     }),
     upstreamDivergence: Effect.fn("GitWorkflowService.upstreamDivergence")(function* (cwd) {

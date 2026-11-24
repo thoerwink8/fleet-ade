@@ -39,8 +39,8 @@ export class WorkspaceEntriesWindowsPathUnsupportedError extends Schema.TaggedEr
   },
 ) {
   override get message(): string {
-    const cwd = this.cwd ? ` from '${this.cwd}'` : "";
-    return `Windows-style workspace path '${this.partialPath}' is not supported on '${this.platform}'${cwd}.`;
+    const cwd = this.cwd ? `（起点 '${this.cwd}'）` : "";
+    return `'${this.platform}' 不支持 Windows 风格的项目路径 '${this.partialPath}'${cwd}。`;
   }
 }
 
@@ -51,7 +51,7 @@ export class WorkspaceEntriesCurrentProjectRequiredError extends Schema.TaggedEr
   },
 ) {
   override get message(): string {
-    return `A current project is required to browse relative workspace path '${this.partialPath}'.`;
+    return `浏览相对项目路径 '${this.partialPath}' 需要当前项目。`;
   }
 }
 
@@ -69,8 +69,8 @@ export class WorkspaceEntriesReadDirectoryError extends Schema.TaggedError<Works
   }
 
   override get message(): string {
-    const cwd = this.cwd ? ` from '${this.cwd}'` : "";
-    return `Failed to read workspace directory '${this.parentPath}' while browsing '${this.partialPath}'${cwd}.`;
+    const cwd = this.cwd ? `（起点 '${this.cwd}'）` : "";
+    return `浏览 '${this.partialPath}'${cwd} 时无法读取项目目录 '${this.parentPath}'。`;
   }
 }
 
@@ -396,7 +396,7 @@ export const make = Effect.gen(function* () {
               relative.split(path.sep).includes(".git") ||
               target.relativePath.split("/").includes(".git")
             ) {
-              throw new Error("Directory must be inside the workspace and outside .git.");
+              throw new Error("目录必须位于项目之内且在 .git 之外。");
             }
             const children = await NodeFSP.readdir(directory, { withFileTypes: true });
             const isSameOrInside = (parent: string, child: string) => {

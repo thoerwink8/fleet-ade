@@ -315,7 +315,7 @@ export const make = Effect.gen(function* () {
       (cause) =>
         new UsageReadError({
           reason: "scanFailed",
-          detail: "Server settings could not be read.",
+          detail: "无法读取后台服务设置。",
           cause: Cause.squash(cause),
         }),
     ),
@@ -728,7 +728,7 @@ export const make = Effect.gen(function* () {
       ...(unread > 0
         ? {
             status: "partial",
-            message: `${unread} transcript path(s) could not be read; usage may be incomplete.`,
+            message: `有 ${unread} 个记录路径无法读取，用量可能不完整。`,
           }
         : {}),
     } satisfies ScannedDir;
@@ -791,7 +791,7 @@ export const make = Effect.gen(function* () {
     if (input.sinceDay > input.untilDay) {
       return yield* new UsageReadError({
         reason: "invalidWindow",
-        detail: `sinceDay '${input.sinceDay}' is after untilDay '${input.untilDay}'`,
+        detail: `起始日 '${input.sinceDay}' 晚于结束日 '${input.untilDay}'`,
       });
     }
 
@@ -804,7 +804,7 @@ export const make = Effect.gen(function* () {
       if (Option.isNone(sinceTime) || Option.isNone(untilTime)) {
         return yield* new UsageReadError({
           reason: "invalidWindow",
-          detail: "Hourly usage requires valid sinceTime and untilTime instants",
+          detail: "按小时用量需要有效的起始时刻和结束时刻",
         });
       }
       const sinceTimeMs = DateTime.toEpochMillis(sinceTime.value);
@@ -813,7 +813,7 @@ export const make = Effect.gen(function* () {
       if (durationMs <= 0 || durationMs > MAX_HOURLY_WINDOW_MS) {
         return yield* new UsageReadError({
           reason: "invalidWindow",
-          detail: "Hourly usage window must be greater than zero and at most 24 hours",
+          detail: "按小时用量的时间范围必须大于零且不超过 24 小时",
         });
       }
       hourlyWindow = { sinceTimeMs, untilTimeMs };
@@ -826,7 +826,7 @@ export const make = Effect.gen(function* () {
     if (Option.isNone(windowStart)) {
       return yield* new UsageReadError({
         reason: "invalidWindow",
-        detail: `sinceDay '${input.sinceDay}' is not a valid date`,
+        detail: `起始日 '${input.sinceDay}' 不是有效日期`,
       });
     }
     const windowStartMs =
@@ -925,8 +925,7 @@ export const make = Effect.gen(function* () {
         });
       }
 
-      const sourceMessage =
-        message ?? (files === null ? "No transcript directory on this environment." : null);
+      const sourceMessage = message ?? (files === null ? "这台电脑上没有记录目录。" : null);
       sources.push({
         fingerprint: { hostId: sourceHostId ?? hostId, provider, resolvedHomePath: dir, volumeId },
         status:
@@ -1148,7 +1147,7 @@ export const make = Effect.gen(function* () {
       if (Option.isNone(sinceTime)) {
         return yield* new UsageReadError({
           reason: "invalidWindow",
-          detail: "Session usage requires a valid sinceTime instant",
+          detail: "会话用量需要有效的起始时刻",
         });
       }
       windowStartMs = DateTime.toEpochMillis(sinceTime.value) - MTIME_SLACK_MS;

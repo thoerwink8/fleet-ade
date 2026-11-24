@@ -389,7 +389,7 @@ export class GitCommandError extends Schema.TaggedError<GitCommandError>()("GitC
 }) {
   override get message(): string {
     const reason = this.reason === undefined ? "" : ` (${this.reason})`;
-    return `Git command failed in ${this.operation} (${this.cwd}): ${this.detail}${reason}`;
+    return `Git 命令在 ${this.operation} 中失败（${this.cwd}）：${this.detail}${reason}`;
   }
 }
 
@@ -402,7 +402,7 @@ export class TextGenerationError extends Schema.TaggedError<TextGenerationError>
   },
 ) {
   override get message(): string {
-    return `Text generation failed in ${this.operation}: ${this.detail}`;
+    return `在 ${this.operation} 中生成文本失败：${this.detail}`;
   }
 }
 
@@ -413,7 +413,7 @@ export class GitManagerError extends Schema.TaggedError<GitManagerError>()("GitM
   cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
-    return `Git manager failed in ${this.operation}: ${this.detail}`;
+    return `Git 管理器在 ${this.operation} 中失败：${this.detail}`;
   }
 }
 
@@ -429,7 +429,7 @@ export class GitPullRequestMaterializationError extends Schema.TaggedError<GitPu
   },
 ) {
   override get message(): string {
-    return `Failed to materialize pull request #${this.pullRequestNumber} branch ${this.headBranch} as ${this.localBranch}.`;
+    return `无法将拉取请求 #${this.pullRequestNumber} 的分支 ${this.headBranch} 落地为本地分支 ${this.localBranch}。`;
   }
 }
 

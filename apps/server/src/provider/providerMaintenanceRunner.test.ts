@@ -301,12 +301,12 @@ describe("providerMaintenanceRunner", () => {
       assert.deepStrictEqual(
         (yield* Ref.get(updateStatesRef)).map((state) => [state.status, state.message]),
         [
-          ["queued", "Waiting for another provider update to finish."],
-          ["running", "Checking for the latest version"],
-          ["running", "Waiting for running provider work to finish."],
+          ["queued", "正在等待另一个智能体更新完成。"],
+          ["running", "正在检查最新版本"],
+          ["running", "正在等待运行中的智能体任务完成。"],
           ["running", "正在运行 native-agent update"],
-          ["running", "Verifying the installed version"],
-          ["succeeded", "Provider updated."],
+          ["running", "正在验证已安装的版本"],
+          ["succeeded", "智能体已更新。"],
         ],
       );
     }).pipe(
@@ -386,13 +386,13 @@ describe("providerMaintenanceRunner", () => {
       assert.deepStrictEqual(calls, skip ? [] : [{ command: "claude", args: ["update"] }]);
       if (!skip) return;
       assert.strictEqual(result.providers[0]?.updateState?.status, "succeeded");
-      assert.strictEqual(result.providers[0]?.updateState?.message, "Already up to date.");
+      assert.strictEqual(result.providers[0]?.updateState?.message, "已是最新版本。");
       assert.deepStrictEqual(
         (yield* Ref.get(updateStatesRef)).map((state) => [state.status, state.message]),
         [
-          ["queued", "Waiting for another provider update to finish."],
-          ["running", "Checking for the latest version"],
-          ["succeeded", "Already up to date."],
+          ["queued", "正在等待另一个智能体更新完成。"],
+          ["running", "正在检查最新版本"],
+          ["succeeded", "已是最新版本。"],
         ],
       );
     }).pipe(
@@ -592,7 +592,7 @@ describe("providerMaintenanceRunner", () => {
         // The registry reports no new version, so a command that exits 0 ends as "unchanged".
         assert.strictEqual(
           result.providers[0]?.updateState?.message,
-          "Update command completed, but Fleet ADE still detects an outdated provider version.",
+          "更新命令已完成，但 Fleet ADE 仍检测到智能体版本过旧。",
         );
       }).pipe(
         Effect.provide(
@@ -709,7 +709,7 @@ describe("providerMaintenanceRunner", () => {
       assert.strictEqual(result.providers[0]?.updateState?.status, "failed");
       assert.strictEqual(
         result.providers[0]?.updateState?.message,
-        "Provider installation changed. Refresh and try again.",
+        "智能体安装已变化，请刷新后重试。",
       );
       assert.deepStrictEqual(
         (yield* Ref.get(updateStatesRef)).map((state) => state.status),
@@ -740,7 +740,7 @@ describe("providerMaintenanceRunner", () => {
       assert.strictEqual(updateState?.status, "failed");
       assert.strictEqual(
         updateState?.message,
-        "Update command exited with code 1: Error: Could not detect the Codex installation method.",
+        "更新命令以退出码 1 退出: Error: Could not detect the Codex installation method.",
       );
       assert.include(updateState?.output ?? "", "checking install");
     }).pipe(
@@ -824,10 +824,7 @@ describe("providerMaintenanceRunner", () => {
 
       const result = yield* updater.updateProvider(CODEX_DRIVER);
 
-      assert.strictEqual(
-        result.providers[0]?.updateState?.message,
-        "Update command exited with code 1.",
-      );
+      assert.strictEqual(result.providers[0]?.updateState?.message, "更新命令以退出码 1 退出.");
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -853,7 +850,7 @@ describe("providerMaintenanceRunner", () => {
         const result = yield* updater.updateProvider(CODEX_DRIVER);
 
         assert.strictEqual(result.providers[0]?.updateState?.status, "unchanged");
-        assert.include(result.providers[0]?.updateState?.message ?? "", "still detects");
+        assert.include(result.providers[0]?.updateState?.message ?? "", "仍检测到");
       }).pipe(
         Effect.provide(
           Layer.mergeAll(
@@ -869,8 +866,8 @@ describe("providerMaintenanceRunner", () => {
   // prints nothing while it does. Killed mid-download, it leaves a truncated
   // binary behind that later updates mistake for an install.
   it.effect.each([
-    { runFor: "6 minutes", status: "succeeded", message: "Provider updated." },
-    { runFor: "31 minutes", status: "failed", message: "Update timed out after 30 minutes." },
+    { runFor: "6 minutes", status: "succeeded", message: "智能体已更新。" },
+    { runFor: "31 minutes", status: "failed", message: "更新在 30 分钟后超时。" },
   ] as const)("lets a slow installer run for $runFor", ({ runFor, status, message }) => {
     const started = Deferred.makeUnsafe<void>();
     return Effect.gen(function* () {
@@ -909,10 +906,7 @@ describe("providerMaintenanceRunner", () => {
       yield* Deferred.await(started);
       yield* Fiber.interrupt(update);
       const last = (yield* Ref.get(updateStatesRef)).at(-1);
-      assert.deepStrictEqual(
-        [last?.status, last?.message],
-        ["failed", "Update stopped before it finished."],
-      );
+      assert.deepStrictEqual([last?.status, last?.message], ["failed", "更新在完成前已停止。"]);
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -982,7 +976,7 @@ describe("providerMaintenanceRunner", () => {
         const error = Cause.squash(second.cause);
         assert.strictEqual(isServerProviderUpdateError(error), true);
         if (isServerProviderUpdateError(error)) {
-          assert.include(error.reason, "already running");
+          assert.include(error.reason, "已有更新正在运行");
         }
       }
 
@@ -1380,10 +1374,10 @@ it.effect.each([
       assert.strictEqual(
         provider.updateState?.message,
         mode === "default-precurrent"
-          ? "Already up to date."
+          ? "已是最新版本。"
           : mode === "unknown"
-            ? "Update command completed, but Fleet ADE could not verify the provider version."
-            : "Provider updated.",
+            ? "更新命令已完成，但 Fleet ADE 无法验证智能体版本。"
+            : "智能体已更新。",
       );
       assert.strictEqual(provider.version, version);
       assert.strictEqual("installedVersion" in provider, mode !== "legacy");
@@ -1452,13 +1446,13 @@ it.effect(
 
       const unchanged = yield* updater.updateProvider(CODEX_DRIVER);
       assert.strictEqual(unchanged.providers[0]?.updateState?.status, "unchanged");
-      assert.match(unchanged.providers[0]?.updateState?.message ?? "", /outdated provider version/);
+      assert.match(unchanged.providers[0]?.updateState?.message ?? "", /仍检测到智能体版本过旧/);
       assert.deepStrictEqual(calls, ["upgrade --cask codex"]);
 
       latest = "3.0.0";
       const refused = yield* updater.updateProvider(CODEX_DRIVER);
       assert.strictEqual(refused.providers[0]?.updateState?.status, "failed");
-      assert.match(refused.providers[0]?.updateState?.message ?? "", /incompatible/);
+      assert.match(refused.providers[0]?.updateState?.message ?? "", /不兼容/);
       assert.deepStrictEqual(calls, ["upgrade --cask codex"]);
     }).pipe(
       Effect.provide(

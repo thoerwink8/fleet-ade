@@ -527,7 +527,7 @@ it.effect("reads nothing from a host its provider does not serve, but reports it
         {
           host: "bitbucket.example.com",
           configured: false,
-          detail: "This host cannot be browsed here yet.",
+          detail: "这里还不能浏览这个托管方。",
         },
       ],
     );
@@ -1665,7 +1665,7 @@ it.effect("refuses an action this viewer may not take, and says what access it t
 
     const error = yield* Effect.flip(service.runAction({ ...reference, action: "merge" }));
     assert.strictEqual(error._tag, "PullRequestOperationError");
-    assert.include(error.message, "You need write access on this repository to merge.");
+    assert.include(error.message, "合并需要你对这个仓库有写入权限。");
     assert.strictEqual(ran, null);
 
     yield* service.runAction({ ...reference, action: "close" });
@@ -1714,7 +1714,7 @@ it.effect("gates arming a merge for later exactly as it gates merging now", () =
       service.runAction({ ...reference, action: "enable-auto-merge", mergeMethod: "squash" }),
     );
     assert.strictEqual(refused._tag, "PullRequestOperationError");
-    assert.include(refused.message, "the repository has to allow it");
+    assert.include(refused.message, "仓库必须允许自动合并");
     assert.strictEqual(ranWith, null);
 
     const wrongStrategy = yield* Effect.flip(
@@ -2929,7 +2929,7 @@ it.effect("asks on its own for a repository a search could not vouch for", () =>
       {
         projectId: "p2" as ProjectId,
         projectTitle: "docs",
-        message: "acme/docs could not be read.",
+        message: "无法读取 acme/docs。",
       },
     ]);
     assert.deepStrictEqual(
