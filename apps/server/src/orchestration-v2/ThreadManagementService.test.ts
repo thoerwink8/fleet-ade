@@ -4,6 +4,7 @@ import {
   EnvironmentId,
   MessageId,
   type OrchestrationV2Command,
+  type OrchestrationV2ServerCommand,
   type OrchestrationV2Run,
   type OrchestrationV2ProviderThread,
   ProviderThreadId,
@@ -1087,7 +1088,7 @@ it.effect(
 it.effect("restoreThread and purgeThread dispatch the command with the client command id", () => {
   const threadId = ThreadId.make("thread:thread-management:trash");
   const commandId = CommandId.make("command:thread-management:trash");
-  const dispatched: Array<OrchestrationV2Command> = [];
+  const dispatched: Array<OrchestrationV2ServerCommand> = [];
   const layerTest = ThreadManagementService.layer.pipe(
     Layer.provide(Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({})),
     Layer.provide(

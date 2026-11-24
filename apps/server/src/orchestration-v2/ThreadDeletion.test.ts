@@ -319,7 +319,9 @@ it.effect("plans purge effects without touching the projection row", () =>
       plan.events.map((event) => [event.type, event.threadId]),
       [["thread.purged", threadId]],
     );
-    assert.equal(plan.events[0]?.payload.deletedAt, projection.thread.deletedAt);
+    const purgedEvent = plan.events[0];
+    assert.ok(purgedEvent?.type === "thread.purged");
+    assert.equal(purgedEvent.payload.deletedAt, projection.thread.deletedAt);
     assert.deepEqual(
       plan.effects.map((effect) => effect.request),
       [
