@@ -29,6 +29,7 @@ export function useSideChat(input: {
     readonly runtimeMode: RuntimeMode;
     readonly modelSelection: ModelSelection | undefined;
   };
+  readonly sendBlockedReason?: string | null;
   readonly onError: (message: string) => void;
 }) {
   const pendingRef = useRef(false);
@@ -117,6 +118,10 @@ export function useSideChat(input: {
   const open = async (prompt?: string) => {
     const { threadRef } = input;
     if (!threadRef || pendingRef.current) return false;
+    if (prompt?.trim() && input.sendBlockedReason) {
+      input.onError(input.sendBlockedReason);
+      return false;
+    }
     pendingRef.current = true;
     return start(threadRef, prompt).finally(() => {
       pendingRef.current = false;

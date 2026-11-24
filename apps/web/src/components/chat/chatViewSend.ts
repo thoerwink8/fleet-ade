@@ -32,9 +32,9 @@ import { ATTACHMENT_ONLY_BOOTSTRAP_PROMPT } from "@t3tools/shared/composerContex
 import { createModelSelection } from "@t3tools/shared/model";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { getComposerPromptInjectionState, getComposerProviderState } from "./composerProviderState";
+import { evaluateProviderInstanceReadiness } from "./composerProviderReadiness";
 import {
   formatOutgoingPrompt,
-  getAntigravitySendBlockReason,
   cloneComposerImageForRetry,
   type ComposerSendSnapshot,
   readFileAsDataUrl,
@@ -290,11 +290,16 @@ export function resolveMultipleModelTargets(input: {
     const provider = input.providerInstanceEntries.find(
       (entry) => entry.instanceId === selection.instanceId,
     );
-    if (!provider?.enabled || !provider.isAvailable || provider.status !== "ready") {
-      return { error: `${selection.model} 的提供方不可用。` };
+    if (!provider) {
+      return { error: `${selection.model} 对应的智能体暂不可用。` };
     }
-    const providerBlockReason = getAntigravitySendBlockReason(provider.snapshot, selection.model);
-    if (providerBlockReason) return { error: providerBlockReason };
+    const readinessBlock = evaluateProviderInstanceReadiness(provider.snapshot, selection.model);
+    if (readinessBlock) {
+      return { error: readinessBlock.reason };
+    }
+    if (!provider.enabled || !provider.isAvailable || provider.status === "disabled") {
+      return { error: `${selection.model} 对应的智能体暂不可用。` };
+    }
     const providerState = getComposerProviderState({
       provider: provider.driverKind,
       model: selection.model,

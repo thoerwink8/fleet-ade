@@ -29,9 +29,11 @@ import * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRunti
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as EffectAcpErrors from "effect-acp/errors";
 import * as TestProviderHost from "@t3tools/provider-testing/TestProviderHost";
 import { GrokSettings } from "../settings.ts";
-import { makeGrokAdapterV2 } from "./adapter.ts";
+import { grokPromptFailure, grokRequiresSignIn, makeGrokAdapterV2 } from "./adapter.ts";
+import { xAiRateLimitedErrorCode } from "./xaiAcpExtension.ts";
 
 const layerTest = Layer.mergeAll(
   NodeServices.layer,
@@ -262,4 +264,41 @@ describe("Grok reasoning effort", () => {
       );
     }),
   );
+});
+
+describe("grok failure classification", () => {
+  it("classifies rate limit, auth, permission, transport, and fallback failures", () => {
+    const authErr = new EffectAcpErrors.AcpRequestError({
+      method: "session/prompt",
+      code: -32000,
+      errorMessage: "401 Unauthorized: token expired",
+    });
+    assert.isTrue(grokRequiresSignIn(authErr));
+    assert.equal(grokPromptFailure(authErr).class, "auth_error");
+    assert.equal(grokPromptFailure(authErr).retryable, false);
+
+    const forbiddenErr = new EffectAcpErrors.AcpRequestError({
+      method: "session/prompt",
+      code: -32603,
+      errorMessage: "403 Forbidden: workspace access denied",
+    });
+    assert.isFalse(grokRequiresSignIn(forbiddenErr));
+    assert.equal(grokPromptFailure(forbiddenErr).class, "permission_error");
+    assert.equal(grokPromptFailure(forbiddenErr).retryable, false);
+
+    const rateLimitErr = new EffectAcpErrors.AcpRequestError({
+      method: "session/prompt",
+      code: xAiRateLimitedErrorCode,
+      errorMessage: "Too many requests",
+    });
+    assert.equal(grokPromptFailure(rateLimitErr).class, "usage_limit");
+
+    const transportErr = new EffectAcpErrors.AcpTransportError({
+      detail: "socket hang up",
+      cause: undefined,
+    });
+    assert.equal(grokPromptFailure(transportErr).class, "transport_error");
+
+    assert.equal(grokPromptFailure(new Error("unknown error")).class, "provider_error");
+  });
 });

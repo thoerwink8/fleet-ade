@@ -349,7 +349,15 @@ function SidebarThreadTooltip({
           >
             <CircleAlertIcon className="size-3 shrink-0 stroke-current" />
             <div className="min-w-0 truncate">
-              {thread.runtime.lastErrorClass === "usage_limit" ? "已达到用量上限" : "发生错误"}
+              {thread.runtime.lastErrorClass === "usage_limit"
+                ? "用量到上限"
+                : thread.runtime.lastErrorClass === "auth_error"
+                  ? "需要重新登录"
+                  : thread.runtime.lastErrorClass === "not_installed"
+                    ? "未安装智能体"
+                    : thread.runtime.lastErrorClass === "transport_error"
+                      ? "连接异常"
+                      : "出错了"}
             </div>
           </div>
         ) : null}

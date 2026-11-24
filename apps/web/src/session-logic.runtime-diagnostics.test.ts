@@ -78,7 +78,7 @@ describe("runtime diagnostics in the v2 work log", () => {
       }),
     );
 
-    expect(workEntryDisplayLabel(entry, undefined)).toBe("正在重试提供方（2/5）");
+    expect(workEntryDisplayLabel(entry, undefined)).toBe("正在重试智能体（2/5）");
     expect(entry.detail).toBe(`${retainedMessage} 1.5 秒后重试。`);
   });
 

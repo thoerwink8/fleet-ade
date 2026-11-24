@@ -61,6 +61,7 @@ import {
 } from "./ProviderSettingsForm";
 import { ProviderModelsSection } from "./ProviderModelsSection";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
+import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -732,7 +733,7 @@ export function ProviderInstanceCard({
   const statusStyle = PROVIDER_STATUS_STYLES[statusKey];
   const summary = enabled
     ? getProviderSummary(effectiveProvider)
-    : { headline: "Disabled", detail: null };
+    : { headline: "已停用", detail: null, rawDetail: null };
   const authEmail = liveProvider?.auth.email?.trim();
   const isAuthenticated = enabled && liveProvider?.auth.status === "authenticated";
   const authLabel =
@@ -936,7 +937,7 @@ export function ProviderInstanceCard({
     isAuthenticated && authEmail ? (
       <>
         {needsAttention ? statusDotNode : null}
-        <span>已认证账户</span>
+        <span>已登录账号</span>
         <ProviderAuthEmail email={authEmail} />
         {authLabel ? <span>· {authLabel}</span> : null}
         {inlineStatusDetail ? (
@@ -964,7 +965,7 @@ export function ProviderInstanceCard({
                   size={mode === "list" ? "icon-micro" : "icon-xs"}
                   variant="ghost-muted"
                   className={mode === "list" ? "pointer-events-auto relative shrink-0" : undefined}
-                  aria-label={`${updateProgress ? "Updating" : versionAdvisory.title}，查看详情`}
+                  aria-label={`${updateProgress ? "正在更新" : versionAdvisory.title}，查看详情`}
                 >
                   {updateProgress ? (
                     <Spinner tone="muted" {...(mode === "list" ? { size: "sm" as const } : {})} />
@@ -1018,15 +1019,23 @@ export function ProviderInstanceCard({
             </Button>
           ) : null}
           {updateProgress || updateProblem ? (
-            <p
-              aria-live="polite"
-              className={cn(
-                "text-xs leading-snug [overflow-wrap:anywhere]",
-                updateProblem ? "text-warning" : "text-muted-foreground",
-              )}
-            >
-              {updateProgress ?? updateProblem}
-            </p>
+            <div className="grid gap-1">
+              <p
+                aria-live="polite"
+                className={cn(
+                  "text-xs leading-snug [overflow-wrap:anywhere]",
+                  updateProblem ? "text-warning" : "text-muted-foreground",
+                )}
+              >
+                {updateProgress ??
+                  (updateProblem && /\p{Script=Han}/u.test(updateProblem)
+                    ? updateProblem
+                    : "无法完成更新。")}
+              </p>
+              {updateProblem && !/\p{Script=Han}/u.test(updateProblem) ? (
+                <ErrorDetailsDisclosure detail={updateProblem} />
+              ) : null}
+            </div>
           ) : null}
           {onRunVersionAction && updateCommand ? (
             <div className="flex items-center gap-2 text-meta font-medium uppercase tracking-wider text-muted-foreground">
@@ -1129,7 +1138,7 @@ export function ProviderInstanceCard({
               />
               <SettingResetButton
                 label={`${displayName} 启用状态`}
-                tooltip="恢复环境设置"
+                tooltip="恢复电脑设置"
                 disabled={readOnly || !canWriteSettings}
                 onClick={projectOverride.onReset}
               />
@@ -1189,6 +1198,9 @@ export function ProviderInstanceCard({
           {editorStatusNode}
         </div>
       </ProviderStatusDiagnostic>
+      {summary.rawDetail ? (
+        <ErrorDetailsDisclosure detail={summary.rawDetail} className="mt-1" />
+      ) : null}
       {restartNotice ? (
         <p aria-live="polite" className="text-xs leading-snug [overflow-wrap:anywhere]">
           {restartNotice}

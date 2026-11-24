@@ -315,6 +315,11 @@ import {
   isThreadErrorBannerDismissedForSession,
   shouldShowThreadErrorBanner,
 } from "./chat/ThreadErrorBanner";
+import {
+  evaluateProviderInstanceReadiness,
+  findAlternativeReadyProvider,
+} from "./chat/composerProviderReadiness";
+import { useRecheckProviderStatusOnReturn } from "./chat/useRecheckProviderStatusOnReturn";
 import { QueuedRunsControl, type QueuedRunsControlHandle } from "./chat/QueuedRunsControl";
 import { useThreadLinkedPullRequest } from "./pullRequest/useThreadLinkedPullRequest";
 import { useProactivePanels } from "../hooks/useProactivePanels";
@@ -1326,6 +1331,32 @@ export default function ChatView(props: ChatViewProps) {
     canOperateThread &&
     conversationProviderStatus !== null &&
     conversationProviderStatus.supportsConversationRollback !== false;
+  const activeAgentName =
+    selectedProviderEntry?.displayName ??
+    (selectedProvider === "codex"
+      ? "Codex"
+      : selectedProvider === "claudeAgent"
+        ? "Claude"
+        : selectedProvider === "antigravity"
+          ? "Antigravity"
+          : selectedProvider === "grok"
+            ? "Grok"
+            : "智能体");
+  const activeProviderReadinessBlock = evaluateProviderInstanceReadiness(
+    activeProviderStatus,
+    composerSelectedModelSelection?.model ??
+      activeThread?.modelSelection.model ??
+      activeProjectDefaultModelSelection?.model ??
+      null,
+  );
+  const providerSendBlockedReason = activeProviderReadinessBlock?.reason ?? null;
+  useRecheckProviderStatusOnReturn({
+    environmentId: activeThread?.environmentId ?? null,
+    instanceId: activeProviderInstanceId,
+    enabled:
+      activeProviderReadinessBlock?.kind === "unauthenticated" ||
+      activeProviderReadinessBlock?.kind === "not_installed",
+  });
   const phase = derivePhase(activeRuntime);
   const serverThreadId = serverThread?.id;
   const serverThreadEnvironmentId = serverThread?.environmentId;
@@ -2778,6 +2809,7 @@ export default function ChatView(props: ChatViewProps) {
       runtimeMode,
       modelSelection: composerRef.current?.getSendContext().selectedModelSelection,
     }),
+    sendBlockedReason: providerSendBlockedReason,
     onError: (message) => {
       if (activeThread) setThreadError(activeThread.id, message);
     },
@@ -2972,6 +3004,76 @@ export default function ChatView(props: ChatViewProps) {
   const sendPreviewAnnotationStable = useStableCallback(sendPreviewAnnotation);
   const onComposerResumeStable = useStableCallback(onResume);
   const onComposerCompactContextStable = useStableCallback(onCompactContext);
+  const activeAlternativeAgent = findAlternativeReadyProvider({
+    entries: providerInstanceEntries,
+    currentInstanceId: selectedProviderEntry?.instanceId ?? activeProviderInstanceId,
+    lockedProvider: modelPickerLockedProvider,
+    lockedInstanceId:
+      activeThread?.runtime?.providerInstanceId ?? activeThread?.modelSelection.instanceId ?? null,
+    supportsProviderSwitchingViaHandoff,
+    isTargetModelDisabled: (instanceId, model) =>
+      getModelDisabledReason(instanceId, model) !== null,
+  });
+  const latestUserTurnMessageText = (() => {
+    for (let index = serverVisibleTurnItems.length - 1; index >= 0; index -= 1) {
+      const entry = serverVisibleTurnItems[index];
+      if (entry?.item.type === "user_message" && entry.item.text.trim().length > 0) {
+        return entry.item.text;
+      }
+    }
+    return null;
+  })();
+  const resendLastUserMessageStable = useStableCallback(() => {
+    if (
+      !latestUserTurnMessageText ||
+      !canOperateThread ||
+      activeEnvironmentUnavailable ||
+      providerSendBlockedReason !== null
+    ) {
+      return;
+    }
+    void sendStandaloneCommand(latestUserTurnMessageText, "无法重新发送上一条消息。");
+  });
+  const retryThreadErrorStable = useStableCallback(() => {
+    if (activeThread) setThreadError(activeThread.id, null);
+    if (canResume && providerSendBlockedReason === null) {
+      void onComposerResumeStable();
+      return;
+    }
+    if (latestUserTurnMessageText && providerSendBlockedReason === null) {
+      void sendStandaloneCommand(latestUserTurnMessageText, "无法重试上一条消息。");
+    }
+  });
+  const switchToAlternativeAgentStable = useStableCallback(
+    (targetInstanceId: ProviderInstanceId) => {
+      if (activeAlternativeAgent && activeAlternativeAgent.instanceId === targetInstanceId) {
+        onProviderModelSelectStable(
+          activeAlternativeAgent.instanceId,
+          activeAlternativeAgent.model,
+        );
+        return;
+      }
+      const fallback = providerInstanceEntries.find(
+        (entry) => entry.instanceId === targetInstanceId,
+      );
+      const model = fallback?.models[0]?.slug;
+      if (fallback && model) {
+        onProviderModelSelectStable(fallback.instanceId, model);
+      }
+    },
+  );
+  const inlineReadinessCoversProviderStatus =
+    composerMounted &&
+    multipleModelSelections === null &&
+    !(isLocalDraftThread && activeProject === null) &&
+    activeProviderStatus !== null &&
+    (!activeProviderStatus.installed || activeProviderStatus.auth.status === "unauthenticated") &&
+    activeProviderStatus.status !== "error" &&
+    (activeProviderStatus.compatibilityAdvisory === undefined ||
+      activeProviderStatus.compatibilityAdvisory.status === "supported" ||
+      activeProviderStatus.compatibilityAdvisory.status === "unknown");
+  const canResendEndedTurn =
+    latestUserTurnMessageText !== null && providerSendBlockedReason === null;
   const queuedRunsControl =
     isServerThread && activeThread ? (
       <>
@@ -2990,6 +3092,7 @@ export default function ChatView(props: ChatViewProps) {
           editBlockedReason={queuedRunEditBlockedReason({
             openQuestionCount: pendingUserInputs.length,
           })}
+          sendBlockedReason={providerSendBlockedReason}
           onEditQueuedRun={queuedRunEdit.beginEdit}
           onCancelEdit={queuedRunEdit.cancelEdit}
           timestampFormat={timestampFormat}
@@ -3348,6 +3451,9 @@ export default function ChatView(props: ChatViewProps) {
                   heldApprovalRequestIds={heldApprovalRequestIds}
                   respondingRequestIds={respondingRequestIds}
                   onRespondToApproval={onRespondToApprovalStable}
+                  {...(canResendEndedTurn
+                    ? { onResendLastUserMessage: resendLastUserMessageStable }
+                    : {})}
                   canOperateThread={canOperateThread}
                   threadDetailRef={routeThreadDetailRef}
                   entriesInput={timelineEntriesInput}
@@ -3495,7 +3601,9 @@ export default function ChatView(props: ChatViewProps) {
                           setDismissedFleetEngineFailureKind(fleetEngineFailure.kind);
                       }}
                       environmentId={activeThread.environmentId}
-                      providerStatus={visibleProviderStatus}
+                      providerStatus={
+                        inlineReadinessCoversProviderStatus ? null : visibleProviderStatus
+                      }
                       providerStatusDismissalKey={providerStatusDismissalKey}
                       onOpenProviderSetup={openProviderSetupStable}
                       threadId={activeThread.id}
@@ -3510,6 +3618,35 @@ export default function ChatView(props: ChatViewProps) {
                           ? (serverRuntime?.lastErrorCode ?? null)
                           : null
                       }
+                      threadErrorIsAgentError={threadErrorIsServerRuntimeError}
+                      threadErrorAgentName={activeAgentName}
+                      threadErrorRetryCount={
+                        threadErrorIsServerRuntimeError
+                          ? (serverRuntime?.lastErrorRetryCount ?? null)
+                          : null
+                      }
+                      threadErrorUsageLimitResetAt={
+                        threadErrorIsServerRuntimeError
+                          ? (serverRuntime?.usageLimitResetAt ?? null)
+                          : null
+                      }
+                      alternativeAgent={
+                        activeAlternativeAgent
+                          ? {
+                              instanceId: activeAlternativeAgent.instanceId,
+                              displayName: activeAlternativeAgent.displayName,
+                            }
+                          : null
+                      }
+                      timestampFormat={timestampFormat}
+                      onSignIn={() =>
+                        openProviderSetupStable(activeProviderInstanceId ?? undefined)
+                      }
+                      onInstallHelp={() =>
+                        openProviderSetupStable(activeProviderInstanceId ?? undefined)
+                      }
+                      onSwitchAgent={switchToAlternativeAgentStable}
+                      onRetryThreadError={retryThreadErrorStable}
                       threadErrorBannerKey={threadErrorBannerKey}
                       setThreadError={setThreadError}
                       setThreadErrorBannerDismissTick={setThreadErrorBannerDismissTick}
@@ -3525,7 +3662,10 @@ export default function ChatView(props: ChatViewProps) {
                       }
                       driver={selectedProvider ?? null}
                     />
-                    <ChildThreadApprovals threadRef={activeThreadRef} />
+                    <ChildThreadApprovals
+                      threadRef={activeThreadRef}
+                      onOpenThread={onOpenRelatedThreadStable}
+                    />
                     <div className="relative">
                       <ComposerSurface.Shell contextRow={showComposerContextStrip}>
                         <ComposerSurface.Host
@@ -3649,6 +3789,9 @@ export default function ChatView(props: ChatViewProps) {
                                 runtimeMode={runtimeMode}
                                 defaultRuntimeMode={defaultRuntimeMode}
                                 lockedProvider={modelPickerLockedProvider}
+                                supportsProviderSwitchingViaHandoff={
+                                  supportsProviderSwitchingViaHandoff
+                                }
                                 providerStatuses={providerStatuses as ServerProvider[]}
                                 providerCatalogKnown={serverConfig !== null}
                                 activeProjectDefaultModelSelection={
@@ -3701,6 +3844,9 @@ export default function ChatView(props: ChatViewProps) {
                                 }
                                 onProviderModelSelect={onProviderModelSelectStable}
                                 onOpenProviderSetup={openProviderSetupStable}
+                                {...(canResendEndedTurn
+                                  ? { onResendLastUserMessage: resendLastUserMessageStable }
+                                  : {})}
                                 getModelDisabledReason={getModelDisabledReason}
                                 handleRuntimeModeChange={handleRuntimeModeChangeStable}
                                 focusComposer={focusComposerStable}

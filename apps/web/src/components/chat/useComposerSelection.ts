@@ -94,10 +94,10 @@ export function useComposerSelection(input: ComposerSelectionInput) {
   };
   const handleRuntimeModeChangeStable = useStableCallback(handleRuntimeModeChange);
 
-  const openProviderSetup = (instanceId: ProviderInstanceId) => {
+  const openProviderSetup = (instanceId?: ProviderInstanceId) => {
     void navigate({
       to: "/settings/providers",
-      search: { environmentId, instanceId },
+      search: instanceId === undefined ? { environmentId } : { environmentId, instanceId },
     });
   };
   const openProviderSetupStable = useStableCallback(openProviderSetup);

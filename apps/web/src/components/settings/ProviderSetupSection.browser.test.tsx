@@ -195,7 +195,7 @@ describe("Antigravity 设置", () => {
 
     await screen.click("安装 Antigravity");
     await expect
-      .element(screen.getByRole("status").filter({ hasText: "无法开始安装." }))
+      .element(screen.getByRole("status").filter({ hasText: "正在开始安装." }))
       .toBeVisible();
 
     setup.installation = {
@@ -210,7 +210,7 @@ describe("Antigravity 设置", () => {
     await act(async () => resolveStart());
     await expect.element(screen.getByRole("button", { name: "取消安装" })).toBeEnabled();
     await expect
-      .element(screen.getByRole("status").filter({ hasText: "Downloading 1.0 MB of 2.0 MB." }))
+      .element(screen.getByRole("status").filter({ hasText: "正在下载 1.0 MB / 2.0 MB。" }))
       .toBeVisible();
   });
 

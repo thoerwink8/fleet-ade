@@ -200,6 +200,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   alternateShortcutLabel: string | null;
   isSendBusy: boolean;
   sendDisabledReason: string | null;
+  sendBlockReasonId?: string | undefined;
   isEnvironmentUnavailable: boolean;
   hasSendableContent: boolean;
   canResume: boolean;
@@ -227,6 +228,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         alternateShortcutLabel={props.alternateShortcutLabel}
         isSendBusy={props.isSendBusy}
         sendDisabledReason={props.sendDisabledReason}
+        {...(props.sendBlockReasonId ? { sendBlockReasonId: props.sendBlockReasonId } : {})}
         isEnvironmentUnavailable={props.isEnvironmentUnavailable}
         isPreparingWorktree={props.isPreparingWorktree}
         hasSendableContent={props.hasSendableContent}

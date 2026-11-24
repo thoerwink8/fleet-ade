@@ -19,7 +19,7 @@ import type {
   OrchestrationV2ThreadHistoryPage,
 } from "@t3tools/contracts";
 import {
-  latestRootProviderFailure,
+  latestRootProviderFailureItem,
   latestUnheldRun,
   threadErrorSummary,
   usageLimitRunPresentedAsLatest,
@@ -1835,7 +1835,7 @@ export function threadShellFromProjection(
       activityRun === null ? null : orchestrationV2RunWorkStartedAt(activityRun),
     status: latestRun?.status ?? "idle",
     ...threadErrorSummary(
-      latestRootProviderFailure(latestRun, projection.turnItems),
+      latestRootProviderFailureItem(latestRun, projection.turnItems),
       providerSession?.lastError ?? null,
     ),
     pendingRuntimeRequest,
@@ -1976,6 +1976,7 @@ type ShellThreadState = {
   readonly lastError: string | null;
   readonly lastErrorClass: OrchestrationV2ThreadShell["lastErrorClass"];
   readonly lastErrorCode: OrchestrationV2ThreadShell["lastErrorCode"];
+  readonly lastErrorRetryCount: OrchestrationV2ThreadShell["lastErrorRetryCount"];
   readonly usageLimitResetAt: OrchestrationV2ThreadShell["usageLimitResetAt"];
   readonly pendingRuntimeRequest: OrchestrationV2PendingRuntimeRequestSummary | null;
   readonly latestUserMessageAt: DateTime.Utc | null;
@@ -2150,6 +2151,7 @@ function shellFromState(input: {
     lastError: input.state.lastError,
     lastErrorClass: input.state.lastErrorClass,
     lastErrorCode: input.state.lastErrorCode,
+    lastErrorRetryCount: input.state.lastErrorRetryCount,
     usageLimitResetAt: input.state.usageLimitResetAt,
     pendingRuntimeRequest: input.state.pendingRuntimeRequest,
     latestVisibleMessage: null,
@@ -8607,7 +8609,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               ? activityRunState.status
               : null,
           ...threadErrorSummary(
-            terminalFailureItem?.type === "error" ? terminalFailureItem.failure : null,
+            terminalFailureItem?.type === "error" ? terminalFailureItem : null,
             row.last_error,
           ),
           pendingRuntimeRequest,

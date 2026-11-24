@@ -246,8 +246,7 @@ export function usePendingThreadRequests(input: {
     ? buildPendingUserInputAnswers(activePendingUserInput.questions, activePendingDraftAnswers)
     : null;
   const activePendingIsResponding = activePendingUserInput
-    ? activePendingUserInput.responseCapability === "not_resumable" ||
-      respondingUserInputRequestIds.includes(activePendingUserInput.requestId)
+    ? respondingUserInputRequestIds.includes(activePendingUserInput.requestId)
     : false;
   const activePendingApproval = pendingApprovals[0] ?? null;
 

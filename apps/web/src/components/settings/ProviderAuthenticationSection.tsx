@@ -24,6 +24,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsRow } from "./settingsLayout";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
+import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 
 const ProviderAuthTerminal = lazy(() => import("./ProviderAuthTerminal"));
 
@@ -51,6 +52,7 @@ export function ProviderAuthenticationSection({
   const [methodId, setMethodId] = useState("");
   const [draft, setDraft] = useState({ id: "", values: {} as Record<string, string> });
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
   const terminalQueue = useRef<ProviderAuthRespondInput[]>([]);
@@ -97,7 +99,13 @@ export function ProviderAuthenticationSection({
           : usesCredentials
             ? `在 ${environmentLabel} 上连接以加载模型。`
             : `在 ${environmentLabel} 上登录。`;
-  const statusMessage = auth?.phase === "failed" ? auth.message : null;
+  const rawStatusMessage = auth?.phase === "failed" ? auth.message : null;
+  const statusMessage =
+    rawStatusMessage && !/\p{Script=Han}/u.test(rawStatusMessage)
+      ? "无法完成智能体登录，请重试。"
+      : rawStatusMessage;
+  const statusDetail =
+    rawStatusMessage && !/\p{Script=Han}/u.test(rawStatusMessage) ? rawStatusMessage : null;
   const disabled = readOnly || pending || query.error !== null || isDiscovering;
   const draftId = `${auth?.flowId ?? ""}:${interaction?.id ?? ""}`;
   const values = draft.id === draftId ? draft.values : {};
@@ -111,16 +119,23 @@ export function ProviderAuthenticationSection({
     pendingRef.current = true;
     setPending(true);
     setError(null);
+    setErrorDetail(null);
     let succeeded = false;
     try {
       const result = await command();
       if (result._tag === "Success") succeeded = true;
       else if (!isAtomCommandInterrupted(result)) {
         const failure = squashAtomCommandFailure(result);
-        setError(failure instanceof Error ? failure.message : "提供方登录失败，请重试。");
+        const raw = failure instanceof Error ? failure.message.trim() : "";
+        if (raw && /\p{Script=Han}/u.test(raw)) {
+          setError(raw);
+        } else {
+          setError("无法完成智能体登录，请重试。");
+          if (raw) setErrorDetail(raw);
+        }
       }
     } catch {
-      setError("提供方登录失败，请重试。");
+      setError("无法完成智能体登录，请重试。");
     }
     pendingRef.current = false;
     setPending(false);
@@ -183,9 +198,12 @@ export function ProviderAuthenticationSection({
       }
       status={
         statusMessage ? (
-          <p role="status" className="[overflow-wrap:anywhere]">
-            {statusMessage}
-          </p>
+          <div className="grid gap-1">
+            <p role="status" className="[overflow-wrap:anywhere]">
+              {statusMessage}
+            </p>
+            <ErrorDetailsDisclosure detail={statusDetail} />
+          </div>
         ) : undefined
       }
       control={
@@ -374,14 +392,14 @@ export function ProviderAuthenticationSection({
                         if (result._tag !== "Success") {
                           terminalQueue.current = [];
                           if (!isAtomCommandInterrupted(result))
-                            setError("提供方登录终端已不可用。");
+                            setError("智能体登录终端已不可用。");
                           break;
                         }
                       }
                     })()
                       .catch(() => {
                         terminalQueue.current = [];
-                        setError("无法向提供方登录终端发送输入。");
+                        setError("无法向智能体登录终端发送输入。");
                       })
                       .finally(() => {
                         terminalSending.current = false;
@@ -467,9 +485,22 @@ export function ProviderAuthenticationSection({
             </form>
           ) : null}
           {error || query.error ? (
-            <p role="alert" className="py-2 text-xs text-destructive">
-              {error ?? query.error}
-            </p>
+            <div className="py-2 text-xs text-destructive">
+              <p role="alert">
+                {error ??
+                  (query.error && /\p{Script=Han}/u.test(query.error)
+                    ? query.error
+                    : "无法读取登录状态，请重试。")}
+              </p>
+              <ErrorDetailsDisclosure
+                detail={
+                  errorDetail ??
+                  (!error && query.error && !/\p{Script=Han}/u.test(query.error)
+                    ? query.error
+                    : null)
+                }
+              />
+            </div>
           ) : null}
         </>
       ) : null}
