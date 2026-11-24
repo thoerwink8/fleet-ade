@@ -21,7 +21,9 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as RpcTest from "effect/rpc/RpcTest";
 
@@ -65,6 +67,51 @@ describe("RPC authorization scopes", () => {
     ]) {
       expect(requiredScopeForRpcMethod(method)).toBe(AuthTerminalOperateScope);
     }
+  });
+
+  it("authorizes stop and rewind through the same dispatch command scope", () => {
+    expect(requiredScopeForRpcMethod(ORCHESTRATION_V2_WS_METHODS.dispatchCommand)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+    expect(clientRpcRequiredScopes(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, undefined)).toEqual(
+      [],
+    );
+    const dispatch = WsRpcGroup.requests.get(ORCHESTRATION_V2_WS_METHODS.dispatchCommand);
+    if (dispatch === undefined) throw new Error("dispatchCommand is not registered");
+    const decode = Schema.decodeUnknownExit(dispatch.payloadSchema);
+    for (const command of [
+      { type: "thread.stop", commandId: "stop-1", threadId: "thread-1" },
+      {
+        type: "checkpoint.rollback",
+        commandId: "rollback-1",
+        threadId: "thread-1",
+        scopeId: "scope-1",
+        checkpointId: "checkpoint-1",
+      },
+      {
+        type: "thread.stop-and-rollback",
+        commandId: "stop-rewind-1",
+        threadId: "thread-1",
+        turnCount: 0,
+      },
+      {
+        type: "thread.pending-rollback.cancel",
+        commandId: "cancel-rewind-1",
+        threadId: "thread-1",
+      },
+    ]) {
+      expect(Exit.isSuccess(decode(command))).toBe(true);
+    }
+    expect(
+      Exit.isFailure(
+        decode({
+          type: "checkpoint.rollback.resume",
+          commandId: "resume-1",
+          threadId: "thread-1",
+          requestId: "rollback-1",
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("lets thread readers observe and refresh checkout branches", () => {

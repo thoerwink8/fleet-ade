@@ -496,6 +496,24 @@ export interface ThreadManagementServiceShape {
   readonly forceStopThread: (
     input: OrchestrationV2ForceStopThreadInput,
   ) => Effect.Effect<OrchestrationV2ForceStopThreadResult, OrchestrationV2ForceStopThreadError>;
+  /** Stops a running turn, then rewinds to `turnCount` once no run is active. */
+  readonly stopAndRollbackThread: (input: {
+    readonly commandId: CommandId;
+    readonly threadId: ThreadId;
+    readonly turnCount: number;
+    readonly restoreFiles?: boolean;
+  }) => Effect.Effect<
+    Orchestrator.OrchestratorV2DispatchResult,
+    Orchestrator.OrchestratorV2Error | ThreadManagementProviderInstanceDisabledError
+  >;
+  /** Clears a rewind that is waiting for the turn to settle. Does not resume the turn. */
+  readonly cancelPendingRollback: (input: {
+    readonly commandId: CommandId;
+    readonly threadId: ThreadId;
+  }) => Effect.Effect<
+    Orchestrator.OrchestratorV2DispatchResult,
+    Orchestrator.OrchestratorV2Error | ThreadManagementProviderInstanceDisabledError
+  >;
   readonly awaitBackgroundTasks: (input: {
     readonly threadId: ThreadId;
     readonly taskIds: ReadonlyArray<string>;
@@ -1642,6 +1660,28 @@ const make = Effect.gen(function* () {
     return { matched, unmatched: input.taskIds.filter((taskId) => !matchedIds.has(taskId)) };
   });
 
+  const stopAndRollbackThread: ThreadManagementServiceShape["stopAndRollbackThread"] = Effect.fn(
+    "ThreadManagementService.stopAndRollbackThread",
+  )(function* (input) {
+    return yield* dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: input.commandId,
+      threadId: input.threadId,
+      turnCount: input.turnCount,
+      ...(input.restoreFiles === undefined ? {} : { restoreFiles: input.restoreFiles }),
+    });
+  });
+
+  const cancelPendingRollback: ThreadManagementServiceShape["cancelPendingRollback"] = Effect.fn(
+    "ThreadManagementService.cancelPendingRollback",
+  )(function* (input) {
+    return yield* dispatch({
+      type: "thread.pending-rollback.cancel",
+      commandId: input.commandId,
+      threadId: input.threadId,
+    });
+  });
+
   const stopDelegatedTasks: ThreadManagementServiceShape["stopDelegatedTasks"] = Effect.fn(
     "ThreadManagementService.stopDelegatedTasks",
   )(function* (input) {
@@ -1810,6 +1850,8 @@ const make = Effect.gen(function* () {
     stopDelegatedTasks,
     stopWorkflow,
     forceStopThread,
+    stopAndRollbackThread,
+    cancelPendingRollback,
     awaitBackgroundTasks,
     getThreadEventSequence: orchestrator.getThreadEventSequence,
     recoverDelegatedTask: orchestrator.recoverDelegatedTask,

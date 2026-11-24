@@ -183,7 +183,8 @@ export type ProjectionRecoveryKind =
   | "runtime"
   | "restart-continuations"
   | "subagent-results"
-  | "delegated-completions";
+  | "delegated-completions"
+  | "pending-rollbacks";
 
 export type ProjectionLimitRecoveryCandidate = Pick<
   OrchestrationV2ThreadShell,
@@ -4938,6 +4939,13 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                   AND CASE WHEN json_valid(payload_json)
                     THEN json_extract(payload_json, '$.restartContinuationOfRunId') IS NOT NULL
                     ELSE 0 END
+              `;
+            case "pending-rollbacks":
+              return sql`
+                SELECT thread_id FROM orchestration_v2_projection_threads
+                WHERE CASE WHEN json_valid(payload_json)
+                  THEN json_type(payload_json, '$.pendingRollback') = 'object'
+                  ELSE 0 END
               `;
             case "runtime":
               return sql`

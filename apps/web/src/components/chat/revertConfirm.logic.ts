@@ -44,7 +44,13 @@ const isRewindFailureError = Schema.is(RewindFailureError);
 const isDispatchCommandError = Schema.is(OrchestrationV2DispatchCommandError);
 const isCheckpointUnavailableError = Schema.is(OrchestrationV2CheckpointUnavailableError);
 
-const ROLLBACK_FAILURE_MESSAGES: Readonly<Record<OrchestrationV2RollbackFailureCode, string>> = {
+/** Codes without an entry here (stop-and-rewind) fall back to the server detail. */
+const ROLLBACK_FAILURE_MESSAGES: Readonly<
+  Partial<Record<OrchestrationV2RollbackFailureCode, string>>
+> & {
+  readonly "checkpoint-unavailable": string;
+  readonly "rollback-failed": string;
+} = {
   "shared-workspace":
     "无法还原文件：这个目录现在和别的会话或侧聊共用。请重新点回退，选择「只回退会话」保留当前文件改动。",
   "checkpoint-unavailable":
@@ -118,14 +124,18 @@ export function describeRevertConfirm(input: {
 
 export function formatRollbackFailureMessage(error: unknown): string {
   if (isRewindFailureError(error)) {
-    return ROLLBACK_FAILURE_MESSAGES[error.code ?? "rollback-failed"];
+    return (
+      ROLLBACK_FAILURE_MESSAGES[error.code ?? "rollback-failed"] ??
+      (error.rawMessage.trim() || ROLLBACK_FAILURE_MESSAGES["rollback-failed"])
+    );
   }
   if (
     isDispatchCommandError(error) ||
     (Predicate.isObject(error) && error._tag === "OrchestrationV2DispatchCommandError")
   ) {
     if ("code" in error && isRollbackFailureCode(error.code)) {
-      return ROLLBACK_FAILURE_MESSAGES[error.code];
+      const known = ROLLBACK_FAILURE_MESSAGES[error.code];
+      if (known !== undefined) return known;
     }
     if ("detail" in error && typeof error.detail === "string" && error.detail.trim().length > 0) {
       return error.detail.trim();

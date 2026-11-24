@@ -131,6 +131,8 @@ const browserTestProject = {
       provider: playwright(),
       instances: [{ browser: "chromium" }],
       screenshotFailures: false,
+      // A cold optimizeDeps prebundle outlives Vitest's 60s default, and that kill leaves the cache uncommitted.
+      connectTimeout: 180_000,
       commands: {
         // Playwright's mouse outlives each test, so whatever mounts under its last
         // position starts hovered. test/browserSetup.ts parks it off the page before each test.
@@ -400,10 +402,16 @@ export default defineConfig(() => {
     },
     worker: { format: "es" },
     test: {
+      // renders is a second browser server with the same prebundle. Boot it for render-metrics, a renders file, or knip.
       projects: [
         defineProject(unitTestProject),
         defineProject(browserTestProject),
-        defineProject(renderScenariosProject),
+        ...(process.env.T3CODE_RENDER_REPORT_DIR ||
+        process.argv.some(
+          (arg) => arg === "renders" || arg.includes(".renders.") || arg.includes("knip"),
+        )
+          ? [defineProject(renderScenariosProject)]
+          : []),
       ],
     },
   };
