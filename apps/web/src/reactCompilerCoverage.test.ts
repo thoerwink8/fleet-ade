@@ -10,6 +10,10 @@ const repoRoot = NodePath.resolve(
   "../../..",
 );
 
+// Titles stay `/`-separated so check:changed's `-t` filter, built from git paths, matches on Windows.
+const compilerCasePath = (file: string) => file.replaceAll("\\", "/");
+export const reactCompilerCaseName = (file: string) => `compiles ${compilerCasePath(file)}`;
+
 const webSourceFiles = NodeFS.readdirSync(NodePath.join(repoRoot, "apps/web/src"), {
   recursive: true,
 })
@@ -35,7 +39,29 @@ const compile = async (file: string) => {
 // Lint reports most compiler bailouts, but not every one (try/finally, throw
 // inside try). A skipped file still builds, just unmemoized, so check the output.
 describe("React Compiler coverage", () => {
-  it.each(webSourceFiles.filter((file) => !slowFiles.has(file)))("compiles %s", compile);
+  it("names compiler cases with forward slashes", () => {
+    for (const file of [...webSourceFiles, ...slowFiles]) {
+      expect(reactCompilerCaseName(file), file).not.toContain("\\");
+    }
+    const winPath = NodePath.win32.join("apps", "web", "src", "components", "ui", "button.tsx");
+    expect(winPath).toContain("\\");
+    expect(reactCompilerCaseName(winPath)).toBe("compiles apps/web/src/components/ui/button.tsx");
+    const readDirShape = `apps/web/src/${NodePath.win32.join("components", "ui", "button.tsx")}`;
+    expect(readDirShape).toContain("\\");
+    expect(reactCompilerCaseName(readDirShape)).toBe(
+      "compiles apps/web/src/components/ui/button.tsx",
+    );
+  });
+
+  it.each(
+    webSourceFiles
+      .filter((file) => !slowFiles.has(compilerCasePath(file)))
+      .map((file) => [compilerCasePath(file), file] as const),
+  )("compiles %s", (_displayPath, file) => compile(file));
   // oxlint-disable-next-line t3code/no-test-timeout-or-unreasoned-skip -- CPU-bound compile of a huge file, not a hidden wait.
-  it.each([...slowFiles])("compiles %s", compile, 60_000);
+  it.each([...slowFiles].map((file) => [compilerCasePath(file), file] as const))(
+    "compiles %s",
+    (_displayPath, file) => compile(file),
+    60_000,
+  );
 });
