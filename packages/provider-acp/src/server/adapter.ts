@@ -9647,6 +9647,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     return yield* new ProviderAdapter.ProviderAdapterProtocolError({
                       driver,
                       detail: `Cannot roll back ACP provider thread ${rollbackInput.providerThread.id} while turn ${currentTurn.providerTurnId} is active`,
+                      reason: "previous_turn_active",
                     });
                   }
                   yield* awaitRuntimeTeardown();

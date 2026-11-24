@@ -317,12 +317,14 @@ const runOrderedV2StartupPhases = Effect.fn("serverRuntimeStartup.runOrderedV2St
     readonly importLegacyShells: Effect.Effect<Import, ImportError, ImportContext>;
     readonly recover: Effect.Effect<Recovery, RecoveryError, RecoveryContext>;
     readonly recoverDelegatedTasks: Effect.Effect<void, DelegationError, DelegationContext>;
+    readonly resumePendingRollbacks: Effect.Effect<number, DelegationError, DelegationContext>;
     readonly startEffectWorker: Effect.Effect<void, WorkerError, WorkerContext>;
     readonly autoBootstrap: Effect.Effect<Bootstrap, BootstrapError, BootstrapContext>;
   }) {
     yield* input.importLegacyShells;
     const recovery = yield* input.recover;
     yield* input.recoverDelegatedTasks;
+    yield* input.resumePendingRollbacks;
     yield* input.startEffectWorker;
     const bootstrap = yield* input.autoBootstrap;
     return { recovery, bootstrap } as const;
@@ -434,6 +436,10 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       recoverDelegatedTasks: runStartupPhase(
         "orchestration-v2.delegated-tasks.recover",
         orchestrator.recoverDelegatedTasks,
+      ),
+      resumePendingRollbacks: runStartupPhase(
+        "orchestration-v2.pending-rollbacks.resume",
+        orchestrator.resumePendingRollbacks,
       ),
       startEffectWorker: runStartupPhase(
         "orchestration-v2.effect-worker.start",
