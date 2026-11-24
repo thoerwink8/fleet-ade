@@ -19,6 +19,7 @@ import {
   comparisonBase,
   defaultConcurrency,
   gitLines,
+  judgeFilteredVitestStep,
   runSteps,
   splitTests,
   type Step,
@@ -135,6 +136,67 @@ describe("check:changed", () => {
       );
     }),
   );
+
+  it("judges a -t vitest step from the json report counts", () => {
+    const filter = "compiles apps/web/src/components/ui/button.tsx$";
+    const note = `过滤没匹配到任何用例\n${filter}`;
+    const judge = (
+      counts: { readonly numPassedTests: number; readonly numFailedTests: number } | undefined,
+      exitOk: boolean,
+    ) =>
+      judgeFilteredVitestStep({
+        reportJson:
+          counts === undefined
+            ? undefined
+            : JSON.stringify({
+                ...counts,
+                numPendingTests: 4,
+                numTotalTests: counts.numPassedTests + counts.numFailedTests + 4,
+                success: counts.numFailedTests === 0,
+              }),
+        exitOk,
+        filter,
+        output: "vitest output",
+      });
+
+    const skipped = judge({ numPassedTests: 0, numFailedTests: 0 }, true);
+    assert.strictEqual(skipped.ok, false);
+    assert.strictEqual(skipped.output, `vitest output\n${note}`);
+
+    const noneCollected = judgeFilteredVitestStep({
+      reportJson: JSON.stringify({
+        numPassedTests: 0,
+        numFailedTests: 0,
+        numTotalTests: 0,
+        success: false,
+      }),
+      exitOk: true,
+      filter,
+      output: "",
+    });
+    assert.strictEqual(noneCollected.ok, false);
+    assert.strictEqual(noneCollected.output, note);
+
+    const missing = judge(undefined, true);
+    assert.strictEqual(missing.ok, false);
+    assert.strictEqual(missing.output, `vitest output\n${note}`);
+
+    const passed = judge({ numPassedTests: 2, numFailedTests: 0 }, true);
+    assert.strictEqual(passed.ok, true);
+    assert.strictEqual(passed.output, "vitest output");
+
+    const crashed = judge({ numPassedTests: 2, numFailedTests: 0 }, false);
+    assert.strictEqual(crashed.ok, false);
+    assert.strictEqual(crashed.output, "vitest output");
+
+    const failed = judge({ numPassedTests: 1, numFailedTests: 1 }, true);
+    assert.strictEqual(failed.ok, false);
+    assert.strictEqual(failed.output, "vitest output");
+
+    const allFailed = judge({ numPassedTests: 0, numFailedTests: 3 }, false);
+    assert.strictEqual(allFailed.ok, false);
+    assert.strictEqual(allFailed.output, "vitest output");
+  });
 
   it("runs the .github/scripts node:test files with node --test, not vitest", () => {
     assert.deepStrictEqual(

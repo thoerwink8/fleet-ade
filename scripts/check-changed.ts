@@ -193,6 +193,33 @@ export const splitTests = (tests: Iterable<string>) => {
 };
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const VitestJsonCounts = Schema.Struct({
+  numPassedTests: Schema.Number,
+  numFailedTests: Schema.Number,
+});
+const decodeVitestJsonCounts = Schema.decodeUnknownOption(Schema.fromJsonString(VitestJsonCounts));
+
+const unmatchedFilterNote = (filter: string) => `过滤没匹配到任何用例\n${filter}`;
+
+// Vitest exits 0 when `-t` matches nothing and counts every other case as skipped.
+export const judgeFilteredVitestStep = (input: {
+  readonly reportJson: string | undefined;
+  readonly exitOk: boolean;
+  readonly filter: string;
+  readonly output: string;
+}): { readonly ok: boolean; readonly output: string } => {
+  const counts =
+    input.reportJson === undefined ? Option.none() : decodeVitestJsonCounts(input.reportJson);
+  const withNote = (output: string) => {
+    const note = unmatchedFilterNote(input.filter);
+    return output.length > 0 ? `${output}\n${note}` : note;
+  };
+  if (Option.isNone(counts)) return { ok: false, output: withNote(input.output) };
+  if (counts.value.numFailedTests > 0) return { ok: false, output: input.output };
+  if (counts.value.numPassedTests === 0) return { ok: false, output: withNote(input.output) };
+  return { ok: input.exitOk, output: input.output };
+};
+
 // A flag wins over its environment variable; either must be a positive integer.
 const override = Effect.fn("checkChanged.override")(function* (
   flagName: string,
@@ -448,7 +475,52 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   );
   const filters = (names: ReadonlyArray<string>) => names.flatMap((name) => ["--filter", name]);
   const typecheckWorkers = Math.min(concurrency, affected.length);
-  const command = (name: string, args: ReadonlyArray<string>) => ({ name, run: vp(args) });
+  // Only vitest's `-t` is a name filter. A miss still exits 0, so read numPassedTests
+  // from the json reporter instead of trusting the exit code.
+  const filteredVitestPattern = (args: ReadonlyArray<string>) => {
+    if (args[0] !== "test") return undefined;
+    const index = args.indexOf("-t");
+    return index >= 0 ? args[index + 1] : undefined;
+  };
+  const filteredVitest = (args: ReadonlyArray<string>, filter: string) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const directory = yield* fs.makeTempDirectoryScoped({
+          prefix: "t3-check-changed-vitest-",
+        });
+        const reportPath = path.join(directory, "report.json");
+        const result = yield* vp([
+          ...args,
+          "--reporter=default",
+          "--reporter=json",
+          `--outputFile=${reportPath}`,
+        ]);
+        const reportJson = Option.getOrUndefined(
+          yield* fs.readFileString(reportPath).pipe(Effect.option),
+        );
+        return judgeFilteredVitestStep({
+          reportJson,
+          exitOk: result.ok,
+          filter,
+          output: result.output,
+        });
+      }),
+    ).pipe(
+      Effect.catch((error) =>
+        Effect.succeed(
+          judgeFilteredVitestStep({
+            reportJson: undefined,
+            exitOk: false,
+            filter,
+            output: error.message,
+          }),
+        ),
+      ),
+    );
+  const command = (name: string, args: ReadonlyArray<string>) => {
+    const filter = filteredVitestPattern(args);
+    return { name, run: filter === undefined ? vp(args) : filteredVitest(args, filter) };
+  };
   const compilerFiles = compilerApps.reduce((count, app) => count + app.names.length, 0);
 
   const steps: Array<Step<never>> = [
