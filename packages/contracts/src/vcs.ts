@@ -98,7 +98,7 @@ export class VcsProcessSpawnError extends Schema.TaggedError<VcsProcessSpawnErro
   },
 ) {
   override get message(): string {
-    return `无法在 ${this.operation} 中启动 VCS 进程：${this.command}（${this.cwd}）`;
+    return `VCS process failed to spawn in ${this.operation}: ${this.command} (${this.cwd})`;
   }
 
   static fromProcessSpawnError(context: VcsProcessErrorContext, error: VcsProcessSpawnFailure) {
@@ -125,7 +125,7 @@ export class VcsProcessExitError extends Schema.TaggedError<VcsProcessExitError>
   },
 ) {
   override get message(): string {
-    return `VCS 进程在 ${this.operation} 中失败：${this.command}（${this.cwd}），退出码 ${this.exitCode} - ${this.detail}`;
+    return `VCS process failed in ${this.operation}: ${this.command} (${this.cwd}) exited with ${this.exitCode} - ${this.detail}`;
   }
 
   static fromProcessExit(
@@ -140,8 +140,8 @@ export class VcsProcessExitError extends Schema.TaggedError<VcsProcessExitError>
         : failureKind === "rate-limited"
           ? "API rate limit exceeded."
           : failureKind === "not-found"
-            ? (options?.notFoundDetail ?? "找不到 VCS 资源。")
-            : "进程以非零状态码退出。";
+            ? (options?.notFoundDetail ?? "VCS resource not found.")
+            : "Process exited with a non-zero status.";
 
     return new VcsProcessExitError({
       ...context,
@@ -166,7 +166,7 @@ export class VcsProcessTimeoutError extends Schema.TaggedError<VcsProcessTimeout
   },
 ) {
   override get message(): string {
-    return `VCS 进程在 ${this.operation} 中超时：${this.command}（${this.cwd}）超过 ${this.timeoutMs}ms`;
+    return `VCS process timed out in ${this.operation}: ${this.command} (${this.cwd}) after ${this.timeoutMs}ms`;
   }
 
   static fromProcessTimeoutError(context: VcsProcessErrorContext, error: VcsProcessTimeoutFailure) {
@@ -193,7 +193,7 @@ export class VcsProcessStdinWriteError extends Schema.TaggedError<VcsProcessStdi
   },
 ) {
   override get message(): string {
-    return `无法在 ${this.operation} 中向 VCS 进程 stdin 写入 ${this.stdinBytes} 字节：${this.command}（${this.cwd}）`;
+    return `VCS process failed to write ${this.stdinBytes} bytes to stdin in ${this.operation}: ${this.command} (${this.cwd})`;
   }
 }
 
@@ -206,7 +206,7 @@ export class VcsProcessOutputReadError extends Schema.TaggedError<VcsProcessOutp
   },
 ) {
   override get message(): string {
-    return `无法在 ${this.operation} 中读取 VCS 进程 ${this.stream}：${this.command}（${this.cwd}）`;
+    return `VCS process failed to read ${this.stream} in ${this.operation}: ${this.command} (${this.cwd})`;
   }
 }
 
@@ -220,7 +220,7 @@ export class VcsProcessOutputLimitError extends Schema.TaggedError<VcsProcessOut
   },
 ) {
   override get message(): string {
-    return `VCS 进程在 ${this.operation} 中 ${this.stream} 输出了 ${this.observedBytes} 字节：${this.command}（${this.cwd}），超过 ${this.maxBytes} 字节上限`;
+    return `VCS process ${this.stream} produced ${this.observedBytes} bytes in ${this.operation}: ${this.command} (${this.cwd}), exceeding the ${this.maxBytes} byte limit`;
   }
 }
 
@@ -229,7 +229,7 @@ export class VcsProcessMissingExitCodeError extends Schema.TaggedError<VcsProces
   VcsProcessBoundaryErrorFields,
 ) {
   override get message(): string {
-    return `VCS 进程在 ${this.operation} 中结束时未给出退出码：${this.command}（${this.cwd}）`;
+    return `VCS process completed without an exit code in ${this.operation}: ${this.command} (${this.cwd})`;
   }
 }
 
@@ -243,7 +243,7 @@ export class VcsRepositoryDetectionError extends Schema.TaggedError<VcsRepositor
   },
 ) {
   override get message(): string {
-    return `在 ${this.operation} 中检测 VCS 仓库失败：${this.cwd} - ${this.detail}`;
+    return `VCS repository detection failed in ${this.operation}: ${this.cwd} - ${this.detail}`;
   }
 }
 
@@ -256,7 +256,7 @@ export class VcsUnsupportedOperationError extends Schema.TaggedError<VcsUnsuppor
   },
 ) {
   override get message(): string {
-    return `在 ${this.operation} 中，${this.kind} 不支持该 VCS 操作：${this.detail}`;
+    return `VCS operation is unsupported for ${this.kind} in ${this.operation}: ${this.detail}`;
   }
 }
 

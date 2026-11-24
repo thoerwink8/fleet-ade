@@ -201,7 +201,7 @@ export class SourceControlProviderError extends Schema.TaggedError<SourceControl
   },
 ) {
   override get message(): string {
-    return `代码托管方 ${this.provider} 在 ${this.operation} 中失败：${this.detail}`;
+    return `Source control provider ${this.provider} failed in ${this.operation}: ${this.detail}`;
   }
 }
 
@@ -272,6 +272,6 @@ export class SourceControlRepositoryError extends Schema.TaggedError<SourceContr
   },
 ) {
   override get message(): string {
-    return `代码托管方 ${this.provider} 的仓库操作 ${this.operation} 失败：${this.detail}`;
+    return `Source control repository operation ${this.operation} failed for ${this.provider}: ${this.detail}`;
   }
 }

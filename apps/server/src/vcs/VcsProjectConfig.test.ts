@@ -69,7 +69,7 @@ describe("VcsProjectConfig", () => {
         assert.instanceOf(error, VcsProjectConfig.VcsProjectConfigError);
         assert.equal(
           error.message,
-          "无法对 " + failedCandidate + " 的版本控制项目配置执行 inspect。",
+          "Failed to inspect VCS project config at " + failedCandidate + ".",
         );
         assert.deepInclude(error, {
           operation: "inspect",
@@ -106,7 +106,7 @@ describe("VcsProjectConfig", () => {
         assert.instanceOf(error, VcsProjectConfig.VcsProjectConfigError);
         assert.equal(
           error.message,
-          "无法对 " + path.join(configDir, "vcs.json") + " 的版本控制项目配置执行 decode。",
+          "Failed to decode VCS project config at " + path.join(configDir, "vcs.json") + ".",
         );
         assert.deepInclude(error.cause, { _tag: "SchemaError" });
         assert.deepInclude(error, {

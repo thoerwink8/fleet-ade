@@ -2570,7 +2570,7 @@ it.effect("tells the thread when its worktree branch could not be renamed", () =
       assert.equal(notice?.type === "system_notice" ? notice.runId : null, projection.runs[0]?.id);
       assert.include(
         notice?.type === "system_notice" ? notice.message : "",
-        `stays ${projection.thread.branch}. 在 generateBranchName 中生成文本失败：Failed to spawn Codex CLI process`,
+        `stays ${projection.thread.branch}. Text generation failed in generateBranchName: Failed to spawn Codex CLI process`,
       );
     }).pipe(Effect.provide(harness.layer));
   }),

@@ -279,7 +279,7 @@ describe("Git output collection", () => {
 
       const error = yield* driver.execute(input).pipe(Effect.flip);
       assert.equal(error.outputLength, 4);
-      assert.include(error.detail, "超过了 3 字节");
+      assert.include(error.detail, "exceeded 3 bytes");
     }).pipe(
       Effect.provide(
         layerServerConfig.pipe(
@@ -440,7 +440,7 @@ it.effect.each(["root", "nested", "worktree"] as const)(
       for (let poll = 0; poll < 3; poll++) {
         const result = yield* driver.statusDetailsLocal(statusCwd).pipe(Effect.result);
         assert.isTrue(Result.isFailure(result));
-        if (Result.isFailure(result)) assert.include(result.failure.detail, "索引已被锁定");
+        if (Result.isFailure(result)) assert.include(result.failure.detail, "index is locked");
       }
       assert.isFalse(yield* fs.exists(runsPath));
       assert.isTrue(yield* fs.exists(lockPath));
@@ -546,7 +546,7 @@ it.effect.each([
         assert.equal(Result.isSuccess(created), hookExitCode === 0);
         if (Result.isFailure(created)) {
           assert.equal(created.failure.operation, "GitVcsDriver.createWorktree");
-          assert.equal(created.failure.detail, "git worktree add 失败");
+          assert.equal(created.failure.detail, "git worktree add failed");
           assert.equal(created.failure.exitCode, hookExitCode);
         }
         const metadataQueries = spawnedArgs.filter((args) => args.includes("--git-common-dir"));
@@ -673,7 +673,7 @@ it.effect.each(["bare", "unborn"] as const)(
         assert.equal(Result.isSuccess(result), state === "bare");
         if (Result.isFailure(result)) {
           assert.equal(result.failure.operation, "GitVcsDriver.createWorktree.createBranch");
-          assert.equal(result.failure.detail, "git branch 失败");
+          assert.equal(result.failure.detail, "git branch failed");
         }
         assert.equal(spawnedArgs.filter((args) => args.includes("--git-common-dir")).length, 1);
         assert.isFalse(spawnedArgs.some((args) => args[0] === "symbolic-ref"));
@@ -1137,7 +1137,7 @@ describe("pullCurrentBranch", () => {
 
       const error = yield* Effect.flip(driver.pullCurrentBranch(cwd));
 
-      assert.include(error.detail, "无法更新本地引用");
+      assert.include(error.detail, "could not update a local reference");
       assert.equal(yield* git(cwd, ["rev-parse", "HEAD"]), before);
       assert.isTrue(yield* fs.exists(`${cwd}/${lock}`));
     }).pipe(Effect.provide(layerTest)),
@@ -1184,7 +1184,7 @@ describe("pullCurrentBranch", () => {
 
         const error = yield* Effect.flip(driver.pullCurrentBranch(cwd));
 
-        assert.include(error.detail, "无法更新本地引用");
+        assert.include(error.detail, "could not update a local reference");
         assert.equal(pulls, 1);
       }).pipe(Effect.scoped, Effect.provide(layerServerConfig.pipe(Layer.provideMerge(layerTest)))),
   );
@@ -1553,78 +1553,78 @@ it.effect.each([
   {
     name: "HTTPS credentials",
     stderr: "fatal: Authentication failed for",
-    expected: "无法向远程完成身份验证",
+    expected: "could not authenticate",
   },
   {
     name: "SSH credentials",
     stderr: "git@example.com: Permission denied (publickey).",
-    expected: "无法向远程完成身份验证",
+    expected: "could not authenticate",
   },
   {
     name: "disabled prompts",
     stderr: "fatal: could not read Username: terminal prompts disabled",
-    expected: "无法向远程完成身份验证",
+    expected: "could not authenticate",
   },
   {
     name: "DNS failure",
     stderr: "fatal: Could not resolve host: example.com",
-    expected: "无法连接远程",
+    expected: "could not reach the remote",
   },
   {
     name: "connection failure",
     stderr: "ssh: connect to host example.com port 22: Connection refused",
-    expected: "无法连接远程",
+    expected: "could not reach the remote",
   },
   {
     name: "missing remote",
     stderr: "remote: Repository not found.",
-    expected: "无法访问远程仓库",
+    expected: "could not access the remote repository",
   },
   {
     name: "invalid remote",
     stderr: "fatal: remote does not appear to be a git repository",
-    expected: "无法访问远程仓库",
+    expected: "could not access the remote repository",
   },
   {
     name: "reference lock",
     stderr: "error: cannot lock ref 'refs/remotes/origin/main': is at abc but expected def",
-    expected: "无法更新本地引用",
+    expected: "could not update a local reference",
     attempts: 2,
   },
   {
     name: "lock file",
     stderr: "fatal: Unable to create '/repo/.git/FETCH_HEAD.lock': File exists.",
-    expected: "无法更新本地引用",
+    expected: "could not update a local reference",
     attempts: 2,
   },
   {
     name: "reference race on Git 2.53",
     stderr: "error: fetching ref refs/remotes/origin/main failed: incorrect old value provided",
-    expected: "无法更新本地引用",
+    expected: "could not update a local reference",
     attempts: 2,
   },
   {
     name: "held reference lock on Git 2.53",
     stderr: "error: fetching ref refs/remotes/origin/main failed: reference already exists",
-    expected: "无法更新本地引用",
+    expected: "could not update a local reference",
     attempts: 2,
   },
   {
     name: "unrelated remote chatter",
     stderr:
       "remote: Help: authentication failed, connection refused, cannot lock ref\nremote: unrelated service error",
-    expected: "git fetch origin 失败",
+    expected: "git fetch origin failed",
   },
   {
     name: "HTTPS DNS failure",
     stderr:
       "fatal: unable to access 'https://example.com/repo.git/': Could not resolve host: example.com",
-    expected: "无法连接远程",
+    expected: "could not reach the remote",
   },
   {
     name: "unknown failure",
     stderr: "fatal: unexpected remote failure",
-    expected: "git fetch origin 失败",
+    expected: "git fetch origin failed",
   },
 ] as const)("reports $name during fetch without retaining remote output", (scenario) =>
   Effect.gen(function* () {
@@ -1903,7 +1903,7 @@ describe("rejected git refs", () => {
         failedPush,
       ],
       reason: "push_rejected_by_remote" as const,
-      detail: "远程拒绝了这次推送。",
+      detail: "The remote rejected the push.",
     },
     {
       label: "a non-fast-forward push",
@@ -1913,7 +1913,7 @@ describe("rejected git refs", () => {
         failedPush,
       ],
       reason: "push_rejected_non_fast_forward" as const,
-      detail: "请先拉取或变基",
+      detail: "Pull or rebase",
     },
   ])("names $label without quoting stderr", ({ stderr, reason, detail }) =>
     Effect.gen(function* () {
@@ -1936,7 +1936,7 @@ describe("rejected git refs", () => {
       );
 
       assert.equal(error.reason, undefined);
-      assert.equal(error.detail, "Git 命令以非零状态码退出。");
+      assert.equal(error.detail, "Git command exited with a non-zero status.");
     }),
   );
 });
@@ -2077,7 +2077,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         assert.deepInclude(error, {
           _tag: "GitCommandError",
           operation: "GitVcsDriver.test.spawnThrow",
-          detail: "无法启动 Git 进程。",
+          detail: "Failed to spawn Git process.",
         });
       }),
     );
@@ -2139,9 +2139,9 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
     );
 
     it.effect.each([
-      { action: "worktree add", detail: "git worktree add 失败" },
-      { action: "worktree add -b", detail: "git branch 失败" },
-      { action: "switch", detail: "git checkout 失败" },
+      { action: "worktree add", detail: "git worktree add failed" },
+      { action: "worktree add -b", detail: "git branch failed" },
+      { action: "switch", detail: "git checkout failed" },
     ])(
       "reports a missing ref during $action with stable, redacted diagnostics",
       ({ action, detail }) =>
@@ -2594,7 +2594,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
           const error = yield* Effect.asVoid<unknown, GitCommandError, never>(request).pipe(
             Effect.flip,
           );
-          assert.include(error.detail, "父提交");
+          assert.include(error.detail, "parent");
         }
       }),
     );
@@ -4510,7 +4510,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         const fetch = yield* traced(driver.fetchRefCommit({ cwd, ref: "refs/pull/1/head" }));
         assert.include(
           Exit.isFailure(fetch.exit) ? Cause.pretty(fetch.exit.cause) : "",
-          "这个仓库没有配置 git 远程。",
+          "No git remote is configured for this repository.",
         );
         assert.deepStrictEqual(fetch.failedSpans, ["GitVcsDriver.fetchRefCommit"]);
       }),
@@ -4976,7 +4976,8 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
           .renameBranch({ cwd, oldBranch: initialBranch, newBranch: "topic" })
           .pipe(Effect.result);
         assert.isTrue(Result.isFailure(result));
-        if (Result.isFailure(result)) assert.include(result.failure.detail, "找不到可用于");
+        if (Result.isFailure(result))
+          assert.include(result.failure.detail, "Could not find an available branch name");
         assert.equal(yield* git(cwd, ["branch", "--show-current"]), initialBranch);
         assert.equal((yield* driver.listLocalBranchNames(cwd)).length, 102);
       }),
@@ -5857,7 +5858,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
             { worktreesDirectory: "relative/worktrees" },
           )
           .pipe(Effect.flip);
-        assert.match(error.detail, /必须是本机上的绝对目录/);
+        assert.match(error.detail, /must be an absolute folder on this machine/);
 
         const rootError = yield* driver
           .createWorktree(
@@ -5865,7 +5866,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
             { worktreesDirectory: "/" },
           )
           .pipe(Effect.flip);
-        assert.match(rootError.detail, /不能是盘符根目录/);
+        assert.match(rootError.detail, /not a drive root/);
       }),
     );
 
@@ -6509,7 +6510,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         const missingRemote = `${cwd}/private-missing-remote`;
         yield* git(cwd, ["remote", "add", "origin", missingRemote]);
         const error = yield* driver.fetchRemote({ cwd, remoteName: "origin" }).pipe(Effect.flip);
-        assert.include(error.detail, "无法访问远程仓库");
+        assert.include(error.detail, "could not access the remote repository");
         assert.equal(error.exitCode, 128);
         assert.isAbove(error.stderrLength ?? 0, 0);
         assert.notInclude(error.detail, missingRemote);
@@ -6870,8 +6871,8 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
               `Selected merge commit succeeded with parents ${parents}; MERGE_HEAD exists: ${NodeFS.existsSync(path.join(gitDir, "MERGE_HEAD"))}`,
             );
           } else {
-            assert.include(result.failure.detail, "正在进行merge，不能只提交选中的文件");
-            assert.include(result.failure.detail, "请提交全部文件");
+            assert.include(result.failure.detail, "Cannot commit selected files during a merge");
+            assert.include(result.failure.detail, "Commit all files");
           }
           assert.deepEqual(
             names.map((name) => NodeFS.readFileSync(path.join(gitDir, name))),
@@ -7766,7 +7767,10 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
 
           assert.equal(error._tag, "GitCommandError");
           assert.equal(error.operation, "GitVcsDriver.pushCurrentBranch");
-          assert.equal(error.detail, "这个仓库没有配置 git 远程，无法推送。");
+          assert.equal(
+            error.detail,
+            "Cannot push because no git remote is configured for this repository.",
+          );
           assert.equal(yield* git(cwd, ["rev-parse", `refs/heads/${parent}`]), parentSha);
         }),
     );

@@ -728,7 +728,7 @@ export const make = Effect.gen(function* () {
       ...(unread > 0
         ? {
             status: "partial",
-            message: `有 ${unread} 个记录路径无法读取，用量可能不完整。`,
+            message: `${unread} transcript path(s) could not be read; usage may be incomplete.`,
           }
         : {}),
     } satisfies ScannedDir;

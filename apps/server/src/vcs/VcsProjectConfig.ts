@@ -37,7 +37,7 @@ export class VcsProjectConfigError extends Schema.TaggedError<VcsProjectConfigEr
   },
 ) {
   override get message(): string {
-    return `无法对 ${this.configPath} 的版本控制项目配置执行 ${this.operation}。`;
+    return `Failed to ${this.operation} VCS project config at ${this.configPath}.`;
   }
 }
 

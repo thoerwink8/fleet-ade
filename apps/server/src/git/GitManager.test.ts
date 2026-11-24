@@ -1415,7 +1415,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
 
       expect(error).toMatchObject({
         _tag: "GitManagerError",
-        detail: "有多个远程同时跟踪 feature/ambiguous-remote，它的PR无法确定。",
+        detail: "Multiple remotes track feature/ambiguous-remote. Its pull request is ambiguous.",
       });
       expect(providerCalls).toHaveLength(0);
     }),
@@ -2957,7 +2957,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
           },
         },
       });
-      expect(result.toast.title).toMatch(/^已提交 [0-9a-f]{7}$/);
+      expect(result.toast.title).toMatch(/^Committed [0-9a-f]{7}$/);
       expect(
         yield* runGit(repoDir, ["log", "-1", "--pretty=%s"]).pipe(
           Effect.map((result) => result.stdout.trim()),
@@ -3329,7 +3329,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         },
       });
       expect(result.toast.title).toMatch(
-        /^已推送 [0-9a-f]{7}到 origin\/feature\/implement-stacked-git-actions$/,
+        /^Pushed [0-9a-f]{7} to origin\/feature\/implement-stacked-git-actions$/,
       );
       expect(
         yield* runGit(repoDir, ["rev-parse", "--abbrev-ref", "HEAD"]).pipe(
@@ -3604,7 +3604,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
 
         expect(yield* readRemoteDevelop).toBe(remoteBefore);
         expect((yield* runGit(repoDir, ["rev-parse", "HEAD"])).stdout).toBe(localBefore);
-        expect(error.message).toContain("develop 是基线分支");
+        expect(error.message).toContain("develop is the base branch");
       }),
   );
 
@@ -3771,11 +3771,11 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
       expect(result.pr.status).toBe("opened_existing");
       expect(result.pr.number).toBe(42);
       expect(result.toast).toEqual({
-        title: "已打开 PR #42",
+        title: "Opened PR #42",
         description: "Existing PR",
         cta: {
           kind: "open_pr",
-          label: "查看 PR",
+          label: "View PR",
           url: "https://github.com/pingdotgg/codething-mvp/pull/42",
         },
       });
@@ -4453,11 +4453,11 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         expect(result.pr.status).toBe("created");
         expect(result.pr.number).toBe(188);
         expect(result.toast).toEqual({
-          title: "已创建 PR #188",
+          title: "Created PR #188",
           description: "Add stacked git actions",
           cta: {
             kind: "open_pr",
-            label: "查看 PR",
+            label: "View PR",
             url: "https://github.com/pingdotgg/codething-mvp/pull/188",
           },
         });
@@ -4664,7 +4664,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         Effect.flip,
         Effect.map((error) => error.message),
       );
-      expect(errorMessage).toContain("游离 HEAD");
+      expect(errorMessage).toContain("detached HEAD");
     }),
   );
 
@@ -5002,7 +5002,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
           mode: "local",
         }).pipe(Effect.flip);
 
-        expect(error.message).toContain("未提交的更改");
+        expect(error.message).toContain("uncommitted changes");
         expect(NodeFS.readFileSync(NodePath.join(repoDir, "README.md"), "utf8")).toBe(
           "my unsaved edit\n",
         );
@@ -6342,7 +6342,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         Effect.map((error) => error.message),
       );
 
-      expect(errorMessage).toContain("已经在主仓库检出");
+      expect(errorMessage).toContain("already checked out in the main repo");
     }),
   );
 
@@ -6427,17 +6427,17 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         expect.objectContaining({
           kind: "phase_started",
           phase: "pr",
-          label: "正在准备PR…",
+          label: "Preparing PR...",
         }),
         expect.objectContaining({
           kind: "phase_started",
           phase: "pr",
-          label: "正在生成PR内容…",
+          label: "Generating PR content...",
         }),
         expect.objectContaining({
           kind: "phase_started",
           phase: "pr",
-          label: "正在创建pull request…",
+          label: "Creating pull request...",
         }),
       ]);
     }),

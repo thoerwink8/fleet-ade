@@ -69,7 +69,8 @@ const VCS_PROCESS_CONCURRENCY = 8;
 const NON_GIT_PROCESS_CONCURRENCY = VCS_PROCESS_CONCURRENCY / 2;
 
 /** Shown to users when a Git command fails because another process holds the index lock. */
-export const GIT_INDEX_LOCKED_DETAIL = "Git 索引已被锁定。请等其他 Git 操作结束后再试。";
+export const GIT_INDEX_LOCKED_DETAIL =
+  "Git's index is locked. Wait for other Git operations to finish, then try again.";
 
 export const CHECKPOINT_CAPTURE_OPERATION = "GitVcsDriver.checkpoints.captureCheckpoint";
 
