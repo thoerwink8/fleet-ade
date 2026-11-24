@@ -303,7 +303,7 @@ export function useQueuedRunEdit(input: {
           toastManager.add(
             stackedThreadToast({
               type: recovery === "kept" ? "info" : "warning",
-              title: "排队的消息已不在队列中",
+              title: "这条消息已不在排队中",
               description:
                 recovery === "kept"
                   ? `未保存的编辑内容${where}已保留在输入框中。`
