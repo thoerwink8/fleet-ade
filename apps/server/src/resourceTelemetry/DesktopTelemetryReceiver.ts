@@ -62,7 +62,7 @@ export class DesktopTelemetryProtocolMismatch extends Schema.TaggedError<Desktop
   },
 ) {
   override get message(): string {
-    return `Desktop telemetry protocol ${this.receivedVersion} is incompatible with expected protocol ${this.expectedVersion}.`;
+    return `桌面遥测协议 ${this.receivedVersion} 与期望的协议 ${this.expectedVersion} 不兼容。`;
   }
 }
 
@@ -73,7 +73,7 @@ export class DesktopTelemetryDecodeFailed extends Schema.TaggedError<DesktopTele
   },
 ) {
   override get message(): string {
-    return "Failed to decode desktop telemetry.";
+    return "无法解码桌面遥测数据。";
   }
 }
 
@@ -85,7 +85,7 @@ export class DesktopTelemetryStreamFailed extends Schema.TaggedError<DesktopTele
   },
 ) {
   override get message(): string {
-    return `Desktop telemetry stream on fd ${this.fd} failed.`;
+    return `桌面遥测流（fd ${this.fd}）出错。`;
   }
 }
 
@@ -96,7 +96,7 @@ export class DesktopTelemetryStreamClosed extends Schema.TaggedError<DesktopTele
   },
 ) {
   override get message(): string {
-    return `Desktop telemetry stream on fd ${this.fd} closed.`;
+    return `桌面遥测流（fd ${this.fd}）已关闭。`;
   }
 }
 
@@ -108,7 +108,7 @@ export class DesktopTelemetryStale extends Schema.TaggedError<DesktopTelemetrySt
   },
 ) {
   override get message(): string {
-    return `Desktop telemetry on fd ${this.fd} has not updated for ${this.staleAfterMs}ms.`;
+    return `fd ${this.fd} 上的桌面遥测已 ${this.staleAfterMs}ms 未更新。`;
   }
 }
 
@@ -128,7 +128,7 @@ export class DesktopTelemetryControlFailed extends Schema.TaggedError<DesktopTel
   },
 ) {
   override get message(): string {
-    return `Desktop telemetry control '${this.operation}' failed on fd ${this.fd}.`;
+    return `桌面遥测控制「${this.operation}」在 fd ${this.fd} 上失败。`;
   }
 }
 
@@ -140,7 +140,7 @@ export class DesktopTelemetryControlStalled extends Schema.TaggedError<DesktopTe
   },
 ) {
   override get message(): string {
-    return `Desktop telemetry control stalled on fd ${this.fd} with ${this.remainingBytes} bytes remaining.`;
+    return `桌面遥测控制写入（fd ${this.fd}）停滞，剩余 ${this.remainingBytes} 字节未写入。`;
   }
 }
 
@@ -696,7 +696,7 @@ export const layerTest = (
     Effect.succeed({
       status: "unavailable" as const,
       lastSampleAt: Option.none<DateTime.Utc>(),
-      lastError: Option.some("Desktop telemetry test implementation is unavailable."),
+      lastError: Option.some("桌面遥测测试实现不可用。"),
     });
   return Layer.succeed(
     DesktopTelemetryReceiver,

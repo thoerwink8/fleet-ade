@@ -197,9 +197,7 @@ NodeAssert.deepEqual(fingerprints(NodeTls.getCACertificates("default")), expecte
       expect(error._tag).toBe("DesktopTelemetryControlStalled");
       expect(error.fd).toBe(7);
       expect(error.remainingBytes).toBe(42);
-      expect(error.message).toBe(
-        "Desktop telemetry control stalled on fd 7 with 42 bytes remaining.",
-      );
+      expect(error.message).toBe("桌面遥测控制写入（fd 7）停滞，剩余 42 字节未写入。");
       yield* requireDesktopTelemetryWriteProgress(7, 42, 1);
     }),
   );

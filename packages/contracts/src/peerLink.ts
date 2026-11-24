@@ -101,10 +101,10 @@ export const PeerLinkRequestAnswerInput = Schema.Struct({
 export type PeerLinkRequestAnswerInput = typeof PeerLinkRequestAnswerInput.Type;
 
 const PEER_LINK_REQUEST_FAILURE_MESSAGES = {
-  load_failed: "Could not load the link request.",
-  not_found: "This link request no longer exists.",
-  already_answered: "This link request was already answered.",
-  record_failed: "Could not update the link request.",
+  load_failed: "无法加载关联请求。",
+  not_found: "此关联请求已不存在。",
+  already_answered: "此关联请求已答复过。",
+  record_failed: "无法更新关联请求。",
 } as const;
 
 export const PeerLinkRequestFailureReason = Schema.Literals(

@@ -1060,7 +1060,7 @@ describe("AssetAccess", () => {
         },
         workspaceRoot: root,
       }).pipe(Effect.flip);
-      expect(error.message).toBe("Workspace file path must be relative to the project root.");
+      expect(error.message).toBe("项目文件路径必须相对于项目根目录。");
       expect(error).toMatchObject({
         _tag: "AssetWorkspacePathValidationError",
         resource: {
