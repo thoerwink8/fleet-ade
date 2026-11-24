@@ -11,7 +11,10 @@ import { showThreadUndoNotice } from "../hooks/showThreadUndoNotice";
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { releaseDraftAttachments } from "./attachmentUploadQueue";
 
-export function discardComposerDraft(target: ComposerThreadTarget): void {
+export function discardComposerDraft(
+  target: ComposerThreadTarget,
+  opts?: { readonly title?: string | null | undefined },
+): void {
   const store = useComposerDraftStore.getState();
   const key = resolveComposerDraftKey(store, target);
   const draft = key === null ? undefined : store.draftsByThreadKey[key];
@@ -21,6 +24,13 @@ export function discardComposerDraft(target: ComposerThreadTarget): void {
     .filter(([, draftKey]) => draftKey === key)
     .map(([logicalProjectKey]) => logicalProjectKey);
   const discardsSession = typeof target === "string";
+  const title =
+    opts?.title ??
+    draft.prompt
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ??
+    null;
 
   const claim = ThreadUndo.begin("discard", key);
   if (discardsSession) {
@@ -41,6 +51,7 @@ export function discardComposerDraft(target: ComposerThreadTarget): void {
 
   showThreadUndoNotice({
     action: "Discarded",
+    title,
     claim,
     failureTitle: "无法恢复草稿",
     undo: async () => {
