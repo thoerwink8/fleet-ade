@@ -13794,6 +13794,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ...projection.thread,
           rollbackRequestId: command.commandId,
           rollbackFailure: null,
+          rollbackInProgressRequestId: command.commandId,
+          rollbackCancelledRequestId: null,
           updatedAt: now,
         },
       });
@@ -13885,6 +13887,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           },
           // A failed rewind must not leave sends blocked. Absent when this was not a pending rewind.
           ...(thread.pendingRollback == null ? {} : { pendingRollback: null }),
+          ...(thread.rollbackInProgressRequestId === command.requestId
+            ? { rollbackInProgressRequestId: null }
+            : {}),
           updatedAt: now,
         },
       });
@@ -14034,6 +14039,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             pendingRollback,
             rollbackRequestId: command.commandId,
             rollbackFailure: null,
+            rollbackCancelledRequestId: null,
             updatedAt: now,
           },
         });
@@ -14215,7 +14221,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         threadId: command.threadId,
         providerInstanceId: thread.providerInstanceId,
         occurredAt: now,
-        payload: { ...thread, pendingRollback: null, updatedAt: now },
+        payload: {
+          ...thread,
+          pendingRollback: null,
+          rollbackCancelledRequestId: thread.pendingRollback.requestId,
+          updatedAt: now,
+        },
       });
     },
   );

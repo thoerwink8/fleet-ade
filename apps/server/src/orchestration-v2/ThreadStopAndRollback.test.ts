@@ -113,6 +113,11 @@ const send = (threadId: ThreadId, text: string) =>
     });
   });
 
+const threadMetadataPayloads = (result: Orchestrator.OrchestratorV2DispatchResult) =>
+  result.storedEvents.flatMap((stored) =>
+    stored.event.type === "thread.metadata-updated" ? [stored.event.payload] : [],
+  );
+
 const effectTypes = (threadId: ThreadId) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -147,6 +152,9 @@ it.effect(
       assert.equal(projection.thread.pendingRollback?.restoreFiles, false);
       assert.equal(projection.thread.rollbackRequestId, commandId);
       assert.isNull(projection.thread.rollbackFailure);
+      // Waiting for the agent to stop is the pending state alone; no rewind has been queued yet.
+      assert.isNull(projection.thread.rollbackInProgressRequestId ?? null);
+      assert.isNull(projection.thread.rollbackCancelledRequestId ?? null);
       assert.notInclude(yield* effectTypes(threadId), "provider-thread.rollback:pending");
       assert.notInclude(yield* effectTypes(threadId), "provider-thread.rollback:succeeded");
       // Same as thread.stop: a run stopped before its provider turn started never starts it.
@@ -712,12 +720,26 @@ it.effect("cancel clears the pending rewind and a later settled run does not rew
       turnCount: 0,
       restoreFiles: false,
     });
-    yield* threads.cancelPendingRollback({
+    const cancelled = yield* threads.cancelPendingRollback({
       commandId: CommandId.make("cancel-pending"),
       threadId,
     });
     assert.isNull((yield* orchestrator.getThreadProjection(threadId)).thread.pendingRollback);
     const projection = yield* orchestrator.getThreadProjection(threadId);
+    // Clients match the id they sent, not the cancel command's own id.
+    assert.equal(
+      projection.thread.rollbackCancelledRequestId,
+      CommandId.make("stop-rewind-cancel"),
+    );
+    assert.isNull(projection.thread.rollbackInProgressRequestId ?? null);
+    // The marker and the cleared pending state are one commit, so no reader sees one without the other.
+    const cancelPayloads = threadMetadataPayloads(cancelled);
+    assert.equal(cancelPayloads.length, 1);
+    assert.isNull(cancelPayloads[0]!.pendingRollback ?? null);
+    assert.equal(
+      cancelPayloads[0]!.rollbackCancelledRequestId,
+      CommandId.make("stop-rewind-cancel"),
+    );
     const run = projection.runs[0]!;
     yield* reactor.handle({
       sequence: 10_000,
@@ -1505,9 +1527,10 @@ it.effect("cancel before settle prevents the rewind entirely", () =>
     yield* createThread(threadId);
     yield* send(threadId, "work");
     const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-cancel-first");
+    const requestId = CommandId.make("stop-rewind-cancel-first");
     yield* orchestrator.dispatch({
       type: "thread.stop-and-rollback",
-      commandId: CommandId.make("stop-rewind-cancel-first"),
+      commandId: requestId,
       threadId,
       turnCount: 0,
       restoreFiles: false,
@@ -1541,6 +1564,22 @@ it.effect("cancel before settle prevents the rewind entirely", () =>
     assert.equal(yield* rollbackEffectCount(threadId), 0);
     const projection = yield* orchestrator.getThreadProjection(threadId);
     assert.isNull(projection.thread.rollbackCompletedRequestId ?? null);
+    assert.equal(projection.thread.rollbackCancelledRequestId, requestId);
+    // A new request clears the old cancelled marker in the commit that queues it.
+    yield* mockRollbackSuccess;
+    const again = yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-cancel-again"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    assert.isTrue(
+      threadMetadataPayloads(again).every((payload) => payload.rollbackCancelledRequestId == null),
+    );
+    const next = (yield* orchestrator.getThreadProjection(threadId)).thread;
+    assert.isNull(next.rollbackCancelledRequestId ?? null);
+    assert.equal(next.rollbackInProgressRequestId, CommandId.make("stop-rewind-cancel-again"));
   }).pipe(Effect.provide(layerTest)),
 );
 
@@ -1578,13 +1617,24 @@ it.effect("resume before cancel finishes the rewind and the cancel is a harmless
         },
       ],
     });
-    yield* orchestrator.dispatch({
+    const requestId = CommandId.make("stop-rewind-resume-first");
+    const resumed = yield* orchestrator.dispatch({
       type: "checkpoint.rollback.resume",
       commandId: CommandId.make("resume-before-cancel"),
       threadId,
-      requestId: CommandId.make("stop-rewind-resume-first"),
+      requestId,
     });
+    // Queuing the rewind, marking it in progress and clearing pending are one commit.
+    const lastPayload = threadMetadataPayloads(resumed).at(-1)!;
+    assert.isNull(lastPayload.pendingRollback ?? null);
+    assert.equal(lastPayload.rollbackInProgressRequestId, requestId);
+    const rewinding = (yield* orchestrator.getThreadProjection(threadId)).thread;
+    assert.isNull(rewinding.pendingRollback);
+    assert.equal(rewinding.rollbackInProgressRequestId, requestId);
     yield* worker.drain();
+    const finished = (yield* orchestrator.getThreadProjection(threadId)).thread;
+    assert.isNull(finished.rollbackInProgressRequestId ?? null);
+    assert.equal(finished.rollbackCompletedRequestId, requestId);
     yield* orchestrator.dispatch({
       type: "thread.pending-rollback.cancel",
       commandId: CommandId.make("cancel-after-resume"),
@@ -1593,6 +1643,7 @@ it.effect("resume before cancel finishes the rewind and the cancel is a harmless
     yield* worker.drain();
     const projection = yield* orchestrator.getThreadProjection(threadId);
     assert.isNull(projection.thread.pendingRollback);
+    assert.isNull(projection.thread.rollbackCancelledRequestId ?? null);
     assert.equal(
       projection.thread.rollbackCompletedRequestId,
       CommandId.make("stop-rewind-resume-first"),
@@ -1678,6 +1729,8 @@ it.effect("a provider turn still active fails retryable and clears the pending r
     const projection = yield* orchestrator.getThreadProjection(threadId);
     assert.equal(projection.thread.rollbackFailure?.code, "provider-turn-active");
     assert.isNull(projection.thread.pendingRollback);
+    // The failure and the cleared in-progress marker are one commit.
+    assert.isNull(projection.thread.rollbackInProgressRequestId ?? null);
     // Clearing pending means a retry command is accepted instead of staying blocked.
     const retryId = CommandId.make("stop-rewind-provider-retry");
     yield* orchestrator.dispatch({
@@ -1731,8 +1784,14 @@ it.effect("an idle rewind records the client's command id and one metadata event
       checkpointId,
       restoreFiles: false,
     });
+    // An idle rewind is marked in progress too, so a second client sees it until it completes.
+    assert.equal(
+      (yield* orchestrator.getThreadProjection(threadId)).thread.rollbackInProgressRequestId,
+      commandId,
+    );
     yield* worker.drain();
     const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.rollbackInProgressRequestId ?? null);
     // The client waits on the id it sent, so completion is recorded under it.
     assert.equal(projection.thread.rollbackCompletedRequestId, commandId);
     const events = yield* eventSink.stream({ threadId, afterSequence: beforeRollback }).pipe(
