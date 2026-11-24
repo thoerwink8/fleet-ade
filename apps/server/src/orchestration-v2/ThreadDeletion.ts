@@ -62,6 +62,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     payload: {
       ...projection.thread,
       deletedAt: projection.thread.deletedAt ?? now,
+      pendingRollback: null,
       titleRegeneration: null,
       updatedAt: now,
     },
