@@ -283,7 +283,6 @@ export function PullRequestMarkdownTextarea({
               id={listId}
               role="listbox"
               aria-label={EMPTY_STATE[trigger?.kind ?? "mention"].label}
-              className="-mx-1.5"
             >
               {candidates.map((completion, index) => (
                 <div
@@ -291,10 +290,8 @@ export function PullRequestMarkdownTextarea({
                   id={optionId(completion.token)}
                   role="option"
                   aria-selected={index === activeIndex}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm",
-                    index === activeIndex && "bg-accent text-accent-foreground",
-                  )}
+                  data-highlighted={index === activeIndex ? "" : undefined}
+                  className="fa-item"
                   onMouseMove={() => {
                     if (index !== activeIndex) setHighlight({ query: trigger?.query ?? "", index });
                   }}

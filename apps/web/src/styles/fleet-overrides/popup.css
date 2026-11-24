@@ -1,0 +1,71 @@
+/* Popover, combobox, and autocomplete.
+   fa-pop always pads. Edge-to-edge popovers (color wells, the model picker,
+   inheritance lists) zero that padding and keep the surface. */
+
+.ade-pop--flush {
+  padding: 0;
+}
+
+[data-slot="popover-popup"].fa-pop,
+[data-slot="combobox-popup"].fa-pop,
+[data-slot="autocomplete-popup"].fa-pop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  will-change: auto;
+}
+
+/* fa-item paints aria-selected. Rows here use that for assistive tech, or for the
+   active option, and show the wash instead. A selected fill is opt-in via data-selected. */
+[data-slot="combobox-item"][aria-selected="true"],
+[data-slot="autocomplete-item"][aria-selected="true"] {
+  background-color: transparent;
+}
+
+[data-slot="combobox-item"][data-selected-fill="true"][data-selected] {
+  background-color: var(--fa-selected);
+}
+
+/* Touch: rows keep their 32px look; ::after stretches the hit area to at least 44px. */
+@media (pointer: coarse) {
+  :is([data-slot="combobox-item"], [data-slot="autocomplete-item"]) {
+    position: relative;
+  }
+
+  :is([data-slot="combobox-item"], [data-slot="autocomplete-item"])::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block: calc((var(--fa-ctrl) - 44px) / 2);
+  }
+}
+
+:is([data-slot="combobox-item"], [data-slot="autocomplete-item"]) {
+  user-select: none;
+}
+
+/* The highlight marks the focused row. The focus ring sits outside the row and the popup clips it. */
+:is([data-slot="combobox-item"], [data-slot="autocomplete-item"]):focus-visible {
+  outline: none;
+}
+
+:is([data-slot="combobox-item"], [data-slot="autocomplete-item"])[data-disabled] {
+  pointer-events: none;
+}
+
+[data-side="none"] [data-slot="combobox-item"] {
+  min-width: calc(var(--anchor-width, 0px) + var(--fa-space-5));
+}
+
+:is([data-slot="combobox-item"], [data-slot="autocomplete-item"]) svg {
+  flex: none;
+  pointer-events: none;
+}
+
+:is([data-slot="combobox-item"], [data-slot="autocomplete-item"]) svg:not([class*="size-"]) {
+  width: 16px;
+  height: 16px;
+}
+
+:is([data-slot="combobox-item"], [data-slot="autocomplete-item"]) svg:not([class*="text-"]) {
+  color: var(--fa-fg-muted);
+}
