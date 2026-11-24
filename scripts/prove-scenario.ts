@@ -231,7 +231,6 @@ const runSide = Effect.fn("prove.runSide")(function* (
   side: "base" | "head",
   rev: string,
   scenarioPath: string,
-  target: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -244,7 +243,7 @@ const runSide = Effect.fn("prove.runSide")(function* (
     // The scenario and e2e come from this checkout; only the app comes from `appDir`.
     run(
       path.join(scripts, "node_modules/.bin/e2e"),
-      ["run", scenarioPath, "--target", target, "--output", path.relative(scripts, outDir)],
+      ["run", scenarioPath, "--output", path.relative(scripts, outDir)],
       {
         cwd: scripts,
         env: { ...environment, T3_SCENARIO_APP_DIR: appDir, E2E_TELEMETRY_DISABLED: "1" },
@@ -267,13 +266,6 @@ const runSide = Effect.fn("prove.runSide")(function* (
     )
     .pipe(Effect.ignore);
   return result;
-});
-
-/** The one target a scenario runs on: an iOS scenario imports `t3-mobile.ts`, a web one does not. */
-const targetOf = Effect.fn("prove.targetOf")(function* (scenarioPath: string) {
-  const fs = yield* FileSystem.FileSystem;
-  const source = yield* fs.readFileString(scenarioPath).pipe(Effect.orElseSucceed(() => ""));
-  return source.includes("t3-mobile") ? "ios" : "web";
 });
 
 /** Uploads the captures and maps each to its URL; a failed upload leaves the map empty. */
@@ -305,7 +297,6 @@ const prove = Effect.fn("prove")(function* (input: {
   readonly base: string;
   readonly head: string;
   readonly uploadCommand: Option.Option<string>;
-  readonly target: Option.Option<string>;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -315,10 +306,8 @@ const prove = Effect.fn("prove")(function* (input: {
   // A proof left by an earlier run must not be read as this one's.
   yield* fs.remove(proveDir, { recursive: true, force: true });
   yield* fs.makeDirectory(proveDir, { recursive: true });
-  // Only that target's app starts: a web scenario needs no Metro and no device.
-  const target = Option.getOrElse(input.target, () => "") || (yield* targetOf(scenarioPath));
-  const base = yield* runSide("base", input.base, scenarioPath, target);
-  const head = yield* runSide("head", input.head, scenarioPath, target);
+  const base = yield* runSide("base", input.base, scenarioPath);
+  const head = yield* runSide("head", input.head, scenarioPath);
   const links = Option.isSome(input.uploadCommand)
     ? yield* upload(input.uploadCommand.value, [...base.captures, ...head.captures])
     : new Map<string, string>();
@@ -353,12 +342,6 @@ const command = Command.make(
     ),
     uploadCommand: Flag.String("upload-command").pipe(
       Flag.withDescription("Command that takes capture paths and prints one URL per line."),
-      Flag.optional,
-    ),
-    target: Flag.String("target").pipe(
-      Flag.withDescription(
-        "Target to run on: web or ios. Default: ios when the scenario imports t3-mobile.ts, else web.",
-      ),
       Flag.optional,
     ),
   },

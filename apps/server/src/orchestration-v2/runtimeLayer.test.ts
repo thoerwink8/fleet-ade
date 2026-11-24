@@ -2594,7 +2594,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
           .dispatch({
             type: "thread.merge_back",
             createdBy: "user",
-            creationSource: "mobile",
+            creationSource: "web",
             commandId: CommandId.make(`runtime-layer-merge-refused-${status}`),
             sourceThreadId,
             targetThreadId,
@@ -2647,7 +2647,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
       yield* orchestrator.dispatch({
         type: "thread.merge_back",
         createdBy: "user",
-        creationSource: "mobile",
+        creationSource: "web",
         commandId: CommandId.make("runtime-layer-waiting-merge"),
         sourceThreadId,
         targetThreadId,

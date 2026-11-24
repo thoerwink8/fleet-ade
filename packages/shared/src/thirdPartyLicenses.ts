@@ -97,11 +97,8 @@ export function filterThirdPartyLicenseEntries(
 }
 
 const BUNDLE_LABELS: Readonly<Record<string, string>> = {
-  android: "Android",
   assets: "Assets",
   desktop: "Desktop",
-  ios: "iOS",
-  mobile: "Mobile",
   server: "Server",
   web: "Web",
 };

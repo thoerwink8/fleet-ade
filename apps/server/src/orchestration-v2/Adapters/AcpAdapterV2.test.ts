@@ -1026,7 +1026,7 @@ const runFormElicitation = (input: {
     return { questions, response: responses[0] };
   });
 
-/** Submits like the web and mobile clients: an option's `value`, else its label. */
+/** Submits like the clients do: an option's `value`, else its label. */
 const optionValues = (question: OrchestrationV2UserInputQuestion | undefined) =>
   question?.options.map((option) => option.value ?? option.label);
 

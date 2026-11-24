@@ -26,6 +26,7 @@
 - [Remote access](./user/remote-access.md)
 - [Outside agents (MCP)](./user/outside-agents.md)
 - [Running in the background](./user/background-service.md)
+- [Updating](./user/updating.md)
 - [Open source licenses](./user/open-source-licenses.md)
 - Provider guides: [Codex](./user/providers-codex.md) · [Claude](./user/providers-claude.md) · [Antigravity](./user/providers-antigravity.md) · [ACP agents](./user/providers-acp.md)
 
@@ -58,6 +59,7 @@ source alone does not explain. Most code changes do not need an internal documen
 - [Environment auth](./internals/environment-auth.md)
 - [Assistant citations](./internals/assistant-citations.md)
 - [Terminal runtime](./internals/terminal-runtime.md)
+- [Server updates](./internals/server-updates.md)
 - [Legacy orchestration migration](./internals/legacy-orchestration-migration.md)
 - [Open source license notices](./internals/open-source-licenses.md)
 
@@ -83,3 +85,12 @@ provider model. Its pages cover the
 - [Live background-work verification](./operations/background-verification.md)
 - [Release](./operations/release.md)
 - [Observability](./operations/observability.md)
+
+### Verification records
+
+Internal fork-verification notes, in Chinese:
+
+- [关一 Linux 测试基线](./验证/关一-Linux测试基线.md)
+- [关二 离得开它家](./验证/关二-离得开它家.md)
+- [关三① 经 reclaude 起 Claude](./验证/关三①-经reclaude起Claude.md)
+- [跳过清单](./验证/跳过清单.md)

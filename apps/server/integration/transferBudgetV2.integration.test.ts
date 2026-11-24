@@ -93,7 +93,7 @@ import {
   turnEvents,
 } from "./TransferBudgetV2Fixture.integration.ts";
 
-// The opt-ins current web and mobile clients send, as client-runtime's boundedThreadSnapshotHttp.ts,
+// The opt-ins current web and desktop clients send, as client-runtime's boundedThreadSnapshotHttp.ts,
 // threadHistoryHttp.ts, shellSnapshotHttp.ts, threads.ts and shell.ts send them. Each is `Required`,
 // so an opt-in added to a contract fails typecheck here until this test sends it. An omitted field
 // differs per request (a cursor, or what the client holds), so each scenario sends its own.
@@ -519,7 +519,7 @@ it.live("reports V2 thread HTTP and WebSocket transfer budgets", () =>
             workAnchor.item.deferredWork.cursor,
             `view=work&throughEntryId=${encodeURIComponent(workAnchor.sourceItemId)}&compactIds=1`,
           );
-          // Mobile opens a thread over the socket alone.
+          // The socket-only client opens a thread over the socket alone.
           const socketOpen = yield* open({ thread: LONG_TURN_THREAD_ID });
           const socketSnapshot = socketOpen.items.find(
             (item) => item.kind === "snapshot" && "projection" in item,

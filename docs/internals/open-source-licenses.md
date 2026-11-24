@@ -1,28 +1,17 @@
 # Open source license notices
 
-License notices are generated independently for the client that ships them:
+License notices are generated for the client that ships them: the web build emits
+`third-party-licenses.json` beside `index.html`, and the Settings page loads that static file, so
+the same artifact works in hosted web, the client bundled with `npx t3`, and desktop.
 
-- The web build emits `third-party-licenses.json` beside `index.html`. The Settings page loads that
-  static file, so the same artifact works in hosted web, the client bundled with `npx t3`, and
-  desktop.
-- The mobile Metro config generates an ignored virtual module before each development, native, or
-  over-the-air JavaScript bundle. Mobile loads and decodes that module only when a license screen
-  opens, so the notice text does not occupy memory during ordinary app startup. It does not need a
-  network request.
-
-Neither path depends on the connected environment or an RPC.
+The artifact does not depend on the connected environment or an RPC.
 
 ## What the build collects
 
 The generator follows installed production and optional dependencies, including dependencies of
-workspace packages, and omits first-party `@t3tools/*` packages. The web manifest starts from the
-web, server, and desktop package manifests. The mobile manifest starts from the mobile package
-manifest. During the web bundle, the generator also checks emitted module ids to catch a bundled
-npm import missing from a package manifest.
-
-The mobile manifest deliberately follows the complete production dependency closure declared by
-Expo and React Native. That is conservative and can include build tooling that is not present in
-the final JavaScript bundle, but it avoids dropping a notice when platform bundling changes.
+workspace packages, and omits first-party `@t3tools/*` packages. The manifest starts from the
+web, server, and desktop package manifests. During the web bundle, the generator also checks
+emitted module ids to catch a bundled npm import missing from a package manifest.
 
 The build fails when a collected package has no distributable license identifier or contains no
 license or notice text. Generated notices use license templates from the pinned SPDX License List,

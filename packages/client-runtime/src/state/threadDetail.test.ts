@@ -311,7 +311,7 @@ describe("derived thread state through a streamed message", () => {
     text: "Then run the tests",
     streaming: false,
     createdBy: "user",
-    creationSource: "mobile",
+    creationSource: "web",
   };
   const queuedRun: OrchestrationV2Run = {
     id: RunId.make("run-2"),
