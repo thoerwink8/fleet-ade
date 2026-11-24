@@ -4,6 +4,7 @@
 @import "@fleet/design/tokens.css" layer(fleet-tokens);
 @import "@fleet/design/styles/base.css" layer(fleet);
 @import "@fleet/design/styles/checkbox.css" layer(fleet);
+@import "./styles/fleet-overrides/checkbox.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
@@ -1207,23 +1208,6 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-foreground: var(--app-theme-terminal-foreground);
   --terminal-cursor: var(--app-theme-terminal-cursor);
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
-}
-
-/* Preserve Grove/Ember's --primary checkbox fill (fleet-design defaults to neutral --fa-fg). */
-:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
-  .fa-checkbox:is(
-    [data-checked],
-    [aria-checked="true"],
-    [data-indeterminate],
-    [aria-checked="mixed"]
-  ) {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.fa-checkbox[aria-invalid="true"] {
-  border-color: var(--fa-danger);
 }
 
 /* Workspace actions use a small, separate chrome hierarchy. Keeping these

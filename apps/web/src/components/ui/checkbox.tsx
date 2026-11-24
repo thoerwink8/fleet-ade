@@ -8,18 +8,42 @@ import { cn } from "~/lib/utils";
 
 type CheckboxVariant = "default" | "contrast";
 
-type CheckboxProps = Omit<CheckboxPrimitive.Root.Props, "className" | "onCheckedChange"> &
-  Pick<FleetCheckboxProps, "label" | "onCheckedChange"> & {
-    className?: string;
+type CheckboxProps = Omit<CheckboxPrimitive.Root.Props, "className" | "style" | "onCheckedChange"> &
+  Pick<FleetCheckboxProps, "label" | "onCheckedChange" | "className" | "style"> & {
     variant?: CheckboxVariant;
   };
 
-function Checkbox({ className, variant = "default", ...props }: CheckboxProps) {
+function Checkbox({
+  className,
+  variant = "default",
+  label,
+  checked,
+  defaultChecked,
+  onCheckedChange,
+  indeterminate,
+  disabled,
+  name,
+  value,
+  style,
+  "aria-label": ariaLabel,
+  ...props
+}: CheckboxProps) {
+  // @fleet/design's Checkbox only forwards `checked` to onCheckedChange, dropping Base UI's eventDetails.
   return (
     <FleetCheckbox
       className={cn(variant === "contrast" && "border-foreground/55", className)}
       data-slot="checkbox"
-      {...(props as FleetCheckboxProps)}
+      {...(label !== undefined ? { label } : {})}
+      {...(checked !== undefined ? { checked } : {})}
+      {...(defaultChecked !== undefined ? { defaultChecked } : {})}
+      {...(onCheckedChange !== undefined ? { onCheckedChange } : {})}
+      {...(indeterminate !== undefined ? { indeterminate } : {})}
+      {...(disabled !== undefined ? { disabled } : {})}
+      {...(name !== undefined ? { name } : {})}
+      {...(value !== undefined ? { value } : {})}
+      {...(style !== undefined ? { style } : {})}
+      {...(ariaLabel !== undefined ? { "aria-label": ariaLabel } : {})}
+      {...props}
     />
   );
 }
