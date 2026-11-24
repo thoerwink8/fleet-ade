@@ -32,7 +32,7 @@ export function ProjectPinButton(props: {
   readonly onToggle: () => void;
   readonly shortcutLabel?: string | null;
 }) {
-  const action = `${props.pinned ? "Unpin" : "Pin"} ${props.name}`;
+  const action = `${props.pinned ? "取消置顶" : "置顶"} ${props.name}`;
   const visibleShortcutLabel = useVisibleShortcutLabel(props.shortcutLabel);
   return (
     <span

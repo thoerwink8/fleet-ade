@@ -274,14 +274,14 @@ function previewAnnotationTooltip(annotation: PreviewAnnotationPayload): string 
   const lines = [annotation.pageTitle?.trim() || annotation.pageUrl];
   if (annotation.comment.trim()) lines.push("", annotation.comment.trim());
   const targets: string[] = [];
-  const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-  if (annotation.elements.length > 0) targets.push(plural(annotation.elements.length, "element"));
-  if (annotation.regions.length > 0) targets.push(plural(annotation.regions.length, "region"));
-  if (annotation.strokes.length > 0) targets.push(plural(annotation.strokes.length, "drawing"));
+  const plural = (count: number, noun: string) => `${count} 个${noun}`;
+  if (annotation.elements.length > 0) targets.push(plural(annotation.elements.length, "元素"));
+  if (annotation.regions.length > 0) targets.push(plural(annotation.regions.length, "区域"));
+  if (annotation.strokes.length > 0) targets.push(plural(annotation.strokes.length, "笔画"));
   if (annotation.styleChanges.length > 0) {
-    targets.push(plural(annotation.styleChanges.length, "style change"));
+    targets.push(plural(annotation.styleChanges.length, "样式变更"));
   }
-  if (targets.length > 0) lines.push("", targets.join(", "));
+  if (targets.length > 0) lines.push("", targets.join("，"));
   return lines.join("\n");
 }
 

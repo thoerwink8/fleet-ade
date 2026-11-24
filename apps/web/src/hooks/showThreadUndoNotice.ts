@@ -29,21 +29,20 @@ type UndoNotice = {
 
 export const useThreadUndoNotice = create<{ notice: UndoNotice | null }>(() => ({ notice: null }));
 
-const UNDONE_ACTION = {
-  Settled: "settle",
-  Snoozed: "snooze",
-  Unpinned: "unpin",
-  Archived: "archive",
-  Discarded: "discard",
-} satisfies Record<UndoOptions["action"], string>;
+const ACTION_TEXT = {
+  Settled: { label: "已收尾", verb: "已收尾", noun: "会话", undone: "已取消完成" },
+  Snoozed: { label: "已暂缓", verb: "已暂缓", noun: "会话", undone: "已取消暂缓" },
+  Unpinned: { label: "已取消置顶", verb: "已取消置顶", noun: "会话", undone: "已重新置顶" },
+  Archived: { label: "已归档", verb: "已归档", noun: "会话", undone: "已取消归档" },
+  Discarded: { label: "已丢弃草稿", verb: "已丢弃", noun: "草稿", undone: "已恢复" },
+} satisfies Record<
+  UndoOptions["action"],
+  { label: string; verb: string; noun: string; undone: string }
+>;
 
-function countLabel(action: UndoOptions["action"], count: number) {
-  const noun = action === "Discarded" ? "draft" : "thread";
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
-
-function threadUndoNoticeSummary(notice: Pick<UndoNotice, "action" | "count">): string {
-  return `${notice.action} ${countLabel(notice.action, notice.count)}`;
+export function threadUndoNoticeSummary(notice: Pick<UndoNotice, "action" | "count">): string {
+  const text = ACTION_TEXT[notice.action];
+  return notice.count === 1 ? text.label : `${text.verb} ${notice.count} 个${text.noun}`;
 }
 
 export function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForCommand>[0]) {
@@ -67,7 +66,7 @@ function syncSettleToast(notice: UndoNotice | null) {
     closeSettleToast();
     return;
   }
-  const title = notice.count === 1 ? "已收尾" : `已收尾 ${notice.count} 个会话`;
+  const title = threadUndoNoticeSummary(notice);
   const actionProps = {
     children: "撤销",
     onClick: () => {
@@ -101,7 +100,7 @@ function setNotice(notice: UndoNotice | null) {
   syncSettleToast(notice);
   if (summary) {
     const label = threadUndoLabel(appAtomRegistry.get(primaryServerKeybindingsAtom));
-    announce(`${summary}, ${label}`, "thread-undo-notice");
+    announce(`${summary}，${label}`, "thread-undo-notice");
   } else {
     cancelAnnouncement("thread-undo-notice");
   }
@@ -163,7 +162,8 @@ function refreshNotice() {
       );
       // Failures already raise a toast, so only what was actually restored is spoken.
       if (undone > 0) {
-        announce(`Undid ${UNDONE_ACTION[latest.action]} of ${countLabel(latest.action, undone)}`);
+        const text = ACTION_TEXT[latest.action];
+        announce(`${text.undone} ${undone} 个${text.noun}`);
       }
     },
   });

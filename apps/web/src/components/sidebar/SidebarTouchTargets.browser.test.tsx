@@ -452,7 +452,7 @@ describe("sidebar mobile touch targets", () => {
       screen.container.querySelector('button[aria-label="新建会话"]')!,
       screen.container.querySelector('button[aria-label="清除会话搜索"]')!,
       draftDiscard,
-      screen.container.querySelector('button[title="Unpin fleet-ade"]')!,
+      screen.container.querySelector('button[title="取消置顶 fleet-ade"]')!,
       screen.container.querySelector('button[aria-label="设置"]')!,
       screen.container.querySelector('button[aria-label="PR"]')!,
       screen.container.querySelector('button[aria-label="用量"]')!,
@@ -573,7 +573,7 @@ describe("sidebar mobile touch targets", () => {
       'button[aria-label="清除会话搜索"]',
     )!;
     const projectPin = screen.container.querySelector<HTMLButtonElement>(
-      'button[title="Unpin fleet-ade"]',
+      'button[title="取消置顶 fleet-ade"]',
     )!;
     const settingsButton = screen.container.querySelector<HTMLButtonElement>(
       'button[aria-label="设置"]',

@@ -195,7 +195,7 @@ export function PullRequestDetailPanel({
   ).changeRequest;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { copyToClipboard: copyReference } = useCopyToClipboard<string>({
-    target: `${terminology.singular} reference`,
+    target: `${terminology.singular} 引用`,
     onCopy: (label) => toastManager.add({ type: "success", title: `已复制 ${label}` }),
     onError: (error, label) =>
       toastManager.add({
@@ -367,9 +367,7 @@ export function PullRequestDetailPanel({
                   <span className="ml-auto inline-flex shrink-0 items-baseline justify-end gap-2 text-2xs">
                     <span
                       className="inline-flex items-baseline gap-1 tabular-nums"
-                      aria-label={`${detail.changedFiles.toLocaleString("zh-CN")} changed ${
-                        detail.changedFiles === 1 ? "file" : "files"
-                      }`}
+                      aria-label={`${detail.changedFiles.toLocaleString("zh-CN")} 个已更改文件`}
                     >
                       <FileDiffIcon aria-hidden className="size-3 self-center" />
                       {detail.changedFiles.toLocaleString("zh-CN")}
@@ -443,7 +441,7 @@ export function PullRequestDetailPanel({
                     <TooltipPopup side="top">{detail.headBranch}</TooltipPopup>
                   </Tooltip>
                 }
-                files={`${detail.changedFiles.toLocaleString("zh-CN")} ${detail.changedFiles === 1 ? "file" : "files"}`}
+                files={`${detail.changedFiles.toLocaleString("zh-CN")} 个文件`}
                 diffStat={
                   <PullRequestDiffStat
                     additions={detail.additions}

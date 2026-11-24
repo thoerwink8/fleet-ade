@@ -65,9 +65,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
         className="sticky top-2 z-10 flex items-center justify-between gap-2 rounded-t-lg bg-secondary px-3 py-2 dark:bg-background dark:bg-linear-to-b dark:from-input/20 dark:to-input/20"
       >
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-meta font-medium text-foreground">
-          <span>
-            {totals.count.toLocaleString("zh-CN")} changed file{totals.count === 1 ? "" : "s"}
-          </span>
+          <span>{totals.count.toLocaleString("zh-CN")} 个已更改文件</span>
           {hasNonZeroStat(totals) && (
             <DiffStatLabel
               additions={totals.additions}
@@ -142,8 +140,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
             variant="ghost-muted"
             onClick={() => onOpenTurnDiff(runId, files[0]?.path)}
           >
-            {hiddenFileCount.toLocaleString("zh-CN")} more file{hiddenFileCount === 1 ? "" : "s"} in
-            the full diff
+            完整 diff 中还有 {hiddenFileCount.toLocaleString("zh-CN")} 个文件
           </Button>
         </div>
       )}

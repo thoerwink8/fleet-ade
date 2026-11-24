@@ -60,7 +60,7 @@ export function CliCommandSettingsRow() {
         ? `已安装到 ${state.installedPath}。打开新终端即可使用。`
         : state.pathSetup?.added
           ? `已安装到 ${state.installedPath}，并已在 ${state.pathSetup.file} 中加入 PATH。打开新终端即可使用。`
-          : `Installed at ${state.installedPath}, which is not on your PATH yet.${state.pathSetup ? "" : " Add its folder to your PATH to run `t3`."}`;
+          : `已安装到 ${state.installedPath}，但它不在 PATH 中。${state.pathSetup ? "" : "请把它的目录加入 PATH，才能运行 `t3`。"}`;
 
   return (
     <SettingsRow

@@ -281,7 +281,7 @@ export function useProjectFileQuery(
         ? null
         : canReadFiles
           ? isMissing && !optimisticFile
-            ? `'${relativePath}' does not exist.`
+            ? `'${relativePath}' 不存在。`
             : errorMessage(cause)
           : (fileAccess.error ?? "此连接无法读取主机文件。"),
     isPending: isQueryEnabled && (fileAccess.isPending || result.waiting),

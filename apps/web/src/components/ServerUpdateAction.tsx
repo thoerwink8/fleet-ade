@@ -296,7 +296,7 @@ export function ServerUpdateAction({
               size="icon-xs"
               variant="ghost-muted"
               className={className}
-              aria-label={`${actionLabel} for ${serverLabel}`}
+              aria-label={`对 ${serverLabel} ${actionLabel}`}
               disabled={manualCommand === null && !canUpdate}
               onClick={onClick}
             />

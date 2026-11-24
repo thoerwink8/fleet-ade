@@ -208,11 +208,11 @@ export function PullRequestThreadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <SourceControlIcon className="me-2 size-4" />
-            Checkout {terminology.singular}
+            检出 {terminology.singular}
           </DialogTitle>
           <DialogDescription>
-            Resolve a {sourceControlPresentation.providerName} {terminology.singular}, then create
-            the draft thread in the main repo or in a dedicated worktree.
+            解析一个 {sourceControlPresentation.providerName} {terminology.singular}，
+            然后在主仓库或专用工作树中创建草稿会话。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -263,7 +263,7 @@ export function PullRequestThreadDialog({
           {isResolving ? (
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <Spinner size="sm" />
-              Resolving {terminology.singular}...
+              正在解析 {terminology.singular}…
             </div>
           ) : null}
 

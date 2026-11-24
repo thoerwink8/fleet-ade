@@ -4,6 +4,7 @@ import {
   type ThreadId,
   type OrchestrationV2ThreadLinkMetadata,
   type OrchestrationGetTurnDiffResult,
+  type OrchestrationV2CheckCheckpointRestoreInput,
   type OrchestrationV2GetTurnItemInput,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
@@ -253,6 +254,16 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
       tag: ORCHESTRATION_V2_WS_METHODS.getWorktreeThreadIds,
       staleTimeMs: 0,
       idleTtlMs: 0,
+    }),
+    // Checked only when the user opens the rewind dialog; isolation reads the filesystem.
+    checkpointRestoreSafety: createEnvironmentQueryAtomFamily(runtime, {
+      label: "environment-data:orchestration:checkpoint-restore-safety",
+      staleTimeMs: 0,
+      idleTtlMs: 0,
+      execute: (input: OrchestrationV2CheckCheckpointRestoreInput) =>
+        request(ORCHESTRATION_V2_WS_METHODS.checkCheckpointRestore, input).pipe(
+          Effect.timeout("5 seconds"),
+        ),
     }),
     threadLatestMessagePreview: createEnvironmentQueryAtomFamily(runtime, {
       label: "environment-data:orchestration:thread-latest-message-preview",

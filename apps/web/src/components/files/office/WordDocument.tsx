@@ -81,9 +81,7 @@ export default function WordDocument(props: {
       .then(async (first) => {
         if (controller.signal.aborted) return;
         setOpened({ pages: first.pages, paint, engine });
-        onDetails(
-          `${first.pages.length}${first.loading ? "+" : ""} page${first.pages.length === 1 && !first.loading ? "" : "s"}`,
-        );
+        onDetails(`${first.pages.length}${first.loading ? "+" : ""} 页`);
         if (!first.loading) return;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         while (!controller.signal.aborted) {
@@ -91,7 +89,7 @@ export default function WordDocument(props: {
           if (!step.done) continue;
           if (step.pages.length > 1000) throw new Error("预览仅限 1,000 页。");
           setOpened({ pages: step.pages, paint, engine });
-          onDetails(`${step.pages.length} page${step.pages.length === 1 ? "" : "s"}`);
+          onDetails(`${step.pages.length} 页`);
           break;
         }
       })

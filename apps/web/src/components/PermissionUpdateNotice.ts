@@ -55,7 +55,7 @@ function showPermissionNotice(
     },
     data: {
       actionLayout: "stacked-end",
-      secondaryActionProps: { children: "Dismiss", onClick: dismiss },
+      secondaryActionProps: { children: "关闭", onClick: dismiss },
       secondaryActionVariant: "ghost",
     },
   });

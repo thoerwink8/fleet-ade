@@ -57,9 +57,7 @@ describe("ACP Registry icon cache", () => {
       }),
     );
 
-    await expect(loadCachedAcpRegistryIcon(url)).rejects.toThrow(
-      "ACP registry icon was too large.",
-    );
+    await expect(loadCachedAcpRegistryIcon(url)).rejects.toThrow("ACP Registry 图标过大。");
     expect(put).not.toHaveBeenCalled();
   });
 

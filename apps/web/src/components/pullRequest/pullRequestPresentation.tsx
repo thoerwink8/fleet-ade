@@ -499,13 +499,13 @@ export function summarizePullRequestChecks(checks: ReadonlyArray<PullRequestChec
   const passed = checks.filter((check) => check.status === "success").length;
   if (failed > 0) return `${failed} 项检查中有 ${checks.length} 项失败`;
   if (workflowApprovalRequired > 0 && otherActionRequired > 0) {
-    return `${workflowApprovalRequired} ${workflowApprovalRequired === 1 ? "workflow" : "workflows"} and ${otherActionRequired} ${otherActionRequired === 1 ? "check" : "checks"} awaiting action`;
+    return `${workflowApprovalRequired} 个工作流和 ${otherActionRequired} 项检查等待处理`;
   }
   if (workflowApprovalRequired > 0) {
-    return `${workflowApprovalRequired} ${workflowApprovalRequired === 1 ? "workflow" : "workflows"} awaiting approval`;
+    return `${workflowApprovalRequired} 个工作流等待批准`;
   }
   if (otherActionRequired > 0) {
-    return `${otherActionRequired} ${otherActionRequired === 1 ? "check" : "checks"} awaiting action`;
+    return `${otherActionRequired} 项检查等待处理`;
   }
   if (pending > 0) return `${pending} 项检查中有 ${checks.length} 项正在运行`;
   return passed === checks.length

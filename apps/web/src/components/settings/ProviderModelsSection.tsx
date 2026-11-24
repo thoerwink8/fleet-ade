@@ -336,10 +336,8 @@ export function ProviderModelsSection({
             </Button>
           ) : null}
           <span className="text-xs text-muted-foreground">
-            {models.length} model{models.length === 1 ? "" : "s"}
-            {favoriteCount > 0
-              ? ` · ${favoriteCount} favorite${favoriteCount === 1 ? "" : "s"}`
-              : ""}
+            {models.length} 个模型
+            {favoriteCount > 0 ? ` · ${favoriteCount} 个收藏` : ""}
             {hiddenCount > 0 ? ` · ${hiddenCount} 个已隐藏` : ""}
           </span>
         </div>

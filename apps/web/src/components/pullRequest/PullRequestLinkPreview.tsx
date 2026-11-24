@@ -206,7 +206,7 @@ function LinkedComment({
           {actorLabel(subject.author)}
         </span>
         {outcome === null ? (
-          <span className="shrink-0">commented</span>
+          <span className="shrink-0">已评论</span>
         ) : (
           <PullRequestReviewOutcomeBadge outcome={outcome} className="shrink-0" />
         )}

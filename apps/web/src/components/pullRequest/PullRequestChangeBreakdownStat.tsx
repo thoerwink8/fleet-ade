@@ -9,11 +9,11 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PullRequestDiffStat } from "./pullRequestPresentation";
 
 const KIND_LABELS = {
-  code: "Code",
-  tests: "Tests",
-  mocks: "Mocks",
-  generated: "Generated",
-  docs: "Docs",
+  code: "代码",
+  tests: "测试",
+  mocks: "模拟数据",
+  generated: "生成文件",
+  docs: "文档",
 } satisfies Record<keyof NonNullable<PullRequestChangeBreakdown>, string>;
 
 type DiffTotals = { additions: number; deletions: number };

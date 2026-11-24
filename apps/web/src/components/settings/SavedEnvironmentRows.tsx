@@ -188,7 +188,7 @@ export function SavedBackendListRow({
         : "已停用"
   }${
     versionMismatch
-      ? `\nUpdate available: ${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
+      ? `\n有可用更新：${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
       : ""
   }`;
 

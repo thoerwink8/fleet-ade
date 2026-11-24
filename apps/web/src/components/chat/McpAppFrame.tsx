@@ -285,7 +285,7 @@ export function McpAppFrame(props: {
           throw new McpAppHostRefusal({ message: "此应用不能调用那个工具。" });
         if (!info.value.readOnly) {
           const approved = await ask(
-            `Allow ${app.server} to run ${info.value.title ?? name}?\n${JSON.stringify(args, null, 2)}`,
+            `允许 ${app.server} 运行 ${info.value.title ?? name}？\n${JSON.stringify(args, null, 2)}`,
             { title: "允许这个应用运行工具？", confirmLabel: "允许" },
           );
           if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
@@ -315,7 +315,7 @@ export function McpAppFrame(props: {
       sendMessage: async (text) => {
         const send = readLive().props.onSendMessage;
         if (send === undefined) throw new McpAppHostRefusal({ message: "这里没有消息。" });
-        const approved = await ask(`Send this message from ${app.server}?\n${text}`, {
+        const approved = await ask(`以 ${app.server} 的身份发送这条消息？\n${text}`, {
           title: "让这个应用代你发送消息？",
           confirmLabel: "发送",
         });
@@ -376,9 +376,9 @@ export function McpAppFrame(props: {
             if (typeof declared === "string") mimeType = declared;
           }
           if (bytes === undefined)
-            throw new McpAppHostRefusal({ message: `${file.name} has no contents.` });
+            throw new McpAppHostRefusal({ message: `${file.name} 没有内容。` });
           if (bytes.byteLength > MAX_DOWNLOAD_BYTES) {
-            throw new McpAppHostRefusal({ message: `${file.name} is too large to save.` });
+            throw new McpAppHostRefusal({ message: `${file.name} 太大，无法保存。` });
           }
           saveBlob(new Blob([bytes.slice()], { type: mimeType }), file.name);
         }
@@ -483,7 +483,7 @@ export function McpAppFrame(props: {
           <iframe
             ref={attachFrame}
             src={src}
-            title={`${app.server} app`}
+            title={`${app.server} 应用`}
             // Omitting allow-same-origin isolates the app from the session.
             sandbox="allow-scripts allow-forms"
             allow={mcpAppAllowAttribute(app.permissions)}

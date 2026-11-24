@@ -33,7 +33,7 @@ export class GhosttyRuntime {
     this.exports = instance.exports;
     const memory = instance.exports.memory;
     if (!(memory instanceof WebAssembly.Memory)) {
-      throw new Error("libghostty-vt did not export WebAssembly memory");
+      throw new Error("libghostty-vt 没有导出 WebAssembly 内存");
     }
     this.memory = memory;
     this.memoryView = new DataView(memory.buffer);
@@ -48,7 +48,7 @@ export class GhosttyRuntime {
   static async load(): Promise<GhosttyRuntime> {
     const response = await fetch(ghosttyWasmUrl);
     if (!response.ok) {
-      throw new Error(`Unable to load libghostty-vt (${response.status})`);
+      throw new Error(`无法加载 libghostty-vt（${response.status}）`);
     }
     let instance: WebAssembly.Instance | undefined;
     const imports = {
@@ -76,14 +76,14 @@ export class GhosttyRuntime {
   fn(name: string): WasmFunction {
     const fn = this.exports[name];
     if (typeof fn !== "function") {
-      throw new Error(`libghostty-vt export is unavailable: ${name}`);
+      throw new Error(`libghostty-vt 导出不可用：${name}`);
     }
     return fn as WasmFunction;
   }
 
   layout(name: string): TypeLayout {
     const layout = this.layouts[name];
-    if (!layout) throw new Error(`libghostty-vt type layout is unavailable: ${name}`);
+    if (!layout) throw new Error(`libghostty-vt 类型布局不可用：${name}`);
     return layout;
   }
 
@@ -116,7 +116,7 @@ export class GhosttyRuntime {
 
   attachPtyWriter(terminal: number, writer: (data: string) => void): number {
     if (this.writePtyFunctionIndex === 0) {
-      throw new Error("libghostty-vt PTY callback trampoline is unavailable");
+      throw new Error("libghostty-vt PTY 回调跳板不可用");
     }
     const id = this.nextPtyWriterId++;
     this.ptyWriters.set(id, writer);
@@ -159,7 +159,7 @@ export class GhosttyRuntime {
 
   setField(pointer: number, structName: string, fieldName: string, value: number): void {
     const field = this.layout(structName).fields[fieldName];
-    if (!field) throw new Error(`libghostty-vt field is unavailable: ${structName}.${fieldName}`);
+    if (!field) throw new Error(`libghostty-vt 字段不可用：${structName}.${fieldName}`);
     const view = this.memoryDataView();
     const offset = pointer + field.offset;
     switch (field.type) {
@@ -181,13 +181,13 @@ export class GhosttyRuntime {
         view.setBigUint64(offset, BigInt(value), true);
         return;
       default:
-        throw new Error(`Unsupported libghostty-vt field type: ${field.type}`);
+        throw new Error(`不支持的 libghostty-vt 字段类型：${field.type}`);
     }
   }
 
   readField(pointer: number, structName: string, fieldName: string): number {
     const field = this.layout(structName).fields[fieldName];
-    if (!field) throw new Error(`libghostty-vt field is unavailable: ${structName}.${fieldName}`);
+    if (!field) throw new Error(`libghostty-vt 字段不可用：${structName}.${fieldName}`);
     const view = this.memoryDataView();
     const offset = pointer + field.offset;
     switch (field.type) {
@@ -204,14 +204,14 @@ export class GhosttyRuntime {
       case "u64":
         return Number(view.getBigUint64(offset, true));
       default:
-        throw new Error(`Unsupported libghostty-vt field type: ${field.type}`);
+        throw new Error(`不支持的 libghostty-vt 字段类型：${field.type}`);
     }
   }
 
   private async installWritePtyTrampoline(): Promise<void> {
     const response = await fetch(ghosttyWritePtyWasmUrl);
     if (!response.ok) {
-      throw new Error(`Unable to load the libghostty-vt PTY trampoline (${response.status})`);
+      throw new Error(`无法加载 libghostty-vt PTY 跳板（${response.status}）`);
     }
     const result = await WebAssembly.instantiate(await response.arrayBuffer(), {
       env: {

@@ -13,7 +13,7 @@ export function PullRequestStackHeader({
   return (
     <MenuGroupLabel>
       <div className="flex items-center justify-between gap-2">
-        <span>Stack #{number}</span>
+        <span>堆叠 #{number}</span>
         {notice ? (
           <Tooltip>
             <TooltipTrigger render={<span role="status" className="text-xs font-normal" />}>

@@ -305,7 +305,7 @@ describe("bounded binary previews", () => {
         await act(() => trigger.focus());
         await userEvent.keyboard("{Enter}");
         await expect
-          .element(page.getByRole("option", { name: "zzInventory (1 rows)" }))
+          .element(page.getByRole("option", { name: "zzInventory（1 行）" }))
           .toBeVisible();
         await userEvent.keyboard("{ArrowDown}{Enter}");
         await vi.waitFor(() =>
@@ -316,7 +316,7 @@ describe("bounded binary previews", () => {
         await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
         await userEvent.keyboard("{Enter}");
         await expect
-          .element(page.getByRole("option", { name: "zzInventory (1 rows)" }))
+          .element(page.getByRole("option", { name: "zzInventory（1 行）" }))
           .toBeVisible();
         await userEvent.keyboard("{Escape}");
       } finally {
@@ -897,7 +897,7 @@ describe("large text preview recovery", () => {
       <LargeTextViewer name="log.txt" text={"bad\0text"} delimiter={null} />,
     );
     await vi.waitFor(
-      () => expect(screen.container.textContent).toContain("This file contains binary data."),
+      () => expect(screen.container.textContent).toContain("这个文件包含二进制数据。"),
       10_000,
     );
     await screen.rerender(<LargeTextViewer name="log.txt" text="" delimiter={null} />);
@@ -1237,7 +1237,7 @@ it("refreshes authorization and retries a failed streamed attachment", async () 
     );
     // A cold large-text worker can take longer than waitFor's default to boot on CI.
     await vi.waitFor(
-      () => expect(screen.container.textContent).toContain("This file contains binary data."),
+      () => expect(screen.container.textContent).toContain("这个文件包含二进制数据。"),
       { timeout: 10_000 },
     );
     await act(() =>
@@ -1298,7 +1298,7 @@ it("copies every indexed line rather than the mounted preview rows", async () =>
     timeout: 10_000,
   });
   const first = copyContents.current!();
-  await expect(copyContents.current!()).rejects.toThrow("Another copy is in progress.");
+  await expect(copyContents.current!()).rejects.toThrow("另一个复制正在进行中。");
   expect(await first).toBe(text);
   expect(await copyContents.current!()).toBe(text);
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
@@ -1957,12 +1957,10 @@ it.each([
       }),
   );
   using _fetch = stubGlobal("fetch", fetchAsset);
-  await expect(factory.fetch({ kind, filename })).rejects.toThrow(
-    `PDF ${directory} asset unavailable.`,
-  );
+  await expect(factory.fetch({ kind, filename })).rejects.toThrow(`PDF ${directory} 资源不可用。`);
   fetchAsset.mockImplementation(async () => new Response(new Uint8Array([1, 2, 3])));
   await expect(factory.fetch({ kind, filename })).resolves.toEqual(new Uint8Array([1, 2, 3]));
   await expect(factory.fetch({ kind, filename: "missing" })).rejects.toThrow(
-    `Unsupported PDF ${directory} asset.`,
+    `不支持的 PDF ${directory} 资源。`,
   );
 });

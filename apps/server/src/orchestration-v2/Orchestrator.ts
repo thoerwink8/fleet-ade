@@ -35,6 +35,7 @@ import {
   type OrchestrationV2InternalCommand,
   type OrchestrationV2LimitRecoveryUpdate,
   type OrchestrationV2Notification,
+  OrchestrationV2RollbackFailureCode,
   type OrchestrationV2ServerCommand,
   type ThreadPullRequestLink,
   type ThreadPullRequestWatch,
@@ -201,6 +202,7 @@ export class OrchestratorDispatchError extends Schema.TaggedError<OrchestratorDi
   {
     commandId: CommandId,
     commandType: Schema.String,
+    code: Schema.optional(OrchestrationV2RollbackFailureCode),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
@@ -13469,6 +13471,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
+          code: "rollback-failed",
           cause: "No active provider thread exists for rollback.",
         });
       }
@@ -13476,6 +13479,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
+          code: "rollback-failed",
           cause: `Provider thread ${providerThread.id} has no provider session.`,
         });
       }
@@ -13508,6 +13512,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
+          code: "checkpoint-unavailable",
           cause: `Checkpoint ${command.checkpointId} was not found.`,
         });
       }
@@ -13519,6 +13524,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
+          code: "checkpoint-unavailable",
           cause: `Checkpoint ${command.checkpointId} is ${targetCheckpoint.status} and cannot be restored.`,
         });
       }
@@ -13529,6 +13535,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
+          code: "checkpoint-unavailable",
           cause: `Checkpoint scope ${targetCheckpoint.scopeId} was not found.`,
         });
       }
@@ -13536,6 +13543,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
+          code: "checkpoint-unavailable",
           cause: `Checkpoint ${command.checkpointId} belongs to scope ${targetScope.id}, not ${command.scopeId}.`,
         });
       }
@@ -13551,6 +13559,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               new OrchestratorDispatchError({
                 commandId: command.commandId,
                 commandType: command.type,
+                code: "rollback-failed",
                 cause,
               }),
           ),
@@ -13559,6 +13568,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return yield* new OrchestratorDispatchError({
             commandId: command.commandId,
             commandType: command.type,
+            code: "shared-workspace",
             cause: SHARED_WORKSPACE_RESTORE_MESSAGE,
           });
       }
@@ -13576,6 +13586,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return yield* new OrchestratorDispatchError({
             commandId: command.commandId,
             commandType: command.type,
+            code: "rollback-failed",
             cause: `Cannot roll back to checkpoint ${targetCheckpoint.id}: its provider turn is unavailable.`,
           });
         }
@@ -13583,6 +13594,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return yield* new OrchestratorDispatchError({
             commandId: command.commandId,
             commandType: command.type,
+            code: "rollback-failed",
             cause: `Cannot roll back provider thread ${providerThread.id} to checkpoint ${targetCheckpoint.id}: target provider turn ${targetProviderTurn.id} belongs to provider thread ${targetProviderTurn.providerThreadId}.`,
           });
         }
@@ -13666,7 +13678,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         occurredAt: now,
         payload: {
           ...thread,
-          rollbackFailure: { requestId: command.requestId, message: command.message },
+          rollbackFailure: {
+            requestId: command.requestId,
+            message: command.message,
+            ...(command.code === undefined ? {} : { code: command.code }),
+          },
           updatedAt: now,
         },
       });

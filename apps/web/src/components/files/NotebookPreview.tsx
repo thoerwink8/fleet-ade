@@ -98,9 +98,9 @@ export default function NotebookPreview(props: {
         className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
         role="status"
       >
-        {props.notebook.cells.length.toLocaleString("zh-CN")} cells · {props.notebook.language}
+        {props.notebook.cells.length.toLocaleString("zh-CN")} 个单元格 · {props.notebook.language}
         {props.sizeBytes !== undefined
-          ? ` · ${props.sizeBytes === 0 ? "0 bytes" : formatAttachmentSize(props.sizeBytes)}`
+          ? ` · ${props.sizeBytes === 0 ? "0 字节" : formatAttachmentSize(props.sizeBytes)}`
           : ""}
       </div>
       <FileSurfaceNotice>仅显示已保存的输出，不会执行代码。</FileSurfaceNotice>

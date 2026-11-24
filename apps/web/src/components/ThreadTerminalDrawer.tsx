@@ -1032,7 +1032,7 @@ function TerminalSessionViewport({
         setupTerminal = null;
         if (cancelled) return;
         const message = error instanceof Error ? error.message : "无法初始化 libghostty-vt";
-        mount.textContent = `${message}. Close and reopen the terminal to retry.`;
+        mount.textContent = `${message}。关闭后重新打开终端重试。`;
       });
 
     return () => {
@@ -1271,7 +1271,7 @@ function TerminalSidebarGroup({
   const groupLabel = !isSplitGroup
     ? "单栏"
     : terminalGroup.splitDirection === "vertical"
-      ? "Stacked"
+      ? "堆叠"
       : "并排";
   const GroupIcon = !isSplitGroup
     ? Square

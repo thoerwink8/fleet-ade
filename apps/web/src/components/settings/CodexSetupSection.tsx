@@ -610,13 +610,13 @@ function ManagedCodexSetup({
 
   const runtimeDescription =
     installation?.phase === "downloading"
-      ? `Downloading ${(installation.downloadedBytes / 1_000_000).toFixed(1)}${installation.totalBytes === null ? "" : ` of ${(installation.totalBytes / 1_000_000).toFixed(1)}`} MB.`
+      ? `正在下载 ${(installation.downloadedBytes / 1_000_000).toFixed(1)}${installation.totalBytes === null ? "" : ` / ${(installation.totalBytes / 1_000_000).toFixed(1)}`} MB。`
       : installation?.phase === "extracting"
         ? "正在安装 Codex。"
         : installation?.phase === "verifying"
           ? "正在检查 Codex。"
           : installed
-            ? `${installation?.source === "local" ? "Using your installed Codex" : "Managed by Fleet ADE"}${installation?.installedVersion ? ` · v${installation.installedVersion}` : ""}.`
+            ? `${installation?.source === "local" ? "使用你安装的 Codex" : "由 Fleet ADE 管理"}${installation?.installedVersion ? ` · v${installation.installedVersion}` : ""}。`
             : (installation?.message ?? "Fleet ADE 会为你下载和管理 Codex。");
   const accountDescription = finishingSignIn ? (
     "正在完成登录…"

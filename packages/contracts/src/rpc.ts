@@ -203,6 +203,7 @@ import {
 import {
   ORCHESTRATION_V2_WS_METHODS,
   OrchestrationGetWorkflowScriptError,
+  OrchestrationV2CheckCheckpointRestoreError,
   OrchestrationV2GetNativeChildWorkError,
   OrchestrationV2StopWorkflowError,
   OrchestrationV2ForceStopThreadError,
@@ -1587,6 +1588,18 @@ const WsOrchestrationV2GetTurnItemRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.get
   error: Schema.Union([OrchestrationV2GetThreadProjectionError, EnvironmentAuthorizationError]),
 });
 
+const WsOrchestrationV2CheckCheckpointRestoreRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.checkCheckpointRestore,
+  {
+    payload: OrchestrationV2RpcSchemas.checkCheckpointRestore.input,
+    success: OrchestrationV2RpcSchemas.checkCheckpointRestore.output,
+    error: Schema.Union([
+      OrchestrationV2CheckCheckpointRestoreError,
+      EnvironmentAuthorizationError,
+    ]),
+  },
+);
+
 const WsOrchestrationV2LaunchThreadRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.launchThread, {
   payload: OrchestrationV2RpcSchemas.launchThread.input,
   success: OrchestrationV2RpcSchemas.launchThread.output,
@@ -1958,6 +1971,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2StopWorkflowRpc,
   WsOrchestrationV2ForceStopThreadRpc,
   WsOrchestrationV2GetTurnItemRpc,
+  WsOrchestrationV2CheckCheckpointRestoreRpc,
   WsOrchestrationV2GetTurnDiffRpc,
   WsOrchestrationV2GetFullThreadDiffRpc,
   WsOrchestrationV2SearchThreadsRpc,

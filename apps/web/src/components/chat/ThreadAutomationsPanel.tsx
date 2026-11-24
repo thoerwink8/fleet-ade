@@ -44,13 +44,13 @@ function taskScheduleLine(task: ScheduledTask, timeZone: string | undefined) {
       {scheduleLabel(task.schedule, timeZone, task.nextRunAt)}
       {task.enabled && task.nextRunAt !== null ? (
         <>
-          {" · next "}
+          {" · 下一次 "}
           <ScheduledRelativeLabel value={task.nextRunAt} />
         </>
       ) : task.enabled ? (
         ""
       ) : (
-        " · paused"
+        " · 已暂停"
       )}
     </>
   );

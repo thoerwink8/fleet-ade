@@ -73,7 +73,7 @@ export function useProjectGroupUpdate() {
       if (result._tag === "Failure") {
         reportProjectFailure(
           members.length > 1
-            ? `${failureTitle} 上的 ${member.environmentLabel ?? "the current environment"}`
+            ? `${member.environmentLabel ?? "当前电脑"}：${failureTitle}`
             : failureTitle,
           result,
         );

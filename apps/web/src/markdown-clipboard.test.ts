@@ -226,7 +226,7 @@ describe("serializeRenderedMarkdownFragment", () => {
       new FakeElement("P").append(new FakeText("Caches are warm.")),
     );
     expect(serializeRenderedMarkdownFragment(asNode(new FakeElement("DIV").append(insight)))).toBe(
-      `★ Insight ${"─".repeat(37)}\nCaches are warm.\n${"─".repeat(49)}`,
+      `★ 洞察 ${"─".repeat(37)}\nCaches are warm.\n${"─".repeat(49)}`,
     );
   });
 
