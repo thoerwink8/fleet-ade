@@ -61,7 +61,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     }
   });
 
-  yield* emitEvent({
+  yield* emitEvent<Extract<OrchestrationV2DomainEvent, { readonly type: "thread.deleted" }>>({
     type: "thread.deleted",
     threadId: command.threadId,
     providerInstanceId: projection.thread.providerInstanceId,
