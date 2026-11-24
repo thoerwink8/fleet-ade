@@ -1,4 +1,5 @@
 import { assert, it, vi } from "@effect/vitest";
+import type { OrchestrationV2CheckpointScope } from "@t3tools/contracts";
 import {
   CheckpointId,
   CheckpointRef,
@@ -15,6 +16,7 @@ import {
   TurnItemId,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
@@ -1044,4 +1046,663 @@ it.effect(
       );
       assert.isNull(failed.thread.pendingRollback);
     }).pipe(Effect.provide(layerTest)),
+);
+
+const promoteRunToRunning = Effect.fn("promoteRunToRunning")(function* (
+  threadId: ThreadId,
+  prefix: string,
+) {
+  const eventSink = yield* EventSink.EventSinkV2;
+  const orchestrator = yield* Orchestrator.OrchestratorV2;
+  const before = yield* orchestrator.getThreadProjection(threadId);
+  const run = before.runs.find((candidate) => candidate.status !== "queued")!;
+  const attempt = before.attempts.find((candidate) => candidate.id === run.activeAttemptId)!;
+  const now = yield* DateTime.now;
+  yield* eventSink.write({
+    commandId: CommandId.make(`${prefix}:running`),
+    events: [
+      {
+        id: EventId.make(`${prefix}:running-run`),
+        type: "run.updated",
+        threadId,
+        runId: run.id,
+        occurredAt: now,
+        payload: { ...run, status: "running", startedAt: now },
+      },
+      {
+        id: EventId.make(`${prefix}:running-attempt`),
+        type: "run-attempt.updated",
+        threadId,
+        runId: run.id,
+        occurredAt: now,
+        payload: { ...attempt, status: "running", startedAt: now },
+      },
+      {
+        id: EventId.make(`${prefix}:running-turn`),
+        type: "provider-turn.updated",
+        threadId,
+        runId: run.id,
+        occurredAt: now,
+        payload: {
+          id: ProviderTurnId.make(`${prefix}:turn`),
+          providerThreadId: run.providerThreadId!,
+          nodeId: run.rootNodeId!,
+          runAttemptId: run.activeAttemptId,
+          nativeTurnRef: null,
+          ordinal: run.ordinal,
+          status: "running",
+          startedAt: now,
+          completedAt: null,
+        },
+      },
+    ],
+  });
+  return { run, attempt };
+});
+
+const seedCheckpoint = (
+  threadId: ThreadId,
+  scope: OrchestrationV2CheckpointScope,
+  name: string,
+  status: "ready" | "missing",
+) =>
+  Effect.gen(function* () {
+    const eventSink = yield* EventSink.EventSinkV2;
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make(`${name}:checkpoint-seed`),
+      events: [
+        {
+          id: EventId.make(`${name}:checkpoint`),
+          type: "checkpoint.captured",
+          threadId,
+          occurredAt: now,
+          payload: {
+            id: CheckpointId.make(`checkpoint:${name}`),
+            threadId,
+            scopeId: scope.id,
+            runId: null,
+            nodeId: scope.nodeId,
+            parentCheckpointId: null,
+            ordinalWithinScope: 0,
+            appRunOrdinal: null,
+            ref: CheckpointRef.make(`refs/t3/${name}`),
+            status,
+            files: [],
+            capturedAt: now,
+          },
+        },
+      ],
+    });
+    return CheckpointId.make(`checkpoint:${name}`);
+  });
+
+const mockRollbackSuccess = Effect.gen(function* () {
+  const sessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
+  const open = vi.spyOn(sessions, "open").mockReturnValue(
+    Effect.succeed({
+      rollbackThread: ({ providerThread }: ProviderAdapter.ProviderAdapterV2RollbackThreadInput) =>
+        Effect.succeed({ providerThread }),
+    } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime),
+  );
+  yield* Effect.addFinalizer(() => Effect.sync(() => open.mockRestore()));
+  return open;
+});
+
+const rollbackEffectCount = (threadId: ThreadId) =>
+  Effect.map(
+    effectTypes(threadId),
+    (rows) =>
+      rows.filter(
+        (row) =>
+          row === "provider-thread.rollback:pending" ||
+          row === "provider-thread.rollback:succeeded",
+      ).length,
+  );
+
+it.effect("a thread deleted while a rewind is pending is left alone, even after restart", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const threadId = ThreadId.make("thread:stop-rewind-delete");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    yield* promoteRunToRunning(threadId, "stop-rewind-delete");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-delete"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    assert.isNotNull((yield* orchestrator.getThreadProjection(threadId)).thread.pendingRollback);
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("delete-while-pending"),
+      threadId,
+    });
+    const deleted = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNotNull(deleted.thread.deletedAt);
+    assert.isNull(deleted.thread.pendingRollback);
+    yield* worker.drain();
+    // A deleted thread must not be rolled back or touched again by startup recovery.
+    assert.equal(yield* orchestrator.resumePendingRollbacks, 0);
+    yield* worker.drain();
+    assert.equal(yield* rollbackEffectCount(threadId), 0);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("a pending rewind survives archive and unarchive and still completes", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const reactor = yield* PendingRollbackReactor.PendingRollbackReactor;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-archive");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    yield* promoteRunToRunning(threadId, "stop-rewind-archive");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-archive"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.archive",
+      commandId: CommandId.make("archive-while-pending"),
+      threadId,
+    });
+    let projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNotNull(projection.thread.archivedAt);
+    assert.isNotNull(projection.thread.pendingRollback);
+    yield* orchestrator.dispatch({
+      type: "thread.unarchive",
+      commandId: CommandId.make("unarchive-while-pending"),
+      threadId,
+    });
+    projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.archivedAt);
+    assert.isNotNull(projection.thread.pendingRollback);
+    yield* worker.drain();
+    const captured = yield* eventSink
+      .readByCommandId({
+        commandId: CommandId.make(`command:effect:checkpoint.capture:${projection.runs[0]!.id}`),
+      })
+      .pipe(Stream.runCollect);
+    const checkpointEvent = captured.find((stored) => stored.event.type === "checkpoint.captured");
+    if (checkpointEvent !== undefined) yield* reactor.handle(checkpointEvent);
+    yield* worker.drain();
+    projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    assert.isNotNull(projection.thread.rollbackCompletedRequestId ?? null);
+    assert.ok(projection.runs.some((candidate) => candidate.status === "rolled_back"));
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("a plain checkpoint.rollback while a rewind is pending is refused once", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const reactor = yield* PendingRollbackReactor.PendingRollbackReactor;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-double");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-double");
+    const started = yield* orchestrator.getThreadProjection(threadId);
+    const scope = started.checkpointScopes[0]!;
+    const checkpointId = yield* seedCheckpoint(threadId, scope, "double", "ready");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-double"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    const direct = yield* orchestrator
+      .dispatch({
+        type: "checkpoint.rollback",
+        commandId: CommandId.make("direct-rollback-while-pending"),
+        threadId,
+        scopeId: scope.id,
+        checkpointId,
+        restoreFiles: false,
+      })
+      .pipe(Effect.flip);
+    assert.equal(direct._tag, "OrchestratorRollbackRejectedError");
+    if (direct._tag === "OrchestratorRollbackRejectedError") {
+      assert.equal(direct.code, "rollback-already-pending");
+    }
+    const pending = yield* orchestrator.getThreadProjection(threadId);
+    assert.equal(pending.thread.pendingRollback?.requestId, CommandId.make("stop-rewind-double"));
+    yield* worker.drain();
+    const captured = yield* eventSink
+      .readByCommandId({
+        commandId: CommandId.make(`command:effect:checkpoint.capture:${run.id}`),
+      })
+      .pipe(Stream.runCollect);
+    const checkpointEvent = captured.find((stored) => stored.event.type === "checkpoint.captured");
+    if (checkpointEvent !== undefined) yield* reactor.handle(checkpointEvent);
+    yield* worker.drain();
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    // Exactly one rewind ran: the pending one, not the refused direct command.
+    assert.equal(yield* rollbackEffectCount(threadId), 1);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("a queued run stays held while the rewind is pending and after it completes", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const reactor = yield* PendingRollbackReactor.PendingRollbackReactor;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-queue");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    yield* orchestrator.dispatch({
+      type: "message.dispatch",
+      commandId: CommandId.make("send:stop-rewind-queue:held"),
+      threadId,
+      messageId: MessageId.make("message:stop-rewind-queue:held"),
+      text: "held",
+      attachments: [],
+      dispatchMode: { type: "queue_after_active" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    yield* promoteRunToRunning(threadId, "stop-rewind-queue");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-queue"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    let projection = yield* orchestrator.getThreadProjection(threadId);
+    const queued = projection.runs.find((candidate) => candidate.status === "queued");
+    assert.equal(queued?.queueHeld, true);
+    const run = projection.runs.find((candidate) => candidate.status !== "queued")!;
+    yield* worker.drain();
+    projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.equal(
+      projection.runs.find((candidate) => candidate.status === "queued")?.queueHeld,
+      true,
+    );
+    const captured = yield* eventSink
+      .readByCommandId({
+        commandId: CommandId.make(`command:effect:checkpoint.capture:${run.id}`),
+      })
+      .pipe(Stream.runCollect);
+    const checkpointEvent = captured.find((stored) => stored.event.type === "checkpoint.captured");
+    if (checkpointEvent !== undefined) yield* reactor.handle(checkpointEvent);
+    yield* worker.drain();
+    projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    // Same as an idle rewind: the held queue entry stays queued for later.
+    assert.equal(
+      projection.runs.find((candidate) => candidate.status === "queued")?.queueHeld,
+      true,
+    );
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("the reactor's live subscription resumes and completes the rewind", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const reactor = yield* PendingRollbackReactor.PendingRollbackReactor;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-live");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-live"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    const rollbackRequested = yield* Deferred.make<void>();
+    yield* Stream.runForEach(orchestrator.streamLiveStoredEvents, (stored) =>
+      stored.event.type === "checkpoint.rollback-requested" && stored.event.threadId === threadId
+        ? Deferred.succeed(rollbackRequested, void 0)
+        : Effect.void,
+    ).pipe(Effect.ignoreCause, Effect.forkScoped({ startImmediately: true }));
+    yield* reactor.start();
+    const projection0 = yield* orchestrator.getThreadProjection(threadId);
+    const run = projection0.runs[0]!;
+    const scope = projection0.checkpointScopes[0]!;
+    yield* seedCheckpoint(threadId, scope, "live", "ready");
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("live-settle"),
+      events: [
+        {
+          id: EventId.make("live-settle-run"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    yield* worker.drain();
+    // The reactor dispatches the resume from the captured checkpoint's real subscription event.
+    yield* Deferred.await(rollbackRequested);
+    yield* worker.drain();
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    assert.equal(projection.thread.rollbackCompletedRequestId, CommandId.make("stop-rewind-live"));
+  }).pipe(Effect.scoped, Effect.provide(layerTest)),
+);
+
+it.effect("two restarts during a pending rewind still roll back exactly once", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-twice");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-twice");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-twice"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    // Restart 1: run still active, so the resume no-ops and pending stays.
+    yield* orchestrator.resumePendingRollbacks;
+    assert.isNotNull((yield* orchestrator.getThreadProjection(threadId)).thread.pendingRollback);
+    // Restart 2: still not settled, pending survives another sweep.
+    yield* orchestrator.resumePendingRollbacks;
+    assert.isNotNull((yield* orchestrator.getThreadProjection(threadId)).thread.pendingRollback);
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("twice-settle"),
+      events: [
+        {
+          id: EventId.make("twice-settle-run"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    yield* worker.drain();
+    const resumed = yield* orchestrator.resumePendingRollbacks;
+    assert.equal(resumed, 1);
+    yield* worker.drain();
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    assert.equal(yield* rollbackEffectCount(threadId), 1);
+    assert.equal(yield* orchestrator.resumePendingRollbacks, 0);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("cancel before settle prevents the rewind entirely", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const threadId = ThreadId.make("thread:stop-rewind-cancel-first");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-cancel-first");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-cancel-first"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.pending-rollback.cancel",
+      commandId: CommandId.make("cancel-before-settle"),
+      threadId,
+    });
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("cancel-settle"),
+      events: [
+        {
+          id: EventId.make("cancel-settle-run"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback.resume",
+      commandId: CommandId.make("resume-after-cancel"),
+      threadId,
+      requestId: CommandId.make("stop-rewind-cancel-first"),
+    });
+    yield* worker.drain();
+    assert.equal(yield* rollbackEffectCount(threadId), 0);
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.rollbackCompletedRequestId ?? null);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("resume before cancel finishes the rewind and the cancel is a harmless no-op", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-resume-first");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-resume-first");
+    const started = yield* orchestrator.getThreadProjection(threadId);
+    const scope = started.checkpointScopes[0]!;
+    yield* seedCheckpoint(threadId, scope, "resume-first", "ready");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-resume-first"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("resume-settle"),
+      events: [
+        {
+          id: EventId.make("resume-settle-run"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback.resume",
+      commandId: CommandId.make("resume-before-cancel"),
+      threadId,
+      requestId: CommandId.make("stop-rewind-resume-first"),
+    });
+    yield* worker.drain();
+    yield* orchestrator.dispatch({
+      type: "thread.pending-rollback.cancel",
+      commandId: CommandId.make("cancel-after-resume"),
+      threadId,
+    });
+    yield* worker.drain();
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    assert.equal(
+      projection.thread.rollbackCompletedRequestId,
+      CommandId.make("stop-rewind-resume-first"),
+    );
+    assert.equal(yield* rollbackEffectCount(threadId), 1);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("a provider turn still active fails retryable and clears the pending rewind", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    const sessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
+    const open = vi.spyOn(sessions, "open").mockReturnValue(
+      Effect.succeed({
+        rollbackThread: ({
+          providerThread,
+        }: ProviderAdapter.ProviderAdapterV2RollbackThreadInput) =>
+          Effect.fail(
+            new ProviderAdapter.ProviderAdapterRollbackThreadError({
+              driver,
+              providerThreadId: providerThread.id,
+              cause: new ProviderAdapter.ProviderAdapterProtocolError({
+                driver,
+                detail: "Cannot roll back while the turn is active",
+                reason: "previous_turn_active",
+              }),
+            }),
+          ),
+      } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime),
+    );
+    yield* Effect.addFinalizer(() => Effect.sync(() => open.mockRestore()));
+    const threadId = ThreadId.make("thread:stop-rewind-provider-active");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-provider-active");
+    const started = yield* orchestrator.getThreadProjection(threadId);
+    const scope = started.checkpointScopes[0]!;
+    yield* seedCheckpoint(threadId, scope, "provider-active", "ready");
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("provider-active-seed"),
+      events: [
+        {
+          id: EventId.make("provider-active-settle"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+        {
+          id: EventId.make("provider-active-pending"),
+          type: "thread.metadata-updated",
+          threadId,
+          occurredAt: now,
+          payload: {
+            ...started.thread,
+            pendingRollback: {
+              requestId: CommandId.make("stop-rewind-provider-active"),
+              turnCount: 0,
+              restoreFiles: false,
+              requestedAt: now,
+            },
+            rollbackRequestId: CommandId.make("stop-rewind-provider-active"),
+            rollbackFailure: null,
+            updatedAt: now,
+          },
+        },
+      ],
+    });
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback.resume",
+      commandId: CommandId.make("resume-provider-active"),
+      threadId,
+      requestId: CommandId.make("stop-rewind-provider-active"),
+    });
+    for (let attempt = 0; attempt < 5; attempt++) {
+      yield* worker.drain();
+      yield* TestClock.adjust("30 seconds");
+    }
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.equal(projection.thread.rollbackFailure?.code, "provider-turn-active");
+    assert.isNull(projection.thread.pendingRollback);
+    // Clearing pending means a retry command is accepted instead of staying blocked.
+    const retryId = CommandId.make("stop-rewind-provider-retry");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: retryId,
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    assert.equal(
+      (yield* orchestrator.getThreadProjection(threadId)).thread.rollbackRequestId,
+      retryId,
+    );
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("an idle rewind records the client's command id and one metadata event", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:idle-rewind-receipt");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const started = yield* orchestrator.getThreadProjection(threadId);
+    const run = started.runs[0]!;
+    const scope = started.checkpointScopes[0]!;
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("idle-receipt-seed"),
+      events: [
+        {
+          id: EventId.make("idle-receipt-settle"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    const checkpointId = yield* seedCheckpoint(threadId, scope, "idle-receipt", "ready");
+    const beforeRollback = yield* eventSink.latestSequence({ threadId });
+    const commandId = CommandId.make("idle-rewind-receipt");
+    yield* orchestrator.dispatch({
+      type: "checkpoint.rollback",
+      commandId,
+      threadId,
+      scopeId: scope.id,
+      checkpointId,
+      restoreFiles: false,
+    });
+    yield* worker.drain();
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    // The client waits on the id it sent, so completion is recorded under it.
+    assert.equal(projection.thread.rollbackCompletedRequestId, commandId);
+    const events = yield* eventSink.stream({ threadId, afterSequence: beforeRollback }).pipe(
+      Stream.take(6),
+      Stream.map((stored) => stored.event.type),
+      Stream.runCollect,
+    );
+    assert.deepEqual(Array.from(events), [
+      "thread.metadata-updated",
+      "checkpoint.rollback-requested",
+      "thread.metadata-updated",
+      "provider-thread.updated",
+      "run.updated",
+      "node.updated",
+    ]);
+  }).pipe(Effect.provide(layerTest)),
 );
