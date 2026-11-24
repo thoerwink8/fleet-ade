@@ -188,7 +188,6 @@ describe("standard painted theme colors", () => {
             ["--fa-border", colors.border],
             ["--fa-accent", colors.messageAction],
             ["--fa-on-accent", colors.messageActionForeground],
-            ["--fa-danger", colors.error],
             ["--fa-focus-ring", colors.focus],
           ];
           for (const [variable, expectedColor] of expectedVariables) {

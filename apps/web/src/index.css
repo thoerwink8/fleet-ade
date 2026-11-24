@@ -1183,6 +1183,20 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
 }
 
+/* --error is a fill. @fleet/design's --fa-danger is that fill and the label, and
+   --fa-on-danger is the page. Mix the text-safe foreground so both jobs clear
+   4.5:1 on the page and the overlay; the library should split fill from label. */
+html[data-theme-id="grove"]:not([data-theme-id=""]),
+html[data-theme-id="ember"]:not([data-theme-id=""]) {
+  --fa-danger: color-mix(in srgb, var(--error-foreground) 88%, black);
+  --fa-on-danger: var(--fa-bg);
+}
+
+html[data-theme="dark"][data-theme-id="grove"]:not([data-theme-id=""]),
+html[data-theme="dark"][data-theme-id="ember"]:not([data-theme-id=""]) {
+  --fa-danger: color-mix(in srgb, var(--error-foreground) 40%, white);
+}
+
 /* Workspace actions use a small, separate chrome hierarchy. Keeping these
    roles explicit prevents the thread toolbar from falling back to the default
    dark-mode whites while preserving the same theme file across clients. */

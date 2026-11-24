@@ -17,7 +17,13 @@
 }
 
 /* Grove and Ember define --error for fills; their toast surface is lighter than the page,
-   so the error icon uses the palette's foreground variant to stay legible. */
+   so the error icon uses the text-safe danger token (the palette foreground is still
+   short of 4.5:1 on the dark overlay). */
 html[data-theme-id]:not([data-theme-id=""]) .fa-toast .m-danger {
   color: var(--error-foreground);
+}
+
+html[data-theme-id="grove"]:not([data-theme-id=""]) .fa-toast .m-danger,
+html[data-theme-id="ember"]:not([data-theme-id=""]) .fa-toast .m-danger {
+  color: var(--fa-danger);
 }
