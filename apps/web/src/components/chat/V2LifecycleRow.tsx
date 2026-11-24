@@ -172,12 +172,12 @@ const STATUS_VISUALS: Record<
   OrchestrationV2TurnItem["status"],
   { dotClass: string; label: string }
 > = {
-  pending: { dotClass: "bg-info", label: "排队中" },
-  running: { dotClass: "bg-info", label: "正在运行" },
+  pending: { dotClass: "bg-info", label: "等空位" },
+  running: { dotClass: "bg-info", label: "运行中" },
   waiting: { dotClass: "bg-info", label: "等待中" },
   idle: { dotClass: "bg-muted-foreground/50", label: "空闲 · 可继续" },
   completed: { dotClass: "bg-success", label: "已完成" },
-  failed: { dotClass: "bg-destructive", label: "失败" },
+  failed: { dotClass: "bg-destructive", label: "出错了" },
   cancelled: { dotClass: "bg-muted-foreground/60", label: "已停止" },
   interrupted: { dotClass: "bg-muted-foreground/60", label: "已停止" },
 };
@@ -336,7 +336,7 @@ const NOTIFICATION_OUTCOME_STATUS: Record<
 
 const NOTIFICATION_OUTCOME_LABEL: Record<OrchestrationV2Notification["outcome"], string> = {
   completed: "已完成",
-  failed: "失败",
+  failed: "出错了",
   cancelled: "已停止",
   updated: "已更新",
   unknown: "已完成",

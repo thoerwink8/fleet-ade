@@ -528,12 +528,12 @@ function SurfaceIcon({
 function sideChatTabState(shell: EnvironmentThreadShell | null) {
   if (shell === null) return null;
   if (shell.hasPendingApprovals || shell.pendingSubagentRequest === "approval") {
-    return "待批准";
+    return "等你批准";
   }
   if (shell.hasPendingUserInput || shell.pendingSubagentRequest === "user_input") {
-    return "待输入";
+    return "等你回答";
   }
-  return threadRuntimeIsActive(shell.runtime) ? "running" : null;
+  return threadRuntimeIsActive(shell.runtime) ? "运行中" : null;
 }
 
 // Static dots: a side chat tab can stay open for a whole run.
@@ -550,7 +550,7 @@ function SideChatTabIcon(props: { environmentId: EnvironmentId | null; threadId:
         <span
           className={cn(
             "absolute -top-0.5 -right-0.5 size-1.5 rounded-full",
-            state === "running" ? "bg-muted-foreground" : "bg-info",
+            state === "运行中" ? "bg-muted-foreground" : "bg-info",
           )}
           aria-hidden
         />

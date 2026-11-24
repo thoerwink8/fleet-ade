@@ -20,7 +20,8 @@ function describeUnavailableInstance(entry: ProviderInstanceEntry): string {
   if (entry.status === "ready" && entry.isAvailable) {
     return label;
   }
-  const kind = entry.status === "error" ? "不可用" : entry.status === "warning" ? "受限" : "未就绪";
+  const kind =
+    entry.status === "error" ? "不可用" : entry.status === "warning" ? "部分可用" : "未就绪";
   const msg = entry.snapshot.message?.trim();
   return msg ? `${label}：${kind}。${msg}` : `${label}：${kind}。`;
 }

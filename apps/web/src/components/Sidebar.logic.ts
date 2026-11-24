@@ -766,12 +766,12 @@ export function buildBulkUnpinContextMenuItem(input: {
 
 export interface ThreadStatusPill {
   label:
-    | "失败"
-    | "已完成"
-    | "待批准"
-    | "待输入"
+    | "出错了"
+    | "有新结果"
+    | "等你批准"
+    | "等你回答"
     | "正在连接"
-    | "排队"
+    | "等空位"
     | "等待中"
     | "计划已就绪"
     | "运行中";
@@ -1041,13 +1041,13 @@ export function isThreadAttentionDismissible(input: {
 function threadAttentionActionText(category: ThreadAttentionCategory): string {
   switch (category) {
     case "approval":
-      return "等待批准，点开处理";
+      return "等你批准，点开处理";
     case "input":
-      return "等待你的回答，点开处理";
+      return "等你回答，点开处理";
     case "failed":
       return "上一轮出错了，点开处理";
     case "limited":
-      return "额度受限，点开处理";
+      return "用量受限，点开处理";
     case "completed":
       return "有新结果，点开查看";
   }
@@ -1253,7 +1253,7 @@ export function resolveWindowTitleThreadStatus(thread: SidebarThreadStatusInput)
     case "input":
       return THREAD_STATUS_TEXT.input;
     case "queued":
-      return "排队";
+      return "等空位";
     case "preparing":
     case "working":
       return THREAD_STATUS_TEXT.working;
@@ -1394,7 +1394,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
     return {
-      label: "待批准",
+      label: "等你批准",
       colorClass: "text-amber-600 dark:text-amber-300/90",
       dotClass: "bg-amber-500 dark:bg-amber-300/90",
       pulse: false,
@@ -1403,7 +1403,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
     return {
-      label: "待输入",
+      label: "等你回答",
       colorClass: "text-indigo-600 dark:text-indigo-300/90",
       dotClass: "bg-indigo-500 dark:bg-indigo-300/90",
       pulse: false,
@@ -1426,7 +1426,7 @@ export function resolveThreadStatusPill(input: {
     (thread.runtime?.status === "starting" && thread.runtime.awaitingSlot === true)
   ) {
     return {
-      label: "排队",
+      label: "等空位",
       colorClass: "text-sidebar-muted-foreground",
       dotClass: "bg-sidebar-muted-foreground",
       pulse: false,
@@ -1456,7 +1456,7 @@ export function resolveThreadStatusPill(input: {
 
   if (hasUnseenFailure(thread)) {
     return {
-      label: "失败",
+      label: "出错了",
       colorClass: "text-red-600 dark:text-red-300/90",
       dotClass: "bg-red-500 dark:bg-red-300/90",
       pulse: false,
@@ -1479,7 +1479,7 @@ export function resolveThreadStatusPill(input: {
 
   if (hasUnseenCompletion(thread)) {
     return {
-      label: "已完成",
+      label: "有新结果",
       colorClass: "text-emerald-600 dark:text-emerald-300/90",
       dotClass: "bg-emerald-500 dark:bg-emerald-300/90",
       pulse: false,

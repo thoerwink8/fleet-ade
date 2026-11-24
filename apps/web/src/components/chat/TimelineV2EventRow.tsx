@@ -86,8 +86,8 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
   const activeCount = agents.filter(({ status }) => isOrchestrationV2WorkActive(status)).length;
   const doneCount = agents.filter(({ status }) => status === "completed").length;
   const countsLabel = [
-    activeCount > 0 ? `${activeCount} 在做` : null,
-    doneCount > 0 ? `${doneCount} 做完` : null,
+    activeCount > 0 ? `${activeCount} 运行中` : null,
+    doneCount > 0 ? `${doneCount} 已完成` : null,
   ]
     .filter(Boolean)
     .join(" · ");

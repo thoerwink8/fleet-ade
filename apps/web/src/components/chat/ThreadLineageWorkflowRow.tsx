@@ -40,7 +40,7 @@ function phaseElapsed(phase: SubagentWorkflowGroup["phases"][number]) {
 
 function phaseStatusLabel(phase: SubagentWorkflowGroup["phases"][number]) {
   if (phase.state === "running") return "运行中";
-  if (phase.members.some((member) => member.status === "failed")) return "失败";
+  if (phase.members.some((member) => member.status === "failed")) return "出错了";
   if (
     phase.members.some((member) => member.status === "cancelled" || member.status === "interrupted")
   ) {
@@ -209,7 +209,9 @@ export function ThreadLineageWorkflowRow({
                   onClick={() => setPhaseOpen((phases) => new Map(phases).set(phase.index, !open))}
                   accessory={
                     <>
-                      {status === "失败" ? <SectionHeaderStatus>失败</SectionHeaderStatus> : null}
+                      {status === "出错了" ? (
+                        <SectionHeaderStatus>出错了</SectionHeaderStatus>
+                      ) : null}
                       <span className="shrink-0 text-2xs font-normal tabular-nums">
                         {phase.settledCount}/{phase.members.length} 个智能体
                       </span>

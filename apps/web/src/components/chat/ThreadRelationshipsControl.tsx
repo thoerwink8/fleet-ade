@@ -171,7 +171,7 @@ function ThreadLineageGroup<Row extends LineageRow>(props: {
           <span className={cn(THREAD_DETAILS_PANEL_LABEL_CLASS, "min-w-0 flex-1 truncate")}>
             {props.label}
           </span>
-          {failedCount > 0 ? <SectionHeaderStatus>{failedCount} 失败</SectionHeaderStatus> : null}
+          {failedCount > 0 ? <SectionHeaderStatus>{failedCount} 出错了</SectionHeaderStatus> : null}
           {expanded ? null : (
             <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">
               {props.rows.length}

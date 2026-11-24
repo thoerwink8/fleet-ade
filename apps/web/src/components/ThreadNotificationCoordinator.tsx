@@ -149,12 +149,12 @@ export function startThreadNotifications(
       kind === "completion"
         ? "会话已完成"
         : status === "approval"
-          ? "需要批准"
+          ? "等你批准"
           : status === "limited"
-            ? "已达到用量上限"
+            ? "用量受限"
             : status === "failed"
-              ? "会话失败"
-              : "需要输入";
+              ? "出错了"
+              : "等你回答";
     if (hasNotificationSound(mode)) {
       void playNotificationSound(kind, () =>
         hasNotificationSound(getClientSettings().notificationMode),

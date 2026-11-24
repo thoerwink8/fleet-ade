@@ -26,7 +26,7 @@ export function subagentGroupSummary(
 const SUBAGENT_SUMMARY_LABELS = {
   working: "运行中",
   done: "已完成",
-  failed: "失败",
+  failed: "出错了",
   stopped: "已停止",
   idle: "空闲",
 } as const;
