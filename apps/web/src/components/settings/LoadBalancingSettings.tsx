@@ -77,7 +77,7 @@ export function LoadBalancingSettings({
       }
     >
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        共享项目的新会话会根据各机器的偏好权重，在空闲 CPU 和内存最多的机器上启动。
+        共享项目的新会话会根据各电脑的偏好权重，在空闲 CPU 和内存最多的电脑上启动。
       </p>
       {environments.map((environment) => (
         <EnvironmentRow

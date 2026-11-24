@@ -69,7 +69,7 @@ export function useMediaActions(source: MediaActionSource) {
     (fileSession.error === null && fileSession.data !== null && allowsHostMedia(fileSession.data));
   const assertCanReadMedia = () => {
     if (!canReadHostMedia(hostEnvironmentId)) {
-      throw new Error("此连接无法读取主机文件。");
+      throw new Error("此连接无法读取电脑文件。");
     }
   };
   const createAssetUrl = useAtomQueryRunner(assetEnvironment.createUrl, {
@@ -84,12 +84,12 @@ export function useMediaActions(source: MediaActionSource) {
     }
     const { environmentId, resource } = source.asset;
     const connection = readPreparedConnection(environmentId);
-    if (!connection) throw new Error("请重新连接此环境后重试。");
+    if (!connection) throw new Error("请重新连接这台电脑后重试。");
     const result = await createAssetUrl({ environmentId, input: { resource } });
     if (result._tag === "Failure") throw squashAtomCommandFailure(result);
     assertCanReadMedia();
     const url = resolveAssetUrl(connection.httpBaseUrl, result.value.relativeUrl);
-    if (!url) throw new Error("环境返回了无效的媒体 URL。");
+    if (!url) throw new Error("电脑返回了无效的媒体 URL。");
     return url;
   };
   const save = async () => {

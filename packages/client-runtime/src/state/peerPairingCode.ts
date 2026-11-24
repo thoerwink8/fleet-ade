@@ -75,7 +75,7 @@ const mintOnEnvironment = Effect.fnUntraced(function* (payload: AuthCreatePairin
   if (Option.isNone(prepared)) {
     return yield* new PeerPairingCodeError({
       reason: "unavailable",
-      cause: "环境未连接。",
+      cause: "电脑未连接。",
     });
   }
   return yield* mintPairingCredential(prepared.value, payload);

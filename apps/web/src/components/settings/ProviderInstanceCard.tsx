@@ -580,7 +580,7 @@ function ProjectOverrideInheritance({
 }) {
   const layers = [
     { key: "project", label: "项目", enabled: projectEnabled, effective: true },
-    { key: "environment", label: "环境", enabled: environmentEnabled, effective: false },
+    { key: "environment", label: "电脑", enabled: environmentEnabled, effective: false },
   ];
   return (
     <Popover>
@@ -1342,7 +1342,7 @@ export function ProviderInstanceCard({
       ) : null}
 
       <SettingsSection
-        title="环境"
+        title="环境变量"
         inert={readOnly}
         aria-disabled={readOnly || undefined}
         className={readOnly ? "opacity-50 select-none" : undefined}
@@ -1368,7 +1368,7 @@ export function ProviderInstanceCard({
         <SettingsSection title="模型">
           <div className="px-3 py-3 sm:px-4">
             <p className="mb-3 text-xs text-muted-foreground">
-              模型偏好和自定义模型保存在所选环境中，并在已连接的设备间共享。
+              模型偏好和自定义模型保存在所选电脑中，并在已连接的设备间共享。
             </p>
             <ProviderModelsSection
               canManageCustomModels={!readOnly}

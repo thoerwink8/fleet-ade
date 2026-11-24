@@ -54,8 +54,8 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
     >
       <SettingsRow
         className="@max-lg/setup:[&>div:first-child]:flex @max-lg/setup:[&>div:first-child]:items-stretch @max-lg/setup:[&>div:first-child]:gap-3"
-        title="环境"
-        description="运行此提供方的设备。"
+        title="电脑"
+        description="运行此提供方的电脑。"
         control={
           <div className="flex min-w-0 flex-col gap-2 sm:items-end">
             <span className="text-muted-foreground [overflow-wrap:anywhere]">
@@ -72,7 +72,7 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
       {props.readOnly ? (
         <SettingsRow title="无法设置" description="提供方设置为只读。" />
       ) : props.provider?.setup === undefined ? (
-        <SettingsRow title="需要更新" description="请更新此环境以管理 Antigravity。" />
+        <SettingsRow title="需要更新" description="请更新这台电脑以管理 Antigravity。" />
       ) : (
         <ProviderSetupActions
           key={`${props.environmentId}:${props.instanceId}`}

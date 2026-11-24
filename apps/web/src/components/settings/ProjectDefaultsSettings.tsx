@@ -139,7 +139,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
       status={
         mixedModel
-          ? `${automaticModel ? "各环境的自动默认值不一样。" : "各环境的默认值不一样。"}请选择一个环境，或改成各环境共用的模型，再编辑力度。`
+          ? `${automaticModel ? "各电脑的自动默认值不一样。" : "各电脑的默认值不一样。"}请选择一台电脑，或改成各电脑共用的模型，再编辑力度。`
           : (presentation.providerNote ?? effortDisabledReason)
       }
       resetAction={

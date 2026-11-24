@@ -104,7 +104,7 @@ function RemoveUsageProviderButton({
           <AlertDialogHeader>
             <AlertDialogTitle>移除 {label}?</AlertDialogTitle>
             <AlertDialogDescription>
-              此服务器将删除中转站的管理密钥，其账户也将从“限制”视图中移除，中转站本身不受影响。再次填写
+              这台电脑将删除中转站的管理密钥，其账户也将从“限制”视图中移除，中转站本身不受影响。再次填写
               URL 和密钥添加中转站，即可恢复显示。
             </AlertDialogDescription>
           </AlertDialogHeader>

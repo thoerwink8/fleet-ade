@@ -246,7 +246,7 @@ function EnvironmentScopeMenu({
     : environments;
   return (
     <ScopeMenu
-      ariaLabel="环境范围"
+      ariaLabel="电脑范围"
       icon={
         selected ? (
           <EnvironmentMachineIcon
@@ -260,20 +260,20 @@ function EnvironmentScopeMenu({
         selected
           ? settingsScopeEnvironmentLabel(selected, environments)
           : environmentValue !== ALL_ENVIRONMENTS_VALUE
-            ? "环境不可用"
+            ? "电脑不可用"
             : singleEnvironment
-              ? "没有环境"
-              : "所有环境"
+              ? "没有电脑"
+              : "所有电脑"
       }
       value={environmentValue}
       onChange={(next) => onChange(selectEnvironmentAxis(value, next))}
-      searchLabel="搜索环境"
+      searchLabel="搜索电脑"
       allOption={
         singleEnvironment
           ? null
           : {
               value: ALL_ENVIRONMENTS_VALUE,
-              label: "所有环境",
+              label: "所有电脑",
               icon: <LayersIcon aria-hidden className="size-3.5 shrink-0" />,
             }
       }

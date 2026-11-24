@@ -172,7 +172,7 @@ describe("searchSettings", () => {
     };
     const results = (hasPeerLinkHost: boolean) =>
       searchSettings(
-        "关联环境",
+        "关联电脑",
         filterAvailableSettingsSearchItems({ ...availability, hasPeerLinkHost }),
       );
     expect(results(false).map((item) => item.id)).not.toContain("linked-environments");

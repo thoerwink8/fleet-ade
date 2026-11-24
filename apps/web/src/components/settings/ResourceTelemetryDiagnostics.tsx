@@ -104,9 +104,9 @@ function formatProcessName(process: Pick<ResourceTelemetryProcess, "command" | "
 function categoryLabel(category: ResourceTelemetryProcessCategory): string {
   switch (category) {
     case "server":
-      return "服务器";
+      return "后台服务";
     case "server-child":
-      return "后端子进程";
+      return "后台服务子进程";
     case "provider-root":
       return "提供方";
     case "terminal-root":
@@ -1006,7 +1006,7 @@ function ResourceTelemetryDiagnosticsBody({
                 Fleet ADE 系统资源占用
               </div>
               <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                服务器、提供方、终端、桌面进程和监测器自身的实时原生统计。
+                后台服务、提供方、终端、桌面进程和监测器自身的实时原生统计。
               </p>
             </div>
             <div className="flex items-center gap-2 text-3xs text-muted-foreground/65">
@@ -1073,7 +1073,7 @@ function ResourceTelemetryDiagnosticsBody({
           {snapshot ? (
             <div className="grid border-t border-border/60 bg-muted/10 md:grid-cols-3">
               <AggregateCard
-                label="后端与智能体"
+                label="后台服务与智能体"
                 accentClass="bg-success/80"
                 aggregate={snapshot.groups.backend}
               />
@@ -1093,7 +1093,7 @@ function ResourceTelemetryDiagnosticsBody({
       </SettingsSection>
 
       <SettingsSection
-        title="主机与采集"
+        title="电脑与采集"
         icon={<GaugeIcon className="size-4 text-muted-foreground" />}
         headerAction={
           collectorNeedsRetry ? (
@@ -1110,7 +1110,7 @@ function ResourceTelemetryDiagnosticsBody({
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <BatteryIcon className="size-3.5" />
               </span>
-              主机状态
+              电脑状态
             </div>
             {hasHostPowerSignal && snapshot ? (
               <>
@@ -1163,9 +1163,9 @@ function ResourceTelemetryDiagnosticsBody({
               </>
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
-                <div className="text-row font-medium text-foreground">未连接桌面主机状态信号</div>
+                <div className="text-row font-medium text-foreground">未连接桌面端电脑状态信号</div>
                 <p className="mt-1.5 max-w-sm text-2xs leading-relaxed text-muted-foreground/70">
-                  电源、闲置、锁定和温度状态由桌面主机提供。当前浏览器会话中的进程遥测仍正常运行。
+                  电源、闲置、锁定和温度状态由桌面端电脑提供。当前浏览器会话中的进程遥测仍正常运行。
                 </p>
               </div>
             )}

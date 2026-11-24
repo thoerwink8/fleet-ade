@@ -22,7 +22,7 @@ export function ProjectsSettings() {
               onClick={() => selectScope(selectEnvironmentAxis(value, ALL_ENVIRONMENTS_VALUE))}
             >
               <LayersIcon />
-              显示所有环境
+              显示所有电脑
             </Button>
           ) : null}
         </div>

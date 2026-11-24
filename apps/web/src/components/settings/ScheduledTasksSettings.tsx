@@ -497,8 +497,8 @@ export function ScheduledTasksSettings(target: {
               <EmptyMedia variant="icon">
                 <Clock3Icon />
               </EmptyMedia>
-              <EmptyTitle>没有可用的环境</EmptyTitle>
-              <EmptyDescription>连接一个环境以管理定时任务。</EmptyDescription>
+              <EmptyTitle>没有可用的电脑</EmptyTitle>
+              <EmptyDescription>连接一台电脑以管理定时任务。</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : environments.length > 1 ? (
@@ -651,7 +651,7 @@ function ScheduledTaskEnvironmentList({
       {populated.length === 0 && loaded.length > 0 ? (
         <SettingsRow
           title="没有定时任务"
-          description="没有符合所选环境和项目的任务。可以从下方模板快速开始："
+          description="没有符合所选电脑和项目的任务。可以从下方模板快速开始："
         >
           <div className="pt-3 pb-2">
             <ScheduledTaskTemplates disabled={!canCreate} onSelect={onCreateFromTemplate} />
@@ -740,7 +740,7 @@ function ScheduledTaskEnvironmentSection({
     >
       {!connected ? (
         <SettingsRow
-          title="环境已断开"
+          title="电脑已断开"
           description={`请重新连接 ${environment.label}，查看其定时任务。`}
         />
       ) : tasksQuery.error ? (
@@ -759,7 +759,7 @@ function ScheduledTaskEnvironmentSection({
           {tasks.length === 0 ? (
             <SettingsRow
               title="没有定时任务"
-              description="没有符合所选环境和项目的任务。可以从下方模板快速开始："
+              description="没有符合所选电脑和项目的任务。可以从下方模板快速开始："
             >
               <div className="pt-3 pb-2">
                 <ScheduledTaskTemplates disabled={!canCreate} onSelect={onCreateFromTemplate} />
@@ -1572,8 +1572,8 @@ function ScheduledTaskEditorDialog({
     }
     if (schedule.type === "once" && !offersOnce) {
       reportFailure(
-        "此环境不支持单次运行",
-        "此环境运行的是旧版 Fleet ADE。请更新后再创建单次定时任务，或选择其他定时规则。",
+        "这台电脑不支持单次运行",
+        "这台电脑运行的是旧版 Fleet ADE。请更新后再创建单次定时任务，或选择其他定时规则。",
       );
       return;
     }
@@ -1678,7 +1678,7 @@ function ScheduledTaskEditorDialog({
           {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
           <fieldset ref={fieldsRef} disabled={saving} className="min-w-0 space-y-5">
             {!connected ? (
-              <p className="text-sm text-destructive">请重新连接此环境后再保存。</p>
+              <p className="text-sm text-destructive">请重新连接这台电脑后再保存。</p>
             ) : null}
             {task === null ? (
               <Field label="从模板开始">
@@ -1688,7 +1688,7 @@ function ScheduledTaskEditorDialog({
                 />
               </Field>
             ) : null}
-            <Field label="运行环境" htmlFor="scheduled-task-environment">
+            <Field label="电脑" htmlFor="scheduled-task-environment">
               <Select
                 value={environmentId}
                 disabled={task !== null || saving}
@@ -1714,7 +1714,7 @@ function ScheduledTaskEditorDialog({
                         kind={resolveEnvironmentMachineKind(environment?.serverConfig ?? null)}
                         className="size-4"
                       />
-                      {environment?.label ?? "环境不可用"}
+                      {environment?.label ?? "电脑不可用"}
                     </span>
                   </SelectValue>
                 </SelectTrigger>

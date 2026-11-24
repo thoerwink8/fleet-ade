@@ -38,17 +38,17 @@ it("names machines from peer-link names, then local labels, then a fallback", ()
   ]);
   expect(fleetMachineName("a", linked, directory)).toBe("链接名");
   expect(fleetMachineName("b", linked, directory)).toBe("机器乙");
-  expect(fleetMachineName("gone", linked, directory)).toBe("未命名机器");
-  expect(fleetMachineName("", linked, directory)).toBe("未命名机器");
+  expect(fleetMachineName("gone", linked, directory)).toBe("未命名电脑");
+  expect(fleetMachineName("", linked, directory)).toBe("未命名电脑");
 });
 
 it("disambiguates duplicate machine names with a short environment id suffix", () => {
   const names = disambiguateMachineNames(
     ["env-alpha-1111", "env-beta-2222", "env-gamma-3333"],
-    (id) => (id === "env-gamma-3333" ? "工作机" : "未命名机器"),
+    (id) => (id === "env-gamma-3333" ? "工作机" : "未命名电脑"),
   );
-  expect(names.get("env-alpha-1111")).toBe("未命名机器 (env-al)");
-  expect(names.get("env-beta-2222")).toBe("未命名机器 (env-be)");
+  expect(names.get("env-alpha-1111")).toBe("未命名电脑 (env-al)");
+  expect(names.get("env-beta-2222")).toBe("未命名电脑 (env-be)");
   expect(names.get("env-gamma-3333")).toBe("工作机");
 });
 
@@ -156,7 +156,7 @@ it("formats reasons, ages and machine names", () => {
   expect(fleetFullReason("line1\nline2")).toBe("line1\nline2");
   expect(fleetStaleReason({ stale: true, staleReason: "environment offline" })).toBeNull();
   expect(fleetStaleReason({ stale: true, staleReason: "lease lost" })).toBe(
-    "卡住 · 这台机器已不在做这单",
+    "卡住 · 这台电脑已不在做这单",
   );
   expect(fleetStaleReason({ stale: false, staleReason: "lease lost" })).toBeNull();
   const at = "2026-01-01T00:00:00Z";

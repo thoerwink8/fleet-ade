@@ -74,7 +74,7 @@ export function useProjectScriptSettings(
     keybinding?: string | null,
   ): Promise<AtomCommandResult<void, unknown>> {
     if (savingRef.current || targets.length === 0) {
-      const message = "没有可用的机器，或另一处操作改动正在保存。";
+      const message = "没有可用的电脑，或另一处操作改动正在保存。";
       toastManager.add({ type: "error", title: "操作未保存", description: message });
       return AsyncResult.failure(Cause.fail(new Error(message)));
     }
@@ -88,7 +88,7 @@ export function useProjectScriptSettings(
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthSettingsWriteScope,
-              message: "此连接无法修改环境设置。",
+              message: "此连接无法修改电脑设置。",
             }),
           ),
         ),

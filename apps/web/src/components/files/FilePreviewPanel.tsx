@@ -1328,7 +1328,7 @@ export default function FilePreviewPanel({
     }
     return (
       <div className="p-4 text-sm text-muted-foreground">
-        {fileAccess.error ?? "此连接无法读取主机文件。"}
+        {fileAccess.error ?? "此连接无法读取电脑文件。"}
       </div>
     );
   }
@@ -1744,7 +1744,7 @@ export function WorkspaceLargeTextPreview(props: {
             setSaving(true);
             void (async () => {
               const url = await refreshAssetUrl();
-              if (!url) throw new Error("请重新连接环境后重试。");
+              if (!url) throw new Error("请重新连接电脑后重试。");
               const response = await fetch(url);
               if (!response.ok) throw new Error("无法加载文件，请重试。");
               const downloadUrl = URL.createObjectURL(await response.blob());

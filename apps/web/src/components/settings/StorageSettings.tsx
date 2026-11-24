@@ -381,7 +381,7 @@ function lastRunSummary(
   if (!first) return "";
   if (machineCount <= 1) return first.counts;
   if (entries.length === machineCount && entries.every((entry) => entry.counts === first.counts)) {
-    return `每台机器均为 ${first.counts}`;
+    return `每台电脑均为 ${first.counts}`;
   }
   return entries.map((entry) => `${entry.label}: ${entry.counts}`).join(" · ");
 }
@@ -414,7 +414,7 @@ function CleanupResults({
                   {entry.reason}
                 </span>
                 <span className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-l border-border/60 pl-3">
-                  <span>机器</span>
+                  <span>电脑</span>
                   <span className="text-foreground/80">{environmentLabel}</span>
                   {entry.projectPath && (
                     <>
@@ -1104,7 +1104,7 @@ function StorageCleanupScopeNotice() {
         )
         .map((environment) => environment.environmentId)}
     >
-      更新所选环境后即可使用存储清理，或选择支持此功能的机器。
+      更新所选电脑后即可使用存储清理，或选择支持此功能的电脑。
     </SettingsScopeNotice>
   );
 }
@@ -1132,7 +1132,7 @@ export function WorktreeCleanupSection() {
           key
         ] !== settings[key],
     )
-      ? "所选机器的设置各不相同"
+      ? "所选电脑的设置各不相同"
       : undefined;
   const update = (
     patch: Partial<StorageCleanupSettings>,
@@ -1156,7 +1156,7 @@ export function WorktreeCleanupSection() {
     return (
       <SettingsSection id="storage-worktrees" title="清理" variant="plain">
         <SettingsScopeNotice inline target="all">
-          请先更新所选机器，再配置项目工作树清理。
+          请先更新所选电脑，再配置项目工作树清理。
         </SettingsScopeNotice>
       </SettingsSection>
     );
@@ -1180,7 +1180,7 @@ export function WorktreeCleanupSection() {
                 ? "保留此项目的工作树，直到你手动删除。"
                 : mode === "custom"
                   ? "此项目使用以下规则。"
-                  : "使用各机器的工作树清理设置。"
+                  : "使用各电脑的工作树清理设置。"
             }
             serverScoped
             settingKeys={["worktreeCleanup"]}
@@ -1278,7 +1278,7 @@ export function WorktreeCleanupSection() {
                     status={[
                       ruleStatus("worktreeSettledAfterDays"),
                       environments.length > connectedEnvironments.length
-                        ? "离线机器不会收到此设置"
+                        ? "离线电脑不会收到此设置"
                         : undefined,
                     ]
                       .filter(Boolean)
@@ -1398,11 +1398,11 @@ export function StorageCleanupSections() {
   const settledLogsStatus = useDebouncedValue(`${targetIdsKey}:${logsMixed}`, 300);
   const artifactsStatus =
     targets.length > 1 && settledArtifactsStatus === `${targetIdsKey}:true`
-      ? "所选机器的设置各不相同"
+      ? "所选电脑的设置各不相同"
       : undefined;
   const logsStatus =
     targets.length > 1 && settledLogsStatus === `${targetIdsKey}:true`
-      ? "所选机器的设置各不相同"
+      ? "所选电脑的设置各不相同"
       : undefined;
   if (scope.kind === "project" || scope.kind === "checkout") return null;
   const update = (

@@ -231,7 +231,7 @@ export function ProjectSettingsPanel({
   }
   if (members.length === 0)
     return (
-      <p className="p-8 text-sm text-muted-foreground">此工作副本在所选项目和环境中已不可用。</p>
+      <p className="p-8 text-sm text-muted-foreground">此工作副本在所选项目和电脑中已不可用。</p>
     );
   const scopedGroup = scopeProjectSettingsGroup(selected, members);
   return (
@@ -660,9 +660,9 @@ function ProjectDetail({
             }
             description={
               hasOtherMembers
-                ? "删除所选机器上的工作副本条目及其会话。其他机器和磁盘上的文件不受影响。"
+                ? "删除所选电脑上的工作副本条目及其会话。其他电脑和磁盘上的文件不受影响。"
                 : group.memberProjects.length > 1
-                  ? `删除所有机器上的全部 ${group.memberProjects.length} 个工作副本条目及其会话。磁盘上的文件不受影响。`
+                  ? `删除所有电脑上的全部 ${group.memberProjects.length} 个工作副本条目及其会话。磁盘上的文件不受影响。`
                   : "删除项目条目及其会话。磁盘上的文件不受影响。"
             }
             control={

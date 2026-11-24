@@ -174,7 +174,7 @@ export function AddEnvironmentDialog({
     handleOpenChange(false);
     toastManager.add({
       type: "success",
-      title: routeTarget ? "已添加线路" : "环境已连接",
+      title: routeTarget ? "已添加线路" : "电脑已连接",
       description: routeTarget
         ? `现在可以通过 SSH ${routeTarget.label} 访问 ${target.alias}。`
         : `${target.alias} 的 SSH 托管隧道已就绪。`,
@@ -209,12 +209,12 @@ export function AddEnvironmentDialog({
         pairingCode: savedBackendPairingCode,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "无法添加后端。";
+      const message = error instanceof Error ? error.message : "无法添加电脑。";
       onErrorChange(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法添加后端",
+          title: "无法添加电脑",
           description: message,
         }),
       );
@@ -229,12 +229,12 @@ export function AddEnvironmentDialog({
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        const message = error instanceof Error ? error.message : "无法添加后端。";
+        const message = error instanceof Error ? error.message : "无法添加电脑。";
         onErrorChange(message);
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法添加后端",
+            title: "无法添加电脑",
             description: message,
           }),
         );
@@ -253,8 +253,8 @@ export function AddEnvironmentDialog({
           }
         : {
             type: "success",
-            title: "已添加后端",
-            description: "已保存环境，应用启动时会自动重新连接。",
+            title: "已添加电脑",
+            description: "已保存电脑，应用启动时会自动重新连接。",
           },
     );
     setIsAddingSavedBackend(false);
@@ -427,7 +427,7 @@ export function AddEnvironmentDialog({
         onClick={() => void handleAddSavedBackend()}
       >
         <PlusIcon className="size-3.5" />
-        {isAddingSavedBackend ? "正在添加…" : routeTarget ? "添加线路" : "添加环境"}
+        {isAddingSavedBackend ? "正在添加…" : routeTarget ? "添加线路" : "添加电脑"}
       </Button>
     </div>
   );
@@ -550,7 +550,7 @@ export function AddEnvironmentDialog({
           onClick={() => void handleAddSavedBackend()}
         >
           <PlusIcon className="size-3.5" />
-          {isAddingSavedBackend ? "正在添加…" : routeTarget ? "添加线路" : "添加环境"}
+          {isAddingSavedBackend ? "正在添加…" : routeTarget ? "添加线路" : "添加电脑"}
         </Button>
       </div>
     </div>
@@ -563,23 +563,23 @@ export function AddEnvironmentDialog({
           render={
             <DialogTrigger
               render={
-                <Button size="xs" variant="ghost-muted" aria-label="添加环境">
+                <Button size="xs" variant="ghost-muted" aria-label="添加电脑">
                   <PlusIcon className="size-3" />
-                  <span>添加环境</span>
+                  <span>添加电脑</span>
                 </Button>
               }
             />
           }
         />
-        <TooltipPopup side="top">添加环境</TooltipPopup>
+        <TooltipPopup side="top">添加电脑</TooltipPopup>
       </Tooltip>
       <DialogPopup className="max-h-[80dvh] sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{routeTarget ? `为 ${routeTarget.label} 添加线路` : "添加环境"}</DialogTitle>
+          <DialogTitle>{routeTarget ? `为 ${routeTarget.label} 添加线路` : "添加电脑"}</DialogTitle>
           <DialogDescription>
             {routeTarget
-              ? "使用其他地址（例如 Tailscale 名称）再次配对此机器。该地址将加入现有线路，不会重复添加机器。"
-              : "将其他环境与此客户端配对。"}
+              ? "使用其他地址（例如 Tailscale 名称）再次配对这台电脑。该地址将加入现有线路，不会重复添加电脑。"
+              : "将其他电脑与此客户端配对。"}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -588,14 +588,14 @@ export function AddEnvironmentDialog({
               {renderConnectionModeCard({
                 mode: "remote",
                 title: "远程连接",
-                description: "输入后端主机和配对码。",
+                description: "输入主机地址和配对码。",
                 icon: <ChevronsLeftRightEllipsisIcon aria-hidden className="size-4" />,
               })}
               {desktopBridge
                 ? renderConnectionModeCard({
                     mode: "ssh",
                     title: "SSH",
-                    description: "使用本地 SSH 配置、认证代理和隧道连接后端。",
+                    description: "使用本地 SSH 配置、认证代理和隧道连接电脑。",
                     icon: <TerminalIcon aria-hidden className="size-4" />,
                   })
                 : null}

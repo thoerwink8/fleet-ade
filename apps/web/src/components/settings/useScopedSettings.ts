@@ -97,7 +97,7 @@ function useRunScopedPlan() {
         options?.onFailed?.();
         toastManager.add({
           type: "error",
-          title: savedEnvironmentCount > 0 ? "部分环境已保存设置" : "设置未保存",
+          title: savedEnvironmentCount > 0 ? "部分电脑已保存设置" : "设置未保存",
           description: [
             ...failedEnvironments.map(({ label, message }) => `无法在 ${label} 上保存：${message}`),
             ...(savedEnvironmentCount > 0

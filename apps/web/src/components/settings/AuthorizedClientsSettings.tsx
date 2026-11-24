@@ -213,7 +213,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         title: kind === "link" ? "已复制配对 URL" : "已复制配对码",
         description:
           kind === "link"
-            ? "在要与此环境配对的客户端中打开此链接。"
+            ? "在要与这台电脑配对的客户端中打开此链接。"
             : "粘贴到另一个客户端中完成配对。",
       });
     },
@@ -283,7 +283,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             <p className="text-2xs text-muted-foreground/70">创建新链接，即可从此客户端分享。</p>
           ) : shareablePairingUrl === null ? (
             <p className="text-2xs text-muted-foreground/70">
-              复制 token，并用此后端可访问的主机从另一个客户端配对。
+              复制 token，并用这台电脑可访问的主机地址从另一个客户端配对。
             </p>
           ) : null}
         </div>
@@ -645,7 +645,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
           <DialogHeader>
             <DialogTitle>创建配对链接</DialogTitle>
             <DialogDescription>
-              生成一次性链接，让其他设备与此后端配对，成为已授权的客户端。
+              生成一次性链接，让其他设备与这台电脑配对，成为已授权的客户端。
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>

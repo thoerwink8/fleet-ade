@@ -660,7 +660,7 @@ export function makeBrowserPullRequestRoutingPermissions(
       if (connectionKey === null)
         return yield* new ConnectionBlockedError({
           reason: "configuration",
-          detail: "此环境没有已保存的连接端点。",
+          detail: "这台电脑没有已保存的连接端点。",
         });
       return yield* write(
         entry.target.environmentId,

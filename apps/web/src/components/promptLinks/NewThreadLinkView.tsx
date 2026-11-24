@@ -184,7 +184,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (project === null) {
       setState({
         status: "failed",
-        message: "你的机器目前都无法在没有项目的情况下启动会话。",
+        message: "你的电脑目前都无法在没有项目的情况下启动会话。",
       });
       return;
     }
@@ -207,7 +207,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (environmentId === null || serverConfig === null || newProjectsRoot === null) {
       setState({
         status: "failed",
-        message: "这台机器无法从链接克隆。请更新其上的 Fleet ADE，或从命令面板克隆仓库。",
+        message: "这台电脑无法从链接克隆。请更新其上的 Fleet ADE，或从命令面板克隆仓库。",
       });
       return;
     }

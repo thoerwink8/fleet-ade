@@ -224,7 +224,7 @@ export function PipelineRunsSection() {
   if (environmentId === null) {
     return (
       <PipelineFrame pending={false} refreshDisabled onRefresh={() => {}}>
-        <p className="text-sm text-muted-foreground">还没有连上的环境。</p>
+        <p className="text-sm text-muted-foreground">还没有连上的电脑。</p>
       </PipelineFrame>
     );
   }

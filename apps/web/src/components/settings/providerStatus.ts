@@ -66,7 +66,7 @@ export function getProviderSummary(provider: ServerProvider | undefined): {
   if (!provider) {
     return {
       headline: "正在检查智能体状态",
-      detail: "正在等待服务器返回安装和登录状态。",
+      detail: "正在等待后台服务返回安装和登录状态。",
       rawDetail: null,
     };
   }

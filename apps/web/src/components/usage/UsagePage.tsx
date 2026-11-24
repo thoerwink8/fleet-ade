@@ -531,8 +531,8 @@ export function UsagePage() {
             {selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
-                  ? `连接一个环境后才能看到${showingLimits ? "限额" : "用量"}。`
-                  : `选择一个环境后才能看到${showingLimits ? "限额" : "用量"}。`}
+                  ? `连接一台电脑后才能看到${showingLimits ? "限额" : "用量"}。`
+                  : `选择一台电脑后才能看到${showingLimits ? "限额" : "用量"}。`}
               </p>
             ) : showingLimits ? (
               <UsageLimitsSection
@@ -1112,7 +1112,7 @@ function UsageCoverageNotice({
         </span>
       ))}
       {duplicateSources.length > 0 ? (
-        <span>在共用一份记录目录的环境之间只计一次： {duplicateSources.join(", ")}</span>
+        <span>在共用一份记录目录的电脑之间只计一次： {duplicateSources.join(", ")}</span>
       ) : null}
     </div>
   );
@@ -1143,10 +1143,10 @@ function UsageEnvironmentFilter({
 }) {
   const allSelected = selectedEnvironmentIds === null;
   const label = allSelected
-    ? "所有环境"
+    ? "所有电脑"
     : selectedEnvironments.length === 1
       ? selectedEnvironments[0]!.label
-      : `${selectedEnvironments.length} 个环境`;
+      : `${selectedEnvironments.length} 台电脑`;
   const hasIssue =
     selectedEnvironments.some((environment) => environment.error !== null) ||
     contractMismatches.length > 0;
@@ -1159,7 +1159,7 @@ function UsageEnvironmentFilter({
           {showUsageStatus && hasIssue ? (
             <CircleAlertIcon
               className="size-3.5 text-warning-foreground"
-              aria-label="部分环境无法提供用量数据"
+              aria-label="部分电脑无法提供用量数据"
             />
           ) : (
             <ChevronDownIcon
@@ -1175,7 +1175,7 @@ function UsageEnvironmentFilter({
           closeOnClick={false}
           onCheckedChange={(checked) => onSelectionChange(checked ? null : new Set())}
         >
-          所有环境
+          所有电脑
         </MenuCheckboxItem>
         <MenuSeparator />
         {environments.map((environment) => {
@@ -1230,11 +1230,11 @@ function UsageEnvironmentFilter({
           );
         })}
         {environments.length === 0 ? (
-          <p className="px-2 py-2 text-xs text-muted-foreground">未连接任何环境。</p>
+          <p className="px-2 py-2 text-xs text-muted-foreground">未连接任何电脑。</p>
         ) : null}
         {showUsageStatus && isPartial ? (
           <p className="px-2 py-2 text-xs text-muted-foreground">
-            选中的环境仍在扫描，总计暂不完整。
+            选中的电脑仍在扫描，总计暂不完整。
           </p>
         ) : null}
         {showUsageStatus ? (

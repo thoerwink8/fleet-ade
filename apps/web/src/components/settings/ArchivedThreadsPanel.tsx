@@ -242,7 +242,7 @@ export function ArchivedThreadsPanel() {
             }
             description={
               isLoadingArchive
-                ? "正在检查已连接的环境。"
+                ? "正在检查已连接的电脑。"
                 : (archiveError ?? "已归档会话将显示在这里。")
             }
           />

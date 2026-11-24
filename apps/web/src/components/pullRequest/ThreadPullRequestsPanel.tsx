@@ -366,7 +366,7 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <PullRequestsUnavailableState
         title="已关联的 PR 不可用"
-        error="此环境不支持关联多个 pull request。"
+        error="这台电脑不支持关联多个 pull request。"
       />
     );
   }

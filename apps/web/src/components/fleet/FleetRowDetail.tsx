@@ -133,7 +133,7 @@ export function FleetRowDetail({
               {!machineConnected ? (
                 <div className="mt-auto flex flex-col gap-3 rounded-lg border bg-card p-3">
                   <p className="text-prose text-muted-foreground">
-                    这台机器没在本客户端连上，看不到详情
+                    这台电脑没在本客户端连上，看不到详情
                   </p>
                   <div className="flex">
                     <Button

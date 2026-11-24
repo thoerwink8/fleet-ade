@@ -1008,7 +1008,7 @@ export function PullRequestsPage() {
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
           title="PR 不可用"
-          error="更新你的 Fleet ADE 服务器以浏览 pull request。"
+          error="更新你的 Fleet ADE 后台服务以浏览 pull request。"
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} caption="正在加载 PR…" />
@@ -1099,7 +1099,7 @@ export function PullRequestsPage() {
     }),
   ];
   const serverMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "所有服务器", Icon: LayersIcon },
+    { value: "", label: "所有电脑", Icon: LayersIcon },
     ...capableEnvironments.map((environment) => ({
       value: environment.environmentId,
       label: environment.label,

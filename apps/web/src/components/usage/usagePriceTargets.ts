@@ -44,7 +44,7 @@ export async function writeUsagePrices(input: {
       if (target.unavailable !== null) {
         result = { status: "failed", error: target.unavailable };
       } else if (aliases.length > 0 && target.aliases === null) {
-        result = { status: "failed", error: "更新服务器后才能映射模型" };
+        result = { status: "failed", error: "更新后台服务后才能映射模型" };
       } else {
         try {
           const saved =

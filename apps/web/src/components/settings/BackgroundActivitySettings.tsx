@@ -50,9 +50,9 @@ const BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS: Record<BackgroundActivityProfil
 };
 
 const BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS: Record<BackgroundActivityProfile, string> = {
-  balanced: "客户端闲置、主机锁定或处于低电量模式时暂停检测。",
-  performance: "有订阅此环境的客户端保持连接时，允许相应的后台检测。",
-  "battery-saver": "主机或客户端使用电池供电时，也会暂停后台检测。",
+  balanced: "客户端闲置、电脑锁定或处于低电量模式时暂停检测。",
+  performance: "有订阅这台电脑的客户端保持连接时，允许相应的后台检测。",
+  "battery-saver": "电脑或客户端使用电池供电时，也会暂停后台检测。",
 };
 
 const ADVANCED_BACKGROUND_ACTIVITY_DESCRIPTION = "使用自定义时间间隔。";
@@ -65,8 +65,8 @@ const BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES: ReadonlyArray<{
     | "pauseWhenOnBattery";
   readonly label: string;
 }> = [
-  { key: "pauseWhenHostLocked", label: "主机锁定时暂停" },
-  { key: "pauseWhenHostLowPower", label: "主机开启低电量模式时暂停" },
+  { key: "pauseWhenHostLocked", label: "电脑锁定时暂停" },
+  { key: "pauseWhenHostLowPower", label: "电脑开启低电量模式时暂停" },
   { key: "pauseWhenClientLowPower", label: "客户端开启低电量模式时暂停" },
   { key: "pauseWhenOnBattery", label: "使用电池时暂停" },
 ];
@@ -222,14 +222,14 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-row font-medium">主机电源监测</div>
+                <div className="text-row font-medium">电脑电源监测</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  客户端活跃时定期检查主机电源状态。
+                  客户端活跃时定期检查电脑电源状态。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="活跃时主机电源检查间隔"
+                  label="活跃时电脑电源检查间隔"
                   value={hostPowerMonitorActiveIntervalSeconds}
                   min={5}
                   step={5}
@@ -250,14 +250,14 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-row font-medium">闲置主机监测</div>
+                <div className="text-row font-medium">闲置电脑监测</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  没有活跃的前台客户端时，定期检查主机电源状态。
+                  没有活跃的前台客户端时，定期检查电脑电源状态。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="闲置时主机电源检查间隔"
+                  label="闲置时电脑电源检查间隔"
                   value={hostPowerMonitorIdleIntervalSeconds}
                   min={5}
                   step={30}

@@ -253,7 +253,7 @@ describe("EnvironmentProviderSettings routing", () => {
     await setup();
     await setProviders([provider()]);
     await using _screen = await render(panel({ targetInstanceId: customId }));
-    await expect.element(page.getByText("此提供方实例在该设备上已不可用。")).toBeVisible();
+    await expect.element(page.getByText("此提供方实例在这台电脑上已不可用。")).toBeVisible();
     expect(state.updateSettings).not.toHaveBeenCalled();
   });
 

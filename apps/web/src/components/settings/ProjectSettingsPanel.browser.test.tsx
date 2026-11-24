@@ -606,13 +606,13 @@ it("opens the fallback search target across all environments from a checkout", a
     </RegistryContext.Provider>,
     { router: false },
   );
-  await userEvent.click(page.getByRole("button", { name: "打开所有环境" }));
+  await userEvent.click(page.getByRole("button", { name: "打开所有电脑" }));
   await vi.waitFor(() => expect(router.state.location.search).toEqual({}));
   expect(router.state.location.hash).toBe("fallback-model");
 });
 
 describe("project settings scope", () => {
-  const environmentMenu = () => page.getByRole("button", { name: /^环境范围:/ });
+  const environmentMenu = () => page.getByRole("button", { name: /^电脑范围:/ });
   const primaryOption = () => page.getByRole("menuitemradio", { name: /^primary/ });
   const remoteOption = () => page.getByRole("menuitemradio", { name: /^remote/ });
 
@@ -683,8 +683,8 @@ describe("project settings scope", () => {
   });
 
   it.each([
-    [undefined, "此项目在此环境中没有工作副本。"],
-    ["removed-checkout", "此工作副本在所选项目和环境中已不可用。"],
+    [undefined, "此项目在这台电脑上没有工作副本。"],
+    ["removed-checkout", "此工作副本在所选项目和电脑中已不可用。"],
   ])("recovers a stale environment link with checkout %s", async (checkout, message) => {
     setup();
     state.projects = state.projects.filter((project) => project.environmentId === primaryId);
@@ -697,14 +697,14 @@ describe("project settings scope", () => {
 
     await expect.element(page.getByText(message, { exact: true })).toBeVisible();
     await expect.element(page.getByRole("button", { name: /^项目范围:/ })).toBeVisible();
-    await expect.element(page.getByRole("button", { name: "环境范围: remote" })).toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "显示所有环境" }));
+    await expect.element(page.getByRole("button", { name: "电脑范围: remote" })).toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "显示所有电脑" }));
 
     await expect
       .element(page.getByRole("textbox", { name: "项目名称" }))
       .toHaveValue("Shared repo");
     expect(screen.router.state.location.search).toEqual({ project: key });
-    await expect.element(page.getByRole("button", { name: "环境范围: 所有环境" })).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "电脑范围: 所有电脑" })).toBeVisible();
     await expect.element(page.getByText(message, { exact: true })).not.toBeInTheDocument();
     await expect.element(page.getByRole("button", { name: "移除项目", exact: true })).toBeEnabled();
   });

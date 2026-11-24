@@ -211,10 +211,10 @@ function ProviderLastChecked({ environmentId }: { environmentId: EnvironmentId }
 }
 
 function providerEnvironmentDetail(environment: EnvironmentPresentation): string {
-  if (environment.entry.target._tag === "PrimaryConnectionTarget") return "主要设备";
+  if (environment.entry.target._tag === "PrimaryConnectionTarget") return "主电脑";
   if (environment.entry.target._tag === "SshConnectionTarget") return "SSH";
-  if (isDesktopLocalConnectionTarget(environment.entry.target)) return "本地设备";
-  return environment.displayUrl ?? "远程设备";
+  if (isDesktopLocalConnectionTarget(environment.entry.target)) return "本机";
+  return environment.displayUrl ?? "远程电脑";
 }
 
 const providerCardHeightClassName =
@@ -271,7 +271,7 @@ function EnvironmentUnavailablePlaceholder({
   const title = isLoading
     ? "正在加载提供方设置"
     : access.kind === "error"
-      ? "无法连接此设备"
+      ? "无法连接这台电脑"
       : "提供方设置不可用";
   const description = isLoading
     ? access.reason === "permissions"
@@ -377,7 +377,7 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
     !target.scoped && !onlyPrimaryDevice && options.length > 0 ? (
       <ScrollArea radius="none" hideScrollbars scrollFade className="h-11 min-w-0 flex-1">
         <ToggleGroup
-          aria-label="设备"
+          aria-label="电脑"
           variant="segmented"
           className="my-2"
           value={effectiveEnvironmentId ? [effectiveEnvironmentId] : []}
@@ -429,17 +429,15 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
         <ProviderSettingsPlaceholder
           deviceTabs={deviceTabs}
           icon={<EnvironmentMachineIcon kind={resolveEnvironmentMachineKind(null)} />}
-          title="设备不可用"
-          description="重新连接此设备以设置提供方，或选择其他设备。"
+          title="电脑不可用"
+          description="重新连接这台电脑以设置提供方，或选择其他电脑。"
         />
       ) : null}
       {options.length === 0 && !targetEnvironmentMissing ? (
         <ProviderSettingsPlaceholder
           icon={<EnvironmentMachineIcon kind={resolveEnvironmentMachineKind(null)} />}
-          title={isReady ? "没有已连接的设备" : "正在加载设备"}
-          description={
-            isReady ? "配置提供方前，请先连接一个执行环境。" : "正在读取已连接的执行环境。"
-          }
+          title={isReady ? "没有已连接的电脑" : "正在加载电脑"}
+          description={isReady ? "配置提供方前，请先连接一台电脑。" : "正在读取已连接的电脑。"}
         />
       ) : null}
 
@@ -1063,7 +1061,7 @@ export function EnvironmentProviderSettings({
               </ScrollArea>
             ) : (
               <div className="p-6 text-sm text-muted-foreground">
-                {targetInstanceMissing ? "此提供方实例在该设备上已不可用。" : "尚未配置提供方。"}
+                {targetInstanceMissing ? "此提供方实例在这台电脑上已不可用。" : "尚未配置提供方。"}
               </div>
             )}
           </div>

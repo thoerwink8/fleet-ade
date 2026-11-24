@@ -154,14 +154,14 @@ function AccessSettings() {
   const picker =
     candidates.length > 1 && accessEnvironmentId !== null ? (
       <div className="flex min-w-0 items-center gap-1.5 px-3 text-sm text-muted-foreground sm:px-4">
-        <span className="shrink-0">权限所属环境</span>
+        <span className="shrink-0">权限所属电脑</span>
         <Select
           value={accessEnvironmentId}
           onValueChange={(next) => {
             if (next !== null) setSelectedEnvironmentId(next);
           }}
         >
-          <SelectTrigger size="sm" className="w-auto max-w-72" aria-label="环境">
+          <SelectTrigger size="sm" className="w-auto max-w-72" aria-label="电脑">
             <SelectValue>
               {(value: EnvironmentId) => {
                 const environment = candidates.find(
@@ -618,12 +618,12 @@ function ConnectionsSettingsContent({
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       const message =
-        error instanceof Error ? error.message : `无法${enabled ? "开启" : "关闭"}后端。`;
+        error instanceof Error ? error.message : `无法${enabled ? "连接" : "断开"}电脑。`;
       setSavedBackendError(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `无法${enabled ? "开启" : "关闭"}后端`,
+          title: `无法${enabled ? "连接" : "断开"}电脑`,
           description: message,
         }),
       );
@@ -638,12 +638,12 @@ function ConnectionsSettingsContent({
     setRemovingSavedEnvironmentId(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
-      const message = error instanceof Error ? error.message : "无法移除后端。";
+      const message = error instanceof Error ? error.message : "无法移除电脑。";
       setSavedBackendError(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法移除后端",
+          title: "无法移除电脑",
           description: message,
         }),
       );
@@ -652,7 +652,7 @@ function ConnectionsSettingsContent({
 
   const handleRemoveSavedBackend = async (environment: EnvironmentPresentation) => {
     const confirmed = await requestConfirmDialog(
-      "这会删除这里保存的配对信息、凭据和缓存的会话。若只是暂时不用，请改为关闭连接。",
+      "这会删除这里保存的配对信息、凭据和缓存的会话。若只是暂时不用，请改为断开连接。",
       {
         title: `从此设备移除“${environment.label}”？`,
         confirmLabel: "移除",
@@ -729,12 +729,12 @@ function ConnectionsSettingsContent({
     });
     if (settled._tag === "Failure") {
       const error = Cause.squash(settled.cause);
-      const message = error instanceof Error ? error.message : "无法更新 WSL 后端。";
+      const message = error instanceof Error ? error.message : "无法更新 WSL 后台服务。";
       setDesktopWslMutationError(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法更改 WSL 后端",
+          title: "无法更改 WSL 后台服务",
           description: message,
         }),
       );
@@ -833,7 +833,7 @@ function ConnectionsSettingsContent({
         return (
           <SettingsRow
             {...searchableSetting("wsl-backend")}
-            description="无法加载 WSL 后端状态。"
+            description="无法加载 WSL 后台服务状态。"
             status={<span className="block text-destructive">{desktopWslError}</span>}
             control={
               <Button
@@ -891,13 +891,13 @@ function ConnectionsSettingsContent({
       <>
         <SettingsRow
           {...searchableSetting("wsl-backend")}
-          description="同时运行所选 WSL 发行版和 Windows 后端。项目保留在原来的文件系统中。"
+          description="同时运行所选 WSL 发行版和 Windows 后台服务。项目保留在原来的文件系统中。"
           status={
             desktopWslError ? (
               <span className="block text-destructive">{desktopWslError}</span>
             ) : desktopWslState.preflightError ? (
               <span className="block text-destructive">
-                WSL 后端无法启动：{desktopWslState.preflightError}
+                WSL 后台服务无法启动：{desktopWslState.preflightError}
               </span>
             ) : null
           }
@@ -912,7 +912,7 @@ function ConnectionsSettingsContent({
               <SelectTrigger
                 size="sm"
                 className="w-full sm:w-56"
-                aria-label="WSL 后端"
+                aria-label="WSL 后台服务"
                 disabled={isUpdatingWslBackend}
               >
                 <SelectValue>{selectLabel}</SelectValue>
@@ -940,7 +940,7 @@ function ConnectionsSettingsContent({
         {desktopWslState.enabled ? (
           <SettingsRow
             title="仅 WSL"
-            description="仅运行 WSL 后端。更改后 Fleet ADE 会重启。"
+            description="仅运行 WSL 后台服务。更改后 Fleet ADE 会重启。"
             className="bg-muted/20 pl-7 sm:pl-8"
             control={
               <Switch
@@ -963,7 +963,7 @@ function ConnectionsSettingsContent({
         tailscaleHttpsEndpoint
           ? tailscaleHttpsEndpoint.status === "available"
             ? tailscaleHttpsEndpoint.httpBaseUrl
-            : "通过 Tailscale Serve，让其他设备使用 MagicDNS HTTPS URL 访问此后端。"
+            : "通过 Tailscale Serve，让其他设备使用 MagicDNS HTTPS URL 访问这台电脑。"
           : missingTailscaleEndpointDescription(desktopServerExposureState)
       }
       control={
@@ -1057,9 +1057,9 @@ function ConnectionsSettingsContent({
         desktopBridge
           ? "此连接无法查看或更改网络开放设置。"
           : isLocalBackendNetworkAccessible
-            ? "已配置远程访问。请在启动服务器的位置更改网络开放设置。"
+            ? "已配置远程访问。请在启动后台服务的位置更改网络开放设置。"
             : currentAuthPolicy === "loopback-browser"
-              ? "仅本机可以连接。请使用非回环主机地址重启服务器，再远程配对。"
+              ? "仅本机可以连接。请使用非回环主机地址重启后台服务，再远程配对。"
               : "无法获取网络开放信息。"
       }
       control={
@@ -1078,7 +1078,7 @@ function ConnectionsSettingsContent({
               }
             />
             <TooltipPopup side="top">
-              更改网络开放设置会重启后端，必须在启动服务器进程的位置操作。
+              更改网络开放设置会重启后台服务，必须在启动后台服务进程的位置操作。
             </TooltipPopup>
           </Tooltip>
         ) : undefined
@@ -1094,7 +1094,7 @@ function ConnectionsSettingsContent({
         <>
           <SettingsSection
             {...searchableSetting("connections-environment")}
-            title={accessEnvironment?.label ?? (desktopBridge ? "本机" : "主环境")}
+            title={accessEnvironment?.label ?? (desktopBridge ? "本机" : "主电脑")}
             icon={
               <EnvironmentMachineIcon
                 aria-hidden
@@ -1113,7 +1113,7 @@ function ConnectionsSettingsContent({
                         type="button"
                         variant="ghost-muted"
                         size="icon-xs"
-                        aria-label="此机器的更多操作"
+                        aria-label="这台电脑的更多操作"
                       />
                     }
                   >
@@ -1152,7 +1152,7 @@ function ConnectionsSettingsContent({
                       size="sm"
                       environmentId={primaryEnvironmentId}
                       serverLabel={
-                        primaryEnvironment ? `${primaryEnvironment.label} 服务器` : "服务器"
+                        primaryEnvironment ? `${primaryEnvironment.label} 后台服务` : "后台服务"
                       }
                       selfUpdate={resolveServerSelfUpdateCapability(primaryServerConfig)}
                       installation={
@@ -1308,27 +1308,27 @@ function ConnectionsSettingsContent({
                   {pendingWslChange?.kind === "disable"
                     ? pendingWslChange.wasWslOnly
                       ? "关闭 WSL 并切回 Windows？"
-                      : "停用 WSL 后端？"
+                      : "停用 WSL 后台服务？"
                     : pendingWslChange?.kind === "distro"
                       ? "切换 WSL 发行版？"
                       : pendingWslChange?.kind === "enable"
-                        ? "启动 WSL 后端"
+                        ? "启动 WSL 后台服务"
                         : pendingWslChange?.nextValue
-                          ? "仅运行 WSL 后端？"
-                          : "重新启用 Windows 后端？"}
+                          ? "仅运行 WSL 后台服务？"
+                          : "重新启用 Windows 后台服务？"}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {pendingWslChange?.kind === "disable"
                     ? pendingWslChange.wasWslOnly
-                      ? "Fleet ADE 将重启并使用 Windows 后端。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 后即可继续访问。"
-                      : "WSL 后端将停止。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 前无法在 Fleet ADE 中访问。"
+                      ? "Fleet ADE 将重启并使用 Windows 后台服务。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 后即可继续访问。"
+                      : "WSL 后台服务将停止。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 前无法在 Fleet ADE 中访问。"
                     : pendingWslChange?.kind === "distro"
-                      ? "Fleet ADE 将在新发行版中重启 WSL 后端。当前发行版中仍在运行的会话会中断。"
+                      ? "Fleet ADE 将在新发行版中重启 WSL 后台服务。当前发行版中仍在运行的会话会中断。"
                       : pendingWslChange?.kind === "enable"
-                        ? "要同时运行 WSL 和 Windows 后端，还是停止 Windows 后端、仅使用 WSL？之后可以在设置中更改。"
+                        ? "要同时运行 WSL 和 Windows 后台服务，还是停止 Windows 后台服务、仅使用 WSL？之后可以在设置中更改。"
                         : pendingWslChange?.nextValue
-                          ? "Fleet ADE 将重启并仅启动 WSL 后端。关闭此选项前，你将无法访问 Windows 中的项目。"
-                          : "Fleet ADE 将重启，并在运行 WSL 的同时重新启动 Windows 后端。"}
+                          ? "Fleet ADE 将重启并仅启动 WSL 后台服务。关闭此选项前，你将无法访问 Windows 中的项目。"
+                          : "Fleet ADE 将重启，并在运行 WSL 的同时重新启动 Windows 后台服务。"}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1365,7 +1365,7 @@ function ConnectionsSettingsContent({
                           正在应用…
                         </>
                       ) : (
-                        "同时运行两个后端"
+                        "同时运行两个后台服务"
                       )}
                     </Button>
                   </>
@@ -1414,7 +1414,7 @@ function ConnectionsSettingsContent({
               <AlertDialogHeader>
                 <AlertDialogTitle>停用 Tailscale HTTPS？</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Fleet ADE 将重启本地后端，并停用 Tailscale 转发。
+                  Fleet ADE 将重启本机后台服务，并停用 Tailscale 转发。
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1452,8 +1452,8 @@ function ConnectionsSettingsContent({
               <DialogHeader>
                 <DialogTitle>设置 Tailscale HTTPS？</DialogTitle>
                 <DialogDescription>
-                  Fleet ADE 将重启本地后端并启用 Tailscale 转发，由 Tailscale 把 HTTPS
-                  流量代理到此后端。
+                  Fleet ADE 将重启本机后台服务并启用 Tailscale 转发，由 Tailscale 把 HTTPS
+                  流量代理到此后台服务。
                 </DialogDescription>
               </DialogHeader>
               <DialogPanel>
@@ -1516,7 +1516,7 @@ function ConnectionsSettingsContent({
         </>
       ) : (
         <SettingsSection {...searchableSetting("connections-environment")}>
-          <SettingsRow title="未选择环境" description="连接一个环境，查看其设置和访问权限。" />
+          <SettingsRow title="未选择电脑" description="连接一台电脑，查看其设置和访问权限。" />
         </SettingsSection>
       )}
     </>
@@ -1531,7 +1531,7 @@ function ConnectionsSettingsContent({
       ) : null}
       <SettingsSection
         {...searchableSetting("remote-environments")}
-        title="环境"
+        title="电脑"
         headerAction={
           <div className="flex items-center gap-1">
             {savedServerUpdateTargets.length > 0 ? (

@@ -181,8 +181,8 @@ export function UsagePriceOverrides({
     ) ?? [];
   const locked = pending || failedDestinations.length > 0;
   const hasChanges = stagedDrafts.length > 0;
-  const destinationLabel = selected.length === 1 ? selected[0]!.label : `${selected.length} 个环境`;
-  const selectionLabel = selectedIds === null ? "所有环境" : destinationLabel;
+  const destinationLabel = selected.length === 1 ? selected[0]!.label : `${selected.length} 台电脑`;
+  const selectionLabel = selectedIds === null ? "所有电脑" : destinationLabel;
   const discard = () => {
     setDrafts([]);
     setAttempt(null);
@@ -233,7 +233,7 @@ export function UsagePriceOverrides({
       (destination) =>
         environments.find(
           (environment) => environment.environmentId === destination.environmentId,
-        ) ?? { ...destination, prices: null, aliases: null, unavailable: "环境已移除" },
+        ) ?? { ...destination, prices: null, aliases: null, unavailable: "电脑已移除" },
     );
     const changes = new Map(
       targets.map((target) => [target.environmentId, usagePriceTableChanges(target, edits)]),
@@ -282,7 +282,7 @@ export function UsagePriceOverrides({
       <DialogPopup className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>自定义模型价格</DialogTitle>
-          <DialogDescription>价格和映射会应用到所选环境过去和将来的全部用量。</DialogDescription>
+          <DialogDescription>价格和映射会应用到所选电脑过去和将来的全部用量。</DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -307,7 +307,7 @@ export function UsagePriceOverrides({
                     closeOnClick={false}
                     onCheckedChange={(checked) => selectEnvironments(checked ? null : new Set())}
                   >
-                    所有环境
+                    所有电脑
                   </MenuCheckboxItem>
                   <MenuSeparator />
                   {environments.map((environment) => (
@@ -340,8 +340,8 @@ export function UsagePriceOverrides({
           {selected.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {environments.length === 0
-                ? "连接一个环境即可设置模型价格。"
-                : "选择一个环境即可查看和修改其模型价格。"}
+                ? "连接一台电脑即可设置模型价格。"
+                : "选择一台电脑即可查看和修改其模型价格。"}
             </p>
           ) : (
             <>
@@ -385,7 +385,7 @@ export function UsagePriceOverrides({
                         <TableCell colSpan={7} className="text-center whitespace-normal">
                           <p className="py-6 text-muted-foreground">
                             {selected.some((environment) => environment.prices === null)
-                              ? "部分环境的价格不可用。"
+                              ? "部分电脑的价格不可用。"
                               : "还没有自定义价格或映射。添加一行即可设置。"}
                           </p>
                         </TableCell>
@@ -557,7 +557,7 @@ export function UsagePriceOverrides({
                 缓存价格留空时使用输入价格。填 0 表示词元
                 免费。被映射的模型，其用量计入映射目标模型。
                 {selected.length > 1
-                  ? " 标为“各不相同”的单元格在修改前会保留各环境自己的价格。"
+                  ? " 标为“各不相同”的单元格在修改前会保留各电脑自己的价格。"
                   : ""}
               </p>
             </>

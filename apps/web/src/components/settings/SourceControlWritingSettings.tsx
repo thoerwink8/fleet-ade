@@ -204,8 +204,8 @@ export function SourceControlWritingSettingsSection() {
                   value={allInstructions ?? ""}
                   onChange={(event) => setAllInstructions(event.target.value)}
                   rows={4}
-                  aria-label="所有所选环境共用的自定义提交与 pull request 指令"
-                  placeholder="输入每个所选环境应使用的指令。"
+                  aria-label="所有所选电脑共用的自定义提交与 pull request 指令"
+                  placeholder="输入每台所选电脑应使用的指令。"
                 />
                 <Button
                   size="sm"
@@ -222,7 +222,7 @@ export function SourceControlWritingSettingsSection() {
                     setEditingAllInstructions(false);
                   }}
                 >
-                  将指令应用到全部环境
+                  将指令应用到全部电脑
                 </Button>
               </>
             ) : (
@@ -234,7 +234,7 @@ export function SourceControlWritingSettingsSection() {
                   setEditingAllInstructions(true);
                 }}
               >
-                为全部环境编写自定义指令
+                为全部电脑编写自定义指令
               </Button>
             )}
           </div>
@@ -304,11 +304,11 @@ export function SourceControlWritingSettingsSection() {
           serverScoped
           settingKeys={["sourceControlWriterModelSelection"]}
           {...searchableSetting("source-control-writer-model")}
-          description="生成提交信息、pull request 文案以及分支或书签名称的模型。关闭时使用此环境配置的文本生成模型。"
+          description="生成提交信息、pull request 文案以及分支或书签名称的模型。关闭时使用这台电脑配置的文本生成模型。"
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                连接一个环境以选择其版本控制文案模型。
+                连接一台电脑以选择其版本控制文案模型。
               </span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-2">

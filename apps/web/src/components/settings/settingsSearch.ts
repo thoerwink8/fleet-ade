@@ -803,14 +803,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "environment-icon",
-    title: "环境图标",
+    title: "电脑图标",
     to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["machine glyph sidebar mac mini studio laptop desktop server cloud vm"],
   },
   {
     id: "local-environment",
-    title: "本地环境",
+    title: "本机后台服务",
     to: "/settings/connections",
     searchTerms: ["turn off on disable enable local server agents remote only restart"],
     desktopOnly: true,
@@ -834,7 +834,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "wsl-backend",
-    title: "WSL 后端",
+    title: "WSL 后台服务",
     to: "/settings/connections",
     searchTerms: [
       "windows subsystem linux distro second server projects stop windows backend restart wsl only",
@@ -855,14 +855,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "linked-environments",
     peerLinksOnly: true,
-    title: "关联环境",
+    title: "关联电脑",
     to: "/settings/connections",
     targetId: "linked-environments",
     searchTerms: ["link peer another machine vps agents work there handoff pairing code"],
   },
   {
     id: "remote-environments",
-    title: "环境",
+    title: "电脑",
     to: "/settings/connections",
     searchTerms: ["add pair backend host code ssh config agent tunnel saved"],
   },

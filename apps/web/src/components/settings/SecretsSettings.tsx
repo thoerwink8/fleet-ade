@@ -47,14 +47,14 @@ export function SecretsSettingsPanel() {
     <>
       {candidates.length > 1 && environment !== null ? (
         <div className="flex min-w-0 items-center gap-1.5 px-3 text-sm text-muted-foreground sm:px-4">
-          <span className="shrink-0">凭据提供方所属环境</span>
+          <span className="shrink-0">凭据提供方所属电脑</span>
           <Select
             value={environment.environmentId}
             onValueChange={(next) => {
               if (next !== null) setSelectedEnvironmentId(next);
             }}
           >
-            <SelectTrigger size="sm" className="w-auto max-w-72" aria-label="环境">
+            <SelectTrigger size="sm" className="w-auto max-w-72" aria-label="电脑">
               <SelectValue>
                 {(value: EnvironmentId) => {
                   const selected = candidates.find(
@@ -103,7 +103,7 @@ export function SecretsSettingsPanel() {
       ) : (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            连接一个环境，即可管理其提供方变量使用的凭据提供方。
+            连接一台电脑，即可管理其提供方变量使用的凭据提供方。
           </p>
         </SettingsSection>
       )}

@@ -325,7 +325,7 @@ function TextGeneratorWizard({
       <WizardPopup>
         <WizardHeader
           title={existing ? `编辑 ${textGeneratorDisplayName(existing)}` : "添加文本生成器"}
-          description="无需启动编程智能体即可撰写会话标题、提交信息等短文本。你的 API 密钥存储在此环境中。"
+          description="无需启动编程智能体即可撰写会话标题、提交信息等短文本。你的 API 密钥存储在这台电脑中。"
         >
           <WizardSteps
             steps={STEPS}

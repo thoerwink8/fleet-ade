@@ -78,7 +78,7 @@ export function resolveSettingsScope(
 
   const environment = environments.find((candidate) => candidate.environmentId === search.machine);
   if (search.machine && !environment) {
-    return unavailable("environment-missing", "此环境已不可用。");
+    return unavailable("environment-missing", "这台电脑已不可用。");
   }
 
   if (search.project) {
@@ -93,8 +93,8 @@ export function resolveSettingsScope(
       return unavailable(
         "checkout-missing",
         search.checkout
-          ? "此工作副本在所选项目和环境中已不可用。"
-          : "此项目在此环境中没有工作副本。",
+          ? "此工作副本在所选项目和电脑中已不可用。"
+          : "此项目在这台电脑上没有工作副本。",
       );
     }
     if (search.checkout) {
@@ -103,7 +103,7 @@ export function resolveSettingsScope(
         (candidate) => candidate.environmentId === checkout.environmentId,
       );
       if (!checkoutEnvironment) {
-        return unavailable("environment-missing", "此工作副本的环境已不可用。");
+        return unavailable("environment-missing", "此工作副本所属电脑已不可用。");
       }
       const sharesEnvironment = group.memberProjects.some(
         (member) =>
@@ -140,7 +140,7 @@ export function resolveSettingsScope(
   }
   return {
     kind: "all",
-    label: "所有环境",
+    label: "所有电脑",
     members: [],
     environmentIds: environments.map((candidate) => candidate.environmentId),
   };

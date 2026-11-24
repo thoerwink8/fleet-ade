@@ -114,7 +114,7 @@ export function SettingsScopeNotice({
               })
           : [
               {
-                label: "打开所有环境",
+                label: "打开所有电脑",
                 icon: <LayersIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
                 search: {},
               },

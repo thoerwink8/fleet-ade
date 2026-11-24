@@ -161,7 +161,7 @@ function itemSummary({
   }
 
   if (item.status !== "available") {
-    return <span>此服务器不可用：{item.installHint}</span>;
+    return <span>这台电脑不可用：{item.installHint}</span>;
   }
 
   if (auth) {
@@ -192,7 +192,7 @@ function itemSummary({
     if (auth.status === "unauthenticated") {
       return (
         <span>
-          {item.label} 在此服务器上尚未登录。请登录，或在服务器主机上用{" "}
+          {item.label} 在这台电脑上尚未登录。请登录，或在这台电脑上用{" "}
           <code className="rounded bg-muted px-1 py-px text-2xs">{item.executable}</code>{" "}
           配置凭据，以启用变更请求功能。
         </span>
@@ -366,17 +366,17 @@ function EmptySourceControlDiscovery({
   const hasError = error !== null;
 
   return (
-    <SettingsSection id={searchableSetting("source-control").id} title="服务器环境">
+    <SettingsSection id={searchableSetting("source-control").id} title="版本控制">
       <Empty>
         <EmptyMedia variant="icon">
           <PullRequestGlyph.pullRequest />
         </EmptyMedia>
         <EmptyHeader>
-          <EmptyTitle>{hasError ? "无法扫描服务器环境" : "尚未检测到任何内容"}</EmptyTitle>
+          <EmptyTitle>{hasError ? "无法扫描版本控制" : "尚未检测到任何内容"}</EmptyTitle>
           <EmptyDescription>
             {hasError
               ? error
-              : "在服务器上安装 Git，添加工作区所需的可选托管集成或凭据，然后重新扫描。"}
+              : "在这台电脑上安装 Git，添加工作区所需的可选托管集成或凭据，然后重新扫描。"}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -485,7 +485,7 @@ export function SourceControlSettingsPanel() {
             variant="ghost-muted"
             onClick={handleScan}
             disabled={discovery.isPending}
-            aria-label="重新扫描服务器环境"
+            aria-label="重新扫描版本控制"
           >
             <RefreshIcon refreshing={discovery.isPending} />
           </Button>
@@ -499,9 +499,9 @@ export function SourceControlSettingsPanel() {
     <SettingsPageContainer>
       <ProjectDefaultsSettings category="source-control" />
       {environmentId === null ? (
-        <SettingsSection id={searchableSetting("source-control").id} title="服务器环境">
+        <SettingsSection id={searchableSetting("source-control").id} title="版本控制">
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            连接一个环境以查看其版本控制工具和托管集成。
+            连接一台电脑以查看其版本控制工具和托管集成。
           </p>
         </SettingsSection>
       ) : isInitialScanPending ? (

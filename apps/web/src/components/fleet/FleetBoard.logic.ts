@@ -20,7 +20,7 @@ export function fleetMachineName(
   linked: ReadonlyMap<string, string>,
   directory: ReadonlyMap<string, string>,
 ): string {
-  return linked.get(id) || directory.get(id) || "未命名机器";
+  return linked.get(id) || directory.get(id) || "未命名电脑";
 }
 
 /** Appends a short environment id suffix when two machines share the same display name. */
@@ -74,7 +74,7 @@ export function fleetStaleReason(
   row: Pick<FleetSummaryRow, "stale" | "staleReason">,
 ): string | null {
   if (!row.stale || row.staleReason === "environment offline") return null;
-  if (row.staleReason === "lease lost") return "卡住 · 这台机器已不在做这单";
+  if (row.staleReason === "lease lost") return "卡住 · 这台电脑已不在做这单";
   return "卡住 · 信息可能过时";
 }
 
