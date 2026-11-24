@@ -140,7 +140,7 @@ export function NoticeText({
             render={
               <Button
                 ref={detailsRef}
-                size="icon-strip"
+                size="icon-sm"
                 variant="ghost-muted"
                 aria-label={detailsLabel}
                 className="flex-none"

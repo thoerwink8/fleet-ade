@@ -242,7 +242,7 @@ function ToggleIcon({ expanded }: { expanded: boolean }) {
   return (
     <Button
       render={<span aria-hidden />}
-      size="icon-strip"
+      size="icon-sm"
       variant="ghost"
       tabIndex={-1}
       className="pointer-events-none"
@@ -254,7 +254,7 @@ function ToggleIcon({ expanded }: { expanded: boolean }) {
 
 function Dismiss({ className, children, ...props }: ComponentProps<typeof Button>) {
   return (
-    <Button size="icon-strip" variant="ghost" className={className} {...props}>
+    <Button size="icon-sm" variant="ghost" className={className} {...props}>
       {children ?? <XIcon />}
     </Button>
   );

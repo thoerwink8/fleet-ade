@@ -299,12 +299,7 @@ export function branchMismatchBannerItem(input: {
       </span>
     ),
     actions: (
-      <Button
-        size="strip"
-        variant="ghost"
-        disabled={input.restoreDisabled}
-        onClick={input.onRestore}
-      >
+      <Button size="sm" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
         {input.restoring ? "正在恢复…" : "恢复分支"}
       </Button>
     ),

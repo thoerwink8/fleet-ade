@@ -82,7 +82,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
         description: projectCloneProgressSummary(activeProjectClone),
         actions: (
           <Button
-            size="strip"
+            size="sm"
             variant="ghost"
             onClick={() =>
               void runProjectCloneActionStable("无法取消克隆", () =>
@@ -105,14 +105,14 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
       actions: (
         <>
           <Button
-            size="strip"
+            size="sm"
             variant="ghost"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
             移除项目
           </Button>
           <Button
-            size="strip"
+            size="sm"
             variant="ghost"
             onClick={() =>
               void runProjectCloneActionStable("无法重试克隆", () =>

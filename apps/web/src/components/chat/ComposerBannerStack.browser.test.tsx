@@ -191,7 +191,7 @@ function errorNotice(title: string): ComposerBannerStackItem {
     icon: <InfoIcon />,
     title,
     description: "The environment stopped answering.",
-    actions: <Button size="strip">重试</Button>,
+    actions: <Button size="sm">重试</Button>,
     dismissLabel: "关闭警告",
     onDismiss: () => undefined,
   };

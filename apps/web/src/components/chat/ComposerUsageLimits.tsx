@@ -89,7 +89,7 @@ export function modelFallbackBannerItem({
     title: `正在使用 ${fallbackModelName}`,
     description: `${defaultProviderName} 的用量已用完${resetsAt ? ` · ${formatUpcomingTimestamp(resetsAt, timestampFormat)} 重置` : ""}`,
     actions: (
-      <Button size="strip" variant="ghost" onClick={onUseDefault}>
+      <Button size="sm" variant="ghost" onClick={onUseDefault}>
         使用 {defaultModelName}
       </Button>
     ),
