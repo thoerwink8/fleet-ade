@@ -486,11 +486,6 @@ export default defineConfig({
       },
       {
         files: ["apps/web/src/**"],
-        // Parallel slices are editing these two files; remove this exclusion once they merge.
-        excludeFiles: [
-          "apps/web/src/components/sidebar/SidebarThreadRow.tsx",
-          "apps/web/src/components/ui/autocomplete.tsx",
-        ],
         rules: { "t3code/max-font-weight": "error" },
       },
       {
