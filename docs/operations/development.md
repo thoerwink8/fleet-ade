@@ -25,6 +25,9 @@ vp run dev
 Open the pairing URL printed by the dev runner. The bare origin does not authenticate
 a new browser.
 
+`pnpm` commands and `vp` (test, lint, run) stop at once when the running Node is not the one
+pinned in `package.json` `engines.node`; switch to that version and run again.
+
 ## Forge mirror (optional)
 
 GitHub is the source of truth. [source.tanstack.com/@pingdotgg/t3code](https://source.tanstack.com/@pingdotgg/t3code)
