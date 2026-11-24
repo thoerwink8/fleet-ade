@@ -551,8 +551,8 @@ describe("sidebar mobile touch targets", () => {
     expect(Math.round(cardUnpin.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(cardSnooze.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(cardSettle.getBoundingClientRect().height)).toBe(24);
-    expect(Math.round(clearSearch.getBoundingClientRect().width)).toBe(20);
-    expect(Math.round(clearSearch.getBoundingClientRect().height)).toBe(20);
+    expect(Math.round(clearSearch.getBoundingClientRect().width)).toBe(24);
+    expect(Math.round(clearSearch.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(projectPin.getBoundingClientRect().width)).toBe(24);
     expect(Math.round(projectPin.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(settingsButton.getBoundingClientRect().width)).toBe(28);

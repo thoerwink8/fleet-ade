@@ -537,7 +537,7 @@ describe("large text preview recovery", () => {
       await vi.waitFor(() => expect(screen.container.textContent).toContain("original"));
       // A cold worker can take longer than waitFor allows to load and index on CI.
       await indexed[0];
-      const scroller = () => screen.container.querySelector<HTMLElement>('[tabindex="0"]');
+      const scroller = () => screen.container.querySelector<HTMLElement>('div[tabindex="0"]');
       // "1,000 行" is also the prefetch label. The indexed viewer is the one no longer saying it is indexing, with a track taller than the viewport.
       await vi.waitFor(() => {
         const text = screen.container.textContent ?? "";
@@ -558,7 +558,7 @@ describe("large text preview recovery", () => {
       const scrollTop = viewport.scrollTop;
       state(`${original}#renewed`, "one");
       await screen.rerender(preview("unrelated-command"));
-      expect(screen.container.querySelector('[tabindex="0"]')).toBe(viewport);
+      expect(screen.container.querySelector('div[tabindex="0"]')).toBe(viewport);
       expect(viewport.scrollTop).toBe(scrollTop);
       expect(workers).toHaveLength(1);
       state(`${changed}#updated`, "two");

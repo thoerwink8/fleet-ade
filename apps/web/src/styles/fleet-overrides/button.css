@@ -1,0 +1,176 @@
+.fa-btn {
+  position: relative;
+  flex-shrink: 0;
+  /* Theme switches toggle data-theme synchronously; skip transitions so contrast settles in one tick. */
+  transition: none;
+}
+
+.fa-btn svg {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.fa-btn svg:not([class*="size-"]) {
+  width: var(--fa-space-4);
+  height: var(--fa-space-4);
+}
+
+/* @fleet/design 0.3.1 omits icon+lg width; keep icon-lg/icon-xl square at 40px. */
+.fa-btn--icon.fa-btn--lg {
+  width: var(--fa-ctrl-lg);
+}
+
+/* Grove and Ember point enabled primary buttons at their active theme accent. */
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-btn.fa-btn--primary:not([disabled], [data-disabled], [aria-disabled="true"]) {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.fa-btn.ade-btn--multiline {
+  height: auto;
+  min-height: var(--fa-ctrl);
+  padding-block: var(--fa-space-1);
+  white-space: normal;
+}
+
+.fa-btn.fa-btn--sm.ade-btn--multiline {
+  min-height: var(--fa-ctrl-sm);
+}
+
+.fa-btn.ade-btn--link {
+  text-underline-offset: var(--fa-space-1);
+}
+
+.fa-btn.ade-btn--link:not([disabled], [data-disabled], [aria-disabled="true"]):is(:hover, :active) {
+  background-image: none;
+  text-decoration: underline;
+}
+
+.fa-btn.ade-btn--glass {
+  background-color: var(--fa-overlay);
+  border-color: var(--fa-border);
+}
+
+.fa-btn.ade-btn--overlay {
+  background-color: rgb(0 0 0 / 70%);
+  color: rgb(255 255 255 / 65%);
+}
+
+.fa-btn.ade-btn--overlay:not([disabled], [data-disabled], [aria-disabled="true"]):is(
+    :hover,
+    :active
+  ) {
+  background-color: rgb(0 0 0 / 90%);
+  background-image: none;
+}
+
+.fa-btn.ade-btn--media-close {
+  background-color: rgb(0 0 0 / 65%);
+  border-color: rgb(255 255 255 / 20%);
+  color: #ffffff;
+}
+
+.fa-btn.ade-btn--media-close:not([disabled], [data-disabled], [aria-disabled="true"]):is(
+    :hover,
+    :active
+  ) {
+  background-color: rgb(0 0 0 / 80%);
+  background-image: none;
+}
+
+.fa-btn.ade-btn--media-navigation {
+  color: rgb(255 255 255 / 90%);
+}
+
+.fa-btn.ade-btn--media-navigation:not([disabled], [data-disabled], [aria-disabled="true"]):is(
+    :hover,
+    :active
+  ) {
+  background-color: rgb(255 255 255 / 10%);
+  background-image: none;
+  color: #ffffff;
+}
+
+.fa-btn.ade-btn--media-close:focus-visible,
+.fa-btn.ade-btn--media-navigation:focus-visible {
+  outline-color: #ffffff;
+}
+
+.fa-btn.ade-btn--warning-outline:not([disabled], [data-disabled], [aria-disabled="true"]) {
+  background-color: var(--warning-surface);
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+  color: var(--warning-foreground);
+}
+
+.fa-btn.ade-btn--warning-outline:not([disabled], [data-disabled], [aria-disabled="true"]):is(
+    :hover,
+    :active,
+    [aria-expanded="true"],
+    [aria-pressed="true"]
+  ) {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background-color: color-mix(in srgb, var(--warning) 16%, transparent);
+  background-image: none;
+}
+
+html[data-theme="dark"]
+  .fa-btn.ade-btn--warning-outline:not([disabled], [data-disabled], [aria-disabled="true"]):is(
+    :hover,
+    :active,
+    [aria-expanded="true"],
+    [aria-pressed="true"]
+  ) {
+  background-color: color-mix(in srgb, var(--warning) 24%, transparent);
+}
+
+/* Expand pointer:coarse hit area without changing visual dimensions; compact stays 32px inside bars. */
+@media (pointer: coarse) {
+  .fa-btn::after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .fa-btn.ade-btn--touch-compact::after {
+    min-width: var(--fa-ctrl);
+    min-height: var(--fa-ctrl);
+  }
+}
+
+@media (max-width: 767.98px), (pointer: coarse) {
+  .fa-btn.ade-btn--touch-compact {
+    width: var(--fa-ctrl);
+    height: var(--fa-ctrl);
+  }
+}
+
+/* Match @fleet/design [disabled] appearance on non-button render targets that use data-disabled or aria-disabled. */
+.fa-btn:is([data-disabled], [aria-disabled="true"]) {
+  cursor: not-allowed;
+  background-color: transparent;
+  background-image: none;
+  border-color: var(--fa-border);
+  color: var(--fa-fg-muted);
+}
+
+.fa-btn:not(.fa-btn--primary, .fa-btn--danger, .fa-btn--secondary, .fa-btn--danger-secondary):is(
+    [data-disabled],
+    [aria-disabled="true"]
+  ) {
+  border-color: transparent;
+}
+
+.fa-btn:is([data-disabled], [aria-disabled="true"]):is(
+    :hover,
+    :active,
+    :focus-visible,
+    [aria-expanded="true"],
+    [aria-pressed="true"]
+  ) {
+  background-image: none;
+  color: var(--fa-fg-muted);
+}
