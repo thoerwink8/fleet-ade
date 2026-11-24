@@ -9,7 +9,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
-import type * as Path from "effect/Path";
+import * as Path from "effect/Path";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { SCAN_CACHE_FILE_NAME } from "./usage/usageScanCache.ts";
@@ -345,6 +345,7 @@ const cleanupFixture = (
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
     const config = yield* ServerConfig.ServerConfig;
     const git = yield* GitVcsDriver.GitVcsDriver;
     const repo = yield* fs.realPath(yield* fs.makeTempDirectoryScoped({ prefix: "cleanup-repo-" }));
@@ -358,7 +359,7 @@ const cleanupFixture = (
     yield* command(repo, ["add", "."]);
     yield* command(repo, ["commit", "-m", "initial"]);
     yield* fs.makeDirectory(config.worktreesDir, { recursive: true });
-    const worktree = `${config.worktreesDir}/feature`;
+    const worktree = path.join(config.worktreesDir, "feature");
     yield* command(repo, ["worktree", "add", "-b", "feature", worktree]);
     let settings: import("@t3tools/contracts").ServerSettings = {
       ...DEFAULT_SERVER_SETTINGS,
