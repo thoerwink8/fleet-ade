@@ -144,6 +144,7 @@ describe("standard painted theme colors", () => {
             ["--error", colors.error],
             ["--fa-bg", colors.canvas],
             ["--fa-panel", colors.surface],
+            ["--fa-overlay", colors.surfaceOverlay],
             ["--fa-fg", colors.text],
             ["--fa-fg-muted", colors.mutedForeground],
             ["--fa-border", colors.border],
