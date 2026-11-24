@@ -413,7 +413,7 @@ describe("sidebar attention offline rows", () => {
     const failedRow = screen.container.querySelector<HTMLElement>(
       `[data-sidebar-row="${activeProject.environmentId}:${failedThread.id}"]`,
     )!;
-    expect(failedRow.className).toContain("opacity-60");
+    expect(getComputedStyle(failedRow).opacity).toBe("1");
     expect(failedRow.className).toContain("cursor-default");
     expect(failedRow.getAttribute("aria-disabled")).toBe("true");
     expect(failedRow.textContent).toContain("环境已断线，连上后处理");
@@ -488,10 +488,17 @@ describe("sidebar card summary preview and counts", () => {
     const firstRow = screen.container.querySelector<HTMLElement>(
       `[data-sidebar-row="${activeProject.environmentId}:thread-dense-0"]`,
     )!;
-    expect(firstRow.querySelector('[data-testid="sidebar-row-preview"]')?.textContent).toBe(
-      "这是第 1 条会话的最新进展摘要",
-    );
-    expect(firstRow.querySelector('[data-testid="sidebar-row-counts"]')?.textContent).toBe(
+    expect(firstRow.querySelector('[data-testid="sidebar-row-preview"]')).toBeNull();
+    expect(firstRow.querySelector('[data-testid="sidebar-row-counts"]')).toBeNull();
+    expect(firstRow.getBoundingClientRect().height).toBe(32);
+
+    await userEvent.hover(firstRow);
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-testid="sidebar-row-preview"]')?.textContent).toBe(
+        "这是第 1 条会话的最新进展摘要",
+      );
+    });
+    expect(document.querySelector('[data-testid="sidebar-row-counts"]')?.textContent).toBe(
       "1 轮 · 1 任务",
     );
 
@@ -499,16 +506,23 @@ describe("sidebar card summary preview and counts", () => {
     const secondRow = screen.container.querySelector<HTMLElement>(
       `[data-sidebar-row="${activeProject.environmentId}:thread-dense-1"]`,
     )!;
-    expect(secondRow.querySelector('[data-testid="sidebar-row-preview"]')).toBeNull();
-    expect(secondRow.querySelector('[data-testid="sidebar-row-counts"]')?.textContent).toBe("2 轮");
+    await userEvent.hover(secondRow);
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-testid="sidebar-thread-details"]')).not.toBeNull();
+    });
+    expect(document.querySelector('[data-testid="sidebar-row-preview"]')).toBeNull();
+    expect(document.querySelector('[data-testid="sidebar-row-counts"]')?.textContent).toBe("2 轮");
 
     // User-authored preview carries the "你：" prefix.
     const thirdRow = screen.container.querySelector<HTMLElement>(
       `[data-sidebar-row="${activeProject.environmentId}:thread-dense-3"]`,
     )!;
-    expect(thirdRow.querySelector('[data-testid="sidebar-row-preview"]')?.textContent).toBe(
-      "你：这是第 4 条会话的最新进展摘要",
-    );
+    await userEvent.hover(thirdRow);
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-testid="sidebar-row-preview"]')?.textContent).toBe(
+        "你：这是第 4 条会话的最新进展摘要",
+      );
+    });
 
     expect(screen.container.querySelectorAll('[data-testid="sidebar-row-card"]')).toHaveLength(120);
     const viewport = screen.container.querySelector<HTMLElement>(
@@ -678,6 +692,8 @@ describe("sidebar thread settle", () => {
     const settleButton = rowBefore.querySelector<HTMLButtonElement>(
       'button[aria-label="收尾会话"]',
     )!;
+    // Row actions stay hidden until the pointer is over the row.
+    await userEvent.hover(rowBefore);
     await userEvent.click(settleButton);
 
     await vi.waitFor(() => {
@@ -779,9 +795,9 @@ describe("sidebar current row neutral selection", () => {
       const otherStyle = getComputedStyle(otherRow);
 
       expect(currentStyle.backgroundColor, `${appearance} current row bg`).toBe(expectedSelectedBg);
-      expect(currentStyle.borderTopColor, `${appearance} current row border`).toBe(
-        "rgba(0, 0, 0, 0)",
-      );
+      expect(currentStyle.borderTopWidth, `${appearance} current row border`).toBe("0px");
+      expect(currentStyle.boxShadow, `${appearance} current row shadow`).toBe("none");
+      expect(parseFloat(currentStyle.borderRadius), `${appearance} radius`).toBeLessThanOrEqual(8);
       expect(otherStyle.backgroundColor, `${appearance} idle row bg`).toBe("rgba(0, 0, 0, 0)");
       expect(currentStyle.backgroundColor).not.toBe(otherStyle.backgroundColor);
     }
@@ -794,6 +810,8 @@ describe("sidebar current row neutral selection", () => {
     currentRow.focus();
     await expect.element(currentRow).toHaveFocus();
     expect(currentRow.matches(":focus-visible"), "keyboard focus ring marker").toBe(true);
-    expect(getComputedStyle(currentRow).boxShadow).not.toBe("none");
+    probe.style.outlineWidth = "var(--fa-bw-focus)";
+    expect(getComputedStyle(currentRow).outlineWidth).toBe(getComputedStyle(probe).outlineWidth);
+    expect(getComputedStyle(currentRow).outlineStyle).toBe("solid");
   });
 });

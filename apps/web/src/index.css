@@ -34,6 +34,10 @@
 @import "./styles/fleet-overrides/number-field.css" layer(fleet);
 @import "@fleet/design/styles/select.css" layer(fleet);
 @import "./styles/fleet-overrides/select.css" layer(fleet);
+@import "@fleet/design/styles/agent.css" layer(fleet);
+@import "@fleet/design/styles/status-tag.css" layer(fleet);
+@import "@fleet/design/styles/thread-row.css" layer(fleet);
+@import "./styles/fleet-overrides/thread-row.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));

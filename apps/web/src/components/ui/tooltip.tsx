@@ -147,7 +147,7 @@ function TooltipPopup({
   align?: TooltipPrimitive.Positioner.Props["align"];
   side?: TooltipPrimitive.Positioner.Props["side"];
   sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
-  variant?: "default" | "surface" | "code";
+  variant?: "default" | "surface" | "code" | "panel";
   anchor?: TooltipPrimitive.Positioner.Props["anchor"];
 }) {
   return (
@@ -158,7 +158,9 @@ function TooltipPopup({
             "fa-tip relative origin-(--transform-origin) text-balance transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0",
             variant === "code"
               ? "max-w-120 wrap-anywhere text-left font-mono leading-relaxed"
-              : "max-w-80 wrap-anywhere whitespace-normal",
+              : variant === "panel"
+                ? "ade-pop-panel"
+                : "max-w-80 wrap-anywhere whitespace-normal",
             className,
           )}
           data-slot="tooltip-popup"
