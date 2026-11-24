@@ -219,7 +219,7 @@ describe("DesktopClientSettings", () => {
     ),
   );
 
-  it.effect("preserves an explicit steer followUpBehavior in client-settings.json", () =>
+  it.effect("migrates a saved steer to queue once, then keeps a later steer choice", () =>
     withClientSettings(
       Effect.gen(function* () {
         const environment = yield* DesktopEnvironment.DesktopEnvironment;
@@ -228,13 +228,22 @@ describe("DesktopClientSettings", () => {
         yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
         yield* fileSystem.writeFileString(
           environment.clientSettingsPath,
-          `${JSON.stringify({ followUpBehavior: "steer" })}\n`,
+          `${JSON.stringify({ followUpBehavior: "steer", wordWrap: false })}
+`,
         );
 
-        const persisted = yield* settings.get;
-        assert.isTrue(Option.isSome(persisted));
-        if (Option.isSome(persisted)) {
-          assert.equal(persisted.value.followUpBehavior, "steer");
+        const migrated = yield* settings.get;
+        assert.isTrue(Option.isSome(migrated));
+        if (!Option.isSome(migrated)) return;
+        assert.equal(migrated.value.followUpBehavior, "queue");
+        assert.isTrue(migrated.value.followUpBehaviorMigrated);
+        assert.isFalse(migrated.value.wordWrap);
+
+        yield* settings.set({ ...migrated.value, followUpBehavior: "steer" });
+        for (let read = 0; read < 2; read += 1) {
+          const again = yield* settings.get;
+          assert.isTrue(Option.isSome(again));
+          if (Option.isSome(again)) assert.equal(again.value.followUpBehavior, "steer");
         }
       }),
     ),

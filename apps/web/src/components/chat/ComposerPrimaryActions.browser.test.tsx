@@ -182,3 +182,22 @@ it("swaps the collapsed composer's send button for Stop while a turn can be stop
   await screen.rerender(collapsed({ canInterrupt: false }));
   await expect.element(screen.getByRole("button", { name: "发送消息" })).toBeVisible();
 });
+
+it.each([
+  ["queue", "排队"],
+  ["steer", "立即发送"],
+] as const)(
+  "names the running-turn send button for the %s default",
+  async (followUpBehavior, name) => {
+    const props = setup();
+    await using screen = await render(
+      <ComposerPrimaryActions
+        {...props}
+        compact={false}
+        hasSendableContent
+        followUpBehavior={followUpBehavior}
+      />,
+    );
+    expect(screen.getByRole("button", { name, exact: true }).element()).toBeEnabled();
+  },
+);

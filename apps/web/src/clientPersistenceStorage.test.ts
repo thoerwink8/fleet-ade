@@ -79,20 +79,22 @@ describe("clientPersistenceStorage", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  it("defaults omitted followUpBehavior to queue while preserving explicit steer", async () => {
+  it("migrates a saved steer once, then keeps a later steer choice", async () => {
     const testWindow = getTestWindow();
-    const { readBrowserClientSettings } = await import("./clientPersistenceStorage");
+    const { readBrowserClientSettings, writeBrowserClientSettings } =
+      await import("./clientPersistenceStorage");
+    const key = "t3code:client-settings:v1";
 
-    testWindow.localStorage.setItem(
-      "t3code:client-settings:v1",
-      JSON.stringify({ wordWrap: false }),
-    );
+    testWindow.localStorage.setItem(key, JSON.stringify({ wordWrap: false }));
     expect(readBrowserClientSettings()?.followUpBehavior).toBe("queue");
 
-    testWindow.localStorage.setItem(
-      "t3code:client-settings:v1",
-      JSON.stringify({ followUpBehavior: "steer" }),
-    );
+    testWindow.localStorage.setItem(key, JSON.stringify({ followUpBehavior: "steer" }));
+    const migrated = readBrowserClientSettings();
+    expect(migrated?.followUpBehavior).toBe("queue");
+    expect(migrated?.followUpBehaviorMigrated).toBe(true);
+
+    writeBrowserClientSettings({ ...migrated!, followUpBehavior: "steer" });
+    expect(readBrowserClientSettings()?.followUpBehavior).toBe("steer");
     expect(readBrowserClientSettings()?.followUpBehavior).toBe("steer");
   });
 });

@@ -1,4 +1,8 @@
-import { ClientSettingsSchema, type ClientSettings } from "@t3tools/contracts";
+import {
+  ClientSettingsSchema,
+  migrateClientSettings,
+  type ClientSettings,
+} from "@t3tools/contracts";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import { resolveSymlinkTarget } from "@t3tools/shared/symlink";
 import * as Context from "effect/Context";
@@ -100,6 +104,7 @@ const readClientSettings = (
         onNone: () => Effect.succeed(Option.none<ClientSettings>()),
         onSome: (raw) =>
           decodeClientSettingsJson(raw).pipe(
+            Effect.map(migrateClientSettings),
             Effect.asSome,
             Effect.catchTags({
               SchemaError: (cause) =>

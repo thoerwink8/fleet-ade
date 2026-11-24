@@ -240,6 +240,9 @@ export const ClientSettingsSchema = Schema.Struct({
   followUpBehavior: Schema.Literals(["queue", "steer"]).pipe(
     Schema.withDecodingDefault(Effect.succeed("queue")),
   ),
+  // Set once `migrateClientSettings` has run. Settings are stored as a full snapshot, so a saved
+  // "steer" written while it was the default cannot be told apart from a deliberate choice.
+  followUpBehaviorMigrated: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   proactivePanelsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   showSkillsInSlashMenu: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   toolCallVisibility: ToolCallVisibility.pipe(
@@ -282,7 +285,23 @@ export const ClientSettingsSchema = Schema.Struct({
 });
 export type ClientSettings = typeof ClientSettingsSchema.Type;
 
-export const DEFAULT_CLIENT_SETTINGS: ClientSettings = Schema.decodeSync(ClientSettingsSchema)({});
+/**
+ * One-time upgrade applied wherever persisted client settings are read. Before queue became the
+ * default, every saved snapshot carried "steer" unless the user changed it, so an unmarked "steer"
+ * counts as never chosen and becomes "queue". Once marked, a "steer" is the user's own choice.
+ */
+export function migrateClientSettings(settings: ClientSettings): ClientSettings {
+  if (settings.followUpBehaviorMigrated) return settings;
+  return {
+    ...settings,
+    followUpBehavior: settings.followUpBehavior === "steer" ? "queue" : settings.followUpBehavior,
+    followUpBehaviorMigrated: true,
+  };
+}
+
+export const DEFAULT_CLIENT_SETTINGS: ClientSettings = migrateClientSettings(
+  Schema.decodeSync(ClientSettingsSchema)({}),
+);
 
 const UsageModelTokenPrice = Schema.Number.check(
   Schema.isFinite(),
@@ -1874,6 +1893,7 @@ export const ClientSettingsPatch = Schema.Struct({
   composerRichTextEnabled: Schema.optionalKey(Schema.Boolean),
   sendShortcut: Schema.optionalKey(Schema.Literals(["enter", "mod-enter-multiline", "mod-enter"])),
   followUpBehavior: Schema.optionalKey(Schema.Literals(["queue", "steer"])),
+  followUpBehaviorMigrated: Schema.optionalKey(Schema.Boolean),
   proactivePanelsEnabled: Schema.optionalKey(Schema.Boolean),
   showSkillsInSlashMenu: Schema.optionalKey(Schema.Boolean),
   toolCallVisibility: Schema.optionalKey(ToolCallVisibility),

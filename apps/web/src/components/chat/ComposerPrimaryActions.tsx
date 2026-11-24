@@ -211,6 +211,10 @@ export function CollapsedComposerStopAction({
   );
 }
 
+function describeActiveTurnAction(action: "queue" | "steer" | "restart"): string {
+  return action === "queue" ? "排队，等这一轮做完再发" : "立即发送，会打断当前这一轮";
+}
+
 export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   compact,
   canOperateThread,
@@ -353,9 +357,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       : compactsBeforeSend
         ? "压缩后发送"
         : isQueuing
-          ? "加入队列"
+          ? "排队"
           : isRunning
-            ? "引导当前执行"
+            ? "立即发送"
             : "发送消息";
   const submitStatus = isEnvironmentUnavailable
     ? "环境已断开"
@@ -372,7 +376,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     (compactsBeforeSend
       ? `先总结 ${compactTokens} token 的历史记录，再发送`
       : isRunning && !isEditingQueuedMessage && canSteer
-        ? `点击以${followUpBehavior}，${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}以${alternateAction}`
+        ? `点击：${describeActiveTurnAction(followUpBehavior)}；${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}：${describeActiveTurnAction(alternateAction)}`
         : submitLabel);
 
   const sendButton = (
