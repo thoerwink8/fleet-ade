@@ -1057,11 +1057,28 @@ const make = Effect.gen(function* () {
           FROM orchestration_v2_projection_threads t
           JOIN projection_projects p ON p.project_id = t.project_id
           WHERE t.deleted_at IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM orchestration_v2_projection_thread_trash trash
+              WHERE trash.thread_id = t.thread_id
+            )
         `.pipe(NodeSqliteClient.readOnly);
-    const deletedThreads = (yield* Effect.forEach(deletedRows, (row) =>
-      decodeCleanupThread(row.payload_json).pipe(
-        Effect.map((thread) => ({ ...thread, workspaceRoot: row.workspaceRoot })),
-      ),
+    const protectedRows = yield* sql<{ payload_json: string; workspaceRoot: string }>`
+          SELECT t.payload_json, p.workspace_root AS "workspaceRoot"
+          FROM orchestration_v2_projection_threads t
+          JOIN projection_projects p ON p.project_id = t.project_id
+          JOIN orchestration_v2_projection_thread_trash trash ON trash.thread_id = t.thread_id
+          WHERE t.deleted_at IS NOT NULL
+        `.pipe(NodeSqliteClient.readOnly);
+    const protectedDeletedIds = new Set<ThreadId>();
+    const deletedThreads = (yield* Effect.forEach(
+      [...deletedRows, ...protectedRows],
+      (row, index) =>
+        decodeCleanupThread(row.payload_json).pipe(
+          Effect.map((thread) => {
+            if (index >= deletedRows.length) protectedDeletedIds.add(thread.id);
+            return { ...thread, workspaceRoot: row.workspaceRoot };
+          }),
+        ),
     )).filter((thread) => thread.worktreePath !== null && thread.branch !== null);
     const snapshot = yield* readThreads();
     const threadsById = new Map(snapshot.threads.map((thread) => [thread.id, thread]));
@@ -1113,20 +1130,21 @@ const make = Effect.gen(function* () {
     );
     const deletedByPath = Map.groupBy(deletedThreads, (_thread, index) => deletedKeys[index]!);
     const candidates = [
-      ...[...groups].map(
-        ([worktreeKey, group]) =>
+      ...[...groups].map(([worktreeKey, group]) => {
+        const deletedAtPath = deletedByPath.get(worktreeKey);
+        return (
+          deletedAtPath?.find((deleted) => protectedDeletedIds.has(deleted.id)) ??
           // A deleted thread still owns the worktree its remaining subagents share,
           // but only deletion cleanup acts on it; otherwise the live rules apply.
-          deletedByPath
-            .get(worktreeKey)
-            ?.find(
-              (deleted) =>
-                resolveWorktreeCleanup(serverSettings, deleted.projectId).worktreeOnDelete &&
-                worktreeOwner([deleted, ...group]) === deleted,
-            ) ??
+          deletedAtPath?.find(
+            (deleted) =>
+              resolveWorktreeCleanup(serverSettings, deleted.projectId).worktreeOnDelete &&
+              worktreeOwner([deleted, ...group]) === deleted,
+          ) ??
           worktreeOwner(group) ??
-          group[0]!,
-      ),
+          group[0]!
+        );
+      }),
       ...deletedThreads.filter((_thread, index) => !groups.has(deletedKeys[index]!)),
     ];
     for (const thread of candidates) {
@@ -1178,6 +1196,8 @@ const make = Effect.gen(function* () {
           ),
         );
         if (!exists) return;
+        if (deleted && protectedDeletedIds.has(thread.id))
+          return keep("会话在最近删除里，到期后按规则清理");
         if (deleted && !settings.worktreeOnDelete) return keep("没有适用的规则");
         if (members.length > 1 && worktreeOwner(members) === undefined)
           return keep(`shared by ${members.length} threads`);
@@ -1564,16 +1584,16 @@ const make = Effect.gen(function* () {
 
   const reportRef = yield* SubscriptionRef.make<StorageCleanupReport | null>(null);
   // Only deleted threads' worktrees wait on session stops: any stop while one waits, or a stop inside one kept for another reason.
-  // A deletion stays pending until a sweep that started after it finishes.
+  // A purge stays pending until a sweep that started after it finishes.
   let deletedWorktreeWaits = true;
   let keptDeletedWorktrees: ReadonlyArray<string> = [];
-  let deletions = 0;
-  let sweptDeletions = 0;
+  let purges = 0;
+  let sweptPurges = 0;
   const sweep = Effect.fn("StorageCleanup.sweep")(function* (
     trigger: StorageCleanupReport["trigger"],
     commit: boolean,
   ) {
-    const deletionsAtStart = deletions;
+    const purgesAtStart = purges;
     const now = yield* Clock.currentTimeMillis;
     const serverSettings = yield* settingsService.getSettings;
     const settings = serverSettings.storageCleanup;
@@ -1600,7 +1620,7 @@ const make = Effect.gen(function* () {
     if (commit) {
       deletedWorktreeWaits = deletedWorktrees.waiting;
       keptDeletedWorktrees = deletedWorktrees.kept;
-      sweptDeletions = deletionsAtStart;
+      sweptPurges = purgesAtStart;
     }
     for (const category of [
       {
@@ -1757,13 +1777,13 @@ const make = Effect.gen(function* () {
     );
     yield* forkParked(
       Stream.runForEach(events, (event) => {
-        if (event.type === "thread.deleted") deletions++;
+        if (event.type === "thread.purged") purges++;
         else if (
           event.type !== "provider-session.updated" ||
           (event.payload.status !== "stopped" && event.payload.status !== "error")
         )
           return Effect.void;
-        else if (!deletedWorktreeWaits && deletions === sweptDeletions) {
+        else if (!deletedWorktreeWaits && purges === sweptPurges) {
           const cwd = pathKey(event.payload.cwd);
           if (
             !keptDeletedWorktrees.some(

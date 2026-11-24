@@ -403,6 +403,7 @@ const cleanupFixture = (
     };
     let threads = [shell({ branch: "feature", worktreePath: worktree })];
     let deletedThreads: OrchestrationV2ThreadShell[] = [];
+    let trashedThreadIds = new Set<ThreadId>();
     let storedWorktreePaths: string[] = [worktree];
     let projectRoots = [repo];
     let editBeforeRemoval = false;
@@ -511,17 +512,26 @@ const cleanupFixture = (
               ]
             : outboxStatus !== null && strings.join("").includes("orchestration_v2_effect_outbox")
               ? [{ status: outboxStatus }]
-              : strings.join("").includes("deleted_at IS NOT NULL")
-                ? deletedThreads.map((thread) => ({
-                    payload_json: JSON.stringify(thread),
-                    workspaceRoot: repo,
-                  }))
-                : strings.join("").includes('AS "worktreePath"')
-                  ? [
-                      ...threads.flatMap((thread) => thread.worktreePath ?? []),
-                      ...storedWorktreePaths,
-                    ].map((worktreePath) => ({ worktreePath }))
-                  : [],
+              : strings.join("").includes("JOIN orchestration_v2_projection_thread_trash")
+                ? deletedThreads
+                    .filter((thread) => trashedThreadIds.has(thread.id))
+                    .map((thread) => ({
+                      payload_json: JSON.stringify(thread),
+                      workspaceRoot: repo,
+                    }))
+                : strings.join("").includes("deleted_at IS NOT NULL")
+                  ? deletedThreads
+                      .filter((thread) => !trashedThreadIds.has(thread.id))
+                      .map((thread) => ({
+                        payload_json: JSON.stringify(thread),
+                        workspaceRoot: repo,
+                      }))
+                  : strings.join("").includes('AS "worktreePath"')
+                    ? [
+                        ...threads.flatMap((thread) => thread.worktreePath ?? []),
+                        ...storedWorktreePaths,
+                      ].map((worktreePath) => ({ worktreePath }))
+                    : [],
         )) as unknown as SqlClient.SqlClient),
       Effect.provideService(GitManager.GitManager, {
         invalidateStatus: () => Effect.void,
@@ -590,6 +600,9 @@ const cleanupFixture = (
       },
       setDeletedThreads: (next: OrchestrationV2ThreadShell[]) => {
         deletedThreads = next;
+      },
+      setTrashedThreadIds: (threadIds: ReadonlyArray<ThreadId>) => {
+        trashedThreadIds = new Set(threadIds);
       },
       setStoredWorktreePaths: (paths: string[]) => {
         storedWorktreePaths = paths;
@@ -1419,6 +1432,28 @@ describe("deleted thread worktrees", () => {
       }).pipe(Effect.provide(cleanupTestLayer)),
   );
 
+  it.effect("keeps a recently deleted thread's worktree until it is purged", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(NOW_MS);
+      const fixture = yield* cleanupFixture({
+        ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+        worktreeAfterDays: null,
+        worktreeOnDelete: true,
+      });
+      const owner = parent(fixture.worktree);
+      fixture.setDeletedThreads([owner]);
+      fixture.setTrashedThreadIds([owner.id]);
+      fixture.setThreads([]);
+      const report = yield* fixture.service.runNow;
+      expect(report.entries[0]).toMatchObject({
+        threadId: owner.id,
+        outcome: "kept",
+        reason: "会话在最近删除里，到期后按规则清理",
+      });
+      expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
+    }).pipe(Effect.provide(cleanupTestLayer)),
+  );
+
   it.effect("applies the remaining subagent's rules when deletion cleanup is off", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(NOW_MS);
@@ -1684,7 +1719,7 @@ describe("deleted thread worktrees", () => {
   );
 
   it.effect(
-    "removes a deleted thread's worktree when its session stops during the deletion's sweep",
+    "removes a purged thread's worktree when its session stops during the purge's sweep",
     () =>
       Effect.gen(function* () {
         yield* TestClock.setTime(NOW_MS);
@@ -1698,9 +1733,9 @@ describe("deleted thread worktrees", () => {
         const startupSwept = yield* Deferred.make<void>();
         const sessionChecked = yield* Deferred.make<void>();
         const delivered = yield* Deferred.make<void>();
-        const deleted = {
-          id: EventId.make("event:thread-deleted"),
-          type: "thread.deleted",
+        const purged = {
+          id: EventId.make("event:thread-purged"),
+          type: "thread.purged",
           threadId: owner.id,
           occurredAt: at(0),
           payload: owner,
@@ -1725,7 +1760,7 @@ describe("deleted thread worktrees", () => {
         };
         yield* fixture.activate(
           Stream.fromEffect(Deferred.await(startupSwept)).pipe(
-            Stream.flatMap(() => Stream.make(deleted)),
+            Stream.flatMap(() => Stream.make(purged)),
             Stream.concat(Stream.fromEffect(Deferred.await(sessionChecked)).pipe(Stream.drain)),
             Stream.concat(Stream.make(stopped)),
             Stream.concat(
@@ -1741,7 +1776,7 @@ describe("deleted thread worktrees", () => {
         yield* fixture.service.drain;
         fixture.setDeletedThreads([owner]);
         fixture.setOpenSessionCwd(fixture.worktree);
-        // The deletion's sweep sees the session live; it stops before that sweep publishes its result.
+        // The purge's sweep sees the session live; it stops before that sweep publishes its result.
         fixture.setOnLiveCheck(
           Effect.gen(function* () {
             fixture.setOnLiveCheck(Effect.void);
@@ -2341,12 +2376,21 @@ describe("storage cleanup reports and local file policies", () => {
           expect(fixture.sessionLiveChecks()).toBe(worktreeOnDelete ? 6 : 0);
 
           fixture.setSessionLive(true);
+          const retiredThread = { ...shell({ deletedAt: at(0) }), lastVisitedAt: null };
           yield* publish({
             id: EventId.make("event:thread:deleted"),
             type: "thread.deleted",
             threadId: ThreadId.make("thread-1"),
             occurredAt: at(0),
-            payload: { ...shell({ deletedAt: at(0) }), lastVisitedAt: null },
+            payload: retiredThread,
+          });
+          expect(fixture.snapshotReads()).toBe(startupReads + 2 * Number(worktreeOnDelete));
+          yield* publish({
+            id: EventId.make("event:thread:purged"),
+            type: "thread.purged",
+            threadId: ThreadId.make("thread-1"),
+            occurredAt: at(0),
+            payload: retiredThread,
           });
           expect(fixture.snapshotReads()).toBe(startupReads + 3 * Number(worktreeOnDelete));
           expect(fixture.sessionLiveChecks()).toBe(worktreeOnDelete ? 6 : 0);
