@@ -1,0 +1,288 @@
+/* @fleet/design/segmented-control.css defines .fa-seg styling for buttons that use
+   [aria-checked=true] / [disabled]. Base UI ToggleGroup + Toggle emit
+   aria-pressed/data-pressed and disabled groups emit data-disabled, so we extend the
+   same selectors here without duplicating layout. Grove/Ember keep their --primary
+   accent on non-disabled checked/pressed items only. */
+
+.fa-seg[data-orientation="vertical"],
+.fa-seg[aria-orientation="vertical"] {
+  flex-direction: column;
+  height: auto;
+}
+
+.fa-seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fa-space-1);
+}
+
+/* Extend the unselected hover to pressed/unchecked toggles. */
+.fa-seg
+  button:hover:not([aria-checked="true"]):not([aria-pressed="true"]):not([data-pressed]):not(
+    [disabled]
+  ):not([data-disabled]):not([aria-disabled="true"]) {
+  background-image: var(--fa-hv);
+  color: var(--fa-fg);
+}
+
+/* Extend checked style to aria-pressed/data-pressed (Base UI Toggle). */
+.fa-seg button:is([aria-checked="true"], [aria-pressed="true"], [data-pressed], [data-checked]) {
+  background: var(--fa-bg);
+  box-shadow: inset 0 0 0 var(--fa-bw-1) var(--fa-border);
+  color: var(--fa-fg);
+}
+
+/* Extend disabled state to Base UI disabled markers. */
+.fa-seg[data-disabled] button,
+.fa-seg[aria-disabled="true"] button,
+.fa-seg button:is([disabled], [data-disabled], [aria-disabled="true"]) {
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--fa-fg-muted);
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: var(--fa-border);
+}
+
+/* Keep selected items visually selected when disabled (muted selected treatment). */
+.fa-seg[data-disabled]
+  button:is([aria-checked="true"], [aria-pressed="true"], [data-pressed], [data-checked]),
+.fa-seg[aria-disabled="true"]
+  button:is([aria-checked="true"], [aria-pressed="true"], [data-pressed], [data-checked]),
+.fa-seg
+  button:is([aria-checked="true"], [aria-pressed="true"], [data-pressed], [data-checked]):is(
+    [disabled],
+    [data-disabled],
+    [aria-disabled="true"]
+  ) {
+  background: var(--fa-bg);
+  box-shadow: inset 0 0 0 var(--fa-bw-1) var(--fa-border);
+  color: var(--fa-fg-muted);
+  text-decoration: none;
+}
+
+/* Grove/Ember: --primary accent on selected/pressed items only. */
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-seg:not([data-disabled]):not([aria-disabled="true"])
+  button:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+    [aria-checked="true"],
+    [aria-pressed="true"],
+    [data-pressed],
+    [data-checked]
+  ) {
+  background: var(--primary);
+  box-shadow: inset 0 0 0 var(--fa-bw-1) var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Non-segmented ToggleGroup variants (default / outline / multi) — token-based, no
+   shadcn utility classes. */
+.fa-toggle-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-1);
+  max-width: 100%;
+}
+
+.fa-toggle-group[data-orientation="vertical"],
+.fa-toggle-group[aria-orientation="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.fa-toggle-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fa-space-1);
+  flex: none;
+  height: var(--fa-ctrl-sm);
+  padding: 0 var(--fa-space-2);
+  border: var(--fa-bw-1) solid transparent;
+  border-radius: var(--fa-radius-md);
+  background: transparent;
+  color: var(--fa-fg-muted);
+  font: 500 14px/20px var(--fa-font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  --fa-hv: linear-gradient(var(--fa-hover), var(--fa-hover));
+}
+
+.fa-toggle-item[data-size="xs"] {
+  height: var(--fa-ctrl-xs);
+  padding: 0 var(--fa-space-2);
+  border-radius: var(--fa-radius-sm);
+  font: 500 12px/16px var(--fa-font-sans);
+}
+.fa-toggle-item[data-size="sm"] {
+  height: var(--fa-ctrl-sm);
+  padding: 0 var(--fa-space-2);
+}
+.fa-toggle-item[data-size="default"] {
+  height: var(--fa-ctrl);
+  padding: 0 var(--fa-space-3);
+}
+.fa-toggle-item[data-size="lg"] {
+  height: var(--fa-ctrl-lg);
+  padding: 0 var(--fa-space-4);
+}
+.fa-toggle-item[data-size="compact"],
+.fa-toggle-item[data-size="segmented"] {
+  height: var(--fa-ctrl-sm);
+  padding: 0 var(--fa-space-2);
+}
+
+.fa-toggle-item[data-variant="outline"] {
+  border-color: var(--fa-border);
+  background: var(--fa-bg);
+}
+.fa-toggle-item[data-variant="ghost"] {
+  color: var(--fa-fg);
+}
+.fa-toggle-item[data-variant="pill"] {
+  border-radius: var(--fa-radius-full);
+  padding: 0 var(--fa-space-3);
+}
+
+.fa-toggle-item:hover:not([aria-pressed="true"]):not([data-pressed]):not([disabled]):not(
+    [data-disabled]
+  ):not([aria-disabled="true"]) {
+  background-image: var(--fa-hv);
+  color: var(--fa-fg);
+}
+
+.fa-toggle-item:is([aria-pressed="true"], [data-pressed]) {
+  background: var(--fa-panel);
+  border-color: var(--fa-fg-muted);
+  color: var(--fa-fg);
+}
+
+.fa-toggle-item[data-variant="outline"]:is([aria-pressed="true"], [data-pressed]) {
+  background: var(--fa-panel);
+  border-color: var(--fa-fg-muted);
+}
+
+.fa-toggle-item:is([disabled], [data-disabled], [aria-disabled="true"]) {
+  background: transparent;
+  background-image: none;
+  border-color: transparent;
+  color: var(--fa-fg-muted);
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: var(--fa-border);
+}
+.fa-toggle-item[data-variant="outline"]:is([disabled], [data-disabled], [aria-disabled="true"]) {
+  border-color: var(--fa-border);
+}
+
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-toggle-item:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+    [aria-pressed="true"],
+    [data-pressed]
+  ) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* RadioGroup + Radio — @fleet/design has no radio component; tokens only. */
+.fa-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-3);
+}
+
+.fa-radio-group[data-orientation="horizontal"],
+.fa-radio-group[aria-orientation="horizontal"] {
+  flex-direction: row;
+}
+
+.fa-radio {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: var(--fa-bw-1) solid var(--fa-fg-muted);
+  border-radius: var(--fa-radius-full);
+  background: var(--fa-bg);
+  cursor: pointer;
+}
+
+.fa-radio:hover:not([data-disabled]):not([aria-disabled="true"]):not([disabled]):not(
+    [data-checked]
+  ):not([aria-checked="true"]) {
+  background-image: var(--fa-hv);
+}
+
+.fa-radio:is([data-checked], [aria-checked="true"]) {
+  border-color: var(--fa-fg);
+  background: var(--fa-fg);
+}
+
+.fa-radio:is([disabled], [data-disabled], [aria-disabled="true"]) {
+  border-color: var(--fa-border);
+  background: var(--fa-panel);
+  cursor: not-allowed;
+}
+
+.fa-radio:is([disabled], [data-disabled], [aria-disabled="true"]):is(
+    [data-checked],
+    [aria-checked="true"]
+  ) {
+  border-color: var(--fa-fg-muted);
+  background: var(--fa-fg-muted);
+}
+
+.fa-radio[aria-invalid="true"] {
+  border-color: var(--fa-danger);
+}
+
+.fa-radio-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--fa-radius-full);
+  background: var(--fa-bg);
+}
+
+.fa-radio-indicator[data-unchecked] {
+  display: none;
+}
+
+@media (max-width: 639.98px) {
+  .fa-radio {
+    width: 18px;
+    height: 18px;
+  }
+  .fa-radio-indicator {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-radio:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+    [data-checked],
+    [aria-checked="true"]
+  ) {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-radio:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+    [data-checked],
+    [aria-checked="true"]
+  )
+  .fa-radio-indicator {
+  background: var(--primary-foreground);
+}
