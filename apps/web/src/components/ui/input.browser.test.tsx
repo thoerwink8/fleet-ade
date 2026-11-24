@@ -298,7 +298,11 @@ describe("Input, Textarea, and InputGroup", () => {
           root.classList.toggle("dark", appearance === "dark");
           root.dataset.theme = appearance;
           applyThemePalette(theme.id, appearance);
-          const dangerValue = getComputedStyle(root).getPropertyValue("--fa-danger").trim();
+          const dangerProbe = document.createElement("div");
+          dangerProbe.style.borderColor = "var(--fa-danger)";
+          document.body.append(dangerProbe);
+          const dangerValue = getComputedStyle(dangerProbe).borderColor;
+          dangerProbe.remove();
           expectCloseColor(
             getComputedStyle(invalidEl).borderColor,
             dangerValue,
