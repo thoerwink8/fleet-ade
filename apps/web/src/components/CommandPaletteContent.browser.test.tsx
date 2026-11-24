@@ -73,7 +73,15 @@ describe("CommandPaletteContent", () => {
     const realMatchMedia = window.matchMedia.bind(window);
     using _touch = vi
       .spyOn(window, "matchMedia")
-      .mockImplementation((query) => realMatchMedia(query === "(pointer: coarse)" ? "all" : query));
+      .mockImplementation((query) =>
+        realMatchMedia(
+          query === "(pointer: coarse)"
+            ? "all"
+            : query === "(any-pointer: fine)"
+              ? "not all"
+              : query,
+        ),
+      );
 
     await using screen = await render(renderPalette(<span>正在搜索消息…</span>));
     await expect.element(page.getByText("正在搜索消息…", { exact: true })).toBeVisible();
