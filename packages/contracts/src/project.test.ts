@@ -87,14 +87,14 @@ describe("project RPC errors", () => {
       cause,
     });
 
-    expect(searchError.message).toBe("Failed to search workspace entries in '/workspace'.");
+    expect(searchError.message).toBe("无法在“/workspace”中搜索项目条目。");
     expect(searchError.message).not.toContain(cause.message);
     expect(searchError.normalizedCwd).toBe("/workspace");
     expect(searchError.queryLength).toBe("authorization: Bearer secret-token".length);
     expect(searchError).not.toHaveProperty("query");
     expect(searchError.message).not.toMatch(/Bearer|secret-token/);
     expect(searchError.cause).toBe(cause);
-    expect(readError.message).toBe("Failed to read workspace file 'src/index.ts' in '/workspace'.");
+    expect(readError.message).toBe("无法读取“/workspace”中的项目文件“src/index.ts”。");
     expect(readError.message).not.toContain(cause.message);
     expect(readError.cause).toBe(cause);
 
@@ -105,7 +105,7 @@ describe("project RPC errors", () => {
       failure: "search_index_search_failed",
       cause,
     });
-    expect(contentSearchError.message).toBe("Failed to search workspace contents in '/workspace'.");
+    expect(contentSearchError.message).toBe("无法在“/workspace”中搜索项目内容。");
     expect(contentSearchError.message).not.toContain(cause.message);
     expect(contentSearchError).not.toHaveProperty("query");
     expect(contentSearchError.cause).toBe(cause);

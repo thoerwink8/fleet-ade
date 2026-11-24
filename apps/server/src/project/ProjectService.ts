@@ -73,7 +73,7 @@ export class ProjectConflictError extends Schema.TaggedError<ProjectConflictErro
   },
 ) {
   override get message(): string {
-    return `Workspace ${this.workspaceRoot} already belongs to project ${this.conflictingProjectId}.`;
+    return `目录 ${this.workspaceRoot} 已属于项目 ${this.conflictingProjectId}。`;
   }
 }
 
@@ -82,7 +82,7 @@ export class ProjectNotEmptyError extends Schema.TaggedError<ProjectNotEmptyErro
   { projectId: ProjectId },
 ) {
   override get message(): string {
-    return `Project ${this.projectId} is not empty.`;
+    return `项目 ${this.projectId} 不是空的。`;
   }
 }
 

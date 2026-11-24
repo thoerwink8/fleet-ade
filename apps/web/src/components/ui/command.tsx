@@ -115,7 +115,7 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof AutocompleteInput>) {
   return (
-    <div className="fa-cmd__in shrink-0" data-slot="command-input-row">
+    <div className="fa-cmd__in" data-slot="command-input-row">
       <AutocompleteInput
         autoFocus
         className={cn(
@@ -254,7 +254,7 @@ function CommandShortcut({
 function CommandFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("fa-cmd__foot shrink-0 justify-between", className)}
+      className={cn("fa-cmd__foot justify-between", className)}
       data-slot="command-footer"
       {...props}
     />
