@@ -918,16 +918,25 @@ class RewindNotCompletedError extends Schema.TaggedError<RewindNotCompletedError
   }
 }
 
+/** Another client cancelled the rewind this client was waiting on; the server said so. */
+export class RewindCancelledElsewhereError extends Schema.TaggedError<RewindCancelledElsewhereError>()(
+  "RewindCancelledElsewhereError",
+  {},
+) {
+  override get message(): string {
+    return "回退已取消。";
+  }
+}
+
 /** Time a queued rollback gets to land once the held rewind is gone, before it counts as lost. */
 export const REWIND_SETTLE_MS = 20_000;
 /** Same, when files are restored too: that step is slower. */
 export const REWIND_SETTLE_WITH_FILES_MS = 60_000;
 
 /**
- * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's stored
- * failure, or `signal`. No deadline while held. Held then gone: at once if a run is still active
- * (the server only queues a rollback after the run settled, so it was cancelled), else `settleMs`.
- * Never held: `timeoutMs`. Once ended it listens to nothing.
+ * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's failure,
+ * or `signal`. Without `markers` a held rewind that vanishes ends at once if a run is active, else
+ * after `settleMs`. With them (`threadRollbackMarkers`) the thread says cancelled or queued: no grace.
  */
 export function waitForRollbackOutcome(
   threadRef: ScopedThreadRef,
@@ -937,9 +946,10 @@ export function waitForRollbackOutcome(
     readonly signal?: AbortSignal;
     readonly timeoutMs?: number;
     readonly settleMs?: number;
+    readonly markers?: boolean;
   } = {},
 ): Promise<void> {
-  const { signal, timeoutMs = 120_000, settleMs = REWIND_SETTLE_MS } = options;
+  const { signal, timeoutMs = 120_000, settleMs = REWIND_SETTLE_MS, markers = false } = options;
   const threadAtom = environmentThreadDetails.stateAtom(threadRef);
   return new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -981,10 +991,13 @@ export function waitForRollbackOutcome(
           }),
         );
       }
-      armTimeout(
-        projection.thread.pendingRollback?.requestId === requestId,
-        hasActiveRun(projection.runs),
-      );
+      if (markers && outcome.kind === "cancelled")
+        return finish(new RewindCancelledElsewhereError());
+      const held =
+        projection.thread.pendingRollback?.requestId === requestId ||
+        (markers && outcome.kind === "rewinding");
+      if (markers && wasHeld && !held) return finish(new RewindNotCompletedError());
+      armTimeout(held, hasActiveRun(projection.runs));
     };
     if (signal?.aborted === true) {
       finish(new RewindCancelledError());
