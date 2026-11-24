@@ -594,7 +594,7 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
           command: "script.run-tests.run",
         });
       }).pipe(toDetailResult);
-      assertFailure(result, "expected JSON array");
+      assertFailure(result, "应为 JSON 数组");
 
       const persistedRaw = yield* fs.readFileString(keybindingsConfigPath);
       assert.equal(persistedRaw, "{ not-json");
@@ -609,7 +609,7 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
 
       const keybindings = yield* Keybindings.Keybindings;
       const failed = yield* toDetailResult(keybindings.loadConfigState);
-      assertFailure(failed, "failed to read keybindings config");
+      assertFailure(failed, "无法读取快捷键配置");
 
       yield* fileSystem.remove(keybindingsConfigPath, { recursive: true });
       yield* writeKeybindingsConfig(keybindingsConfigPath, [

@@ -45,7 +45,7 @@ export class ResourceTelemetryRefreshFailed extends Schema.TaggedError<ResourceT
   },
 ) {
   override get message(): string {
-    return `Resource telemetry operation '${this.operation}' failed.`;
+    return `无法执行资源遥测操作「${this.operation}」。`;
   }
 }
 
