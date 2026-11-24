@@ -787,6 +787,9 @@ function ScheduledTaskRow({
   const canOperate = useAtomValue(
     serverEnvironment.upsertScheduledTask.permissionAtom(environmentId),
   );
+  const canUndoDelete =
+    useEnvironment(environmentId)?.serverConfig?.environment.capabilities
+      .scheduledTaskUndoDelete === true;
   const [busy, setBusy] = useState(false);
   const [deliveriesOpen, setDeliveriesOpen] = useState(false);
   const isWebhook = task.schedule.type === "webhook";
@@ -884,7 +887,7 @@ function ScheduledTaskRow({
               <MenuItem
                 onClick={() => {
                   if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
-                  requestScheduledTaskDelete(environmentId, task);
+                  requestScheduledTaskDelete(environmentId, task, canUndoDelete);
                 }}
               >
                 <Trash2Icon />

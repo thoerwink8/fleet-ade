@@ -8,12 +8,13 @@ import { toastManager } from "../ui/toast";
 
 export const SCHEDULED_TASK_UNDO_MS = 8_000;
 
-function scheduledTaskDeletedNotice(title: string, undo: () => void) {
+function scheduledTaskDeletedNotice(title: string, undo: (() => void) | null) {
   return {
     type: "success" as const,
     title: `已删除定时任务「${title}」`,
     timeout: SCHEDULED_TASK_UNDO_MS,
-    actionProps: { children: "撤销" as const, onClick: undo },
+    // An older server deletes for good, so it must not offer a way back that cannot work.
+    ...(undo === null ? {} : { actionProps: { children: "撤销" as const, onClick: undo } }),
   };
 }
 
@@ -46,11 +47,17 @@ async function undoScheduledTaskDelete(
 export function requestScheduledTaskDelete(
   environmentId: EnvironmentId,
   task: Pick<ScheduledTask, "id" | "title">,
+  canUndo: boolean,
 ): void {
   toastManager.add(
-    scheduledTaskDeletedNotice(task.title, () => {
-      void undoScheduledTaskDelete(environmentId, task);
-    }),
+    scheduledTaskDeletedNotice(
+      task.title,
+      canUndo
+        ? () => {
+            void undoScheduledTaskDelete(environmentId, task);
+          }
+        : null,
+    ),
   );
   void runAtomCommand(
     appAtomRegistry,

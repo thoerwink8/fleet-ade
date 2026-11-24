@@ -180,6 +180,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   freshContext: Schema.optionalKey(Schema.Boolean),
   /** Server saves and runs scheduled task `threadMode`; older servers ignore it. */
   scheduledTaskThreadModes: Schema.optionalKey(Schema.Boolean),
+  /** Server keeps a deleted scheduled task for a short window and serves `scheduledTasks.undoDelete`. */
+  scheduledTaskUndoDelete: Schema.optionalKey(Schema.Boolean),
   /**
    * The server config's flags of the same names. A server that names them here lets a client
    * load the shell snapshot before the socket opens, and answers its `resumeFrom`.

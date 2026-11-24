@@ -268,6 +268,7 @@ export const make = Effect.gen(function* () {
       oneTimeSchedules: true,
       freshContext: true,
       scheduledTaskThreadModes: true,
+      scheduledTaskUndoDelete: true,
       ...(serverConfig.mode === "desktop" ? { desktopAppInstall: true } : {}),
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),
       ...(serverInstallation === null ? {} : { serverInstallation }),
