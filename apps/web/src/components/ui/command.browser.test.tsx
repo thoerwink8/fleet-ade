@@ -113,10 +113,10 @@ describe("command palette shell", () => {
     const list = popup.querySelector<HTMLElement>('[data-slot="command-list"]');
     expect(heading, "group heading").not.toBeNull();
     expect(list, "virtualised list").not.toBeNull();
-    // Result rows, headings and the virtualised list are not part of this shell
-    // change. These are their computed height and font size.
+    // Result rows are library rows now: the 14px title is the row's first line.
+    // The headings and the virtualised list keep their computed height and font size.
     expect(row.getBoundingClientRect().height).toBe(32);
-    expect(getComputedStyle(row).fontSize).toBe("14px");
+    expect(getComputedStyle(row.querySelector(".l1")!).fontSize).toBe("14px");
     expect(heading!.getBoundingClientRect().height).toBe(28);
     expect(getComputedStyle(heading!).fontSize).toBe("12px");
     expect(list!.getBoundingClientRect().height).toBe(415);
