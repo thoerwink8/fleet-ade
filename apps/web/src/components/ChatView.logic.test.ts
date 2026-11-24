@@ -1542,6 +1542,27 @@ describe("waitForRollbackOutcome", () => {
       expect(await result).toBe("回退没有完成，可能已被取消。可以重新回退。");
     });
 
+    it("ends at once when the held rewind goes while a run is still active, since it was cancelled", async () => {
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {});
+      await Promise.resolve();
+      appAtomRegistry.set(handle.state, {
+        data: Option.some({
+          ...handle.projection,
+          runs: [{ status: "running" }],
+          thread: { ...handle.projection.thread, pendingRollback: held },
+        } as never),
+      });
+      appAtomRegistry.set(handle.state, {
+        data: Option.some({
+          ...handle.projection,
+          runs: [{ status: "running" }],
+          thread: { ...handle.projection.thread, pendingRollback: null },
+        } as never),
+      });
+      await expect(waiting).rejects.toMatchObject({ _tag: "RewindNotCompletedError" });
+    });
+
     it("still completes when the queued rollback lands inside the settle window", async () => {
       vi.useFakeTimers();
       const handle = projectionAtom();

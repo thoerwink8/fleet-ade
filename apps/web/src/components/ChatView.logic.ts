@@ -15,7 +15,7 @@ import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
 import { RewindFailureError } from "./chat/revertConfirm.logic";
-import { classifyRewindOutcome } from "./chat/stopAndRewind.logic";
+import { classifyRewindOutcome, hasActiveRun } from "./chat/stopAndRewind.logic";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
@@ -919,14 +919,15 @@ class RewindNotCompletedError extends Schema.TaggedError<RewindNotCompletedError
 }
 
 /** Time a queued rollback gets to land once the held rewind is gone, before it counts as lost. */
-export const REWIND_SETTLE_MS = 5_000;
+export const REWIND_SETTLE_MS = 20_000;
 /** Same, when files are restored too: that step is slower. */
-export const REWIND_SETTLE_WITH_FILES_MS = 30_000;
+export const REWIND_SETTLE_WITH_FILES_MS = 60_000;
 
 /**
  * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's stored
- * failure, or `signal`. No deadline while held; once held then gone, `settleMs`; never held,
- * `timeoutMs`. Once ended it listens to nothing.
+ * failure, or `signal`. No deadline while held. Held then gone: at once if a run is still active
+ * (the server only queues a rollback after the run settled, so it was cancelled), else `settleMs`.
+ * Never held: `timeoutMs`. Once ended it listens to nothing.
  */
 export function waitForRollbackOutcome(
   threadRef: ScopedThreadRef,
@@ -955,13 +956,14 @@ export function waitForRollbackOutcome(
     };
     const onAbort = () => finish(new RewindCancelledError());
     let wasHeld = false;
-    const armTimeout = (held: boolean) => {
+    const armTimeout = (held: boolean, runActive: boolean) => {
       if (held) {
         wasHeld = true;
         if (timeout !== undefined) globalThis.clearTimeout(timeout);
         timeout = undefined;
         return;
       }
+      if (wasHeld && runActive) return finish(new RewindNotCompletedError());
       timeout ??= wasHeld
         ? globalThis.setTimeout(() => finish(new RewindNotCompletedError()), settleMs)
         : globalThis.setTimeout(() => finish(new Error("等待会话回退超时。")), timeoutMs);
@@ -979,7 +981,10 @@ export function waitForRollbackOutcome(
           }),
         );
       }
-      armTimeout(projection.thread.pendingRollback?.requestId === requestId);
+      armTimeout(
+        projection.thread.pendingRollback?.requestId === requestId,
+        hasActiveRun(projection.runs),
+      );
     };
     if (signal?.aborted === true) {
       finish(new RewindCancelledError());
@@ -987,7 +992,7 @@ export function waitForRollbackOutcome(
     }
     signal?.addEventListener("abort", onAbort, { once: true });
     unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
-    armTimeout(false);
+    armTimeout(false, false);
     Promise.resolve().then(send).then(inspect, finish);
   });
 }
