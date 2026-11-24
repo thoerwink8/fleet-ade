@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
+import { RewindFailureError } from "./chat/revertConfirm.logic";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
@@ -856,7 +857,12 @@ export async function waitForRevertedMessage(
       if (!thread) return;
       const failure = thread.thread.rollbackFailure;
       if (failure?.requestId === requestId) {
-        finish(new Error(failure.message));
+        finish(
+          new RewindFailureError({
+            rawMessage: failure.message,
+            ...(failure.code === undefined ? {} : { code: failure.code }),
+          }),
+        );
         return;
       }
       if (

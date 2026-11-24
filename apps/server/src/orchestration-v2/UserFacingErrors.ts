@@ -1,5 +1,10 @@
-import { PROVIDER_DISPLAY_NAMES, type ProviderDriverKind } from "@t3tools/contracts";
+import {
+  OrchestrationV2RollbackFailureCode,
+  PROVIDER_DISPLAY_NAMES,
+  type ProviderDriverKind,
+} from "@t3tools/contracts";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import * as SqlError from "effect/sql/SqlError";
 
 const GENERIC_ERROR_PREFIXES = [
@@ -130,6 +135,19 @@ function collectErrorMessages(value: unknown, seen: Set<unknown>): ReadonlyArray
   ];
 
   return message === undefined ? nested : [message, ...nested];
+}
+
+const isRollbackFailureCode = Schema.is(OrchestrationV2RollbackFailureCode);
+
+export function dispatchErrorCode(cause: unknown): OrchestrationV2RollbackFailureCode | undefined {
+  const seen = new Set<unknown>();
+  let value = cause;
+  while (Predicate.isObject(value) && !seen.has(value)) {
+    seen.add(value);
+    if ("code" in value && isRollbackFailureCode(value.code)) return value.code;
+    value = value.cause;
+  }
+  return undefined;
 }
 
 export function userFacingDispatchErrorMessage(cause: unknown): string | undefined {
