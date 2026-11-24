@@ -136,9 +136,7 @@ describe("CommandPalette open intents", () => {
     openCommandPalette({});
     await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
     await userEvent.keyboard("速查");
-    await expect
-      .element(page.getByRole("option", { name: "快捷键速查", exact: true }))
-      .toBeVisible();
+    await expect.element(page.getByRole("option", { name: /^快捷键速查(?!设置)/ })).toBeVisible();
     await userEvent.keyboard("{Escape}");
     await expect.element(page.getByRole("dialog", { name: "命令面板" })).not.toBeInTheDocument();
     await expect.element(opener).toHaveFocus();
@@ -266,9 +264,7 @@ describe("CommandPalette open intents", () => {
     const input = page.getByPlaceholder("搜索命令、项目和会话…");
     await expect.element(input).toHaveFocus();
     await input.fill("快捷键速查");
-    await expect
-      .element(page.getByRole("option", { name: "快捷键速查", exact: true }))
-      .toBeVisible();
+    await expect.element(page.getByRole("option", { name: /^快捷键速查(?!设置)/ })).toBeVisible();
     await expect
       .element(page.getByRole("option", { name: /^在以下位置新建会话/ }))
       .not.toBeInTheDocument();
@@ -288,7 +284,7 @@ describe("CommandPalette open intents", () => {
     openCommandPalette({ query: "快捷键速查" });
     const reopened = page.getByPlaceholder("搜索命令、项目和会话…");
     await expect.element(reopened).toHaveFocus();
-    const cheatsheet = page.getByRole("option", { name: "快捷键速查", exact: true });
+    const cheatsheet = page.getByRole("option", { name: /^快捷键速查(?!设置)/ });
     await expect.element(cheatsheet).toBeVisible();
     if (!cheatsheet.element().hasAttribute("data-highlighted")) {
       await userEvent.keyboard("{ArrowDown}");

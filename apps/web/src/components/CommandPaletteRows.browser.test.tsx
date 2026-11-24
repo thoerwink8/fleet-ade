@@ -194,19 +194,11 @@ describe("command palette rows", () => {
       expect(getComputedStyle(second).fontSize).toBe("12px");
       weightAtMost500(title);
       weightAtMost500(second);
-      if (width >= 640) {
-        const shortcut = one().querySelector("[data-slot=command-shortcut]");
-        expect(shortcut, "desktop shortcut hint").not.toBeNull();
-        expect(getComputedStyle(shortcut!).fontSize).toBe("12px");
-        weightAtMost500(shortcut!);
-      } else {
-        await vi.waitFor(() => {
-          expect(
-            one().querySelector("[data-slot=command-shortcut]"),
-            "narrow viewports hide keyboard hints",
-          ).toBeNull();
-        });
-      }
+      // A narrow window still has a keyboard, so the hint stays at every width.
+      const shortcut = one().querySelector("[data-slot=command-shortcut]");
+      expect(shortcut, `${width} shortcut hint`).not.toBeNull();
+      expect(getComputedStyle(shortcut!).fontSize).toBe("12px");
+      weightAtMost500(shortcut!);
       expect(getComputedStyle(heading()).fontSize).toBe("12px");
       weightAtMost500(heading());
 
