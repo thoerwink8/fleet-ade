@@ -44,6 +44,8 @@ import {
   respondToThreadUserInput,
   dismissThreadUserInput,
   revertThreadCheckpoint,
+  stopAndRollbackThread,
+  cancelPendingRollback,
   setThreadInteractionMode,
   setThreadRuntimeMode,
   pinThread,
@@ -349,6 +351,18 @@ export function createThreadEnvironmentAtoms<R, E>(
     revertCheckpoint: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:revert-checkpoint",
       execute: revertThreadCheckpoint,
+      scheduler,
+      concurrency,
+    }),
+    stopAndRollback: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:stop-and-rollback",
+      execute: stopAndRollbackThread,
+      scheduler,
+      concurrency,
+    }),
+    cancelPendingRollback: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:cancel-pending-rollback",
+      execute: cancelPendingRollback,
       scheduler,
       concurrency,
     }),

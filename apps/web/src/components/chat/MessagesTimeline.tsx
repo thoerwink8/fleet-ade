@@ -305,6 +305,8 @@ interface MessagesTimelineProps {
   onSendAppMessage?: (text: string) => Promise<void>;
   onRunShellCommand?: (command: string) => void;
   isRevertingCheckpoint: boolean;
+  /** The server stops a running thread itself, so Rewind stays on while it works. */
+  canRewindWhileWorking?: boolean;
   onImageExpand: (preview: ExpandedImagePreview) => void;
   onFileOpen?: (attachment: ChatFileAttachment) => void;
   onFileDownload?: (attachment: ChatFileAttachment) => void;
@@ -408,6 +410,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   onSendAppMessage,
   onRunShellCommand,
   isRevertingCheckpoint,
+  canRewindWhileWorking = false,
   onImageExpand,
   onFileOpen = NOOP_OPEN_ATTACHMENT,
   onFileDownload = NOOP_OPEN_ATTACHMENT,
@@ -1306,6 +1309,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     isWorking,
     isCompacting: compactionAwaitingRow,
     isRevertingCheckpoint,
+    canRewindWhileWorking,
     backgroundWorktreeSetup,
     awaitingUser: awaitingUser !== null,
     isPreparingWorktree,
