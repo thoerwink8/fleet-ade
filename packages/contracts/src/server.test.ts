@@ -209,3 +209,59 @@ describe("OtlpEndpointCheckInput", () => {
     }
   });
 });
+
+describe("ServerLifecycleWelcomePayload", () => {
+  const decodeLifecycleEvent = Schema.decodeUnknownSync(ServerLifecycleStreamEvent);
+  const environment = {
+    environmentId: "env-1",
+    label: "Test box",
+    platform: { os: "linux", arch: "x64" },
+    serverVersion: "1.0.0",
+    capabilities: {},
+  };
+
+  it("decodes a fresh welcome payload without bootstrapThreadId", () => {
+    const decoded = decodeLifecycleEvent({
+      version: 1,
+      sequence: 1,
+      type: "welcome",
+      payload: {
+        environment,
+        cwd: "/workspace/project",
+        projectName: "project",
+        bootstrapProjectId: "project-1",
+      },
+    });
+
+    expect(decoded.type).toBe("welcome");
+    if (decoded.type !== "welcome") return;
+    expect(decoded.payload.bootstrapProjectId).toBe("project-1");
+    expect(decoded.payload.bootstrapThreadId).toBeUndefined();
+  });
+
+  it("decodes legacy welcome payloads carrying bootstrapThreadId and retired bootstrap fields", () => {
+    const decoded = decodeLifecycleEvent({
+      version: 1,
+      sequence: 1,
+      type: "welcome",
+      payload: {
+        environment,
+        cwd: "/workspace/project",
+        projectName: "project",
+        bootstrapStatus: "complete",
+        bootstrapProjectId: "project-1",
+        bootstrapThreadId: "thread-1",
+        bootstrapProjectCreated: true,
+        bootstrapThreadCreated: true,
+      },
+    });
+
+    expect(decoded.type).toBe("welcome");
+    if (decoded.type !== "welcome") return;
+    expect(decoded.payload.bootstrapStatus).toBe("complete");
+    expect(decoded.payload.bootstrapProjectId).toBe("project-1");
+    expect(decoded.payload.bootstrapThreadId).toBe("thread-1");
+    expect(decoded.payload.bootstrapProjectCreated).toBe(true);
+    expect(decoded.payload.bootstrapThreadCreated).toBe(true);
+  });
+});
