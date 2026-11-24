@@ -11,6 +11,14 @@ import { removeLocalStorageItem } from "../../hooks/useLocalStorage";
 import { applyThemePalette, EMBER_THEME, GROVE_THEME } from "../../themePalette";
 import type { Project, Thread } from "../../types";
 import { CommandPalette } from "../CommandPalette";
+import {
+  Command,
+  CommandDialog,
+  CommandDialogPopup,
+  CommandFooter,
+  CommandInput,
+  CommandPanel,
+} from "./command";
 import { StandalonePage, StandalonePageHeader } from "./standalone-page";
 
 useMode(modeRgb);
@@ -173,6 +181,29 @@ describe("command palette shell", () => {
       root.classList.remove("dark");
       delete root.dataset.theme;
     }
+  });
+});
+
+describe("command palette shell in a fixed-height popup", () => {
+  it("keeps the input row at 48px and the footer at 32px when the list overflows", async () => {
+    await using _screen = await render(
+      <CommandDialog open>
+        <CommandDialogPopup aria-label="固定高度" className="h-64">
+          <Command>
+            <CommandInput placeholder="搜索" />
+            <CommandPanel>
+              <div style={{ height: 2000 }} />
+            </CommandPanel>
+            <CommandFooter>底部</CommandFooter>
+          </Command>
+        </CommandDialogPopup>
+      </CommandDialog>,
+    );
+    await expect.element(page.getByRole("dialog", { name: "固定高度" })).toBeVisible();
+    const { inputRow, footer } = paletteShell();
+    if (!footer) throw new Error("footer is missing");
+    expect(inputRow.getBoundingClientRect().height).toBe(48);
+    expect(footer.getBoundingClientRect().height).toBe(32);
   });
 });
 
