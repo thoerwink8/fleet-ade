@@ -425,7 +425,11 @@ describe("destructive contrast", () => {
       </div>,
     );
     await act(async () => {
-      requestConfirmDialog("删除这项？", { variant: "destructive" });
+      requestConfirmDialog("删除后无法恢复。", {
+        title: "删除这项？",
+        confirmLabel: "确认删除",
+        variant: "destructive",
+      });
     });
     const byContrast = (id: string) => {
       const element = document.querySelector(`[data-contrast="${id}"]`);
@@ -437,7 +441,7 @@ describe("destructive contrast", () => {
     const ghost = byContrast("ghost");
     const disabled = byContrast("disabled");
     const confirm = [...document.querySelectorAll("button")].find(
-      (element) => element.textContent === "确认",
+      (element) => element.textContent === "确认删除",
     );
     if (!confirm) throw new Error("confirm button missing");
     confirm.setAttribute("data-contrast", "confirm");
