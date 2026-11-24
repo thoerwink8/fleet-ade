@@ -350,6 +350,9 @@ describe("Select", () => {
     const trigger = screen.getByRole("combobox", { name: "Letter" });
     await userEvent.click(trigger);
     await expect.element(page.getByRole("listbox")).toBeVisible();
+    // The highlighted option is focused a frame after the list is shown. ArrowDown
+    // before that is taken as "jump to the first item", which is already selected.
+    await expect.element(page.getByRole("option", { name: "Alpha" })).toHaveFocus();
 
     await userEvent.keyboard("{ArrowDown}");
     await vi.waitFor(() =>
