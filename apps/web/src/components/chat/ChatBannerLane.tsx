@@ -88,7 +88,7 @@ export function ChatBannerLane(props: {
           <AlertTitle>{fleetEngineFailure.title}</AlertTitle>
           <AlertDescription>
             <span>{fleetEngineFailure.description}</span>
-            <span className="flex flex-wrap items-center gap-2">
+            <span className="ade-touch-row ade-touch-row--gap-2 flex flex-wrap items-center gap-2">
               <Button
                 disabled={fleetEngineRetrying}
                 onClick={onRetryFleetEngine}
