@@ -32,8 +32,8 @@ library's density table and type scale (`--fa-ctrl-*`, `--fa-row-*`, `.fa-captio
   a tag, not a click target. A standalone control is 32px. 28px and 24px sit only inside a bar or
   row that is itself at least 32px. A checkbox or radio mark stays 16px inside that row.
 - Under `pointer: coarse`, stretch the hit area to at least 44px with an `::after` and leave the
-  painted height alone. The library does not do this; growing the control to 44px would change
-  the desktop metrics. Text inputs are the exception: below 640px the box is 36px, on the 4px
+  painted height alone. The library does this for `.fa-btn`; controls it does not cover need it
+  here, since growing the control to 44px would change the desktop metrics. Text inputs are the exception: below 640px the box is 36px, on the 4px
   grid and taller than the library's 32px field, with 16px type, because iOS Safari zooms the
   page on focus when a field's type is under 16px.
 - A clickable list row is 32, 52, or 72px for one, two, or three lines (`--fa-row-1`, `--fa-row-2`,
