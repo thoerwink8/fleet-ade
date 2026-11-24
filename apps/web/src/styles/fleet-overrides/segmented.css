@@ -135,6 +135,19 @@
   padding: 0 var(--fa-space-2);
 }
 
+/* Narrow viewports (< 640px / sm) keep the taller touch targets the old toggle had. */
+@media (max-width: 639.98px) {
+  .fa-toggle-item[data-size="xs"] {
+    height: var(--fa-ctrl-sm);
+  }
+  .fa-toggle-item[data-size="sm"] {
+    height: var(--fa-ctrl);
+  }
+  .fa-toggle-item[data-size="default"] {
+    height: calc(var(--fa-ctrl) + 4px);
+  }
+}
+
 .fa-toggle-item[data-variant="outline"] {
   border-color: var(--fa-border);
   background: var(--fa-bg);
