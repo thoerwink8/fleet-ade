@@ -70,6 +70,7 @@ import { DispatchModeLimit, exceededDispatchModeLimit } from "./DispatchModeLimi
 import { projectTurnItemForDetail } from "./WireProjection.ts";
 import * as LegacyV1ThreadImporter from "./legacy/LegacyV1ThreadImporter.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import { providerRefusal } from "./ProviderReadinessGate.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
 export type ThreadManagementSendMode = "auto" | "queue" | "steer" | "restart";
@@ -623,27 +624,16 @@ const make = Effect.gen(function* () {
         if (Option.isSome(receipt) || Option.isNone(providerRegistry)) {
           return Effect.void;
         }
-        return providerRegistry.value.getProviders.pipe(
-          Effect.flatMap((providers) => {
-            const provider = providers.find((entry) => entry.instanceId === input.instanceId);
-            if (provider === undefined) return Effect.void;
-            const agentName = provider.displayName?.trim() || provider.instanceId;
-            if (!provider.installed) {
-              return new Orchestrator.OrchestratorCommandRejectedError({
-                commandId: input.commandId,
-                commandType: input.commandType,
-                cause: new Error(`这台电脑上没装 ${agentName}。`),
-              });
-            }
-            if (provider.auth.status === "unauthenticated") {
-              return new Orchestrator.OrchestratorCommandRejectedError({
-                commandId: input.commandId,
-                commandType: input.commandType,
-                cause: new Error(`${agentName} 需要重新登录。`),
-              });
-            }
-            return Effect.void;
-          }),
+        return providerRefusal(providerRegistry.value, input.instanceId).pipe(
+          Effect.flatMap((reason) =>
+            reason === null
+              ? Effect.void
+              : new Orchestrator.OrchestratorCommandRejectedError({
+                  commandId: input.commandId,
+                  commandType: input.commandType,
+                  cause: new Error(reason),
+                }),
+          ),
         );
       }),
     );

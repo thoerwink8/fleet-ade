@@ -52,6 +52,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import { providerRefusal } from "./ProviderReadinessGate.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
@@ -1065,27 +1066,13 @@ const make = Effect.gen(function* () {
         instanceId: input.modelSelection.instanceId,
       });
       if (Option.isNone(launchReceipt)) {
-        const providers = yield* providerRegistry.getProviders;
-        const provider = providers.find(
-          (entry) => entry.instanceId === input.modelSelection.instanceId,
-        );
-        if (provider !== undefined) {
-          const operation = input.threadId === undefined ? "create-thread" : "update-thread";
-          const agentName = provider.displayName?.trim() || provider.instanceId;
-          if (!provider.installed) {
-            return yield* mapError(
-              input,
-              operation,
-              input.threadId,
-            )(new Error(`这台电脑上没装 ${agentName}。`));
-          }
-          if (provider.auth.status === "unauthenticated") {
-            return yield* mapError(
-              input,
-              operation,
-              input.threadId,
-            )(new Error(`${agentName} 需要重新登录。`));
-          }
+        const refusal = yield* providerRefusal(providerRegistry, input.modelSelection.instanceId);
+        if (refusal !== null) {
+          return yield* mapError(
+            input,
+            input.threadId === undefined ? "create-thread" : "update-thread",
+            input.threadId,
+          )(new Error(refusal));
         }
       }
       return yield* Effect.gen(function* () {

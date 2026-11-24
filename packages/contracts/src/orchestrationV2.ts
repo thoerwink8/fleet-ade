@@ -1519,7 +1519,7 @@ export const OrchestrationV2FileChangeDetail = Schema.Struct({
 });
 export type OrchestrationV2FileChangeDetail = typeof OrchestrationV2FileChangeDetail.Type;
 
-export const OrchestrationV2ProviderFailureClass = Schema.Literals([
+const KnownProviderFailureClass = Schema.Literals([
   "usage_limit",
   "auth_error",
   "not_installed",
@@ -1528,6 +1528,27 @@ export const OrchestrationV2ProviderFailureClass = Schema.Literals([
   "permission_error",
   "validation_error",
   "unknown",
+]);
+
+/**
+ * A class this build does not know, such as one a newer server added, decodes as "unknown"
+ * instead of failing the whole event, so clients show it as an ordinary failure.
+ */
+export const OrchestrationV2ProviderFailureClass = Schema.Union([
+  KnownProviderFailureClass,
+  Schema.String.check(
+    Schema.makeFilter(
+      (value: string) =>
+        !KnownProviderFailureClass.literals.includes(
+          value as (typeof KnownProviderFailureClass.literals)[number],
+        ) || "A known failure class must decode as itself.",
+    ),
+  ).pipe(
+    Schema.decodeTo(Schema.Literal("unknown"), {
+      decode: SchemaGetter.transform((): "unknown" => "unknown"),
+      encode: SchemaGetter.forbidden(() => "Unknown failure classes are decode-only."),
+    }),
+  ),
 ]);
 export type OrchestrationV2ProviderFailureClass = typeof OrchestrationV2ProviderFailureClass.Type;
 

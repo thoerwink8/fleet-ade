@@ -319,6 +319,7 @@ import {
   evaluateProviderInstanceReadiness,
   findAlternativeReadyProvider,
 } from "./chat/composerProviderReadiness";
+import { useRecheckProviderStatusOnReturn } from "./chat/useRecheckProviderStatusOnReturn";
 import { QueuedRunsControl, type QueuedRunsControlHandle } from "./chat/QueuedRunsControl";
 import { useThreadLinkedPullRequest } from "./pullRequest/useThreadLinkedPullRequest";
 import { useProactivePanels } from "../hooks/useProactivePanels";
@@ -1349,6 +1350,13 @@ export default function ChatView(props: ChatViewProps) {
       null,
   );
   const providerSendBlockedReason = activeProviderReadinessBlock?.reason ?? null;
+  useRecheckProviderStatusOnReturn({
+    environmentId: activeThread?.environmentId ?? null,
+    instanceId: activeProviderInstanceId,
+    enabled:
+      activeProviderReadinessBlock?.kind === "unauthenticated" ||
+      activeProviderReadinessBlock?.kind === "not_installed",
+  });
   const phase = derivePhase(activeRuntime);
   const serverThreadId = serverThread?.id;
   const serverThreadEnvironmentId = serverThread?.environmentId;
