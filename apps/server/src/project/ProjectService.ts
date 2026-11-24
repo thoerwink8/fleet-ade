@@ -31,7 +31,7 @@ import {
 } from "../orchestration-v2/ProjectCommands.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
-import { planThreadDeletion } from "../orchestration-v2/ThreadDeletion.ts";
+import { planThreadDeletion, planThreadPurge } from "../orchestration-v2/ThreadDeletion.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { makeIsManagedWorktreePath } from "../worktreesDirectory.ts";
 import * as ProjectEnrichmentService from "./ProjectEnrichmentService.ts";
@@ -466,13 +466,41 @@ export const make = Effect.gen(function* () {
       threadId,
     };
     const now = yield* DateTime.now;
-    const plan = yield* planThreadDeletion({
+    const attachmentIds = yield* threadProjections.getThreadAttachmentIds(threadId);
+    const deletion = yield* planThreadDeletion({
       command,
       projection,
-      attachmentIds: yield* threadProjections.getThreadAttachmentIds(threadId),
+      attachmentIds,
       now,
       idAllocator,
     });
+    const deletedEvent = deletion.events.find((event) => event.type === "thread.deleted");
+    const purge =
+      deletedEvent?.type === "thread.deleted"
+        ? yield* planThreadPurge({
+            command: {
+              type: "thread.purge",
+              commandId: command.commandId,
+              threadId,
+            },
+            projection: { thread: deletedEvent.payload },
+            attachmentIds,
+            now,
+            idAllocator,
+          })
+        : { events: [], effects: [] };
+    // Project deletion is immediate: the delete plan's terminal.cleanup (keepHistory) is covered
+    // by the purge's full cleanup and would collide on the same effect id.
+    const plan = {
+      events: [...deletion.events, ...purge.events],
+      effects:
+        purge.events.length === 0
+          ? deletion.effects
+          : [
+              ...deletion.effects.filter((effect) => effect.request.type !== "terminal.cleanup"),
+              ...purge.effects,
+            ],
+    };
     const committed = yield* eventSink.commitCommand({
       commandId: command.commandId,
       commandType: command.type,
