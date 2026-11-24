@@ -6,6 +6,7 @@ import {
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ContextHandoff,
   type OrchestrationV2ExecutionNode,
+  type OrchestrationV2ProviderFailureClass,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2Run,
   type OrchestrationV2RunAttempt,
@@ -24,6 +25,8 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
+import * as EffectAcpErrors from "effect-acp/errors";
+import { isCommandMissingCause } from "@t3tools/provider-core/server/snapshotProbe";
 
 import * as ServerConfig from "../config.ts";
 import {
@@ -81,6 +84,46 @@ const isProviderAdapterProtocolError = Schema.is(ProviderAdapter.ProviderAdapter
 const isProviderAdapterOpenSessionError = Schema.is(
   ProviderAdapter.ProviderAdapterOpenSessionError,
 );
+const isAcpRequestError = Schema.is(EffectAcpErrors.AcpRequestError);
+const START_FAILURE_MAX_CAUSE_DEPTH = 6;
+
+function classifyStartFailure(error: unknown): OrchestrationV2ProviderFailureClass {
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  for (
+    let depth = 0;
+    depth < START_FAILURE_MAX_CAUSE_DEPTH && current !== undefined && current !== null;
+    depth += 1
+  ) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    if (isProviderAdapterOpenSessionError(current)) {
+      if (current.requiresSignIn === true) return "auth_error";
+      if (current.notInstalled === true) return "not_installed";
+    }
+    if (isAcpRequestError(current) && current.code === -32000) {
+      return "auth_error";
+    }
+    if (
+      isCommandMissingCause(current) ||
+      (Predicate.isObject(current) && "code" in current && current.code === "ENOENT")
+    ) {
+      return "not_installed";
+    }
+    if (Predicate.isObject(current) && "cause" in current) {
+      current = current.cause;
+    } else {
+      break;
+    }
+  }
+  return "provider_error";
+}
+
+function isNonRetryableStartFailureClass(
+  failureClass: OrchestrationV2ProviderFailureClass,
+): boolean {
+  return failureClass === "auth_error" || failureClass === "not_installed";
+}
 
 /**
  * Claude refuses these before it reads the prompt: replacing a process running background work,
@@ -456,6 +499,7 @@ export const layer: Layer.Layer<
           readonly error: Error;
           readonly message?: string;
         }) {
+          const failureClass = classifyStartFailure(failed.error);
           yield* settleRunBeforeStart({
             signal: failed.signal,
             status: "failed",
@@ -468,7 +512,8 @@ export const layer: Layer.Layer<
               failure: makeProviderFailure({
                 cause: failed.error,
                 message: failed.message ?? startFailureMessage(failed.error),
-                class: "provider_error",
+                class: failureClass,
+                ...(isNonRetryableStartFailureClass(failureClass) ? { retryable: false } : {}),
               }),
             },
           });
@@ -700,11 +745,12 @@ export const layer: Layer.Layer<
       );
       if (sessionResult._tag === "Failure") {
         const failure = sessionResult.failure;
-        const requiresSignIn =
-          "cause" in failure &&
-          isProviderAdapterOpenSessionError(failure.cause) &&
-          failure.cause.requiresSignIn === true;
-        if (input.willRetry === true && !requiresSignIn) return yield* failure;
+        if (
+          input.willRetry === true &&
+          !isNonRetryableStartFailureClass(classifyStartFailure(failure))
+        ) {
+          return yield* failure;
+        }
         yield* settleStartFailure({
           signal: "provider-session-open-failure",
           title: "Provider session failed to open",
@@ -719,7 +765,12 @@ export const layer: Layer.Layer<
       ) {
         const loaded = yield* Effect.result(load);
         if (loaded._tag === "Success") return loaded.success;
-        if (input.willRetry === true) return yield* loaded.failure;
+        if (
+          input.willRetry === true &&
+          !isNonRetryableStartFailureClass(classifyStartFailure(loaded.failure))
+        ) {
+          return yield* loaded.failure;
+        }
         yield* settleStartFailure({
           signal: "provider-thread-load-failure",
           title: "Provider turn failed to start",
@@ -1067,6 +1118,15 @@ export const layer: Layer.Layer<
               }),
             );
             if (forked._tag === "Success") return forked.success;
+            const forkFailureClass = classifyStartFailure(forked.failure);
+            if (isNonRetryableStartFailureClass(forkFailureClass)) {
+              yield* settleStartFailure({
+                signal: "provider-thread-fork-failure",
+                title: "Provider turn failed to start",
+                error: forked.failure,
+              });
+              return undefined;
+            }
             if (input.willRetry === true) return yield* forked.failure;
             if (!(yield* isCurrentAttemptInStatus("starting"))) return undefined;
             // Retries are spent (e.g. the source's native session is gone): start fresh with portable history.

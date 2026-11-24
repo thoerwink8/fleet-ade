@@ -243,17 +243,12 @@ export function ComposerControlsBar(props: {
   return showProviderUnavailable ? (
     <ComposerControl
       type="button"
-      disabled={!providerSetupInstanceId}
-      onClick={() => {
-        if (providerSetupInstanceId) {
-          onOpenProviderSetup(providerSetupInstanceId);
-        }
-      }}
+      onClick={() => onOpenProviderSetup(providerSetupInstanceId)}
       data-chat-provider-unavailable="true"
       className="shrink-0"
     >
       <CircleAlertIcon className="size-4" />
-      {providerSetupInstanceId ? "打开提供方设置" : "没有可用的提供方"}
+      {providerSetupInstanceId ? "打开智能体设置" : "还没有可用的智能体，去设置"}
     </ComposerControl>
   ) : (
     <>

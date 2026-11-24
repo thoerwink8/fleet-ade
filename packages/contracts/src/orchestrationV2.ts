@@ -462,6 +462,14 @@ const OrchestrationV2LastTitleRegeneration = Schema.Struct({
   completedAt: Schema.DateTimeUtc,
 });
 
+export const OrchestrationV2RollbackFailureCode = Schema.Literals([
+  "shared-workspace",
+  "checkpoint-unavailable",
+  "git-index-locked",
+  "rollback-failed",
+]);
+export type OrchestrationV2RollbackFailureCode = typeof OrchestrationV2RollbackFailureCode.Type;
+
 export const OrchestrationV2AppThread = Schema.Struct({
   ...OrchestrationV2CreationFields,
   id: ThreadId,
@@ -535,6 +543,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
       Schema.Struct({
         requestId: CommandId,
         message: TrimmedNonEmptyString,
+        code: Schema.optional(OrchestrationV2RollbackFailureCode),
       }),
     ),
   ),
@@ -1519,13 +1528,36 @@ export const OrchestrationV2FileChangeDetail = Schema.Struct({
 });
 export type OrchestrationV2FileChangeDetail = typeof OrchestrationV2FileChangeDetail.Type;
 
-export const OrchestrationV2ProviderFailureClass = Schema.Literals([
+const KnownProviderFailureClass = Schema.Literals([
   "usage_limit",
+  "auth_error",
+  "not_installed",
   "provider_error",
   "transport_error",
   "permission_error",
   "validation_error",
   "unknown",
+]);
+
+/**
+ * A class this build does not know, such as one a newer server added, decodes as "unknown"
+ * instead of failing the whole event, so clients show it as an ordinary failure.
+ */
+export const OrchestrationV2ProviderFailureClass = Schema.Union([
+  KnownProviderFailureClass,
+  Schema.String.check(
+    Schema.makeFilter(
+      (value: string) =>
+        !KnownProviderFailureClass.literals.includes(
+          value as (typeof KnownProviderFailureClass.literals)[number],
+        ) || "A known failure class must decode as itself.",
+    ),
+  ).pipe(
+    Schema.decodeTo(Schema.Literal("unknown"), {
+      decode: SchemaGetter.transform((): "unknown" => "unknown"),
+      encode: SchemaGetter.forbidden(() => "Unknown failure classes are decode-only."),
+    }),
+  ),
 ]);
 export type OrchestrationV2ProviderFailureClass = typeof OrchestrationV2ProviderFailureClass.Type;
 
@@ -2201,6 +2233,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   lastError: Schema.optional(Schema.NullOr(Schema.String)),
   lastErrorClass: Schema.optional(Schema.NullOr(OrchestrationV2ProviderFailureClass)),
   lastErrorCode: Schema.optional(Schema.NullOr(Schema.String)),
+  lastErrorRetryCount: Schema.optional(Schema.NullOr(PositiveInt)),
   usageLimitResetAt: Schema.optional(Schema.NullOr(IsoDateTime)),
   pendingRuntimeRequest: Schema.NullOr(OrchestrationV2PendingRuntimeRequestSummary),
   /** Retired with guest links; no longer populated. Kept so older servers decode. */
@@ -3664,6 +3697,7 @@ const OrchestrationV2InternalCommand = Schema.Union([
     threadId: ThreadId,
     requestId: CommandId,
     message: TrimmedNonEmptyString,
+    code: Schema.optional(OrchestrationV2RollbackFailureCode),
   }),
   /** Delivering the answer to request `requestId` failed on its last attempt. */
   Schema.Struct({
@@ -3773,6 +3807,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   stopWorkflow: "orchestration.stopWorkflow",
   forceStopThread: "orchestration.forceStopThread",
   getTurnItem: "orchestration.getTurnItem",
+  checkCheckpointRestore: "orchestration.checkCheckpointRestore",
   launchThread: "orchestration.launchThread",
   subscribeShell: "orchestration.subscribeShell",
   subscribeThread: "orchestration.subscribeThread",
@@ -4159,6 +4194,7 @@ export class OrchestrationV2DispatchCommandError extends Schema.TaggedError<Orch
     commandType: Schema.String,
     message: Schema.String,
     detail: Schema.optional(Schema.String),
+    code: Schema.optional(OrchestrationV2RollbackFailureCode),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {}
@@ -4446,6 +4482,48 @@ export class OrchestrationV2SearchThreadError extends Schema.TaggedError<Orchest
   }
 }
 
+export const OrchestrationV2CheckpointRestoreBlockedReason = Schema.Literals([
+  "checkpoint-missing",
+  "shared-workspace",
+]);
+export type OrchestrationV2CheckpointRestoreBlockedReason =
+  typeof OrchestrationV2CheckpointRestoreBlockedReason.Type;
+
+export const OrchestrationV2CheckCheckpointRestoreInput = Schema.Struct({
+  threadId: ThreadId,
+  turnCount: NonNegativeInt,
+});
+export type OrchestrationV2CheckCheckpointRestoreInput =
+  typeof OrchestrationV2CheckCheckpointRestoreInput.Type;
+
+export const OrchestrationV2CheckCheckpointRestoreResult = Schema.Union([
+  Schema.Struct({
+    canRestoreFiles: Schema.Literal(true),
+    removedTurnCount: NonNegativeInt,
+  }),
+  Schema.Struct({
+    canRestoreFiles: Schema.Literal(false),
+    reason: OrchestrationV2CheckpointRestoreBlockedReason,
+    /** True when the thread runs directly in the project directory rather than an isolated worktree. */
+    inProjectDirectory: Schema.optionalKey(Schema.Boolean),
+    removedTurnCount: NonNegativeInt,
+  }),
+]);
+export type OrchestrationV2CheckCheckpointRestoreResult =
+  typeof OrchestrationV2CheckCheckpointRestoreResult.Type;
+
+export class OrchestrationV2CheckCheckpointRestoreError extends Schema.TaggedError<OrchestrationV2CheckCheckpointRestoreError>()(
+  "OrchestrationV2CheckCheckpointRestoreError",
+  {
+    threadId: ThreadId,
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    return "Failed to check checkpoint restore safety.";
+  }
+}
+
 export const OrchestrationV2RpcSchemas = {
   searchThread: {
     input: OrchestrationV2SearchThreadInput,
@@ -4510,6 +4588,10 @@ export const OrchestrationV2RpcSchemas = {
   getTurnItem: {
     input: OrchestrationV2GetTurnItemInput,
     output: OrchestrationV2GetTurnItemResult,
+  },
+  checkCheckpointRestore: {
+    input: OrchestrationV2CheckCheckpointRestoreInput,
+    output: OrchestrationV2CheckCheckpointRestoreResult,
   },
   launchThread: {
     input: OrchestrationV2ThreadLaunchInput,

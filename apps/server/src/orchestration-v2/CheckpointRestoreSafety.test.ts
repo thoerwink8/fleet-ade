@@ -7,6 +7,7 @@ import {
   ProviderInstanceId,
   ProviderSessionId,
   ProviderThreadId,
+  RunId,
   ThreadId,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
@@ -252,3 +253,149 @@ it.effect.each([
       assert.equal(result, isolated);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
+
+it.effect.each([
+  {
+    name: "ready isolated worktree",
+    turnCount: 1,
+    checkpointStatus: "ready" as const,
+    isolatedWorktree: true,
+    overlappingThread: false,
+    expected: { canRestoreFiles: true, removedTurnCount: 2 },
+  },
+  {
+    name: "missing checkpoint at thread start",
+    turnCount: 0,
+    checkpointStatus: "missing" as const,
+    isolatedWorktree: true,
+    overlappingThread: false,
+    expected: { canRestoreFiles: false, reason: "checkpoint-missing", removedTurnCount: 3 },
+  },
+  {
+    name: "shared project directory",
+    turnCount: 1,
+    checkpointStatus: "ready" as const,
+    isolatedWorktree: false,
+    overlappingThread: false,
+    expected: {
+      canRestoreFiles: false,
+      reason: "shared-workspace",
+      inProjectDirectory: true,
+      removedTurnCount: 2,
+    },
+  },
+  {
+    name: "overlapping worktree thread",
+    turnCount: 1,
+    checkpointStatus: "ready" as const,
+    isolatedWorktree: true,
+    overlappingThread: true,
+    expected: {
+      canRestoreFiles: false,
+      reason: "shared-workspace",
+      inProjectDirectory: false,
+      removedTurnCount: 2,
+    },
+  },
+] as const)(
+  "checkRestoreSafety evaluates $name",
+  ({ turnCount, checkpointStatus, isolatedWorktree, overlappingThread, expected }) =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const parent = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-v2-precheck-" });
+      const worktreeCwd = path.join(parent, "worktree");
+      const nestedCwd = path.join(worktreeCwd, "nested");
+      yield* fsMakeDir(fileSystem, nestedCwd);
+      const threadId = ThreadId.make("precheck-current");
+      const otherId = ThreadId.make("precheck-other");
+      const projectId = ProjectId.make("precheck-project");
+      const scopeId = CheckpointScopeId.make("precheck-scope");
+      const cwd = isolatedWorktree ? worktreeCwd : parent;
+      const worktreePath = isolatedWorktree ? worktreeCwd : null;
+      const serviceLayer = CheckpointRollbackService.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            NodeServices.layer,
+            Layer.mock(ServerConfig.ServerConfig)({
+              worktreesDir: "/synthetic-worktrees",
+            } as never),
+            ServerSettings.layerTest(),
+            ThreadCommandExecutor.layer,
+            IdAllocator.layer,
+            Layer.mock(GitWorkflowService.GitWorkflowService)({}),
+            Layer.mock(ProjectStore.ProjectStoreV2)({
+              get: () => Effect.succeedSome({ workspaceRoot: parent } as never),
+            }),
+            Layer.mock(ProjectionStoreV2)({
+              getThread: () =>
+                Effect.succeed({
+                  id: threadId,
+                  projectId,
+                  worktreePath,
+                } as never),
+              getCheckpointContext: () =>
+                Effect.succeed({
+                  runs: [
+                    { id: RunId.make("run-1"), ordinal: 1, status: "completed" },
+                    { id: RunId.make("run-2"), ordinal: 2, status: "completed" },
+                    { id: RunId.make("run-3"), ordinal: 3, status: "interrupted" },
+                    { id: RunId.make("run-4"), ordinal: 4, status: "rolled_back" },
+                    { id: RunId.make("run-5"), ordinal: 5, status: "running" },
+                  ],
+                  checkpointScopes: [{ id: scopeId, runId: null, kind: "thread", cwd }],
+                  checkpoints: [
+                    {
+                      scopeId,
+                      runId: turnCount === 0 ? null : RunId.make("run-1"),
+                      ordinalWithinScope: turnCount === 0 ? 0 : 1,
+                      appRunOrdinal: turnCount === 0 ? null : 1,
+                      status: checkpointStatus,
+                      ref: "refs/t3/precheck",
+                    },
+                  ],
+                } as never),
+              getShellSnapshot: () =>
+                Effect.succeed({
+                  schemaVersion: 1,
+                  snapshotSequence: 0,
+                  threads: overlappingThread
+                    ? ([
+                        {
+                          id: otherId,
+                          projectId,
+                          deletedAt: null,
+                          lineage: {
+                            parentThreadId: null,
+                            relationshipToParent: null,
+                            rootThreadId: otherId,
+                          },
+                          worktreePath: nestedCwd,
+                        },
+                      ] as never)
+                    : [],
+                  archivedThreads: [],
+                }),
+              getThreadProviderContext: () =>
+                Effect.succeed({
+                  providerThreads: [],
+                  providerSessions: [],
+                } as never),
+            }),
+            Layer.mock(CheckpointServiceV2)({}),
+            Layer.mock(EventSinkV2)({}),
+            Layer.mock(ProviderSessionManagerV2)({}),
+            Layer.mock(RuntimePolicyV2)({}),
+          ),
+        ),
+      );
+      const service = yield* CheckpointRollbackService.CheckpointRollbackServiceV2.pipe(
+        Effect.provide(serviceLayer),
+      );
+      const actual = yield* service.checkRestoreSafety({ threadId, turnCount });
+      assert.deepEqual(actual, expected);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+const fsMakeDir = (fileSystem: FileSystem.FileSystem, directory: string) =>
+  fileSystem.makeDirectory(directory, { recursive: true });

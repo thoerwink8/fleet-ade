@@ -62,7 +62,7 @@ const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
   created: "从本会话创建",
   agent: "由智能体关联",
   stack: "在堆叠中发现",
-  "stack-dismissed": "Dismissed",
+  "stack-dismissed": "已忽略",
 };
 
 function ChecksGlyph({
@@ -244,8 +244,8 @@ function LinkRowImpl({
                   </TooltipTrigger>
                   <TooltipPopup>
                     {stack.kind === "native"
-                      ? `${sourceControlClients.hostLabelForChangeRequestUrl(link.url)} stack of ${stack.size}: merging a layer lands the ones below it.`
-                      : `${stack.size} ${linkHost.changeRequest.plural} chained by base branch.`}
+                      ? `${sourceControlClients.hostLabelForChangeRequestUrl(link.url)} 堆叠，共 ${stack.size} 层：合并某一层会同时合并它下面的各层。`
+                      : `${stack.size} 个 ${linkHost.changeRequest.plural} 按基础分支串联。`}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}
@@ -428,7 +428,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-row font-semibold">没有已关联的 PR</p>
+        <p className="text-row font-medium">没有已关联的 PR</p>
         <p className="max-w-60 text-xs text-muted-foreground">
           智能体从本会话打开的 pull request 会显示在这里。你也可以通过 URL 或编号自行关联。
         </p>
@@ -471,10 +471,10 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         />
         <footer className="flex items-center justify-between border-t border-border/60 px-2 py-1.5 text-2xs text-muted-foreground">
           <span>
-            {openCount} open · {linkCount} linked
+            {openCount} 个未关闭 · {linkCount} 个已关联
             {lastSynced ? (
               <>
-                {" · synced "}
+                {" · 同步于 "}
                 <RelativeTime timestamp={lastSynced} />
               </>
             ) : null}

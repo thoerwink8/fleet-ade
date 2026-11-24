@@ -1299,7 +1299,7 @@ function OpenCommandPaletteDialog(props: {
         searchTerms: ["new thread", "chat", "create", "draft"],
         title: (
           <>
-            在 <span className="font-semibold">{activeProjectTitle}</span> 中新建会话
+            在 <span className="font-medium">{activeProjectTitle}</span> 中新建会话
           </>
         ),
         searchTitle: `在 ${activeProjectTitle} 中新建会话`,
@@ -2516,9 +2516,7 @@ function OpenCommandPaletteDialog(props: {
             ...(isCreatingNewProject ? { disabled: true, disabledReason: "正在创建项目。" } : {}),
             ...(option.environmentId === newProjectFlow.environmentId
               ? {
-                  titleTrailingContent: (
-                    <CheckIcon className="ms-auto size-4 shrink-0 text-muted-foreground/70" />
-                  ),
+                  titleTrailingContent: <CheckIcon className="fa-ic ms-auto" />,
                 }
               : {}),
           })),
@@ -2537,9 +2535,7 @@ function OpenCommandPaletteDialog(props: {
               title: "添加现有项目",
               description: "打开文件夹或克隆仓库",
               icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
-              titleTrailingContent: (
-                <ChevronRightIcon className="-me-0.5 ms-auto size-4 shrink-0 text-muted-foreground/70" />
-              ),
+              titleTrailingContent: <ChevronRightIcon className="fa-ic ms-auto" />,
               keepOpen: true,
               run: async () => {
                 showExistingProjectSources(newProjectFlow.environmentId);
@@ -3032,8 +3028,8 @@ function OpenCommandPaletteDialog(props: {
         id={submitButtonId}
         label={isCreatingNewProject ? "正在创建" : "创建"}
         shortcutLabel={createShortcutLabel}
-        ariaLabel={`Create (${createShortcutLabel})`}
-        tooltip={`Create (${createShortcutLabel})`}
+        ariaLabel={`创建（${createShortcutLabel}）`}
+        tooltip={`创建（${createShortcutLabel}）`}
         disabled={!canSubmitNewProject}
         onSubmit={() => {
           void submitNewProject();
@@ -3044,8 +3040,8 @@ function OpenCommandPaletteDialog(props: {
         id={submitButtonId}
         label={isRemoteProjectPending ? "运行中" : remoteProjectButtonLabel}
         shortcutLabel="Enter"
-        ariaLabel={`${remoteProjectButtonLabel ?? "Continue"} (Enter)`}
-        tooltip={`${remoteProjectButtonLabel ?? "Continue"} (Enter)`}
+        ariaLabel={`${remoteProjectButtonLabel ?? "继续"}（Enter）`}
+        tooltip={`${remoteProjectButtonLabel ?? "继续"}（Enter）`}
         disabled={!canSubmitRemoteProjectFlow}
         onSubmit={() => {
           void submitAddProjectCloneFlow();
@@ -3183,11 +3179,11 @@ function OpenCommandPaletteDialog(props: {
         />
       ) : null}
       {browseAccessError ? (
-        <div role="alert" className="px-4 py-3 text-sm text-muted-foreground">
+        <div role="alert" className="fa-cmd__empty">
           {browseAccessError}
         </div>
       ) : isBrowsePending && browseResult === null ? (
-        <div role="status" className="px-4 py-3 text-sm text-muted-foreground">
+        <div role="status" className="fa-cmd__empty">
           正在加载文件夹…
         </div>
       ) : null}

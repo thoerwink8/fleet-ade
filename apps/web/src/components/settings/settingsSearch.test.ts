@@ -327,7 +327,7 @@ describe("source control host search items", () => {
 
   it("lists a host by its label, its keywords, and its settings fields", () => {
     const items = sourceControlHostSearchItems([UNKNOWN_SOURCE_CONTROL_CLIENT, definition]);
-    expect(items.map((item) => item.title)).toEqual(["Example credentials"]);
+    expect(items.map((item) => item.title)).toEqual(["Example 凭证"]);
     expect(searchSettings("sample apitoken", items).map((item) => item.id)).toEqual([
       sourceControlHostSettingsSearchId("example"),
     ]);
@@ -347,7 +347,7 @@ describe("source control host search items", () => {
         },
       },
     ]);
-    expect(items.map((item) => item.title)).toEqual(["Example accounts and token"]);
+    expect(items.map((item) => item.title)).toEqual(["Example 账户和 token"]);
     expect(searchSettings("ex switch accounts", items)).toHaveLength(1);
   });
 

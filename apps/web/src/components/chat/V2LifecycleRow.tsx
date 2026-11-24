@@ -115,7 +115,7 @@ export function V2LifecycleRow(props: {
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
             <MessageSquareIcon className="size-4 text-secondary-label" aria-hidden />
           </span>
-          <span className="min-w-0 flex-1 truncate text-row font-semibold">
+          <span className="min-w-0 flex-1 truncate text-row font-medium">
             {item.title ?? "已创建会话"}
           </span>
           <Button
@@ -461,11 +461,11 @@ function SubagentTimelineLink(props: {
       />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
-          <span className="min-w-0 truncate text-meta font-semibold text-foreground">
+          <span className="min-w-0 truncate text-meta font-medium text-foreground">
             {props.title}
           </span>
           {remote !== undefined ? (
-            <span className="shrink-0 text-xs text-muted-foreground">星期 {remote.label}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">在 {remote.label}</span>
           ) : null}
         </span>
         <span

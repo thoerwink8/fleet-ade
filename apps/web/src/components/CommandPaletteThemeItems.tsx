@@ -59,9 +59,7 @@ export function useCommandPaletteThemeItems() {
           icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
           titleTrailingContent: (
             <span className="flex shrink-0 items-center gap-2">
-              {activeThemeId === id ? (
-                <span className="text-xs text-muted-foreground/70">当前</span>
-              ) : null}
+              {activeThemeId === id ? <span className="st">当前</span> : null}
               <span className="flex items-center gap-1" aria-hidden>
                 {previews.map((preview) => (
                   <ThemePreviewCircle
@@ -101,9 +99,7 @@ export function useCommandPaletteThemeItems() {
           searchTerms: [label, "appearance", "mode"],
           icon: <Icon className={ITEM_ICON_CLASS} />,
           titleTrailingContent:
-            appearanceMode === mode ? (
-              <span className="text-xs text-muted-foreground/70">当前</span>
-            ) : undefined,
+            appearanceMode === mode ? <span className="st">当前</span> : undefined,
           run: async () => {
             if (!setAppearanceMode(mode)) notifyThemeSaveFailure();
           },

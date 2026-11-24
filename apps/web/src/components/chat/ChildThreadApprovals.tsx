@@ -1,5 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import { AuthOrchestrationOperateScope, type ScopedThreadRef } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  type EnvironmentId,
+  type ScopedThreadRef,
+  type ThreadId,
+} from "@t3tools/contracts";
 import type { ChildThreadApproval } from "@t3tools/client-runtime/state/thread-requests";
 import { fullAccessOverrideExplanation } from "@t3tools/client-runtime/state/thread-requests";
 import {
@@ -10,26 +15,43 @@ import { useState } from "react";
 import { useEnvironmentScope } from "../../state/session";
 import { childThreadApprovalsAtom, threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { InlineButton } from "../ui/button";
 import { ComposerPendingApprovalActions } from "./ComposerPendingApprovalActions";
 
-function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
+function ChildApproval({
+  entry,
+  onOpenThread,
+}: {
+  entry: ChildThreadApproval;
+  onOpenThread?: ((threadId: ThreadId, environmentId?: EnvironmentId) => void) | undefined;
+}) {
   const canRespond = useEnvironmentScope(entry.thread.environmentId, AuthOrchestrationOperateScope);
   const respond = useAtomCommand(threadEnvironment.respondToApproval, { reportFailure: false });
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { approval } = entry;
+  const isLive = approval.responseCapability === "live";
   return (
     <section
       aria-label={`来自 ${entry.title} 的审批`}
       className="rounded-lg border border-border bg-background p-3 text-xs"
     >
-      <p className="mb-2 font-semibold">需要来自 {entry.title} 的批准</p>
+      <p className="mb-2 font-medium">需要来自 {entry.title} 的批准</p>
       <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono">
         {approval.detail || approval.requestKind}
       </pre>
       {approval.appName ? <p className="mt-2 text-muted-foreground">{approval.appName}</p> : null}
-      {approval.responseCapability !== "live" ? (
-        <p className="mt-2 text-warning">提供方进程已退出。请中断或重启子会话后再回应。</p>
+      {!isLive ? (
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-warning">
+          <span>这一轮已经结束，无法继续操作。</span>
+          {onOpenThread ? (
+            <InlineButton
+              onClick={() => onOpenThread(entry.thread.threadId, entry.thread.environmentId)}
+            >
+              打开子会话
+            </InlineButton>
+          ) : null}
+        </div>
       ) : null}
       {approval.reason ? <p className="mt-2 text-muted-foreground">{approval.reason}</p> : null}
       {approval.fullAccessOverride ? (
@@ -37,31 +59,33 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
           {fullAccessOverrideExplanation(approval.fullAccessOverride)}
         </p>
       ) : null}
-      <div className="mt-2 flex flex-wrap gap-2">
-        <ComposerPendingApprovalActions
-          presentation="inline"
-          requestId={approval.requestId}
-          isResponding={responding}
-          canRespond={approval.responseCapability === "live"}
-          disabled={!canRespond}
-          options={approval.options}
-          onRespondToApproval={async (requestId, decision) => {
-            if (!canRespond || responding) return;
-            setResponding(true);
-            setError(null);
-            const result = await respond({
-              environmentId: entry.thread.environmentId,
-              input: { threadId: entry.thread.threadId, requestId, decision },
-            });
-            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-              const failure = squashAtomCommandFailure(result);
-              setError(failure instanceof Error ? failure.message : "无法提交审批决定。");
-            }
-            setResponding(false);
-            return result;
-          }}
-        />
-      </div>
+      {isLive ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <ComposerPendingApprovalActions
+            presentation="inline"
+            requestId={approval.requestId}
+            isResponding={responding}
+            canRespond={isLive}
+            disabled={!canRespond}
+            options={approval.options}
+            onRespondToApproval={async (requestId, decision) => {
+              if (!canRespond || responding) return;
+              setResponding(true);
+              setError(null);
+              const result = await respond({
+                environmentId: entry.thread.environmentId,
+                input: { threadId: entry.thread.threadId, requestId, decision },
+              });
+              if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+                const failure = squashAtomCommandFailure(result);
+                setError(failure instanceof Error ? failure.message : "无法提交审批决定。");
+              }
+              setResponding(false);
+              return result;
+            }}
+          />
+        </div>
+      ) : null}
       {error !== null ? (
         <p role="alert" className="mt-2 text-destructive">
           {error}
@@ -71,7 +95,13 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
   );
 }
 
-export function ChildThreadApprovals({ threadRef }: { threadRef: ScopedThreadRef | null }) {
+export function ChildThreadApprovals({
+  threadRef,
+  onOpenThread,
+}: {
+  threadRef: ScopedThreadRef | null;
+  onOpenThread?: ((threadId: ThreadId, environmentId?: EnvironmentId) => void) | undefined;
+}) {
   const approvals = useAtomValue(childThreadApprovalsAtom(threadRef));
   if (approvals.length === 0) return null;
   return (
@@ -84,6 +114,7 @@ export function ChildThreadApprovals({ threadRef }: { threadRef: ScopedThreadRef
             entry.approval.requestId,
           ])}
           entry={entry}
+          onOpenThread={onOpenThread}
         />
       ))}
     </div>

@@ -8,6 +8,7 @@ import { type PendingUserInput } from "../../session-logic";
 import type { PendingUserInputDraftAnswer } from "@t3tools/client-runtime/state/pending-user-input";
 import { derivePendingUserInputProgress } from "../../pendingUserInput";
 import { CheckboxMark } from "../ui/checkbox";
+import { InlineButton } from "../ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { Kbd } from "../ui/kbd";
 import { cn } from "~/lib/utils";
@@ -26,6 +27,7 @@ interface PendingUserInputPanelProps {
   onToggleOption: (questionId: string, optionValue: string) => void;
   onAdvance: () => void;
   onDismiss: (requestId: RuntimeRequestId) => void;
+  onResendLastUserMessage?: (() => void) | undefined;
 }
 
 export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserInputPanel({
@@ -39,6 +41,7 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
   onToggleOption,
   onAdvance,
   onDismiss,
+  onResendLastUserMessage,
 }: PendingUserInputPanelProps) {
   if (pendingUserInputs.length === 0) return null;
   const activePrompt = pendingUserInputs[0];
@@ -57,6 +60,7 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
       onToggleOption={onToggleOption}
       onAdvance={onAdvance}
       onDismiss={onDismiss}
+      onResendLastUserMessage={onResendLastUserMessage}
     />
   );
 });
@@ -72,6 +76,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   onToggleOption,
   onAdvance,
   onDismiss,
+  onResendLastUserMessage,
 }: {
   prompt: PendingUserInput;
   cwd: string | undefined;
@@ -83,6 +88,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   onToggleOption: (questionId: string, optionValue: string) => void;
   onAdvance: () => void;
   onDismiss: (requestId: RuntimeRequestId) => void;
+  onResendLastUserMessage?: (() => void) | undefined;
 }) {
   // Message-mode requests remain answerable after their provider turn ends.
   const canRespond = prompt.responseCapability !== "not_resumable";
@@ -233,7 +239,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
             </ComposerBanner.Count>
           ) : null}
           <ComposerBanner.ToggleIcon expanded={!isCollapsed} />
-          {prompt.dismissible ? (
+          {prompt.dismissible && canRespond ? (
             <ComposerBanner.Dismiss
               render={<span role="button" tabIndex={0} />}
               aria-label="不回答并关闭问题"
@@ -265,6 +271,14 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
               lineBreaks
               className={cn("pt-1 text-foreground", questionTextAlign)}
             />
+            {!canRespond ? (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-warning">
+                <span>这一轮已经结束，无法继续回答。</span>
+                {onResendLastUserMessage ? (
+                  <InlineButton onClick={onResendLastUserMessage}>重新发送上一条</InlineButton>
+                ) : null}
+              </div>
+            ) : null}
             {/* Rows span the header row's width so the radios align with the question text and the shortcut column sits under the dismiss button. */}
             <div className="-ms-2 mt-2">
               {activeQuestion.options.map((option, index) => {
@@ -278,8 +292,8 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                   questionTextAlign,
                   "group flex w-full items-start gap-2 rounded-lg bg-transparent py-2 ps-2 outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/25",
                   isSelected ? "text-foreground" : "text-muted-foreground hover:bg-muted/30",
-                  (disabled || isResponding) && "opacity-50 cursor-not-allowed",
-                  !disabled && !isResponding && "cursor-pointer",
+                  responseDisabled && "opacity-50 cursor-not-allowed",
+                  !responseDisabled && "cursor-pointer",
                 );
                 // The h-5 slots match the label's line box, so the indicator and shortcut stay on its first line.
                 const content = (
@@ -317,7 +331,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                     <button
                       type="button"
                       aria-pressed={isSelected}
-                      disabled={disabled || isResponding}
+                      disabled={responseDisabled}
                       onClick={() => {
                         handleOptionSelection(activeQuestion.id, optionValue);
                       }}

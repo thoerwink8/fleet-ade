@@ -5,7 +5,7 @@ const LAST_FAILURE_KEY = "t3code:boot-failed-at";
 const REPEAT_FAILURE_MS = 5 * 60_000;
 const MAX_CAUSES = 3;
 const MAX_ERROR_CHARS = 6_000;
-const COPY_BLOCKED = "Copy was blocked. The text is selected so you can copy it manually.";
+const COPY_BLOCKED = "复制被拦截。文本已选中，请手动复制。";
 
 function safeString(value: unknown) {
   try {
@@ -138,9 +138,7 @@ function copyText(target: HTMLElement, onCopied: () => void, onBlocked: (hint: s
   const fallback = () => {
     selectContents(target);
     if (copySelection()) return onCopied();
-    onBlocked(
-      /Mac|iPhone|iPad/.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy",
-    );
+    onBlocked(/Mac|iPhone|iPad/.test(navigator.platform) ? "按 ⌘C 复制" : "按 Ctrl+C 复制");
   };
   const clipboard = window.isSecureContext ? navigator.clipboard : undefined;
   if (typeof clipboard?.writeText !== "function") return fallback();
@@ -167,11 +165,11 @@ export function showBootError(error: unknown) {
   };
 
   const message = element("div", {}, [
-    element("h1", { textContent: "Fleet ADE failed to start" }),
+    element("h1", { textContent: "Fleet ADE 启动失败" }),
     element("p", {
       textContent: offline
-        ? "This browser appears to be offline. Check the connection, then reload."
-        : "We are not sure why. Try a reload first.",
+        ? "浏览器似乎已离线。请检查连接，然后重新加载。"
+        : "原因未知。请先尝试重新加载。",
     }),
   ]);
   message.setAttribute("role", "alert");
@@ -179,24 +177,24 @@ export function showBootError(error: unknown) {
   const reload = element("button", {
     id: "boot-error-reload",
     type: "button",
-    textContent: "Reload",
+    textContent: "重新加载",
   });
   reload.addEventListener("click", () => window.location.reload());
 
-  let report = "(no error message)";
+  let report = "（无错误信息）";
   try {
     report = buildErrorReport(error, environment);
   } catch (reportError) {
     console.warn("Could not describe the startup error.", reportError);
   }
   const details = element("pre", { id: "boot-error-details", tabIndex: 0, textContent: report });
-  const copyDetails = element("button", { type: "button", textContent: "Copy error details" });
+  const copyDetails = element("button", { type: "button", textContent: "复制错误详情" });
   copyDetails.addEventListener("click", () =>
     copyText(
       details,
       () => {
-        copyDetails.textContent = "Copied";
-        announce("Copied to clipboard.");
+        copyDetails.textContent = "已复制";
+        announce("已复制到剪贴板。");
       },
       (hint) => {
         copyDetails.textContent = hint;
@@ -214,15 +212,15 @@ export function showBootError(error: unknown) {
   issue.searchParams.set("version", `${environment.version} (${environment.channel})`);
   issue.searchParams.set("environment", `${environment.surface}, ${environment.platform}`);
   const more = element("details", { open: isRepeatFailure(Date.now()) }, [
-    element("summary", { textContent: "More options if it keeps failing" }),
+    element("summary", { textContent: "仍然失败时的更多选项" }),
     element("div", {}, [
       details,
       element("p", {
-        textContent: "Details may include local file paths and names. Check before sharing.",
+        textContent: "详情可能包含本地文件路径和名称。分享前请检查。",
       }),
       element("div", { id: "boot-error-report" }, [
         copyDetails,
-        link(issue.href, "File a bug report on GitHub"),
+        link(issue.href, "在 GitHub 上提交问题报告"),
       ]),
     ]),
   ]);

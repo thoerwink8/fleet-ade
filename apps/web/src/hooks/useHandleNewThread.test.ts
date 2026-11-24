@@ -203,7 +203,15 @@ vi.mock("../lib/chatThreadActions", async (importOriginal) => ({
   hasExplicitComposerModelSelection: () => false,
   resolveNewThreadModelSelectionOverride: () => null,
 }));
-vi.mock("../providerInstances", () => ({ resolveDefaultProviderModelSelection: () => null }));
+vi.mock("../providerInstances", () => ({
+  resolveDefaultProviderModelSelection: () => null,
+  resolveProjectDefaultProviderModelSelection: () => null,
+  resolveNewSessionDefaultModelSelection: ({
+    defaultSelection,
+  }: {
+    readonly defaultSelection: unknown;
+  }) => defaultSelection,
+}));
 vi.mock("../lib/t3ProjectFileDefaults", () => ({
   readT3ProjectFile: () => testState.projectFileRead,
 }));

@@ -93,8 +93,29 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
   };
 }
 
+export function getUsageLimitRecoveryButtonsState(input: {
+  readonly pendingAction: "resume" | "snooze" | null;
+  readonly scheduled: boolean;
+  readonly snoozed: boolean;
+  readonly resetPassed: boolean;
+}) {
+  const resumePending = input.pendingAction === "resume";
+  const snoozePending = input.pendingAction === "snooze";
+  return {
+    resume: {
+      disabled: resumePending,
+      label: resumePending ? "正在保存…" : input.scheduled ? "取消自动继续" : "重置后自动继续",
+    },
+    snooze: {
+      disabled: snoozePending || (!input.snoozed && input.resetPassed),
+      label: snoozePending ? "正在保存…" : input.snoozed ? "立即唤醒" : "暂缓到重置时",
+    },
+  };
+}
+
 function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: RecoveryProps) {
-  const [pending, setPending] = useState(false);
+  const [pendingResume, setPendingResume] = useState(false);
+  const [pendingSnooze, setPendingSnooze] = useState(false);
 
   const scheduled =
     recovery?.runId === runId && recovery.resetAt === resetAt && recovery.autoResume;
@@ -105,6 +126,7 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     limitRecoveryOwnsSnooze({ runId, resetAt, recovery, snoozedUntil }) && !resetPassed;
   async function toggle(action: "resume" | "snooze") {
     if (resetAt === null) return;
+    if (action === "resume" ? pendingResume : pendingSnooze) return;
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
       toastManager.add({
         type: "error",
@@ -115,7 +137,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
       deadlineStore(Date.parse(resetAt)).refresh();
       return;
     }
-    setPending(true);
+    const setActionPending = action === "resume" ? setPendingResume : setPendingSnooze;
+    setActionPending(true);
     try {
       await onChange({
         runId,
@@ -129,20 +152,36 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
         description: cause instanceof Error ? cause.message : "发生错误。",
       });
     }
-    setPending(false);
+    setActionPending(false);
   }
+  const resumeState = getUsageLimitRecoveryButtonsState({
+    pendingAction: pendingResume ? "resume" : null,
+    scheduled,
+    snoozed,
+    resetPassed,
+  }).resume;
+  const snoozeState = getUsageLimitRecoveryButtonsState({
+    pendingAction: pendingSnooze ? "snooze" : null,
+    scheduled,
+    snoozed,
+    resetPassed,
+  }).snooze;
   // Inline errors would widen the actions column and crush the title.
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
-      <InlineButton touchTarget="padded" disabled={pending} onClick={() => void toggle("resume")}>
-        {pending ? "正在保存…" : scheduled ? "取消自动继续" : "重置后自动继续"}
+      <InlineButton
+        touchTarget="padded"
+        disabled={resumeState.disabled}
+        onClick={() => void toggle("resume")}
+      >
+        {resumeState.label}
       </InlineButton>
       <InlineButton
         touchTarget="padded"
-        disabled={pending || (!snoozed && resetPassed)}
+        disabled={snoozeState.disabled}
         onClick={() => void toggle("snooze")}
       >
-        {pending ? "正在保存…" : snoozed ? "立即唤醒" : "暂缓到重置时"}
+        {snoozeState.label}
       </InlineButton>
     </span>
   );

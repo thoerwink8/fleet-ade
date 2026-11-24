@@ -116,6 +116,10 @@
   --workspace-gutter-start: calc(env(safe-area-inset-left) + var(--workspace-gutter));
   --workspace-gutter-end: calc(env(safe-area-inset-right) + var(--workspace-gutter));
 
+  @media (pointer: coarse) {
+    --workspace-titlebar-control-gap: 0.5rem;
+  }
+
   @variant sm {
     --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
     --workspace-titlebar-control-gap: 0.75rem;
@@ -1183,6 +1187,20 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
 }
 
+/* --error is a fill. @fleet/design's --fa-danger is that fill and the label, and
+   --fa-on-danger is the page. Mix the text-safe foreground so both jobs clear
+   4.5:1 on the page and the overlay; the library should split fill from label. */
+html[data-theme-id="grove"]:not([data-theme-id=""]),
+html[data-theme-id="ember"]:not([data-theme-id=""]) {
+  --fa-danger: color-mix(in srgb, var(--error-foreground) 88%, black);
+  --fa-on-danger: var(--fa-bg);
+}
+
+html[data-theme="dark"][data-theme-id="grove"]:not([data-theme-id=""]),
+html[data-theme="dark"][data-theme-id="ember"]:not([data-theme-id=""]) {
+  --fa-danger: color-mix(in srgb, var(--error-foreground) 40%, white);
+}
+
 /* Workspace actions use a small, separate chrome hierarchy. Keeping these
    roles explicit prevents the thread toolbar from falling back to the default
    dark-mode whites while preserving the same theme file across clients. */
@@ -1205,26 +1223,23 @@ html[data-theme-id] [data-chat-header] [data-toolbar-control] {
 /* The panel layout toggles stay ghost: they render both inside the header and
    in the titlebar strip, so filling them would make them change appearance as
    the panel opens. They only take the themed foreground; hover and pressed
-   keep the base ghost accent. The tooltip trigger's data-slot wins over the
-   toggle's when the trigger renders the toggle, so match both. */
-html[data-theme-id] [data-panel-layout-controls] [data-slot="toggle"],
-html[data-theme-id] [data-panel-layout-controls] [data-slot="tooltip-trigger"],
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="toggle"],
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigger"] {
+   keep the toggle's own fill. Disabled toggles are excluded so they keep the
+   library's muted text. The tooltip trigger's data-slot wins over the toggle's
+   when the trigger renders the toggle, so match both. */
+html[data-theme-id]
+  [data-panel-layout-controls]
+  [data-slot="toggle"]:not([disabled], [data-disabled], [aria-disabled="true"]),
+html[data-theme-id]
+  [data-panel-layout-controls]
+  [data-slot="tooltip-trigger"]:not([disabled], [data-disabled], [aria-disabled="true"]),
+html[data-theme-id]
+  [data-workspace-titlebar-controls]
+  [data-slot="toggle"]:not([disabled], [data-disabled], [aria-disabled="true"]),
+html[data-theme-id]
+  [data-workspace-titlebar-controls]
+  [data-slot="tooltip-trigger"]:not([disabled], [data-disabled], [aria-disabled="true"]) {
   --control-icon-color: var(--contrast-toolbar-foreground);
   color: var(--contrast-toolbar-foreground);
-}
-
-html[data-theme-id] [data-panel-layout-controls] [data-slot="toggle"]:disabled,
-html[data-theme-id] [data-panel-layout-controls] [data-slot="tooltip-trigger"]:disabled,
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="toggle"]:disabled,
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigger"]:disabled {
-  --control-icon-color: color-mix(
-    in oklab,
-    var(--contrast-toolbar-foreground) 55%,
-    var(--toolbar-background)
-  );
-  color: color-mix(in oklab, var(--contrast-toolbar-foreground) 55%, var(--toolbar-background));
 }
 
 html[data-theme-id]
@@ -1496,6 +1511,7 @@ code {
 :is(.chat-markdown, .composer-tiptap) h5,
 :is(.chat-markdown, .composer-tiptap) h6 {
   margin: 1.25em 0 0.45em;
+  /* font-weight-allow: user and agent Markdown headings */
   font-weight: 600;
   color: var(--contrast-foreground);
 }
@@ -1748,6 +1764,7 @@ code {
   border-radius: 0.25rem;
   text-decoration: none;
   font-size: 0.75rem;
+  /* font-weight-allow: user and agent Markdown footnote references */
   font-weight: 600;
 }
 
@@ -1778,6 +1795,7 @@ code {
 }
 
 .chat-markdown strong {
+  /* font-weight-allow: user and agent Markdown bold emphasis */
   font-weight: 600;
 }
 
@@ -1909,6 +1927,7 @@ code {
 .chat-markdown thead th {
   border-bottom: 1px solid color-mix(in srgb, var(--contrast-border) 60%, transparent);
   padding-block: 0.55rem;
+  /* font-weight-allow: user and agent Markdown table headers */
   font-weight: 600;
 }
 

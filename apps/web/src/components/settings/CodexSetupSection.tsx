@@ -43,6 +43,7 @@ import { ChatGptAccountPicker } from "./ChatGptAccountPicker";
 import { Input } from "../ui/input";
 import { OpenAI } from "../Icons";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
+import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 import { SettingsRow } from "./settingsLayout";
 import { AddCodexAccountDialog } from "./AddCodexAccountDialog";
 import { getOnboardingProviderState } from "../../onboarding/providerReadiness.logic";
@@ -315,6 +316,7 @@ function ManagedCodexSetup({
   const [awaitingProvider, setAwaitingProvider] = useState<"sign-in" | "handoff" | null>(null);
   const pendingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   // The setup or sign-in this client started. Its follow-up steps (sign in
   // once the install lands, open the page once the flow waits) belong to it
   // alone, so Cancel, a new attempt, or unmounting abort them.
@@ -382,20 +384,27 @@ function ManagedCodexSetup({
     pendingRef.current = true;
     setPending(true);
     setError(null);
+    setErrorDetail(null);
     let succeeded = false;
     try {
       const result = await request();
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           const failure = squashAtomCommandFailure(result);
-          setError(failure instanceof Error ? failure.message : "Codex 设置失败。请重试。");
+          const raw = failure instanceof Error ? failure.message.trim() : "";
+          if (raw && /\p{Script=Han}/u.test(raw)) {
+            setError(raw);
+          } else {
+            setError("无法完成 Codex 设置，请重试。");
+            if (raw) setErrorDetail(raw);
+          }
         }
       } else {
         succeeded = true;
         onSuccess?.(result.value);
       }
     } catch {
-      setError("Codex 设置失败。请重试。");
+      setError("无法完成 Codex 设置，请重试。");
     }
     pendingRef.current = false;
     setPending(false);
@@ -601,13 +610,13 @@ function ManagedCodexSetup({
 
   const runtimeDescription =
     installation?.phase === "downloading"
-      ? `Downloading ${(installation.downloadedBytes / 1_000_000).toFixed(1)}${installation.totalBytes === null ? "" : ` of ${(installation.totalBytes / 1_000_000).toFixed(1)}`} MB.`
+      ? `正在下载 ${(installation.downloadedBytes / 1_000_000).toFixed(1)}${installation.totalBytes === null ? "" : ` / ${(installation.totalBytes / 1_000_000).toFixed(1)}`} MB。`
       : installation?.phase === "extracting"
         ? "正在安装 Codex。"
         : installation?.phase === "verifying"
           ? "正在检查 Codex。"
           : installed
-            ? `${installation?.source === "local" ? "Using your installed Codex" : "Managed by Fleet ADE"}${installation?.installedVersion ? ` · v${installation.installedVersion}` : ""}.`
+            ? `${installation?.source === "local" ? "使用你安装的 Codex" : "由 Fleet ADE 管理"}${installation?.installedVersion ? ` · v${installation.installedVersion}` : ""}。`
             : (installation?.message ?? "Fleet ADE 会为你下载和管理 Codex。");
   const accountDescription = finishingSignIn ? (
     "正在完成登录…"
@@ -1053,12 +1062,27 @@ function ManagedCodexSetup({
       ) : null}
       {callbackFallback ? <div className="px-3 py-3 sm:px-4">{callbackFallback}</div> : null}
       {error || authQuery.error || installQuery.error || installation?.phase === "failed" ? (
-        <p role="alert" className="px-3 py-2 text-xs text-destructive sm:px-4">
-          {error ??
-            (installation?.phase === "failed"
-              ? installation.message
-              : "无法读取 Codex 设置状态。请重新连接后重试。")}
-        </p>
+        <div className="px-3 py-2 sm:px-4">
+          <p role="alert" className="text-xs text-destructive">
+            {error ??
+              (installation?.phase === "failed"
+                ? installation.message && /\p{Script=Han}/u.test(installation.message)
+                  ? installation.message
+                  : "无法完成 Codex 安装，请重试。"
+                : "无法读取 Codex 设置状态。请重新连接后重试。")}
+          </p>
+          <ErrorDetailsDisclosure
+            detail={
+              errorDetail ??
+              (!error &&
+              installation?.phase === "failed" &&
+              installation.message &&
+              !/\p{Script=Han}/u.test(installation.message)
+                ? installation.message
+                : null)
+            }
+          />
+        </div>
       ) : null}
     </section>
   );
@@ -1181,7 +1205,7 @@ function CodexWelcomeCard({
       <div className="flex flex-wrap items-center gap-3">
         <OpenAI className="size-5 shrink-0 fill-foreground" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-row font-semibold">{title}</h3>
+          <h3 className="text-row font-medium">{title}</h3>
           <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</div>
         </div>
         {control || secondaryControl ? (

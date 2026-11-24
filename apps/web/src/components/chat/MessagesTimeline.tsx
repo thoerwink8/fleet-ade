@@ -233,6 +233,7 @@ interface MessagesTimelineProps {
   respondingRequestIds?: TimelineRowSharedState["respondingRequestIds"];
   canOperateThread?: boolean;
   onRespondToApproval?: TimelineRowSharedState["onRespondToApproval"];
+  onResendLastUserMessage?: TimelineRowSharedState["onResendLastUserMessage"];
   citationRequest?: AssistantCitationRequest | null;
   citationHistory?: CitedHistory;
   onCiteAssistantText?: (
@@ -356,6 +357,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   respondingRequestIds = EMPTY_RESPONDING_REQUEST_IDS,
   canOperateThread = false,
   onRespondToApproval,
+  onResendLastUserMessage,
   citationRequest = null,
   citationHistory = CITED_HISTORY_LOADING,
   onCiteAssistantText,
@@ -1231,6 +1233,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     respondingRequestIds,
     canOperateThread,
     onRespondToApproval,
+    onResendLastUserMessage,
     citationRequest: readyCitationRequest,
     onReplyToResponse,
     listRef,
@@ -1950,14 +1953,12 @@ function ContextCompactionTimelineRow({
         <>
           {row.title ?? "上下文已压缩"} {row.tokenCounts.before}
           <ArrowRightIcon aria-hidden="true" className="size-3" />
-          {row.tokenCounts.after} tokens
+          {row.tokenCounts.after} 个 token
         </>
       ) : (
         label
       )}
-      {row.failure ? (
-        <span className="min-w-0 truncate opacity-80">&middot; {row.failure}</span>
-      ) : null}
+      {row.failure ? <span className="min-w-0 truncate opacity-80">· {row.failure}</span> : null}
     </span>
   );
   return (
@@ -2097,7 +2098,7 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
         ) : (
           <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="text-meta font-semibold text-foreground/80">
+        <span className="text-meta font-medium text-foreground/80">
           {row.label}
           {error ? ` · ${error}` : ""}
         </span>

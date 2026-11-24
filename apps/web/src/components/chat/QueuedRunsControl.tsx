@@ -79,6 +79,7 @@ export function QueuedRunsControl({
   readonly editingRunId: RunId | null;
   /** Set while something else holds the composer, such as an open question. */
   readonly editBlockedReason: string | null;
+  readonly sendBlockedReason?: string | null;
   readonly onEditQueuedRun: (request: EditQueuedRunRequest) => void;
   readonly onCancelEdit: () => void;
   readonly timestampFormat: TimestampFormat;
@@ -165,7 +166,9 @@ export function QueuedRunsControl({
     const freshContext = queued.some(
       ({ run }) => run.id === queuedRunId && run.freshContext === true,
     );
-    if (!canSendRun(freshContext) || steerInFlightRef.current) return;
+    if (!canSendRun(freshContext) || props.sendBlockedReason != null || steerInFlightRef.current) {
+      return;
+    }
     steerInFlightRef.current = true;
     setBusyRunId(queuedRunId);
     if (workflow?.canSendNow) {
@@ -186,7 +189,9 @@ export function QueuedRunsControl({
   useImperativeHandle(ref, () => ({
     steerNext(repeat) {
       const next = queued[0];
-      if (!next || !canSendRun(next.run.freshContext === true)) return false;
+      if (!next || !canSendRun(next.run.freshContext === true) || props.sendBlockedReason != null) {
+        return false;
+      }
       if (!repeat && busyRunId === null) void sendQueuedMessage(next.run.id);
       return true;
     },
@@ -271,7 +276,11 @@ export function QueuedRunsControl({
                         <Button
                           size="xs"
                           variant="ghost-muted"
-                          disabled={item.runId === null || busyRunId !== null}
+                          disabled={
+                            item.runId === null ||
+                            busyRunId !== null ||
+                            props.sendBlockedReason != null
+                          }
                           onClick={() => {
                             if (item.runId !== null) {
                               void sendQueuedMessage(item.runId);
@@ -283,7 +292,8 @@ export function QueuedRunsControl({
                         </Button>
                       </TooltipTrigger>
                       <TooltipPopup>
-                        {`${workflow?.canSendNow ? "用这条消息开始新一轮" : workflow?.promoteSkipsCompaction ? "跳过压缩并发送这条消息" : "发送到当前这一轮"}${item.serverIndex === 0 && steerShortcutLabel ? ` (${steerShortcutLabel})` : ""}`}
+                        {props.sendBlockedReason ??
+                          `${workflow?.canSendNow ? "用这条消息开始新一轮" : workflow?.promoteSkipsCompaction ? "跳过压缩并发送这条消息" : "发送到当前这一轮"}${item.serverIndex === 0 && steerShortcutLabel ? ` (${steerShortcutLabel})` : ""}`}
                       </TooltipPopup>
                     </Tooltip>
                   </>

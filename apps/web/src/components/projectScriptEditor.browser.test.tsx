@@ -1,8 +1,10 @@
+import "~/index.css";
 import { act, render, type Screen } from "../../test/render";
 import { EnvironmentId } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { page } from "vite-plus/test/browser";
 
 vi.mock(import("~/state/session"), async (original) => ({
   ...(await original()),
@@ -62,7 +64,44 @@ function setup() {
   onDelete.mockReset();
 }
 
+function controlHeight(variable: string): string {
+  const probe = document.createElement("div");
+  probe.style.height = `var(${variable})`;
+  document.body.append(probe);
+  try {
+    return getComputedStyle(probe).height;
+  } finally {
+    probe.remove();
+  }
+}
+
 describe("project action editor save lifecycle", () => {
+  it("keeps the icon trigger on the 32px step beside the name field", async () => {
+    setup();
+    const previous = { width: window.innerWidth, height: window.innerHeight };
+    await using screen = await render(null);
+    try {
+      for (const [width, height] of [
+        [1280, 800],
+        [390, 844],
+      ] as const) {
+        await page.viewport(width, height);
+        await open(screen, request("build"));
+        const trigger = screen.getByRole("button", { name: "选择图标" }).element();
+        const nameField = document.querySelector<HTMLInputElement>("#script-name")!;
+        const expected = controlHeight("--fa-ctrl");
+        expect(getComputedStyle(trigger).width, `${width}px width`).toBe(expected);
+        expect(getComputedStyle(trigger).height, `${width}px height`).toBe(expected);
+        const fieldHeight = nameField.getBoundingClientRect().height;
+        const triggerHeight = trigger.getBoundingClientRect().height;
+        if (width >= 640) expect(fieldHeight, `${width}px field`).toBe(triggerHeight);
+        else expect(fieldHeight, `${width}px field`).toBeGreaterThan(triggerHeight);
+      }
+    } finally {
+      await page.viewport(previous.width, previous.height);
+    }
+  });
+
   it("does not close a replacement request or release its in-flight save", async () => {
     setup();
     await using screen = await render(null);

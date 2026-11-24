@@ -132,7 +132,7 @@ export function SkillChipPopover(props: {
       copyMarkdown={props.copyMarkdown}
     >
       <div className="space-y-3 p-2 text-sm">
-        <p className="text-row font-semibold">{props.label}</p>
+        <p className="text-row font-medium">{props.label}</p>
         <p>{props.description || "这个技能没有描述。"}</p>
         {props.onViewInstructions ? (
           <Button variant="outline" size="sm" onClick={props.onViewInstructions}>

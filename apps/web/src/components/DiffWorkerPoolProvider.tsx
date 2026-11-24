@@ -13,7 +13,7 @@ export class DiffWorkerError extends Schema.TaggedError<DiffWorkerError>()("Diff
   cause: Schema.Defect(),
 }) {
   override get message(): string {
-    return `Diff worker operation ${this.operation} failed for theme ${this.themeName}.`;
+    return `Diff worker 操作 ${this.operation} 对主题 ${this.themeName} 失败。`;
   }
 }
 

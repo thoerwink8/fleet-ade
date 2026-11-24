@@ -133,7 +133,7 @@ const EMPTY_STATE = {
   },
   reference: {
     label: "引用 issue 或 change request",
-    pending: "Searching...",
+    pending: "正在搜索…",
     failed: "无法搜索托管平台",
     none: "没有匹配的 issue 或 change request",
   },

@@ -91,6 +91,7 @@ import {
   resolvePreviewAnnotationImage,
   userMessageFileLabel,
 } from "./TimelineUserMessageRow.logic";
+import { revertButtonLabel } from "./revertConfirm.logic";
 
 // Drawn inside the media so dark screenshots keep an edge on the dark background.
 const MEDIA_EDGE_CLASS_NAME =
@@ -116,7 +117,7 @@ function UserFileCard({
         <PierreEntryIcon pathValue={file.name} kind="file" theme={ctx.resolvedTheme} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-row font-semibold group-hover/file:underline">
+        <span className="block truncate text-row font-medium group-hover/file:underline">
           {label}
         </span>
         <span className="block text-xs text-muted-foreground tabular-nums">
@@ -1069,24 +1070,26 @@ function RevertUserMessageButton({
 }) {
   const ctx = use(TimelineRowCtx);
   const activity = use(TimelineRowActivityCtx);
+  const label = revertButtonLabel({
+    isWorking: activity.isWorking,
+    isRevertingCheckpoint: activity.isRevertingCheckpoint,
+  });
 
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            disabled={activity.isRevertingCheckpoint || activity.isWorking}
-            onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
-            aria-label="从这里编辑"
-          />
-        }
-      >
-        <PencilIcon className="size-3.5" />
+      <TooltipTrigger render={<span className="inline-flex" />}>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          disabled={activity.isRevertingCheckpoint || activity.isWorking}
+          onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
+          aria-label={label}
+        >
+          <PencilIcon className="size-3.5" />
+        </Button>
       </TooltipTrigger>
-      <TooltipPopup side="top">从这里编辑</TooltipPopup>
+      <TooltipPopup side="top">{label}</TooltipPopup>
     </Tooltip>
   );
 }

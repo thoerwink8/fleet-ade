@@ -1879,8 +1879,38 @@ effectIt.effect("fails the run without a retry when the provider needs sign-in",
         type: "error",
         status: "failed",
         failure: {
-          class: "provider_error",
+          class: "auth_error",
+          retryable: false,
           message: "Failed to open antigravity provider session new-provider-session.",
+        },
+      },
+    ]);
+  }),
+);
+
+effectIt.effect("fails the run without a retry when the provider is not installed", () =>
+  Effect.gen(function* () {
+    const harness = makeLocalCommandHarness({
+      text: "继续",
+      openFailure: new ProviderAdapter.ProviderAdapterOpenSessionError({
+        driver: ProviderDriverKind.make("codex"),
+        providerSessionId: ProviderSessionId.make("new-provider-session"),
+        notInstalled: true,
+      }),
+    });
+
+    yield* harness.startWithRetry;
+
+    expect(harness.open).toHaveBeenCalledOnce();
+    expect(harness.projection().runs.at(-1)?.status).toBe("failed");
+    expect(harness.projection().turnItems).toMatchObject([
+      {
+        type: "error",
+        status: "failed",
+        failure: {
+          class: "not_installed",
+          retryable: false,
+          message: "Failed to open codex provider session new-provider-session.",
         },
       },
     ]);

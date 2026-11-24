@@ -2,6 +2,7 @@ import type { EnvironmentThreadShell, ThreadStructure } from "@t3tools/client-ru
 import type { ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import type { SessionPhase } from "../../types";
+import { useRef } from "react";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import {
   AuthOrchestrationOperateScope,
@@ -24,8 +25,10 @@ import { newThreadId } from "~/lib/utils";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { threadEnvironment } from "../../state/threads";
+import { orchestrationEnvironment } from "../../state/orchestration";
 import { waitForThreadShell } from "../../state/entities";
 import { openRevertConfirm } from "./ChatOverlayHosts";
+import { countRollbackTurns, type RevertRestoreAvailability } from "./revertConfirm.logic";
 import { assetEnvironment } from "../../state/assets";
 import { readEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -82,6 +85,14 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     reportFailure: false,
     refresh: true,
   });
+  const checkCheckpointRestore = useAtomQueryRunner(
+    orchestrationEnvironment.checkpointRestoreSafety,
+    { reportFailure: false, reportDefect: false, refresh: true },
+  );
+  const pendingPrecheckRef = useRef<{
+    readonly id: number;
+    readonly messageId: MessageId;
+  } | null>(null);
 
   const revertThreadCheckpoint = useOrchestrationCommand(threadEnvironment.revertCheckpoint, {
     reportFailure: false,
@@ -113,16 +124,46 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `请先重新连接 ${activeEnvironmentUnavailableLabel}，再回退检查点。`,
+        `请先重新连接 ${activeEnvironmentUnavailableLabel}，再回退。`,
       );
       return;
     }
     if (phase === "running" || isSendBusy) {
-      setThreadError(activeThread.id, "请先中断当前这一轮，再回退检查点。");
+      setThreadError(activeThread.id, "正在运行，请先停止再回退。");
       return;
     }
     if (restoreFiles === undefined) {
-      openRevertConfirm(routeThreadKey, { turnCount, messageId });
+      if (pendingPrecheckRef.current?.messageId === messageId) return;
+      const precheckId = (pendingPrecheckRef.current?.id ?? 0) + 1;
+      pendingPrecheckRef.current = { id: precheckId, messageId };
+      const fallbackTurnCount = countRollbackTurns(serverProjection?.runs ?? [], turnCount);
+      const result = await checkCheckpointRestore({
+        environmentId,
+        input: { threadId: activeThread.id, turnCount },
+      });
+      if (pendingPrecheckRef.current?.id !== precheckId) return;
+      pendingPrecheckRef.current = null;
+      if (currentRouteThreadKeyRef.current !== routeThreadKey) return;
+      const availability: RevertRestoreAvailability =
+        result._tag === "Success"
+          ? result.value.canRestoreFiles
+            ? { status: "ready" }
+            : {
+                status: "blocked",
+                reason: result.value.reason,
+                ...(result.value.inProjectDirectory === undefined
+                  ? {}
+                  : { inProjectDirectory: result.value.inProjectDirectory }),
+              }
+          : { status: "unavailable" };
+      const removedTurnCount =
+        result._tag === "Success" ? result.value.removedTurnCount : fallbackTurnCount;
+      openRevertConfirm(routeThreadKey, {
+        turnCount,
+        messageId,
+        availability,
+        removedTurnCount,
+      });
       return;
     }
 
@@ -181,7 +222,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         sourceThreadId: input.sourceThreadId,
         targetThreadId,
         runId: input.runId,
-        title: `${activeThread.title} fork`,
+        title: `${activeThread.title}（分叉）`,
       },
     });
     if (result._tag === "Failure") {

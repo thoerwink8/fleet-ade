@@ -27,7 +27,7 @@ export function PullRequestListGhost({ rows = 7, caption }: { rows?: number; cap
     <div role="status" aria-label={caption ?? "正在加载拉取请求"} className="space-y-0.5">
       {/* Outside the pulse so the explanation stays readable. */}
       {caption ? (
-        <p className="px-3 pb-1 text-meta font-semibold text-muted-foreground">{caption}</p>
+        <p className="px-3 pb-1 text-meta font-medium text-muted-foreground">{caption}</p>
       ) : null}
       <div className="motion-safe:animate-skeleton space-y-0.5">
         {Array.from({ length: rows }, (_, index) => (
@@ -141,7 +141,7 @@ export function PullRequestDetailGhost({
               title={
                 <PullRequestDetailTitleRow>
                   {seed ? (
-                    <h1 className="truncate text-base font-semibold leading-snug">{seed.title}</h1>
+                    <h1 className="truncate text-base font-medium leading-snug">{seed.title}</h1>
                   ) : (
                     <GhostBar className="h-5 w-4/5 max-w-md" />
                   )}
@@ -190,7 +190,7 @@ export function PullRequestDetailGhost({
                 changedFiles === null ? (
                   <GhostBar className="h-3 w-10" />
                 ) : (
-                  `${changedFiles.toLocaleString("zh-CN")} ${changedFiles === 1 ? "file" : "files"}`
+                  `${changedFiles.toLocaleString("zh-CN")} 个文件`
                 )
               }
               diffStat={

@@ -44,13 +44,13 @@ function taskScheduleLine(task: ScheduledTask, timeZone: string | undefined) {
       {scheduleLabel(task.schedule, timeZone, task.nextRunAt)}
       {task.enabled && task.nextRunAt !== null ? (
         <>
-          {" · next "}
+          {" · 下一次 "}
           <ScheduledRelativeLabel value={task.nextRunAt} />
         </>
       ) : task.enabled ? (
         ""
       ) : (
-        " · paused"
+        " · 已暂停"
       )}
     </>
   );
@@ -175,7 +175,7 @@ export function ThreadAutomationsPanel(props: {
             </span>
             <Tooltip>
               <TooltipTrigger render={<div className="min-w-0 flex-1" />}>
-                <span className="block truncate text-row font-semibold text-foreground/80">
+                <span className="block truncate text-row font-medium text-foreground/80">
                   {task.title}
                 </span>
                 <p className="truncate text-2xs text-muted-foreground">
@@ -183,7 +183,7 @@ export function ThreadAutomationsPanel(props: {
                 </p>
               </TooltipTrigger>
               <TooltipPopup side="left">
-                <p className="text-meta font-semibold">{task.title}</p>
+                <p className="text-meta font-medium">{task.title}</p>
                 <p className="text-muted-foreground">
                   {taskScheduleLine(task, tasksQuery.data?.timeZone)}
                 </p>

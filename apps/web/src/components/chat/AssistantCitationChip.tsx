@@ -95,7 +95,7 @@ function ResponseCard({
         className="block min-w-0 rounded-lg bg-black/10 px-2.5 py-1.5 text-start text-sm text-muted-foreground! no-underline! wrap-break-word hover:bg-black/14 focus-visible:outline-2 focus-visible:outline-ring dark:bg-black/35 dark:hover:bg-black/50"
       >
         {title ? (
-          <span className="block truncate text-meta font-semibold text-foreground/80" dir="auto">
+          <span className="block truncate text-meta font-medium text-foreground/80" dir="auto">
             {title}
           </span>
         ) : null}

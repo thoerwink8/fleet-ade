@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import * as Stream from "effect/Stream";
 import { HttpServer } from "effect/http";
 import * as NetAddress from "effect/net/NetAddress";
 
@@ -27,6 +28,7 @@ import * as ThreadLaunch from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "./orchestration-v2/ThreadManagementService.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ProjectService from "./project/ProjectService.ts";
+import * as ProviderRegistry from "./provider/ProviderRegistry.ts";
 import { ServerActivation } from "./serverActivation.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
@@ -139,6 +141,10 @@ it.effect("parks automatic pull until activation without delaying command readin
         countThreads: () => Effect.succeed(0),
       }),
       Layer.mock(ThreadLaunch.ThreadLaunchService)({}),
+      Layer.mock(ProviderRegistry.ProviderRegistry)({
+        getProviders: Effect.succeed([]),
+        streamChanges: Stream.empty,
+      }),
       Layer.mock(ServiceLauncherClient.ServiceLauncherClient)({
         managed: true,
         protocol: SERVICE_LAUNCHER_PROTOCOL,

@@ -10,7 +10,6 @@ import { type ReactNode, useState } from "react";
 import { sourceControlIcon } from "~/sourceControlPresentation";
 import { ITEM_ICON_CLASS } from "./CommandPalette.logic";
 import { useHideCommandPaletteKeyboardHints } from "./CommandPaletteContent";
-import { CommandPaletteTitleIcon } from "./CommandPaletteResults";
 import { Button } from "./ui/button";
 import { Kbd, KbdGroup } from "./ui/kbd";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
@@ -134,17 +133,19 @@ export function NewProjectSummary(props: {
 }) {
   return (
     <div className="p-2 pb-0">
-      <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
-        <CommandPaletteTitleIcon>
+      <div className="fa-cmd__row fa-cmd__row--2 has-lead">
+        <span className="lead">
           <FolderGit2Icon className={ITEM_ICON_CLASS} />
-        </CommandPaletteTitleIcon>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-foreground text-sm">
-            {props.name.length > 0 ? props.name : "新建项目"}
+        </span>
+        <span className="fa-cmd__body">
+          <span className="l l1">
+            <span className="x grow">{props.name.length > 0 ? props.name : "新建项目"}</span>
           </span>
-          <span className="truncate text-muted-foreground/85 text-xs">
-            {props.name.length > 0 ? `将创建 ${props.pathPreview}` : `位于 ${props.projectsRoot}`}
-            {props.environmentLabel === null ? null : `在 ${props.environmentLabel} 上`}
+          <span className="l l2">
+            <span className="x">
+              {props.name.length > 0 ? `将创建 ${props.pathPreview}` : `位于 ${props.projectsRoot}`}
+              {props.environmentLabel === null ? null : `在 ${props.environmentLabel} 上`}
+            </span>
           </span>
         </span>
       </div>
@@ -159,14 +160,16 @@ export function RemoteRepositorySummary(props: {
 }) {
   return (
     <div className="shrink-0 p-2 pb-0">
-      <div className="px-2 py-1.5 text-meta font-semibold text-muted-foreground">仓库</div>
-      <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
-        <CommandPaletteTitleIcon>
-          {remoteProjectSourceIcon(props.source, ITEM_ICON_CLASS)}
-        </CommandPaletteTitleIcon>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-foreground text-sm">{props.title}</span>
-          <span className="truncate text-muted-foreground/85 text-xs">{props.description}</span>
+      <div className="fa-glabel">仓库</div>
+      <div className="fa-cmd__row fa-cmd__row--2 has-lead">
+        <span className="lead">{remoteProjectSourceIcon(props.source, ITEM_ICON_CLASS)}</span>
+        <span className="fa-cmd__body">
+          <span className="l l1">
+            <span className="x grow">{props.title}</span>
+          </span>
+          <span className="l l2">
+            <span className="x">{props.description}</span>
+          </span>
         </span>
       </div>
     </div>

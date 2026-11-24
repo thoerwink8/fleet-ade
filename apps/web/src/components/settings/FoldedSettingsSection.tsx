@@ -79,7 +79,7 @@ export function FoldedSettingsSection({
                 open && "rotate-90",
               )}
             />
-            <span className="shrink-0 text-row font-semibold">{title}</span>
+            <span className="shrink-0 text-row font-medium">{title}</span>
             {summary ? (
               <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span>
             ) : null}

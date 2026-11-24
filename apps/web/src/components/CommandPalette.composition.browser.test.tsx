@@ -178,7 +178,7 @@ it.each([
     description: /添加.*(Ctrl|⌘) Enter/,
   },
   { step: "repository", source: "Git URL", keys: "", description: /继续.*Enter/ },
-  { step: "new project", source: "新建项目", keys: "", description: /Create.*Enter/ },
+  { step: "new project", source: "新建项目", keys: "", description: /创建（.*Enter）/ },
   {
     step: "permission-blocked folder",
     source: "本地文件夹",
@@ -221,8 +221,8 @@ it("keeps the caret in place when an edit briefly makes the folder path not a pa
 });
 
 it.each([
-  { flow: "Git URL", value: "https://github.com/pingdotgg/t3code.git", submit: "继续 (Enter)" },
-  { flow: "新建项目", value: "demo-tab-order", submit: /^Create \(/ },
+  { flow: "Git URL", value: "https://github.com/pingdotgg/t3code.git", submit: "继续（Enter）" },
+  { flow: "新建项目", value: "demo-tab-order", submit: /^创建（/ },
 ])("moves focus from the $flow input to its enabled submit button on Tab", async (step) => {
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
   await act(() => openCommandPalette({ open: "add-project" }));
@@ -265,7 +265,7 @@ it("hides the submit button keycap on touch while keeping the submit button visi
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
   await act(() => openCommandPalette({ open: "add-project" }));
   await page.getByText("Git URL", { exact: true }).click();
-  const submit = page.getByRole("button", { name: "继续 (Enter)" });
+  const submit = page.getByRole("button", { name: "继续（Enter）" });
   await expect.element(submit).toBeVisible();
   expect(submit.element().querySelector('[data-slot="kbd"]')).toBeNull();
 });

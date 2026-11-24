@@ -6,6 +6,8 @@ import { NodeId, RunAttemptId, TrimmedNonEmptyString } from "./index.ts";
 import {
   latestProviderTurnForAttempt,
   OrchestrationV2ProviderCapabilities,
+  OrchestrationV2ProviderFailure,
+  OrchestrationV2ProviderFailureClass,
   OrchestrationV2ProviderThread,
   OrchestrationV2ProviderThreadJson,
   OrchestrationV2RpcSchemas,
@@ -18,6 +20,8 @@ import {
 } from "./orchestrationV2.ts";
 
 const now = DateTime.makeUnsafe("2026-04-20T00:00:00.000Z");
+const decodeFailure = Schema.decodeSync(OrchestrationV2ProviderFailure);
+const decodeFailureClass = Schema.decodeSync(OrchestrationV2ProviderFailureClass);
 
 const decodeOrchestrationV2TurnItemJson = Schema.decodeUnknownSync(OrchestrationV2TurnItemJson);
 const encodeOrchestrationV2TurnItemJson = Schema.encodeSync(OrchestrationV2TurnItemJson);
@@ -484,6 +488,19 @@ describe("thread open stats", () => {
     const opens = { openedAt: 1, score: 1, picks: [{ query: "upl", at: 1 }] };
     expect(decode({ ...shell, opens }).opens).toEqual(opens);
     expect(decode({ ...shell, opens: { openedAt: "2026-10-01", score: 1 } }).opens).toBeNull();
+    expect(
+      decode({ ...shell, lastErrorClass: "auth_error", lastErrorRetryCount: 2 }),
+    ).toMatchObject({ lastErrorClass: "auth_error", lastErrorRetryCount: 2 });
+    expect(decode({ ...shell, lastErrorClass: "not_installed" }).lastErrorClass).toBe(
+      "not_installed",
+    );
+  });
+
+  it("decodes a failure class this build does not know as unknown instead of failing", () => {
+    const failure = { class: "something_newer", message: "x", code: null, retryable: null };
+    expect(decodeFailure(failure).class).toBe("unknown");
+    expect(decodeFailureClass("auth_error")).toBe("auth_error");
+    expect(decodeFailure({ ...failure, class: "auth_error" }).class).toBe("auth_error");
   });
 });
 

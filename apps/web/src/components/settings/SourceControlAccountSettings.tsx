@@ -118,7 +118,7 @@ export function SourceControlAccountSettings({
           <div key={group.host} className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 space-y-0.5">
-                <span className="text-meta font-semibold text-foreground">{group.host}</span>
+                <span className="text-meta font-medium text-foreground">{group.host}</span>
                 {group.selectable.length === 1 && group.selectable[0] !== undefined ? (
                   <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                     <span>已登录账户</span>
@@ -152,7 +152,7 @@ export function SourceControlAccountSettings({
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              活跃 {cliName} account
+                              活跃 {cliName} 账户
                               {group.activeAccount ? (
                                 <>
                                   (
@@ -173,7 +173,7 @@ export function SourceControlAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          活跃 {cliName} account
+                          活跃 {cliName} 账户
                           {group.activeAccount ? (
                             <>
                               (<RedactedLogin revealed={revealed} account={group.activeAccount} />)

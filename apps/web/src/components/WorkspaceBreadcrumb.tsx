@@ -60,7 +60,7 @@ export function WorkspaceBreadcrumbItem({
       aria-current={current ? "page" : undefined}
       className={cn(
         "flex min-w-0 items-center font-medium",
-        current ? "text-title font-semibold text-foreground" : "shrink-0 text-muted-foreground",
+        current ? "text-title text-foreground" : "shrink-0 text-muted-foreground",
         className,
       )}
     >

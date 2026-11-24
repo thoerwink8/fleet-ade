@@ -401,7 +401,7 @@ export function useProjectContentSearch(target: ProjectContentSearchTarget) {
         : !canReadFiles
           ? (fileAccess.error ?? "此连接无法搜索主机文件。")
           : queryTooLong
-            ? `Search is limited to ${PROJECT_SEARCH_CONTENTS_QUERY_MAX_LENGTH} characters.`
+            ? `搜索最多支持 ${PROJECT_SEARCH_CONTENTS_QUERY_MAX_LENGTH} 个字符。`
             : result.error,
     isPending:
       isCheckingAccess ||

@@ -30,7 +30,7 @@ export function createLocalApi(): LocalApi {
         if (window.desktopBridge) {
           const opened = await window.desktopBridge.openExternal(url);
           if (!opened) {
-            throw new Error("Unable to open link.");
+            throw new Error("无法打开链接。");
           }
           return;
         }
@@ -83,7 +83,7 @@ export function readLocalApi(): LocalApi | undefined {
 export function ensureLocalApi(): LocalApi {
   const api = readLocalApi();
   if (!api) {
-    throw new Error("Local API not found");
+    throw new Error("找不到本地 API");
   }
   return api;
 }

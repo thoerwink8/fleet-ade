@@ -3,16 +3,19 @@ import { useLegendListRef } from "~/hooks/useLegendListRef";
 import { type ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { ChevronRightIcon } from "lucide-react";
-import { type ReactNode, type RefObject, useState } from "react";
+import { type RefObject, useState } from "react";
 import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { toastManager } from "./ui/toast";
 import { shortcutLabelForCommand } from "../keybindings";
 import {
   commandPaletteDisabledReason,
+  commandPaletteItemLineCount,
+  commandPaletteRowMetric,
   type CommandPaletteActionItem,
   type CommandPaletteGroup,
   type CommandPaletteRow,
+  type CommandPaletteRowMetric,
   type CommandPaletteSubmenuItem,
 } from "./CommandPalette.logic";
 import { useHideCommandPaletteKeyboardHints } from "./CommandPaletteContent";
@@ -41,11 +44,28 @@ interface CommandPaletteResultsProps {
 
 function CommandPaletteEmptyState(props: { emptyStateMessage?: string; isActionsOnly: boolean }) {
   return (
-    <div className="py-10 text-center text-sm text-muted-foreground">
+    <div className="fa-cmd__empty">
       {props.emptyStateMessage ??
         (props.isActionsOnly ? "没有匹配的操作。" : "没有匹配的命令、项目或会话。")}
     </div>
   );
+}
+
+/** Heights the virtualiser locks in. Read from the library tokens, plus the
+ *  `.fa-glabel` line (12px on 16px) which has no height token of its own. */
+export function commandPaletteFixedRowSize(metric: CommandPaletteRowMetric): number | undefined {
+  if (typeof document === "undefined") return undefined;
+  const root = getComputedStyle(document.documentElement);
+  const px = (name: string) => {
+    const value = Number.parseFloat(root.getPropertyValue(name));
+    return Number.isFinite(value) ? value : undefined;
+  };
+  if (metric === "item-1") return px("--fa-row-1");
+  if (metric === "item-2") return px("--fa-row-2");
+  const padTop = px("--fa-space-2");
+  const padBottom = px("--fa-space-1");
+  if (padTop === undefined || padBottom === undefined) return undefined;
+  return padTop + 16 + padBottom;
 }
 
 export function CommandPaletteResults(props: CommandPaletteResultsProps) {
@@ -131,13 +151,10 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
         data={props.rows}
         initialScrollOffset={0}
         keyExtractor={(row) => row.key}
-        getItemType={(row) => row.kind}
         extraData={`${hideKeyboardHints ? "1" : "0"}:${props.highlightedItemValue ?? ""}`}
         renderItem={({ item: row }) =>
           row.kind === "label" ? (
-            <div className={row.first ? undefined : "pt-1.5"}>
-              <CommandListHeading>{row.label}</CommandListHeading>
-            </div>
+            <CommandListHeading>{row.label}</CommandListHeading>
           ) : row.itemIndex === null ? (
             <DisabledCommandPaletteResultRow item={row.item} />
           ) : (
@@ -151,7 +168,14 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
             />
           )
         }
-        estimatedItemSize={40}
+        getItemType={(row) => commandPaletteRowMetric(row)}
+        getFixedItemSize={(row, _index, type) =>
+          commandPaletteFixedRowSize(
+            type === "label" || type === "item-1" || type === "item-2"
+              ? type
+              : commandPaletteRowMetric(row),
+          )
+        }
         drawDistance={400}
         onLayout={updateScrollFade}
         onScroll={updateScrollFade}
@@ -168,10 +192,6 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
   );
 }
 
-export function CommandPaletteTitleIcon(props: { children: ReactNode }) {
-  return <span className="flex h-5 shrink-0 items-center self-start pt-0.5">{props.children}</span>;
-}
-
 function CommandPaletteTitle({
   item,
 }: {
@@ -179,7 +199,7 @@ function CommandPaletteTitle({
 }) {
   const { title } = item;
   return (
-    <span className="truncate" dir={typeof title === "string" ? textDirection(title) : undefined}>
+    <span className="x grow" dir={typeof title === "string" ? textDirection(title) : undefined}>
       {title}
     </span>
   );
@@ -199,11 +219,63 @@ function ThreadRowContext({
   const context = [item.threadSearch.projectTitle, item.threadSearch.environmentLabel]
     .filter((part) => part && part !== item.matchHint?.text)
     .join(" · ");
-  return context ? (
-    <span className="max-w-[45%] shrink-0 truncate text-muted-foreground/70 text-xs">
-      {context}
-    </span>
-  ) : null;
+  return context ? <span className="st max-w-[45%] shrink-0 truncate">{context}</span> : null;
+}
+
+function CommandPaletteResultLines(props: {
+  item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
+  reason?: string | null;
+  shortcutLabel?: string | null;
+  hideShortcuts?: boolean;
+  keybindings?: ResolvedKeybindingsConfig;
+}) {
+  const twoLine = commandPaletteItemLineCount(props.item) === 2;
+  return (
+    <>
+      <span className="lead">{props.item.icon}</span>
+      <span className="fa-cmd__body">
+        <span className="l l1">
+          {props.item.titleLeadingContent}
+          <CommandPaletteTitle item={props.item} />
+          <ThreadRowContext item={props.item} />
+          {props.reason != null && props.reason !== props.item.description ? (
+            <span className="st">{props.reason}</span>
+          ) : null}
+          {props.item.titleTrailingContent}
+          {props.item.kind === "action" && props.item.pin && props.keybindings ? (
+            <ProjectPinButton
+              name={props.item.pin.name}
+              pinned={props.item.pin.pinned}
+              onToggle={props.item.pin.toggle}
+              shortcutLabel={
+                props.hideShortcuts
+                  ? null
+                  : shortcutLabelForCommand(props.keybindings, "thread.pin")
+              }
+            />
+          ) : null}
+          {props.item.timestamp ? <span className="tm">{props.item.timestamp}</span> : null}
+          {props.shortcutLabel ? (
+            <CommandShortcut variant="hint">{props.shortcutLabel}</CommandShortcut>
+          ) : null}
+          {props.item.kind === "submenu" ? <ChevronRightIcon className="fa-ic" /> : null}
+        </span>
+        {twoLine ? (
+          <span className="l l2">
+            <span className="x">
+              {props.item.threadContentMatch ? (
+                <ThreadSearchMatchExcerpt match={props.item.threadContentMatch} tone="neutral" />
+              ) : props.item.matchHint ? (
+                <SearchMatchHintLine hint={props.item.matchHint} />
+              ) : (
+                props.item.description
+              )}
+            </span>
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
 }
 
 function DisabledCommandPaletteResultRow(props: {
@@ -212,6 +284,7 @@ function DisabledCommandPaletteResultRow(props: {
   const reason =
     commandPaletteDisabledReason(props.item) ??
     (typeof props.item.description === "string" ? props.item.description : null);
+  const twoLine = commandPaletteItemLineCount(props.item) === 2;
   return (
     <button
       type="button"
@@ -221,36 +294,9 @@ function DisabledCommandPaletteResultRow(props: {
           toastManager.add({ type: "info", title: "命令不可用", description: reason });
         }
       }}
-      className="flex min-h-8 w-full select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-base opacity-64 hover:bg-accent/40 sm:min-h-7 sm:text-sm"
+      className={cn("fa-cmd__row has-lead", twoLine ? "fa-cmd__row--2" : "fa-cmd__row--1")}
     >
-      <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
-      {props.item.description || props.item.threadContentMatch ? (
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
-            {props.item.titleLeadingContent}
-            <CommandPaletteTitle item={props.item} />
-            <ThreadRowContext item={props.item} />
-          </span>
-          {props.item.threadContentMatch ? (
-            <ThreadSearchMatchExcerpt match={props.item.threadContentMatch} />
-          ) : props.item.matchHint ? (
-            <SearchMatchHintLine hint={props.item.matchHint} />
-          ) : props.item.description ? (
-            <span className="min-w-0 text-muted-foreground/70 text-xs">
-              {props.item.description}
-            </span>
-          ) : null}
-        </span>
-      ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-foreground">
-          {props.item.titleLeadingContent}
-          <CommandPaletteTitle item={props.item} />
-        </span>
-      )}
-      {reason !== null && reason !== props.item.description ? (
-        <span className="text-xs text-muted-foreground">{reason}</span>
-      ) : null}
-      {props.item.titleTrailingContent}
+      <CommandPaletteResultLines item={props.item} reason={reason} />
     </button>
   );
 }
@@ -268,9 +314,12 @@ function CommandPaletteResultRow(props: {
       ? shortcutLabelForCommand(props.keybindings, props.item.shortcutCommand)
       : null;
 
+  const twoLine = commandPaletteItemLineCount(props.item) === 2;
   return (
     <CommandItem
       {...(props.index === undefined ? {} : { index: props.index })}
+      lines={twoLine ? 2 : 1}
+      hasLead
       value={props.item.value}
       active={props.isActive}
       {...(props.item.kind === "action" && props.item.checked !== undefined
@@ -293,50 +342,12 @@ function CommandPaletteResultRow(props: {
         props.onExecuteItem(props.item);
       }}
     >
-      <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
-      {props.item.description || props.item.threadContentMatch ? (
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
-            {props.item.titleLeadingContent}
-            <CommandPaletteTitle item={props.item} />
-            <ThreadRowContext item={props.item} />
-          </span>
-          {props.item.threadContentMatch ? (
-            <ThreadSearchMatchExcerpt match={props.item.threadContentMatch} />
-          ) : props.item.matchHint ? (
-            <SearchMatchHintLine hint={props.item.matchHint} />
-          ) : props.item.description ? (
-            <span className="min-w-0 text-muted-foreground/70 text-xs">
-              {props.item.description}
-            </span>
-          ) : null}
-        </span>
-      ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-foreground">
-          {props.item.titleLeadingContent}
-          <CommandPaletteTitle item={props.item} />
-        </span>
-      )}
-      {props.item.titleTrailingContent}
-      {props.item.kind === "action" && props.item.pin ? (
-        <ProjectPinButton
-          name={props.item.pin.name}
-          pinned={props.item.pin.pinned}
-          onToggle={props.item.pin.toggle}
-          shortcutLabel={
-            props.hideShortcuts ? null : shortcutLabelForCommand(props.keybindings, "thread.pin")
-          }
-        />
-      ) : null}
-      {props.item.timestamp ? (
-        <span className="min-w-12 shrink-0 text-right text-xs tabular-nums text-muted-foreground/70">
-          {props.item.timestamp}
-        </span>
-      ) : null}
-      {shortcutLabel ? <CommandShortcut>{shortcutLabel}</CommandShortcut> : null}
-      {props.item.kind === "submenu" ? (
-        <ChevronRightIcon className="-me-0.5 ms-auto size-4 shrink-0 text-muted-foreground/70" />
-      ) : null}
+      <CommandPaletteResultLines
+        item={props.item}
+        shortcutLabel={shortcutLabel}
+        hideShortcuts={props.hideShortcuts}
+        keybindings={props.keybindings}
+      />
     </CommandItem>
   );
 }

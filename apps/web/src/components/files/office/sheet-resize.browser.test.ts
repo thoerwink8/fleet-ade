@@ -93,7 +93,7 @@ it.each([false, true])(
       expect(taller.chartHeight - opened!.layout.chartHeight).toBeCloseTo(frozen ? 1 : 40, 0);
       await expect(
         client.call("resize", { sheet: 0, axis: "row", index: 0, delta: NaN }),
-      ).rejects.toThrow("Invalid track resize");
+      ).rejects.toThrow("行列尺寸调整无效");
       expect(await client.call("position", { sheet: 1, cell: { row: 0, col: 0 } })).toEqual(other);
       await client.call("show", { sheet: 1 });
       await client.call("show", { sheet: 0 });

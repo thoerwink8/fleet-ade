@@ -111,7 +111,7 @@ export async function openWordDocument(bytes: Uint8Array, fonts: FontFaceSet | u
 
   const measurement = measure.measurementConfigForRequirements(requirements);
 
-  if (!measurement) throw new Error("The document's fonts could not be prepared");
+  if (!measurement) throw new Error("无法准备文档的字体");
 
   const input = JSON.stringify({ ...request, measurement });
 
@@ -151,8 +151,7 @@ export async function openWordDocument(bytes: Uint8Array, fonts: FontFaceSet | u
   const prefix = session.layoutDocumentWithRegionsPrefixRetainedJson(input, firstPages);
   const retained = { frame: display(null, prefix) };
 
-  if (retained.frame.displayList.pages.length === 0)
-    throw new Error("The document produced no pages");
+  if (retained.frame.displayList.pages.length === 0) throw new Error("文档没有生成页面");
 
   // The region layout that finishes the document: begun on the first step, `cost` the running average milliseconds a
   // body block takes.
@@ -215,7 +214,7 @@ export async function openWordDocument(bytes: Uint8Array, fonts: FontFaceSet | u
     // The engine sets glyphs no bundled face has, such as Thai ones or emoji, as missing glyphs, which outline as empty
     // boxes. A run whose outlines fail paints whole with the canvas's fonts instead, which the system's cover.
     provider: (font, glyph) => {
-      if (glyph === 0) throw new Error("No bundled face has this glyph");
+      if (glyph === 0) throw new Error("内置字体没有这个字形");
 
       return session.outlineGlyphJson(font, glyph);
     },

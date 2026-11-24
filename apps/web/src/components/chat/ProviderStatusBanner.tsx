@@ -4,15 +4,15 @@ import {
   type ServerProvider,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { memo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useState, useSyncExternalStore } from "react";
 import { InfoIcon, XIcon } from "lucide-react";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
-import { Button, InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
 import { formatProviderDriverKindLabel } from "../../providerModels";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { RefreshIcon } from "../ui/refresh-icon";
+import { ErrorDetailsDisclosure } from "./ErrorDetailsDisclosure";
+import { classifyProviderError, type AlternativeReadyAgent } from "./providerErrorClassification";
 
 function getIncompatibleVersion(status: ServerProvider) {
   const compatibility = status.compatibilityAdvisory;
@@ -115,50 +115,56 @@ export function getProviderStatusMessage(status: ServerProvider): string {
   if (status.message) return status.message;
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
   if (!status.installed && hasProviderSetup(status)) {
-    return `打开提供方设置，在此环境中安装 ${formatProviderDriverKindLabel(status.driver)}。`;
+    return `打开智能体设置，在这台电脑上安装 ${formatProviderDriverKindLabel(status.driver)}。`;
   }
   if (status.auth.status === "unauthenticated") {
     if (hasProviderSetup(status)) {
       return status.driver === "antigravity"
-        ? "打开提供方设置，使用 Google 登录。"
-        : "打开提供方设置进行登录。";
+        ? "打开智能体设置，使用 Google 登录。"
+        : "打开智能体设置进行登录。";
     }
-    return "请通过 CLI 重新登录认证。";
+    return "请重新登录这个智能体。";
   }
   return status.status === "ready"
-    ? "这个提供方没有可用的模型。"
+    ? "这个智能体没有可用的模型。"
     : status.status === "error"
-      ? `提供方 ${providerName} 不可用。`
-      : `提供方 ${providerName} 部分可用。`;
+      ? `${providerName} 不可用。`
+      : `${providerName} 部分可用。`;
 }
 
 export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   environmentId,
   onDismiss,
   onOpenProviderSetup,
+  alternativeAgent,
+  onSwitchAgent,
   status,
 }: {
   environmentId: EnvironmentId;
   onDismiss: () => void;
   onOpenProviderSetup?: (instanceId: ProviderInstanceId) => void;
+  alternativeAgent?: AlternativeReadyAgent | null;
+  onSwitchAgent?: (instanceId: ProviderInstanceId) => void;
   status: ServerProvider | null;
 }) {
   const canRefresh = useAtomValue(serverEnvironment.refreshProviders.permissionAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
-    label: "刷新提供方状态",
+    label: "刷新智能体状态",
   });
-  const refreshingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refresh = async () => {
-    if (!status || !canRefresh || refreshingRef.current) return;
-    refreshingRef.current = true;
+    if (!status || !canRefresh || isRefreshing) return;
     setIsRefreshing(true);
-    await refreshProviders({
-      environmentId,
-      input: { instanceId: status.instanceId, refreshModels: true },
-    });
-    refreshingRef.current = false;
+    try {
+      await refreshProviders({
+        environmentId,
+        input: { instanceId: status.instanceId, refreshModels: true },
+      });
+    } catch (cause) {
+      setIsRefreshing(false);
+      throw cause;
+    }
     setIsRefreshing(false);
   };
 
@@ -167,15 +173,68 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   }
 
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
-  const isUnauthenticated = status.status === "error" && status.auth.status === "unauthenticated";
   const incompatible = getIncompatibleVersion(status);
-  const title = isUnauthenticated
-    ? `${providerName} 未登录`
-    : incompatible
-      ? `${providerName} ${status.version ?? ""} ${incompatible.status === "broken" ? "已知不兼容" : "不受支持"}`
-      : `提供方 ${providerName} 状态`;
-  const message = incompatible?.message ?? getProviderStatusMessage(status);
-  const variant = getProviderStatusBannerVariant(status);
+  const classified =
+    incompatible === null
+      ? classifyProviderError({
+          agentName: providerName,
+          rawError: status.message ?? null,
+          providerStatus: status,
+          alternativeAgent: alternativeAgent ?? null,
+        })
+      : null;
+
+  const title = incompatible
+    ? `${providerName} ${status.version ?? ""} ${incompatible.status === "broken" ? "已知不兼容" : "版本不受支持"}`.trim()
+    : classified!.message;
+  const rawDetail = incompatible
+    ? (incompatible.message ?? status.message ?? null)
+    : classified!.rawDetail;
+  const variant = incompatible ? getProviderStatusBannerVariant(status) : classified!.variant;
+
+  const primaryAction = (() => {
+    if (incompatible) {
+      if (onOpenProviderSetup && hasProviderSetup(status)) {
+        return {
+          label: "打开智能体设置",
+          disabled: false,
+          onClick: () => onOpenProviderSetup(status.instanceId),
+        };
+      }
+      return {
+        label: isRefreshing ? "正在重试…" : "再试一次",
+        disabled: !canRefresh || isRefreshing,
+        onClick: () => void refresh(),
+      };
+    }
+    const action = classified!.action;
+    if (!action) return null;
+    switch (action.kind) {
+      case "sign_in":
+      case "install_help":
+        return onOpenProviderSetup
+          ? {
+              label: action.label,
+              disabled: false,
+              onClick: () => onOpenProviderSetup(status.instanceId),
+            }
+          : null;
+      case "switch_agent":
+        return onSwitchAgent
+          ? {
+              label: action.label,
+              disabled: false,
+              onClick: () => onSwitchAgent(action.targetInstanceId),
+            }
+          : null;
+      case "retry":
+        return {
+          label: isRefreshing ? "正在重试…" : action.label,
+          disabled: !canRefresh || isRefreshing,
+          onClick: () => void refresh(),
+        };
+    }
+  })();
 
   return (
     <Alert
@@ -185,35 +244,24 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     >
       <InfoIcon />
       <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>
-        <Tooltip>
-          <TooltipTrigger render={<div className="line-clamp-3" />}>{message}</TooltipTrigger>
-          <TooltipPopup side="top" className="whitespace-pre-wrap">
-            {message}
-          </TooltipPopup>
-        </Tooltip>
-        {onOpenProviderSetup && hasProviderSetup(status) ? (
-          <InlineButton
-            className="self-start"
-            onClick={() => onOpenProviderSetup(status.instanceId)}
-          >
-            打开提供方设置
-          </InlineButton>
-        ) : null}
-      </AlertDescription>
+      {rawDetail ? (
+        <AlertDescription>
+          <ErrorDetailsDisclosure detail={rawDetail} />
+        </AlertDescription>
+      ) : null}
       <AlertAction>
+        {primaryAction ? (
+          <Button
+            disabled={primaryAction.disabled}
+            onClick={primaryAction.onClick}
+            size="sm"
+            variant="outline"
+          >
+            {primaryAction.label}
+          </Button>
+        ) : null}
         <Button
-          aria-label={`刷新提供方 ${providerName} 的状态`}
-          disabled={!canRefresh || isRefreshing}
-          onClick={() => void refresh()}
-          size="sm"
-          variant="outline"
-        >
-          <RefreshIcon />
-          {isRefreshing ? "正在刷新…" : "刷新"}
-        </Button>
-        <Button
-          aria-label={`关闭提供方 ${providerName} 的提示（${status.status}）`}
+          aria-label={`关闭 ${providerName} 提示（${status.status}）`}
           onClick={onDismiss}
           size="icon-sm"
           variant="ghost-muted"

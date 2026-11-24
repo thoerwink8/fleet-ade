@@ -198,7 +198,7 @@ export default function BinaryViewer(props: {
             {selectedPath ?? (folder || "压缩包内容")}
           </span>
           <span className="shrink-0 text-muted-foreground">
-            {archive.entries.length.toLocaleString("zh-CN")} entries
+            {archive.entries.length.toLocaleString("zh-CN")} 个条目
             {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
           </span>
         </div>
@@ -215,13 +215,13 @@ export default function BinaryViewer(props: {
               >
                 <SelectTrigger aria-label="表格" aria-disabled={busy} aria-busy={busy} size="xs">
                   <SelectValue>
-                    {table.name} ({table.count.toLocaleString("zh-CN")} rows)
+                    {table.name}（{table.count.toLocaleString("zh-CN")} 行）
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
                   {database.tables.map((item) => (
                     <SelectItem key={item.name} value={item.name}>
-                      {item.name} ({item.count.toLocaleString("zh-CN")} rows)
+                      {item.name}（{item.count.toLocaleString("zh-CN")} 行）
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -347,7 +347,7 @@ export default function BinaryViewer(props: {
                   <th
                     key={name}
                     scope="col"
-                    className="border-r border-b border-border/60 px-3 py-2 text-left font-semibold whitespace-nowrap"
+                    className="border-r border-b border-border/60 px-3 py-2 text-left font-medium whitespace-nowrap"
                   >
                     {name}
                   </th>

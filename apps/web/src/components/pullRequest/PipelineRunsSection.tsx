@@ -92,7 +92,7 @@ function RunDetailRow({ run }: { run: PipelineRun }) {
           ) : null}
         </div>
       </div>
-      <p className="min-w-0 text-row font-semibold break-words text-foreground">{run.title}</p>
+      <p className="min-w-0 text-row font-medium break-words text-foreground">{run.title}</p>
       {run.notifyNote ? (
         <p className="text-xs leading-5 text-muted-foreground">{run.notifyNote}</p>
       ) : null}
@@ -127,7 +127,7 @@ function RunSection({
     <section className="min-w-0 space-y-2.5">
       <div className="space-y-1 px-1">
         <div className="flex min-h-7 items-center gap-2">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <h2 className="text-base font-medium text-foreground">{title}</h2>
           <span className="font-mono text-xs tabular-nums text-muted-foreground">
             {runs.length}
           </span>
@@ -172,7 +172,7 @@ function PipelineFrame({
   return (
     <section aria-label="流水线" className="grid min-w-0 gap-4 rounded-xl border p-4">
       <div className="flex items-center gap-3">
-        <h2 className="min-w-0 flex-1 text-base font-semibold">流水线</h2>
+        <h2 className="min-w-0 flex-1 text-base font-medium">流水线</h2>
         <Button variant="outline" size="sm" disabled={refreshDisabled} onClick={onRefresh}>
           <RefreshIcon refreshing={pending} />
           刷新

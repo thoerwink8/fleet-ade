@@ -50,6 +50,7 @@ export interface TimelineRowSharedState {
   onRespondToApproval:
     | ((requestId: RuntimeRequestId, decision: ProviderApprovalDecision) => Promise<unknown>)
     | undefined;
+  onResendLastUserMessage?: (() => void) | undefined;
   citationRequest: AssistantCitationTarget | null;
   /** Absent hides "Reply". */
   onReplyToResponse: ((response: ResponseContextRecord) => boolean) | undefined;

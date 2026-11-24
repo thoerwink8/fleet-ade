@@ -788,7 +788,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         {
           id: "chatgpt",
           name: "使用 ChatGPT 登录",
-          description: current?.email ? `Reconnect ${current.email}.` : null,
+          description: current?.email ? `重新连接 ${current.email}。` : null,
           ...(current?.email ? { accountEmail: current.email } : {}),
           type: "agent" as const,
         },

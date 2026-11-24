@@ -25,7 +25,7 @@ export function announceSidebarVisibility(open: boolean) {
     const next = first!.textContent ? second! : first!;
     first!.textContent = "";
     second!.textContent = "";
-    next.textContent = `Sidebar ${latestOpen ? "shown" : "hidden"}`;
+    next.textContent = `侧边栏${latestOpen ? "已显示" : "已隐藏"}`;
   };
   // Screen readers ignore text written in the same task that inserts its live region.
   // Toggles during that delay only update the state the pending write announces.

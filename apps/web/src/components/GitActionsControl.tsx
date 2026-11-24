@@ -529,7 +529,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
   );
   const publishPathPlaceholder = currentPublishProvider.pathPlaceholder;
   const publishProviderLabel = currentPublishProvider.label;
-  const publishWizardSteps = ["Provider", "Repository", "Summary"] as const;
+  const publishWizardSteps = ["托管平台", "仓库", "概要"] as const;
   const publishWizardStepSummaries = [
     publishProviderLabel,
     publishResult?.repository.nameWithOwner ?? null,
@@ -621,7 +621,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
           <div className={cn("space-y-2", publishWizardStep !== 0 && "hidden")}>
             <span
               id="publish-provider-cards-label"
-              className="text-meta font-semibold text-foreground"
+              className="text-meta font-medium text-foreground"
             >
               提供方
             </span>
@@ -697,7 +697,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
             <div className="space-y-2">
               <label
                 htmlFor="publish-repository-path"
-                className="text-meta font-semibold text-foreground"
+                className="text-meta font-medium text-foreground"
               >
                 仓库
               </label>
@@ -729,7 +729,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
             <div className="space-y-2">
               <span
                 id="publish-visibility-cards-label"
-                className="text-meta font-semibold text-foreground"
+                className="text-meta font-medium text-foreground"
               >
                 可见性
               </span>
@@ -771,7 +771,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                     >
                       <option.Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-row font-semibold text-foreground">
+                        <span className="block text-row font-medium text-foreground">
                           {option.label}
                         </span>
                         <span className="block text-xs text-muted-foreground">
@@ -802,7 +802,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               {publishAdvancedOpen ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="space-y-1.5" htmlFor="publish-remote-name">
-                    <span className="text-meta font-semibold text-foreground">远端</span>
+                    <span className="text-meta font-medium text-foreground">远端</span>
                     <Input
                       id="publish-remote-name"
                       value={publishRemoteName}
@@ -814,7 +814,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                   <div className="space-y-1.5">
                     <span
                       id="publish-protocol-label"
-                      className="text-meta font-semibold text-foreground"
+                      className="text-meta font-medium text-foreground"
                     >
                       协议
                     </span>
@@ -852,7 +852,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 role="alert"
                 className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
               >
-                <p className="text-meta font-semibold">发布失败</p>
+                <p className="text-meta font-medium">发布失败</p>
                 <p className="mt-0.5 text-destructive/90">{publishError}</p>
               </div>
             ) : null}
@@ -865,7 +865,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                   <span className="grid size-8 place-items-center rounded-full bg-success/15 text-success">
                     <CheckIcon className="size-4" aria-hidden />
                   </span>
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 className="text-sm font-medium text-foreground">
                     {publishResult.status === "pushed" ? "仓库已发布" : "已创建仓库"}
                   </h3>
                   <p className="max-w-xs text-pretty text-xs text-muted-foreground">
@@ -888,7 +888,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                     void openLink(publishResult.repository.url).catch(() => undefined);
                   }}
                 >
-                  Open on {publishProviderLabel}
+                  在 {publishProviderLabel} 上打开
                 </Button>
               </>
             ) : (
@@ -922,7 +922,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                   disabled={!hasReadyPublishProvider || !selectedPublishProviderReadiness.ready}
                   onClick={() => setPublishWizardStep((step) => Math.min(1, step + 1))}
                 >
-                  Next
+                  下一步
                 </Button>
               ) : (
                 <Button disabled={!canSubmitPublishRepository} onClick={submitPublishRepository}>
@@ -1918,7 +1918,7 @@ export default function GitActionsControl({
               </div>
             </div>
             <div className="space-y-1">
-              <p className="text-row font-semibold">提交信息（可选）</p>
+              <p className="text-row font-medium">提交信息（可选）</p>
               <Textarea
                 value={dialogCommitMessage}
                 onChange={(event) => setDialogCommitMessage(event.target.value)}

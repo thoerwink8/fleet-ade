@@ -81,7 +81,7 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
     };
   });
   const summary = subagentGroupSummary(agents);
-  const label = `${members.length} ${members.length === 1 ? "subagent" : "subagents"}`;
+  const label = `${members.length} 个子代理`;
   const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
   const activeCount = agents.filter(({ status }) => isOrchestrationV2WorkActive(status)).length;
   const doneCount = agents.filter(({ status }) => status === "completed").length;
@@ -107,7 +107,7 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
             className="flex h-9 w-full min-w-0 items-center gap-2 px-3 text-left text-ui text-foreground"
           >
             <WorkflowIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate font-semibold">并行子任务</span>
+            <span className="min-w-0 flex-1 truncate font-medium">并行子任务</span>
             <span
               className={cn(
                 "shrink-0 text-meta tabular-nums",

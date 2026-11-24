@@ -11,10 +11,10 @@ type FailureScanTurnItem =
   | ErrorTurnItem
   | { readonly type: Exclude<OrchestrationV2TurnItem["type"], "error"> };
 
-export function latestRootProviderFailure(
+export function latestRootProviderFailureItem(
   run: OrchestrationV2Run | null,
   turnItems: ReadonlyArray<FailureScanTurnItem>,
-): OrchestrationV2ProviderFailure | null {
+): ErrorTurnItem | null {
   if (run?.status !== "failed") return null;
   let latest: ErrorTurnItem | null = null;
   for (const item of turnItems) {
@@ -34,13 +34,26 @@ export function latestRootProviderFailure(
       latest = item;
     }
   }
-  return latest?.failure ?? null;
+  return latest;
+}
+
+export function latestRootProviderFailure(
+  run: OrchestrationV2Run | null,
+  turnItems: ReadonlyArray<FailureScanTurnItem>,
+): OrchestrationV2ProviderFailure | null {
+  return latestRootProviderFailureItem(run, turnItems)?.failure ?? null;
 }
 
 export function threadErrorSummary(
-  failure: OrchestrationV2ProviderFailure | null,
+  failureOrItem: OrchestrationV2ProviderFailure | ErrorTurnItem | null,
   sessionError: string | null,
 ) {
+  const failure =
+    failureOrItem !== null && "failure" in failureOrItem ? failureOrItem.failure : failureOrItem;
+  const retryCount =
+    failureOrItem !== null && "failure" in failureOrItem
+      ? (failureOrItem.retry?.attempt ?? null)
+      : null;
   const currentFailure =
     sessionError !== null && sessionError !== failure?.message ? null : failure;
   return {
@@ -49,6 +62,7 @@ export function threadErrorSummary(
     lastError: sessionError ?? failure?.message ?? null,
     lastErrorClass: currentFailure?.class ?? null,
     lastErrorCode: currentFailure?.code ?? null,
+    lastErrorRetryCount: currentFailure !== null ? retryCount : null,
   };
 }
 

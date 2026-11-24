@@ -15,11 +15,6 @@
   height: var(--fa-space-4);
 }
 
-/* @fleet/design 0.3.1 omits icon+lg width; keep icon-lg/icon-xl square at 40px. */
-.fa-btn--icon.fa-btn--lg {
-  width: var(--fa-ctrl-lg);
-}
-
 .fa-btn.ade-btn--multiline {
   height: auto;
   min-height: var(--fa-ctrl);
@@ -165,6 +160,39 @@ html[data-theme="dark"]
     [aria-expanded="true"],
     [aria-pressed="true"]
   ) {
+  background-image: none;
+  color: var(--fa-fg-muted);
+}
+
+/* These themes map --fa-hover to an opaque accent, which would paint over a danger
+   fill. Keep the library's translucent wash, including on the inherited --fa-wash2. */
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-btn:is(.fa-btn--danger, .fa-btn--danger-secondary, .fa-btn--danger-ghost):not(
+    [disabled],
+    [data-disabled],
+    [aria-disabled="true"]
+  ) {
+  --fa-hover: color-mix(in srgb, var(--fa-fg) 5%, transparent);
+  --fa-wash2:
+    linear-gradient(var(--fa-hover), var(--fa-hover)),
+    linear-gradient(var(--fa-hover), var(--fa-hover));
+}
+
+/* A pressed toggle keeps the neutral selected fill, not the accent and not the
+   hover gradient, so idle, hover and pressed read as three different states.
+   Disabled stays muted text but the fill remains, so a pressed disabled toggle
+   is still visibly pressed. */
+.fa-btn.ade-toggle:is([aria-pressed="true"], [data-pressed]) {
+  background-color: var(--fa-selected);
+  background-image: none;
+}
+
+.fa-btn.ade-toggle:is([aria-pressed="true"], [data-pressed]):is(
+    [disabled],
+    [data-disabled],
+    [aria-disabled="true"]
+  ) {
+  background-color: var(--fa-selected);
   background-image: none;
   color: var(--fa-fg-muted);
 }

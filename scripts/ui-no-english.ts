@@ -4,9 +4,31 @@
 // users, the modules that put sign-in or provider status text on screen, and
 // the functions that format a duration a person reads. Logs, comments,
 // developer CLI text, font names, and code identifiers are out of scope. Each
-// allowlist line keeps one string; the comment above it is the reason. JSX
-// text, string literals inside JSX, and UI string attributes are read from the
-// syntax tree, so a phrase on its own line is not skipped.
+// allowlist line keeps one string; the comment above it is the reason.
+//
+// Every string literal and template in the scanned files passes the strict
+// phrase check: a whole English sentence is suspicious wherever it sits, since
+// copy is composed in hooks and helpers before it reaches JSX. The strict
+// check only fires on sentence-shaped text, so identifiers, keys, paths, and
+// single words stay quiet. On top of that, three weaker detectors look for
+// fragments a phrase check cannot see:
+//
+// - JSX attribute/property names known to carry copy (title, label, …) get a
+//   relaxed check that drops the capitalization and lowercase guards, so
+//   `title: `${name} fork`` and `label="more options"` are caught; a bare
+//   single word is still skipped because it is usually an identifier value.
+// - Files that already render Chinese copy flag English JSX text and literals
+//   that a JSX expression renders, plus literals returned from components and
+//   copy-named helpers. A leftover English word inside a translated component
+//   is what `saving 2 图片s…` and `5 more` looked like.
+// - A ternary or object literal that mixes Chinese and English text means one
+//   branch was translated and the other was not (`"文件"` vs `"attachment"`,
+//   `failed: "Failed"` next to `unchecked: "尚未检查"`); the English side is
+//   flagged.
+//
+// What it still cannot see: a whole-English sentence assembled entirely from
+// variables (`${behavior}` whose value is an English enum) and strings that
+// only ever travel through identifiers.
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
@@ -45,34 +67,41 @@ const ROOTS = [
   "packages/shared/src/usageLimits.ts",
   "apps/server/src/provider/CodexManagedErrors.ts",
 ];
+const UI_NAMES: Record<string, true> = {
+  title: true,
+  label: true,
+  placeholder: true,
+  "aria-label": true,
+  "aria-description": true,
+  "aria-placeholder": true,
+  alt: true,
+  description: true,
+  tooltip: true,
+  heading: true,
+  emptyText: true,
+  hint: true,
+  caption: true,
+  subtitle: true,
+  detail: true,
+  actionLabel: true,
+  buttonLabel: true,
+  confirmTitle: true,
+  confirmLabel: true,
+  dialogTitle: true,
+  searchPlaceholder: true,
+  statusText: true,
+  errorText: true,
+  empty: true,
+  footerActionLabel: true,
+};
 
-const UI_NAMES = new Set([
-  "title",
-  "label",
-  "placeholder",
-  "aria-label",
-  "aria-description",
-  "aria-placeholder",
-  "alt",
-  "description",
-  "tooltip",
-  "heading",
-  "emptyText",
-  "hint",
-  "caption",
-  "subtitle",
-  "detail",
-  "actionLabel",
-  "buttonLabel",
-  "confirmTitle",
-  "confirmLabel",
-  "dialogTitle",
-  "searchPlaceholder",
-  "statusText",
-  "errorText",
-  "empty",
-  "footerActionLabel",
-]);
+// Variable and function names that conventionally hold the words on screen.
+// A literal in `errorMessage = "…"` or `return "…"` inside `statusLabel()` is
+// copy even though it never touches JSX syntax.
+const COPY_NAME =
+  /(?:label|title|message|notice|text|copy|status|hint|tooltip|summary|headline|placeholder|caption|subtitle|snippet)s?$/i;
+
+const CJK = /[一-鿿]/;
 
 interface AllowEntry {
   readonly phrase: string;
@@ -102,12 +131,17 @@ function loadAllowlist(file: string): ReadonlyArray<AllowEntry> {
 function leftoverEnglishWords(text: string, allowlist: ReadonlyArray<AllowEntry>): string[] {
   let rest = text;
   for (const entry of allowlist) {
-    const pattern = new RegExp(entry.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const escaped = entry.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = /^\w+$/.test(entry.phrase)
+      ? new RegExp(`\\b${escaped}\\b`, "gi")
+      : new RegExp(escaped, "gi");
     rest = rest.replace(pattern, " ");
   }
   rest = rest
     .replace(/\b--?[A-Za-z][\w.-]*\b/g, " ")
     .replace(/\b[A-Z][A-Z0-9_]{2,}\b/g, " ")
+    .replace(/\b[A-Z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\b/g, " ")
+    .replace(/\b[a-z]+(?:[A-Z][a-zA-Z0-9]*)+\b/g, " ")
     .replace(/\b[A-Za-z]+(?:[/_-][A-Za-z0-9]+)+\b/g, " ");
   return rest.match(/\b[A-Za-z]{3,}\b/g) ?? [];
 }
@@ -117,9 +151,21 @@ function leftoverEnglishWords(text: string, allowlist: ReadonlyArray<AllowEntry>
 const SHORT_FUNCTION_WORDS =
   /^(?:a|an|and|as|at|be|by|do|for|from|go|if|in|is|it|no|of|on|or|so|the|to|up|we|with)$/i;
 
-function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean {
+// "strict" is the sentence-shaped test used everywhere. "loose" drops the
+// capitalization and lowercase guards but still skips a bare single word
+// (usually an identifier value). "loose-bare" accepts bare words too; it only
+// runs where context already proves the text renders.
+type CheckMode = "strict" | "loose" | "loose-bare";
+
+function isUserCopy(
+  text: string,
+  allowlist: ReadonlyArray<AllowEntry>,
+  mode: CheckMode = "strict",
+): boolean {
   const plain = text
     .replace(/\$\{[^}]*\}/g, " ")
+    .replace(/\{\{[^}]*\}\}/g, " ")
+    .replace(/--[A-Za-z][\w.-]*/g, " ")
     .replace(/&(?:apos|rsquo|lsquo|quot);/g, "'")
     .replace(/\s+/g, " ")
     .trim();
@@ -131,13 +177,22 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
   ) {
     return false;
   }
-  if (/^[()[\]|&,]/.test(plain) || /\bnew (?:Map|Set)\b|\bAtom\b|\bKeyboardEvent\b/.test(plain)) {
+  // A leading bracket or comma is a code fragment in generic positions; in
+  // copy positions "(empty)" is exactly what a person reads.
+  if (
+    mode === "strict" &&
+    (/^[()[\]|&,]/.test(plain) || /\bnew (?:Map|Set)\b|\bAtom\b|\bKeyboardEvent\b/.test(plain))
+  ) {
     return false;
   }
   const words = leftoverEnglishWords(plain, allowlist);
   if (words.length === 0) return false;
+  // A font-family value is a comma-separated list of font tokens, not a sentence.
+  if (/^(?:"[^"]+"|'[^']+'|[\w-]+)(?:\s*,\s*(?:"[^"]+"|'[^']+'|[\w-]+))+\s*,?\s*$/.test(plain)) {
+    return false;
+  }
   // A Chinese sentence that only borrows one name or token is already translated.
-  if (/[\u4e00-\u9fff]/.test(plain) && words.length < 2) return false;
+  if (CJK.test(plain) && words.length < 2) return false;
   if (
     /^(?:oklch|rgba|rgb|hsla?)\(|var\(--|system-ui|ui-monospace|sans-serif|video\/|codecs=/.test(
       plain,
@@ -155,9 +210,20 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
   if (/(?:^and |, and\b)|\b\d+ other\b|\b(?:is|are|was|were|has|have) [a-z]{3,}\b/.test(plain)) {
     return true;
   }
-
+  // A count followed by a lowercase noun (`1 file`, `3 clients`) is a plural template
+  // whose capital letter is missing, so the sentence guards below would skip it.
+  if (
+    /^\d[\d,.+]*\s+[a-z]{3,}(?:\s+[a-z]{3,})*$/.test(plain) &&
+    !/^\d[\d,.+]*\s+(?:millis|milliseconds?|seconds?|minutes?|hours?|days?)$/.test(plain)
+  ) {
+    return true;
+  }
+  if (mode === "loose-bare") return true;
+  // A lone identifier-shaped word is a value like "auto", not copy.
+  if (/^[a-z][A-Za-z0-9_-]*$/.test(plain)) return false;
+  if (mode === "loose") return true;
   if (/^[a-z0-9_.:/\- ]+$/.test(plain)) return false;
-  if (!/[A-Z\u4e00-\u9fff]/.test(plain)) return false;
+  if (!/[A-Z一-鿿]/.test(plain)) return false;
   return (
     / [A-Za-z]{3,}/.test(plain) ||
     /\b[A-Z][a-z]{2,} \d/.test(plain) ||
@@ -181,8 +247,10 @@ function included(file: string): boolean {
   if (!/\.tsx?$/.test(rel) || rel.endsWith(".d.ts")) return false;
   if (/\.(?:test|browser\.test|stories)\./.test(rel)) return false;
   if (rel.endsWith(".gen.ts") || rel.includes("/_generated/")) return false;
-  if (rel.endsWith("/appearanceFonts.ts") || rel.endsWith("/composer-code-languages.ts"))
+  // Font-name lists hold machine strings, not interface copy.
+  if (rel.endsWith("/appearanceFonts.ts") || rel.endsWith("/composer-code-languages.ts")) {
     return false;
+  }
   return true;
 }
 
@@ -199,6 +267,19 @@ function isLogCall(node: ts.CallExpression): boolean {
       name === "log") &&
     ts.isIdentifier(node.expression.expression) &&
     node.expression.expression.text === "console"
+  );
+}
+
+// Calls whose arguments are compared or parsed, never shown: error-substring
+// matchers, regex/string operations, and constructors for internal values.
+function isInternalTextCall(node: ts.CallExpression): boolean {
+  if (isLogCall(node)) return true;
+  if (ts.isIdentifier(node.expression)) {
+    return /^(?:RegExp|Set|Map|URL|Boolean|Number|BigInt)$/.test(node.expression.text);
+  }
+  if (!ts.isPropertyAccessExpression(node.expression)) return false;
+  return /^(?:includes|startsWith|endsWith|indexOf|lastIndexOf|test|match|matchAll|replace|replaceAll|split|search|localeCompare|normalize|at|charAt|charCodeAt|codePointAt|getAttribute|hasAttribute|setAttribute|querySelector|querySelectorAll|closest|matches|getElementById|getItem|setItem|removeItem|add|delete|has|set|get|join|concat|slice|substring|substr|trim|toLowerCase|toUpperCase|encodeURI|encodeURIComponent|decodeURIComponent|parse|parseInt|parseFloat|stringify|exec)$/.test(
+    node.expression.name.text,
   );
 }
 
@@ -286,6 +367,57 @@ function expressionCandidateTexts(node: ts.Expression): string[] {
   return [];
 }
 
+// Flags English alternatives next to a Chinese one: a ternary or an object
+// literal where one side was translated and the other was not. A bare word is
+// kept (`"文件" : "attachment"` leaks a lowercase word); non-phrase text
+// (ids, mime types, urls) is not.
+function mixedLanguageTexts(texts: ReadonlyArray<string>): string[] {
+  if (!texts.some((text) => CJK.test(text))) return [];
+  return texts.filter(
+    (text) =>
+      !CJK.test(text) &&
+      leftoverEnglishWords(text, allowlist).length > 0 &&
+      !/[:/\\{}]|--/.test(text.trim()),
+  );
+}
+
+// Object properties that carry values for the machine, not for the reader:
+// `label: "scheduled task upsert"` is a telemetry tag even though it sits next
+// to translated copy.
+const NON_COPY_PROPS: Record<string, true> = {
+  label: true,
+  _tag: true,
+  id: true,
+  key: true,
+  type: true,
+  kind: true,
+  name: true,
+  value: true,
+  command: true,
+  icon: true,
+  role: true,
+  status: true,
+  state: true,
+  mode: true,
+  method: true,
+  action: true,
+  operation: true,
+  target: true,
+  source: true,
+  format: true,
+  language: true,
+  version: true,
+  slug: true,
+  accelerator: true,
+  hotkey: true,
+  shortcut: true,
+  testId: true,
+  "data-testid": true,
+  mimeType: true,
+  searchTerms: true,
+  shortcutCommand: true,
+};
+
 // Substituted templates such as `${minutes}m` never appear as one literal, so
 // the sentence check cannot see a single-letter unit. These files are the
 // formatters that print a duration on screen.
@@ -311,6 +443,56 @@ for (const root of ROOTS) {
   } else walk(full, files);
 }
 
+const qualifiesAsCopyScope = (name: string | undefined): boolean =>
+  name !== undefined && (/^[A-Z]/.test(name) || COPY_NAME.test(name));
+
+// These modules publish the sentence a person reads while signing in or out.
+// Their strings are not all object fields, so every literal is a candidate.
+const SERVER_COPY = [
+  "/UserFacingErrors.ts",
+  "/providerAuthFlow.ts",
+  "/provider-acp-registry/src/server/auth.ts",
+  "/CodexManagedProvider.ts",
+  "/CodexAuthCallbackPage.ts",
+  "/codexAuthCallback.ts",
+  "/t3McpToolPresentation.ts",
+  "/toolActivity.ts",
+  "/work-log/presentation.ts",
+  "/t3ToolSummary.ts",
+  "/subagentDisplay.ts",
+  "/threadExecution.ts",
+  "/compactionTitle.ts",
+  "/sessionConfig.ts",
+  "/AntigravityProvider.ts",
+  "/antigravityAuthSupport.ts",
+  "/antigravityUsageLimits.ts",
+  "/CodexManagedErrors.ts",
+];
+
+function isServerCopyFile(rel: string): boolean {
+  return (
+    SERVER_COPY.some((suffix) => rel.endsWith(suffix)) || /\/provider\/[^/]*Auth\.ts$/.test(rel)
+  );
+}
+
+function isUiSurfaceFile(rel: string): boolean {
+  const path = rel.replace(/^\.\//, "").replace(/^.*?apps\//, "apps/");
+  return path.startsWith("apps/web/src/") || path.startsWith("apps/desktop/src/window/");
+}
+
+// Substituted templates in these modules are also the words a person reads;
+// elsewhere a reconstructed template is checked only in UI-surface files.
+const TEMPLATE_COPY = [
+  "/AntigravityProvider.ts",
+  "/UserFacingErrors.ts",
+  "/t3McpToolPresentation.ts",
+  "/toolActivity.ts",
+  "/work-log/presentation.ts",
+  "/t3ToolSummary.ts",
+  "/subagentDisplay.ts",
+  "/threadExecution.ts",
+];
+
 const findings: string[] = [];
 for (const file of files.filter(included)) {
   const sourceText = NodeFS.readFileSync(file, "utf8");
@@ -318,119 +500,263 @@ for (const file of files.filter(included)) {
     file,
     sourceText,
     ts.ScriptTarget.Latest,
-    false,
+    true,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const rel = file.replaceAll("\\", "/");
-  // These modules publish the sentence a person reads while signing in or out.
-  // Their strings are not all object fields, so every literal is a candidate.
-  const serverCopy =
-    rel.endsWith("/UserFacingErrors.ts") ||
-    rel.endsWith("/providerAuthFlow.ts") ||
-    rel.endsWith("/provider-acp-registry/src/server/auth.ts") ||
-    rel.endsWith("/CodexManagedProvider.ts") ||
-    rel.endsWith("/CodexAuthCallbackPage.ts") ||
-    rel.endsWith("/codexAuthCallback.ts") ||
-    rel.endsWith("/t3McpToolPresentation.ts") ||
-    rel.endsWith("/toolActivity.ts") ||
-    rel.endsWith("/work-log/presentation.ts") ||
-    rel.endsWith("/t3ToolSummary.ts") ||
-    rel.endsWith("/subagentDisplay.ts") ||
-    rel.endsWith("/threadExecution.ts") ||
-    rel.endsWith("/compactionTitle.ts") ||
-    rel.endsWith("/sessionConfig.ts") ||
-    rel.endsWith("/AntigravityProvider.ts") ||
-    rel.endsWith("/antigravityAuthSupport.ts") ||
-    rel.endsWith("/antigravityUsageLimits.ts") ||
-    rel.endsWith("/CodexManagedErrors.ts") ||
-    /\/provider\/[^/]*Auth\.ts$/.test(rel);
-  const templateCopy =
-    rel.endsWith("/AntigravityProvider.ts") ||
-    rel.endsWith("/UserFacingErrors.ts") ||
-    rel.endsWith("/t3McpToolPresentation.ts") ||
-    rel.endsWith("/toolActivity.ts") ||
-    rel.endsWith("/work-log/presentation.ts") ||
-    rel.endsWith("/t3ToolSummary.ts") ||
-    rel.endsWith("/subagentDisplay.ts") ||
-    rel.endsWith("/threadExecution.ts");
+  // A file already rendering Chinese text is a translated surface; leftover
+  // English words in its JSX and component returns are leaks, not prose.
+  const fileHasCjk = CJK.test(sourceText);
   const durationFile = isDurationFormatter(rel);
+  const serverCopy = isServerCopyFile(rel);
+  const templateCopy = TEMPLATE_COPY.some((suffix) => rel.endsWith(suffix));
+  // Full literal scanning applies where the file is a UI surface or a module
+  // that publishes user-facing text; other scanned roots keep positional checks.
+  const everyLiteral = isUiSurfaceFile(rel) || serverCopy;
+  const uiSurface = isUiSurfaceFile(rel);
   const opensJsx = (node: ts.Node) =>
     ts.isJsxElement(node) ||
     ts.isJsxFragment(node) ||
     ts.isJsxSelfClosingElement(node) ||
     ts.isJsxAttribute(node) ||
     ts.isJsxExpression(node);
-  const visit = (node: ts.Node, inJsx: boolean): void => {
+
+  const debug = process.env.UI_NO_ENGLISH_DEBUG === "1";
+  const flagged = new Set<string>();
+  const report = (node: ts.Node, text: string, mode: CheckMode, rule = "?"): void => {
+    const trimmed = text.trim();
+    const hit = isUserCopy(trimmed, allowlist, mode);
+    if (!hit) return;
+    flagged.add(`${file}:${String(lineOf(source, node))}  ${debug ? `[${rule}] ` : ""}${trimmed}`);
+  };
+
+  const visit = (
+    node: ts.Node,
+    inJsx: boolean,
+    jsxChild: boolean,
+    copyScope: "none" | "copy" | "component",
+  ): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
-    // Log calls and error-substring matchers are out of scope even when they sit in a sign-in module.
-    if (ts.isCallExpression(node)) {
-      if (isLogCall(node)) return;
-      if (
-        serverCopy &&
-        ts.isPropertyAccessExpression(node.expression) &&
-        /^(?:includes|startsWith|endsWith|indexOf)$/.test(node.expression.name.text)
-      ) {
-        return;
-      }
+    // Type-position literals and enum members are values, not sentences.
+    if (ts.isLiteralTypeNode(node) || ts.isEnumMember(node)) return;
+    // `toastManager.add({ … })` shares a method name with Set.add; an object argument is copy.
+    if (
+      ts.isCallExpression(node) &&
+      isInternalTextCall(node) &&
+      (isLogCall(node) ||
+        !node.arguments.some((argument) => ts.isObjectLiteralExpression(argument)))
+    ) {
+      return;
     }
-    const texts: string[] = [];
-    if (serverCopy) {
-      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-        texts.push(node.text);
-      } else if (ts.isTemplateExpression(node) && templateCopy) {
-        // Interpolated status, tool summary, and launch sentences are still the words a person reads.
-        texts.push(reconstructTemplateSample(node), ...templateSpans(node));
-      }
-    } else if (ts.isJsxText(node)) {
+    // Operands of an equality are compared keys; case labels likewise.
+    if (
+      (ts.isBinaryExpression(node) &&
+        (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+          node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+          node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken ||
+          node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken)) ||
+      ts.isCaseClause(node)
+    ) {
+      return;
+    }
+
+    if (ts.isJsxText(node)) {
       if (SHORT_FUNCTION_WORDS.test(node.text.trim())) {
-        findings.push(`${file}:${String(lineOf(source, node))}  ${node.text.trim()}`);
+        flagged.add(`${file}:${String(lineOf(source, node))}  ${node.text.trim()}`);
       }
-      texts.push(node.text);
+      report(node, node.text, "strict", "jsxtext");
+      if (uiSurface && fileHasCjk) report(node, node.text, "loose-bare", "jsxtext");
     } else if (ts.isJsxAttribute(node)) {
       const name = node.name.getText(source);
       const initializer = node.initializer;
-      if (UI_NAMES.has(name) && initializer) {
-        if (ts.isStringLiteral(initializer)) texts.push(initializer.text);
-        else if (ts.isJsxExpression(initializer) && initializer.expression) {
-          texts.push(...expressionCandidateTexts(initializer.expression));
+      if (UI_NAMES[name] === true && initializer) {
+        if (ts.isStringLiteral(initializer)) {
+          report(initializer, initializer.text, "strict", "uiattr");
+          if (uiSurface) report(initializer, initializer.text, "loose", "uiattr");
+        } else if (ts.isJsxExpression(initializer) && initializer.expression) {
+          for (const text of expressionCandidateTexts(initializer.expression)) {
+            report(initializer, text, "strict", "uiattr");
+            if (uiSurface) report(initializer, text, "loose", "uiattr");
+          }
         }
       }
     } else if (ts.isPropertyAssignment(node)) {
       const name = propertyName(node.name);
-      if (name !== undefined && UI_NAMES.has(name)) {
-        texts.push(...expressionCandidateTexts(node.initializer));
+      if (name !== undefined && UI_NAMES[name] === true && name !== "label") {
+        for (const text of expressionCandidateTexts(node.initializer)) {
+          report(node.initializer, text, "strict", "uiprop");
+          if (uiSurface) report(node.initializer, text, "loose", "uiprop");
+        }
+      }
+      // `children: "Retry"` or `generated: "Generated"`: one capitalized English
+      // word as a property value is a label unless the property carries a machine tag.
+      if (uiSurface && name !== undefined && NON_COPY_PROPS[name] !== true) {
+        const text = literalText(node.initializer);
+        if (
+          text !== undefined &&
+          /^[A-Z][a-z]{2,}$/.test(text) &&
+          leftoverEnglishWords(text, allowlist).length > 0
+        ) {
+          flagged.add(`${file}:${String(lineOf(source, node))}  ${text}`);
+        }
       }
     }
 
-    // `value={"No project"}` is a literal inside JSX, not a named UI attribute,
-    // and a ternary keeps each branch as its own literal.
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      if (everyLiteral) report(node, node.text, "strict", "lit");
+      // A literal a JSX expression renders in a translated file is a leftover
+      // word like `saving` or `dropped`, even with no phrase around it.
+      if (uiSurface && jsxChild && fileHasCjk) report(node, node.text, "loose-bare", "jsxlit");
+    } else if (ts.isTemplateExpression(node)) {
+      if (everyLiteral || templateCopy)
+        report(node, reconstructTemplateSample(node), "strict", "lit");
+      if (uiSurface && jsxChild && fileHasCjk)
+        report(node, reconstructTemplateSample(node), "loose-bare", "jsxlit");
+    }
+
+    // `return "(empty)"` in a helper named for copy, or "retrying" returned by
+    // a component, in a file that is otherwise translated.
     if (
-      !serverCopy &&
-      inJsx &&
-      (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+      ts.isReturnStatement(node) &&
+      node.expression !== undefined &&
+      copyScope !== "none" &&
+      uiSurface &&
+      fileHasCjk
     ) {
-      texts.push(node.text);
+      for (const text of expressionCandidateTexts(node.expression)) {
+        report(node.expression, text, copyScope === "component" ? "loose-bare" : "loose", "ret");
+      }
     }
-    if (!serverCopy && inJsx && ts.isTemplateExpression(node)) {
-      texts.push(reconstructTemplateSample(node), ...templateSpans(node));
+
+    // `const installationStatusMessage = condition ? "Downloading …" : "…"`.
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer !== undefined &&
+      ts.isIdentifier(node.name) &&
+      COPY_NAME.test(node.name.text)
+    ) {
+      for (const text of expressionCandidateTexts(node.initializer)) {
+        report(node.initializer, text, "strict", "var");
+        if (uiSurface) report(node.initializer, text, "loose", "var");
+      }
     }
+
+    if (ts.isConditionalExpression(node)) {
+      const texts = [
+        ...expressionCandidateTexts(node.whenTrue),
+        ...expressionCandidateTexts(node.whenFalse),
+      ];
+      for (const text of mixedLanguageTexts(texts)) {
+        if (uiSurface) report(node, text, "loose-bare", "mixcond");
+      }
+    }
+    if (
+      ts.isArrayLiteralExpression(node) &&
+      !(
+        ts.isPropertyAssignment(node.parent) &&
+        propertyName(node.parent.name) !== undefined &&
+        NON_COPY_PROPS[propertyName(node.parent.name)!]
+      )
+    ) {
+      const texts = node.elements.flatMap((element) => expressionCandidateTexts(element));
+      for (const text of mixedLanguageTexts(texts)) {
+        if (uiSurface) report(node, text, "loose", "mixarr");
+      }
+    }
+    if (ts.isObjectLiteralExpression(node)) {
+      const texts = node.properties.flatMap((property) =>
+        ts.isPropertyAssignment(property) &&
+        !(propertyName(property.name) !== undefined && NON_COPY_PROPS[propertyName(property.name)!])
+          ? expressionCandidateTexts(property.initializer)
+          : [],
+      );
+      for (const text of mixedLanguageTexts(texts)) {
+        if (uiSurface) report(node, text, "loose", "mixobj");
+      }
+    }
+
     if (durationFile && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
-      texts.push(node.text);
+      const trimmed = node.text.trim();
+      if (isLatinDurationUnit(trimmed) || isUserCopy(trimmed, allowlist)) {
+        flagged.add(`${file}:${String(lineOf(source, node))}  ${trimmed}`);
+      }
     }
     if (durationFile && ts.isTemplateExpression(node)) {
-      texts.push(...templateSpans(node));
+      for (const text of templateSpans(node)) {
+        if (isLatinDurationUnit(text.trim())) {
+          flagged.add(`${file}:${String(lineOf(source, node))}  ${text.trim()}`);
+        }
+      }
     }
-    for (const text of texts) {
-      const hit = durationFile
-        ? isLatinDurationUnit(text) || isUserCopy(text, allowlist)
-        : isUserCopy(text, allowlist);
-      if (!hit) continue;
-      findings.push(`${file}:${String(lineOf(source, node))}  ${text.trim()}`);
+
+    // Descend. JSX element/fragment children render text (jsxChild); attribute
+    // initializers do not; a JSX expression keeps whatever position it sits in.
+    const nextInJsx = inJsx || opensJsx(node);
+    const nextJsxChild =
+      ts.isJsxElement(node) || ts.isJsxFragment(node)
+        ? true
+        : ts.isJsxAttribute(node) || ts.isJsxSelfClosingElement(node)
+          ? false
+          : ts.isJsxExpression(node)
+            ? jsxChild
+            : jsxChild &&
+              (ts.isConditionalExpression(node) ||
+                ts.isParenthesizedExpression(node) ||
+                (ts.isBinaryExpression(node) &&
+                  (node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+                    node.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+                    node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)));
+
+    // copyScope marks functions whose returns are copy by name: components and
+    // copy-named helpers. It is not inherited — a callback inside a component
+    // usually returns state, not text.
+    const functionLike =
+      ts.isFunctionDeclaration(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node) ||
+      ts.isArrowFunction(node);
+    const nextScope = functionLike
+      ? "name" in node &&
+        node.name !== undefined &&
+        ts.isIdentifier(node.name as ts.Node) &&
+        qualifiesAsCopyScope((node.name as ts.Identifier).text)
+        ? /^[A-Z]/.test((node.name as ts.Identifier).text)
+          ? "component"
+          : "copy"
+        : "none"
+      : copyScope;
+
+    // A function initializer bound to a copy-named variable or property
+    // qualifies on its own.
+    if (
+      (ts.isVariableDeclaration(node) || ts.isPropertyAssignment(node)) &&
+      node.initializer !== undefined &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      const declaredName = ts.isVariableDeclaration(node)
+        ? ts.isIdentifier(node.name)
+          ? node.name.text
+          : undefined
+        : propertyName(node.name);
+      const initScope =
+        declaredName !== undefined && /^[A-Z]/.test(declaredName)
+          ? "component"
+          : declaredName !== undefined && qualifiesAsCopyScope(declaredName)
+            ? "copy"
+            : "none";
+      ts.forEachChild(node, (child) =>
+        visit(child, nextInJsx, nextJsxChild, child === node.initializer ? initScope : nextScope),
+      );
+      return;
     }
-    const childJsx = inJsx || opensJsx(node);
-    ts.forEachChild(node, (child) => visit(child, childJsx));
+
+    ts.forEachChild(node, (child) => visit(child, nextInJsx, nextJsxChild, nextScope));
   };
-  visit(source, false);
+  visit(source, false, false, "none");
+
+  for (const finding of flagged) findings.push(finding);
 }
 
 const uniqueFindings = [...new Set(findings)];

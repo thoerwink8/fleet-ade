@@ -424,8 +424,8 @@ describe("pull request timeline", () => {
       })
         .filter((event) => event.kind === "opened" || event.kind === "closed")
         .map((event) => event.title);
-    expect(titles("github")).toEqual(["已关闭 Pull request", "opened this pull request"]);
-    expect(titles("gitlab")).toEqual(["已关闭 Change request", "opened this change request"]);
+    expect(titles("github")).toEqual(["已关闭 Pull request", "发起了这个 pull request"]);
+    expect(titles("gitlab")).toEqual(["已关闭 Change request", "发起了这个 change request"]);
   });
 
   it("groups conversation sections without crossing commits or PR updates", () => {

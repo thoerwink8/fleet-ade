@@ -69,7 +69,7 @@ export function ShortcutCheatsheetDialog() {
             <div className="space-y-5">
               {groups.map((group) => (
                 <section key={group.id} className="space-y-1">
-                  <h3 className="text-row font-semibold leading-6 text-muted-foreground">
+                  <h3 className="text-row font-medium leading-6 text-muted-foreground">
                     {group.title}
                   </h3>
                   <ul>

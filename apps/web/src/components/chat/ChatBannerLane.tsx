@@ -5,9 +5,11 @@ import type {
   ServerProvider,
   ThreadId,
 } from "@t3tools/contracts";
+import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { Fragment, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { ChevronDownIcon, ChevronUpIcon, CircleAlertIcon, XIcon } from "lucide-react";
 import type { FleetEngineFailure } from "../../state/fleetEngine";
+import type { AlternativeReadyAgent } from "./providerErrorClassification";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import {
@@ -43,20 +45,36 @@ interface LaneItem {
 export function ChatBannerLane(props: {
   environmentId: EnvironmentId;
   fleetEngineFailure: FleetEngineFailure | null;
+  fleetEngineRetrying?: boolean;
+  onRetryFleetEngine: () => void;
+  onOpenFleetConnectionsSettings: () => void;
   onDismissFleetEngineFailure: () => void;
   providerStatus: ServerProvider | null;
   providerStatusDismissalKey: string | null;
-  onOpenProviderSetup: (instanceId: ProviderInstanceId) => void;
+  onOpenProviderSetup: (instanceId?: ProviderInstanceId) => void;
   threadId: ThreadId;
   threadError: string | null;
   threadErrorClass: OrchestrationV2ProviderFailureClass | null;
   threadErrorCode: string | null;
+  threadErrorIsAgentError?: boolean;
+  threadErrorAgentName?: string | null;
+  threadErrorRetryCount?: number | null;
+  threadErrorUsageLimitResetAt?: string | null;
+  alternativeAgent?: AlternativeReadyAgent | null;
+  timestampFormat?: TimestampFormat;
+  onSignIn?: () => void;
+  onInstallHelp?: () => void;
+  onSwitchAgent?: (instanceId: ProviderInstanceId) => void;
+  onRetryThreadError?: () => void;
   threadErrorBannerKey: string | null;
   setThreadError: (threadId: ThreadId | null, error: string | null) => void;
   setThreadErrorBannerDismissTick: Dispatch<SetStateAction<number>>;
 }) {
   const {
     fleetEngineFailure,
+    fleetEngineRetrying = false,
+    onRetryFleetEngine,
+    onOpenFleetConnectionsSettings,
     onDismissFleetEngineFailure,
     providerStatus,
     providerStatusDismissalKey,
@@ -65,6 +83,16 @@ export function ChatBannerLane(props: {
     threadError,
     threadErrorClass,
     threadErrorCode,
+    threadErrorIsAgentError,
+    threadErrorAgentName,
+    threadErrorRetryCount,
+    threadErrorUsageLimitResetAt,
+    alternativeAgent,
+    timestampFormat,
+    onSignIn,
+    onInstallHelp,
+    onSwitchAgent,
+    onRetryThreadError,
     threadErrorBannerKey,
     setThreadError,
     setThreadErrorBannerDismissTick,
@@ -80,10 +108,25 @@ export function ChatBannerLane(props: {
         <Alert variant="error" controlAlignment="first-line">
           <CircleAlertIcon />
           <AlertTitle>{fleetEngineFailure.title}</AlertTitle>
-          <AlertDescription>{fleetEngineFailure.description}</AlertDescription>
+          <AlertDescription>
+            <span>{fleetEngineFailure.description}</span>
+            <span className="ade-touch-row ade-touch-row--gap-2 flex flex-wrap items-center gap-2">
+              <Button
+                disabled={fleetEngineRetrying}
+                onClick={onRetryFleetEngine}
+                size="sm"
+                variant="secondary"
+              >
+                {fleetEngineRetrying ? "正在重试…" : "重试"}
+              </Button>
+              <Button onClick={onOpenFleetConnectionsSettings} size="sm" variant="ghost">
+                去 设置 → 连接 查看
+              </Button>
+            </span>
+          </AlertDescription>
           <AlertAction>
             <Button
-              aria-label="关闭引擎故障提示"
+              aria-label="关闭机群服务故障提示"
               onClick={onDismissFleetEngineFailure}
               size="icon-sm"
               variant="ghost-muted"
@@ -105,6 +148,8 @@ export function ChatBannerLane(props: {
           status={providerStatus}
           onDismiss={() => dismissProviderStatusBannerForSession(providerStatusDismissalKey)}
           onOpenProviderSetup={onOpenProviderSetup}
+          alternativeAgent={alternativeAgent ?? null}
+          {...(onSwitchAgent === undefined ? {} : { onSwitchAgent })}
         />
       ),
     });
@@ -121,6 +166,17 @@ export function ChatBannerLane(props: {
           error={threadError}
           errorClass={threadErrorClass}
           errorCode={threadErrorCode}
+          classifyError={threadErrorIsAgentError ?? true}
+          agentName={threadErrorAgentName ?? null}
+          retryCount={threadErrorRetryCount ?? null}
+          usageLimitResetAt={threadErrorUsageLimitResetAt ?? null}
+          providerStatus={providerStatus}
+          alternativeAgent={alternativeAgent ?? null}
+          {...(timestampFormat === undefined ? {} : { timestampFormat })}
+          {...(onSignIn === undefined ? {} : { onSignIn })}
+          {...(onInstallHelp === undefined ? {} : { onInstallHelp })}
+          {...(onSwitchAgent === undefined ? {} : { onSwitchAgent })}
+          {...(onRetryThreadError === undefined ? {} : { onRetry: onRetryThreadError })}
           onDismiss={() => {
             setThreadError(threadId, null);
             dismissThreadErrorBannerForSession(threadErrorBannerKey);

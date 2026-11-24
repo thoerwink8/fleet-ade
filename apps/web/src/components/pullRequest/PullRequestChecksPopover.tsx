@@ -176,7 +176,7 @@ export function PullRequestChecksPopover({
                 <span className="whitespace-nowrap">
                   {checks.length - incompleteCount}/{checks.length}
                 </span>{" "}
-                checks
+                项检查
               </span>
             ) : failedCount > 0 ? (
               <span className="min-w-0 truncate tabular-nums">{failedCount} 失败</span>
@@ -185,7 +185,7 @@ export function PullRequestChecksPopover({
         ) : null}
       </PopoverTrigger>
       <PopoverPopup align="start" width="md" side="bottom">
-        <p className="mb-2 text-row font-semibold">{presentation.label}</p>
+        <p className="mb-2 text-row font-medium">{presentation.label}</p>
         {summary === null ? null : <p className="mb-2 text-muted-foreground text-xs">{summary}</p>}
         {stale ? (
           <p className="text-muted-foreground text-xs">

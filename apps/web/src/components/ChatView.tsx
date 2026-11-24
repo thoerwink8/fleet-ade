@@ -120,12 +120,13 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
-import { useAtomValue, useAtomSet } from "@effect/atom-react";
+import { useAtomValue } from "@effect/atom-react";
 import {
-  dismissedFleetEngineFailureAtom,
   reconcileFleetEngineFailureDismissal,
   resolveFleetEngineFailure,
+  retryFleetEngineStatus,
   shouldShowFleetEngineFailure,
+  useFleetEngineFailureDismissal,
   useFleetEngineStatus,
 } from "~/state/fleetEngine";
 import { type SetStateAction, use, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -193,6 +194,7 @@ import { isInSideChatPane, type SideChatParentPanel } from "~/lib/sideChatPane";
 import {
   NO_PROVIDER_MODEL_SELECTION,
   providerInstanceEntriesFor,
+  resolveNewSessionDefaultModelSelection,
   resolveProjectDefaultProviderModelSelection,
   shouldShowInstanceBadge,
 } from "../providerInstances";
@@ -313,6 +315,11 @@ import {
   isThreadErrorBannerDismissedForSession,
   shouldShowThreadErrorBanner,
 } from "./chat/ThreadErrorBanner";
+import {
+  evaluateProviderInstanceReadiness,
+  findAlternativeReadyProvider,
+} from "./chat/composerProviderReadiness";
+import { useRecheckProviderStatusOnReturn } from "./chat/useRecheckProviderStatusOnReturn";
 import { QueuedRunsControl, type QueuedRunsControlHandle } from "./chat/QueuedRunsControl";
 import { useThreadLinkedPullRequest } from "./pullRequest/useThreadLinkedPullRequest";
 import { useProactivePanels } from "../hooks/useProactivePanels";
@@ -777,24 +784,36 @@ export default function ChatView(props: ChatViewProps) {
     }
   }
   const nowMinute = useNowMinute();
-  const draftDefaultModelSelection = draftThread
+  const draftConfiguredDefaultModelSelection = draftThread
     ? resolveProjectSettings(
         settings,
         fallbackDraftProject?.id ?? null,
         fallbackDraftProject ?? undefined,
       ).settings.defaultModelSelection
     : null;
+  const draftProviders = draftThread
+    ? (providersByEnvironment.get(draftThread.environmentId) ?? [])
+    : [];
+  const draftDefaultModelSelection =
+    draftThread && draftConfiguredDefaultModelSelection !== null
+      ? resolveNewSessionDefaultModelSelection({
+          defaultSelection: draftConfiguredDefaultModelSelection,
+          providers: draftProviders,
+          settings,
+          projectId: draftThread.projectId,
+        })
+      : null;
   const draftModelResolution = draftThread
     ? resolveNewThreadModelSelection({
         defaultSelection:
           draftDefaultModelSelection ??
           resolveProjectDefaultProviderModelSelection(
-            providersByEnvironment.get(draftThread.environmentId) ?? [],
+            draftProviders,
             settings,
             draftThread.projectId,
           ),
         fallbackSelection: settings.fallbackModelSelection,
-        providers: providersByEnvironment.get(draftThread.environmentId) ?? [],
+        providers: draftProviders,
         settings,
         projectId: draftThread.projectId,
         now: Date.parse(`${nowMinute}:00Z`),
@@ -1090,7 +1109,9 @@ export default function ChatView(props: ChatViewProps) {
   const activeProjectDefaultModelSelection =
     !isServerThread && draftFallback
       ? draftFallback.selection
-      : activeProjectSettings.settings.defaultModelSelection;
+      : !isServerThread
+        ? draftDefaultModelSelection
+        : activeProjectSettings.settings.defaultModelSelection;
   const handleNewThreadInActiveProject = () => {
     startNewThreadForProject(activeProjectRef, handleNewThread);
   };
@@ -1310,6 +1331,32 @@ export default function ChatView(props: ChatViewProps) {
     canOperateThread &&
     conversationProviderStatus !== null &&
     conversationProviderStatus.supportsConversationRollback !== false;
+  const activeAgentName =
+    selectedProviderEntry?.displayName ??
+    (selectedProvider === "codex"
+      ? "Codex"
+      : selectedProvider === "claudeAgent"
+        ? "Claude"
+        : selectedProvider === "antigravity"
+          ? "Antigravity"
+          : selectedProvider === "grok"
+            ? "Grok"
+            : "智能体");
+  const activeProviderReadinessBlock = evaluateProviderInstanceReadiness(
+    activeProviderStatus,
+    composerSelectedModelSelection?.model ??
+      activeThread?.modelSelection.model ??
+      activeProjectDefaultModelSelection?.model ??
+      null,
+  );
+  const providerSendBlockedReason = activeProviderReadinessBlock?.reason ?? null;
+  useRecheckProviderStatusOnReturn({
+    environmentId: activeThread?.environmentId ?? null,
+    instanceId: activeProviderInstanceId,
+    enabled:
+      activeProviderReadinessBlock?.kind === "unauthenticated" ||
+      activeProviderReadinessBlock?.kind === "not_installed",
+  });
   const phase = derivePhase(activeRuntime);
   const serverThreadId = serverThread?.id;
   const serverThreadEnvironmentId = serverThread?.environmentId;
@@ -1843,7 +1890,7 @@ export default function ChatView(props: ChatViewProps) {
   const insertArtifactTemplateStable = useStableCallback(insertArtifactTemplate);
   const sendAppMessage = async (text: string) => {
     if (!isServerThread || activeThreadId === null) {
-      throw new Error("Messages from apps need a started thread.");
+      throw new Error("应用消息需要一个已启动的会话。");
     }
     const result = await startThreadTurn({
       environmentId,
@@ -1857,7 +1904,7 @@ export default function ChatView(props: ChatViewProps) {
     });
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      throw error instanceof Error ? error : new Error("Could not send the app's message.");
+      throw error instanceof Error ? error : new Error("无法发送应用的消息。");
     }
   };
   const sendAppMessageStable = useStableCallback(sendAppMessage);
@@ -1934,24 +1981,29 @@ export default function ChatView(props: ChatViewProps) {
     isServerThread && supportsThreadPullRequests && visiblePullRequestCount > 0;
   const fleetEngineHealth = useFleetEngineStatus(environmentId);
   const fleetEngineFailure = resolveFleetEngineFailure(fleetEngineHealth);
-  const dismissedFleetEngineFailureKind = useAtomValue(
-    dismissedFleetEngineFailureAtom(environmentId),
-  );
-  const dismissFleetEngineFailure = useAtomSet(dismissedFleetEngineFailureAtom(environmentId));
+  const [dismissedFleetEngineFailureKind, setDismissedFleetEngineFailureKind] =
+    useFleetEngineFailureDismissal(environmentId);
   const shownFleetEngineFailure = shouldShowFleetEngineFailure(
     fleetEngineFailure,
     dismissedFleetEngineFailureKind,
   )
     ? fleetEngineFailure
     : null;
+  const retryFleetEngineStable = useStableCallback(() => {
+    retryFleetEngineStatus(environmentId);
+  });
+  const openFleetConnectionsSettingsStable = useStableCallback(() => {
+    void navigate({ to: "/settings/connections" });
+  });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a successful poll ends the failure period that its dismissal covers
   useEffect(() => {
     const dismissed = reconcileFleetEngineFailureDismissal(
       fleetEngineHealth,
       dismissedFleetEngineFailureKind,
     );
-    if (dismissed !== dismissedFleetEngineFailureKind) dismissFleetEngineFailure(dismissed);
-  }, [dismissedFleetEngineFailureKind, dismissFleetEngineFailure, fleetEngineHealth]);
+    if (dismissed !== dismissedFleetEngineFailureKind)
+      setDismissedFleetEngineFailureKind(dismissed);
+  }, [dismissedFleetEngineFailureKind, setDismissedFleetEngineFailureKind, fleetEngineHealth]);
   // The thread's own change request, placed against the project it belongs to. Without a
   // project there is nothing to resolve it against, so the caller falls back to the browser.
   const activeProjectRepository = sourceControlClients.repositorySelector(
@@ -2757,6 +2809,7 @@ export default function ChatView(props: ChatViewProps) {
       runtimeMode,
       modelSelection: composerRef.current?.getSendContext().selectedModelSelection,
     }),
+    sendBlockedReason: providerSendBlockedReason,
     onError: (message) => {
       if (activeThread) setThreadError(activeThread.id, message);
     },
@@ -2951,6 +3004,76 @@ export default function ChatView(props: ChatViewProps) {
   const sendPreviewAnnotationStable = useStableCallback(sendPreviewAnnotation);
   const onComposerResumeStable = useStableCallback(onResume);
   const onComposerCompactContextStable = useStableCallback(onCompactContext);
+  const activeAlternativeAgent = findAlternativeReadyProvider({
+    entries: providerInstanceEntries,
+    currentInstanceId: selectedProviderEntry?.instanceId ?? activeProviderInstanceId,
+    lockedProvider: modelPickerLockedProvider,
+    lockedInstanceId:
+      activeThread?.runtime?.providerInstanceId ?? activeThread?.modelSelection.instanceId ?? null,
+    supportsProviderSwitchingViaHandoff,
+    isTargetModelDisabled: (instanceId, model) =>
+      getModelDisabledReason(instanceId, model) !== null,
+  });
+  const latestUserTurnMessageText = (() => {
+    for (let index = serverVisibleTurnItems.length - 1; index >= 0; index -= 1) {
+      const entry = serverVisibleTurnItems[index];
+      if (entry?.item.type === "user_message" && entry.item.text.trim().length > 0) {
+        return entry.item.text;
+      }
+    }
+    return null;
+  })();
+  const resendLastUserMessageStable = useStableCallback(() => {
+    if (
+      !latestUserTurnMessageText ||
+      !canOperateThread ||
+      activeEnvironmentUnavailable ||
+      providerSendBlockedReason !== null
+    ) {
+      return;
+    }
+    void sendStandaloneCommand(latestUserTurnMessageText, "无法重新发送上一条消息。");
+  });
+  const retryThreadErrorStable = useStableCallback(() => {
+    if (activeThread) setThreadError(activeThread.id, null);
+    if (canResume && providerSendBlockedReason === null) {
+      void onComposerResumeStable();
+      return;
+    }
+    if (latestUserTurnMessageText && providerSendBlockedReason === null) {
+      void sendStandaloneCommand(latestUserTurnMessageText, "无法重试上一条消息。");
+    }
+  });
+  const switchToAlternativeAgentStable = useStableCallback(
+    (targetInstanceId: ProviderInstanceId) => {
+      if (activeAlternativeAgent && activeAlternativeAgent.instanceId === targetInstanceId) {
+        onProviderModelSelectStable(
+          activeAlternativeAgent.instanceId,
+          activeAlternativeAgent.model,
+        );
+        return;
+      }
+      const fallback = providerInstanceEntries.find(
+        (entry) => entry.instanceId === targetInstanceId,
+      );
+      const model = fallback?.models[0]?.slug;
+      if (fallback && model) {
+        onProviderModelSelectStable(fallback.instanceId, model);
+      }
+    },
+  );
+  const inlineReadinessCoversProviderStatus =
+    composerMounted &&
+    multipleModelSelections === null &&
+    !(isLocalDraftThread && activeProject === null) &&
+    activeProviderStatus !== null &&
+    (!activeProviderStatus.installed || activeProviderStatus.auth.status === "unauthenticated") &&
+    activeProviderStatus.status !== "error" &&
+    (activeProviderStatus.compatibilityAdvisory === undefined ||
+      activeProviderStatus.compatibilityAdvisory.status === "supported" ||
+      activeProviderStatus.compatibilityAdvisory.status === "unknown");
+  const canResendEndedTurn =
+    latestUserTurnMessageText !== null && providerSendBlockedReason === null;
   const queuedRunsControl =
     isServerThread && activeThread ? (
       <>
@@ -2969,6 +3092,7 @@ export default function ChatView(props: ChatViewProps) {
           editBlockedReason={queuedRunEditBlockedReason({
             openQuestionCount: pendingUserInputs.length,
           })}
+          sendBlockedReason={providerSendBlockedReason}
           onEditQueuedRun={queuedRunEdit.beginEdit}
           onCancelEdit={queuedRunEdit.cancelEdit}
           timestampFormat={timestampFormat}
@@ -3327,6 +3451,9 @@ export default function ChatView(props: ChatViewProps) {
                   heldApprovalRequestIds={heldApprovalRequestIds}
                   respondingRequestIds={respondingRequestIds}
                   onRespondToApproval={onRespondToApprovalStable}
+                  {...(canResendEndedTurn
+                    ? { onResendLastUserMessage: resendLastUserMessageStable }
+                    : {})}
                   canOperateThread={canOperateThread}
                   threadDetailRef={routeThreadDetailRef}
                   entriesInput={timelineEntriesInput}
@@ -3466,12 +3593,17 @@ export default function ChatView(props: ChatViewProps) {
                   <div className="relative z-10">
                     <ChatBannerLane
                       fleetEngineFailure={shownFleetEngineFailure}
+                      fleetEngineRetrying={fleetEngineHealth.isRetrying}
+                      onRetryFleetEngine={retryFleetEngineStable}
+                      onOpenFleetConnectionsSettings={openFleetConnectionsSettingsStable}
                       onDismissFleetEngineFailure={() => {
                         if (fleetEngineFailure !== null)
-                          dismissFleetEngineFailure(fleetEngineFailure.kind);
+                          setDismissedFleetEngineFailureKind(fleetEngineFailure.kind);
                       }}
                       environmentId={activeThread.environmentId}
-                      providerStatus={visibleProviderStatus}
+                      providerStatus={
+                        inlineReadinessCoversProviderStatus ? null : visibleProviderStatus
+                      }
                       providerStatusDismissalKey={providerStatusDismissalKey}
                       onOpenProviderSetup={openProviderSetupStable}
                       threadId={activeThread.id}
@@ -3486,6 +3618,35 @@ export default function ChatView(props: ChatViewProps) {
                           ? (serverRuntime?.lastErrorCode ?? null)
                           : null
                       }
+                      threadErrorIsAgentError={threadErrorIsServerRuntimeError}
+                      threadErrorAgentName={activeAgentName}
+                      threadErrorRetryCount={
+                        threadErrorIsServerRuntimeError
+                          ? (serverRuntime?.lastErrorRetryCount ?? null)
+                          : null
+                      }
+                      threadErrorUsageLimitResetAt={
+                        threadErrorIsServerRuntimeError
+                          ? (serverRuntime?.usageLimitResetAt ?? null)
+                          : null
+                      }
+                      alternativeAgent={
+                        activeAlternativeAgent
+                          ? {
+                              instanceId: activeAlternativeAgent.instanceId,
+                              displayName: activeAlternativeAgent.displayName,
+                            }
+                          : null
+                      }
+                      timestampFormat={timestampFormat}
+                      onSignIn={() =>
+                        openProviderSetupStable(activeProviderInstanceId ?? undefined)
+                      }
+                      onInstallHelp={() =>
+                        openProviderSetupStable(activeProviderInstanceId ?? undefined)
+                      }
+                      onSwitchAgent={switchToAlternativeAgentStable}
+                      onRetryThreadError={retryThreadErrorStable}
                       threadErrorBannerKey={threadErrorBannerKey}
                       setThreadError={setThreadError}
                       setThreadErrorBannerDismissTick={setThreadErrorBannerDismissTick}
@@ -3501,7 +3662,10 @@ export default function ChatView(props: ChatViewProps) {
                       }
                       driver={selectedProvider ?? null}
                     />
-                    <ChildThreadApprovals threadRef={activeThreadRef} />
+                    <ChildThreadApprovals
+                      threadRef={activeThreadRef}
+                      onOpenThread={onOpenRelatedThreadStable}
+                    />
                     <div className="relative">
                       <ComposerSurface.Shell contextRow={showComposerContextStrip}>
                         <ComposerSurface.Host
@@ -3625,6 +3789,9 @@ export default function ChatView(props: ChatViewProps) {
                                 runtimeMode={runtimeMode}
                                 defaultRuntimeMode={defaultRuntimeMode}
                                 lockedProvider={modelPickerLockedProvider}
+                                supportsProviderSwitchingViaHandoff={
+                                  supportsProviderSwitchingViaHandoff
+                                }
                                 providerStatuses={providerStatuses as ServerProvider[]}
                                 providerCatalogKnown={serverConfig !== null}
                                 activeProjectDefaultModelSelection={
@@ -3677,6 +3844,9 @@ export default function ChatView(props: ChatViewProps) {
                                 }
                                 onProviderModelSelect={onProviderModelSelectStable}
                                 onOpenProviderSetup={openProviderSetupStable}
+                                {...(canResendEndedTurn
+                                  ? { onResendLastUserMessage: resendLastUserMessageStable }
+                                  : {})}
                                 getModelDisabledReason={getModelDisabledReason}
                                 handleRuntimeModeChange={handleRuntimeModeChangeStable}
                                 focusComposer={focusComposerStable}
@@ -3938,11 +4108,7 @@ export default function ChatView(props: ChatViewProps) {
         </ChatRightPanel>
       ) : null}
 
-      <RevertConfirmHost
-        threadKey={routeThreadKey}
-        checkpoints={serverProjection?.checkpoints}
-        onConfirm={onConfirmRevertStable}
-      />
+      <RevertConfirmHost threadKey={routeThreadKey} onConfirm={onConfirmRevertStable} />
       {embedded ? null : <LinkPullRequestDialogHost />}
       <ThreadVisitWatermark threadRef={routeThreadRef} />
       <ExpandedImageDialogHost threadKey={routeThreadKey} />

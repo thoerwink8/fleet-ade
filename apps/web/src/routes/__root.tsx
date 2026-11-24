@@ -81,7 +81,7 @@ function RootRouteNotFoundView() {
   return (
     <main className="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6">
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
-        <h1 className="text-dialog-title font-semibold text-foreground">页面不存在</h1>
+        <h1 className="text-dialog-title font-medium text-foreground">页面不存在</h1>
         <p className="text-sm text-muted-foreground">
           此链接不是 {APP_DISPLAY_NAME} 里的页面。返回首页以选择项目或开始会话。
         </p>
@@ -189,7 +189,7 @@ function RootRouteErrorView({ error }: ErrorComponentProps) {
       </div>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-border/70 bg-background/55">
-        <p className="px-3 py-1.5 text-meta font-semibold text-muted-foreground">错误报告</p>
+        <p className="px-3 py-1.5 text-meta font-medium text-muted-foreground">错误报告</p>
         <pre className="max-h-64 overflow-auto border-t border-border/70 bg-background/80 px-3 py-2 text-xs whitespace-pre-wrap text-foreground/85">
           {report}
         </pre>
@@ -218,7 +218,7 @@ function errorMessage(error: unknown): string {
     return error;
   }
 
-  return "An unexpected router error occurred.";
+  return "发生了未预期的路由错误。";
 }
 
 function errorDetails(error: unknown): string {
@@ -233,7 +233,7 @@ function errorDetails(error: unknown): string {
   try {
     return JSON.stringify(error, null, 2);
   } catch {
-    return "No additional error details are available.";
+    return "没有更多错误详情。";
   }
 }
 

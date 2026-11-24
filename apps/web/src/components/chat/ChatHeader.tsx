@@ -262,7 +262,7 @@ export const ChatHeader = memo(function ChatHeader({
     >
       <WorkspaceBreadcrumb
         ariaLabel="会话路径导航"
-        className="min-w-0 shrink overflow-clip [overflow-clip-margin:2px]"
+        className="min-w-0 shrink overflow-x-clip overflow-y-visible [overflow-clip-margin:2px]"
         listClassName="gap-2 sm:gap-2"
       >
         {activeProject ? (
@@ -275,7 +275,7 @@ export const ChatHeader = memo(function ChatHeader({
                       type="button"
                       aria-label={`在 ${activeProjectName} 中新建会话`}
                       onClick={onNewThreadInProject}
-                      className="inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-secondary-label transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      className="ade-touch-target ade-touch-target--y inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-secondary-label transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     />
                   }
                 >
@@ -302,7 +302,7 @@ export const ChatHeader = memo(function ChatHeader({
                       type="button"
                       aria-label={`打开父会话：${parentThreadLink.title}`}
                       onClick={() => onOpenThread(parentThreadLink.threadId)}
-                      className="inline-flex min-w-0 max-w-full cursor-pointer items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      className="ade-touch-target ade-touch-target--y inline-flex min-w-0 max-w-full cursor-pointer items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     />
                   }
                 >
@@ -332,7 +332,7 @@ export const ChatHeader = memo(function ChatHeader({
               autoFocus
               dir="auto"
               aria-label="会话标题"
-              className="min-w-0 flex-1 rounded-sm bg-transparent text-base font-semibold text-foreground outline-none ring-1 ring-inset ring-ring/50 focus:ring-ring sm:text-title"
+              className="min-w-0 flex-1 rounded-sm bg-transparent text-base font-medium text-foreground outline-none ring-1 ring-inset ring-ring/50 focus:ring-ring sm:text-title"
               defaultValue={renamingTitle}
               onBlur={(event) => {
                 if (renameCommittedRef.current) return;
@@ -358,7 +358,7 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-haspopup="menu"
                     onClick={openMenuFromTitle}
                     onDoubleClick={canOperateThread ? handleTitleDoubleClick : undefined}
-                    className="group/thread-title inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-sm text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="ade-touch-target ade-touch-target--y group/thread-title inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1 rounded-sm text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   />
                 }
               >

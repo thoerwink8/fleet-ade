@@ -23,7 +23,8 @@ library's density table and type scale (`--fa-ctrl-*`, `--fa-row-*`, `.fa-captio
 
 - Type is 12, 14, 15, 18, or 20px. Weight is 400, or 500 for button text, a selected nav item, an
   unread row title, or a block title (menu group label, dialog title, section head). Nothing is
-  600 or above: rank comes from `--fa-fg` against `--fa-fg-muted`. Clickable text is at least 14px.
+  600 or above (`t3code/max-font-weight` and [`cssFontWeight.test.ts`](../../apps/web/src/cssFontWeight.test.ts)
+  enforce this): rank comes from `--fa-fg` against `--fa-fg-muted`. Clickable text is at least 14px.
   12px is for times, hints, and labels you cannot click. Inputs, menu items, and other controls
   are 14px. 15px is body text and the composer field.
 - A fixed control is 24, 28, 32, or 40px tall (`--fa-ctrl-xs`, `--fa-ctrl-sm`, `--fa-ctrl`,

@@ -418,12 +418,13 @@ function ProjectScriptEditorForm({
                       <Button
                         type="button"
                         variant="outline"
-                        className="size-9 shrink-0"
+                        size="icon"
+                        className="shrink-0"
                         aria-label="选择图标"
                       />
                     }
                   >
-                    <ScriptIcon icon={icon} className="size-4.5" />
+                    <ScriptIcon icon={icon} className="size-4" />
                   </PopoverTrigger>
                   <PopoverPopup align="start">
                     <div className="grid grid-cols-3 gap-2">

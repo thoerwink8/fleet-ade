@@ -94,6 +94,12 @@
   color: var(--fa-danger);
 }
 
+/* Same opaque --fa-hover as the buttons: a danger row keeps a translucent wash. */
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-item--danger:not([disabled], [data-disabled], [aria-disabled="true"]) {
+  --fa-hover: color-mix(in srgb, var(--fa-fg) 5%, transparent);
+}
+
 /* Radio items without an explicit indicator still show the checked state. */
 [data-slot="menu-radio-item"][data-checked] {
   background-color: var(--fa-selected);

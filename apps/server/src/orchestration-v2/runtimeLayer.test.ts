@@ -1490,6 +1490,8 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
               scopeId: scope.id,
             })
             .pipe(Effect.flip);
+          assert.instanceOf(overlap, Orchestrator.OrchestratorDispatchError);
+          assert.equal(overlap.code, "shared-workspace");
           assert.match(String(overlap.cause), /isolated worktree/);
           assert.equal(yield* orchestrator.getThreadEventSequence(threadId), overlapSequence);
           assert.deepEqual(yield* outbox.listByCommandId(overlapCommandId), []);
@@ -1510,6 +1512,8 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
               scopeId: scope.id,
             })
             .pipe(Effect.flip);
+          assert.instanceOf(shared, Orchestrator.OrchestratorDispatchError);
+          assert.equal(shared.code, "shared-workspace");
           assert.match(String(shared.cause), /isolated worktree/);
           assert.equal(yield* orchestrator.getThreadEventSequence(threadId), sequence);
           assert.deepEqual(yield* outbox.listByCommandId(sharedCommandId), []);
@@ -1528,6 +1532,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
         } else {
           const error = yield* rollback.pipe(Effect.flip);
           assert.instanceOf(error, Orchestrator.OrchestratorDispatchError);
+          assert.equal(error.code, "checkpoint-unavailable");
           assert.equal(
             error.cause,
             `Checkpoint ${checkpointId} is ${status} and cannot be restored.`,

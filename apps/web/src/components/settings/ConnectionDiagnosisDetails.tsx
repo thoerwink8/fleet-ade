@@ -52,11 +52,11 @@ export function ConnectionDiagnosisHeadline({
 }
 
 const HOP_MARK = { ok: "✓", failed: "✕", unchecked: "–" } as const;
-const HOP_NOTE = { ok: "", failed: "Failed", unchecked: "尚未检查" } as const;
+const HOP_NOTE = { ok: "", failed: "失败", unchecked: "尚未检查" } as const;
 
 /** Ticks once per second, and only while a retry is scheduled, so the list around it does not re-render. */
 function RetryCountdown({ retryAt }: { readonly retryAt: number }) {
-  return useDeadlinePassed(retryAt) ? "retrying" : <RetryCountdownTicker retryAt={retryAt} />;
+  return useDeadlinePassed(retryAt) ? "正在重试" : <RetryCountdownTicker retryAt={retryAt} />;
 }
 
 function RetryCountdownTicker({ retryAt }: { readonly retryAt: number }) {
@@ -84,7 +84,7 @@ export function ConnectionDiagnosisSummary({
       <p className="flex flex-wrap items-center gap-1 text-muted-foreground">
         {retryAt !== null ? <RetryCountdown retryAt={retryAt} /> : null}
         {retryAt !== null && attempt > 0 ? <span aria-hidden>·</span> : null}
-        {attempt > 0 ? <span>attempt {attempt}</span> : null}
+        {attempt > 0 ? <span>第 {attempt} 次尝试</span> : null}
         {retryAt !== null || attempt > 0 ? <span aria-hidden>·</span> : null}
         <button
           type="button"
@@ -150,7 +150,7 @@ export function ConnectionDiagnosisPanel({
         ))}
       </ol>
       <div>
-        <p className="text-meta font-semibold text-foreground">可以尝试</p>
+        <p className="text-meta font-medium text-foreground">可以尝试</p>
         <ol className="list-decimal pl-4 text-muted-foreground">
           {diagnosis.steps.map((step) => (
             <li key={step}>{step}</li>

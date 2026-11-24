@@ -75,7 +75,8 @@ import {
   replaceTextRange,
 } from "../../composer-logic";
 import { getComposerPlaceholder } from "../../composerPlaceholder";
-import { deriveComposerSendState, getAntigravitySendBlockReason } from "../ChatView.logic";
+import { deriveComposerSendState } from "../ChatView.logic";
+import { evaluateComposerProviderReadiness } from "./composerProviderReadiness";
 import {
   dataTransferHasComposerMention,
   makeComposerMentionDragHandlers,
@@ -223,6 +224,7 @@ import { observeResize } from "~/lib/observeResize";
 
 const isEnvironmentRequestInvalidError = Schema.is(EnvironmentRequestInvalidError);
 import { toastManager } from "../ui/toast";
+import { Button } from "../ui/button";
 import { PlayIcon, ReplyIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { assistantCitationLabel } from "@t3tools/shared/assistantCitations";
@@ -401,6 +403,7 @@ export interface ChatComposerProps {
   defaultRuntimeMode?: RuntimeMode;
 
   lockedProvider: ProviderDriverKind | null;
+  supportsProviderSwitchingViaHandoff?: boolean;
   providerStatuses: ServerProvider[];
   providerCatalogKnown: boolean;
   activeProjectDefaultModelSelection: ModelSelection | null | undefined;
@@ -462,7 +465,8 @@ export interface ChatComposerProps {
     model: string,
     options?: { focusComposer?: boolean },
   ) => void;
-  onOpenProviderSetup: (instanceId: ProviderInstanceId) => void;
+  onOpenProviderSetup: (instanceId?: ProviderInstanceId) => void;
+  onResendLastUserMessage?: (() => void) | undefined;
   getModelDisabledReason: (instanceId: ProviderInstanceId, model: string) => string | null;
   handleRuntimeModeChange: (mode: RuntimeMode) => void;
 
@@ -518,6 +522,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     respondingRequestIds,
     runtimeMode,
     lockedProvider,
+    supportsProviderSwitchingViaHandoff = false,
     providerStatuses,
     providerCatalogKnown,
     activeProjectDefaultModelSelection,
@@ -553,6 +558,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onChangeActivePendingUserInputCustomAnswer,
     onProviderModelSelect,
     onOpenProviderSetup,
+    onResendLastUserMessage,
     getModelDisabledReason,
     handleRuntimeModeChange,
     focusComposer,
@@ -858,10 +864,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     );
   const compatibleRuntimeModeOptions = resolveRuntimeModeOptions(compatibleRuntimeModes);
 
-  const providerSendBlockReason = getAntigravitySendBlockReason(
-    selectedProviderEntry?.snapshot,
+  const lockedInstanceIdForReadiness =
+    activeThread?.runtime?.providerInstanceId ?? activeThreadModelSelection?.instanceId;
+  const composerReadiness = evaluateComposerProviderReadiness({
+    selectedEntry: selectedProviderEntry,
     selectedModel,
-  );
+    entries: providerInstanceEntries,
+    lockedProvider,
+    lockedInstanceId: lockedInstanceIdForReadiness ?? null,
+    supportsProviderSwitchingViaHandoff,
+    isTargetModelDisabled: (instanceId, model) =>
+      getModelDisabledReason(instanceId, model) !== null,
+    providersHydrated: providerCatalogKnown,
+  });
+  const providerSendBlockReason = composerReadiness.block?.reason ?? null;
+  const composerReadinessId = useId();
   const sendDisabledReason =
     externalSendDisabledReason ??
     (multipleModelSelections?.length === 0 ? "请至少选择一个模型。" : null) ??
@@ -1101,6 +1118,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerSuggestionsVisible = composerMenuOpen;
   const composerSuggestionListVisible = composerSuggestionsVisible && composerMenuItems.length > 0;
   const activePendingUserInput = pendingUserInputs[0] ?? null;
+  const activePendingIsEnded = activePendingUserInput?.responseCapability === "not_resumable";
   const isChoiceOnlyPendingQuestion =
     activePendingProgress?.activeQuestion?.allowCustomAnswer === false;
   const showComposerTopDrawer = pendingUserInputs.length > 0;
@@ -1745,7 +1763,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   // The pending Submit button follows the answer's own blockers, matching submitComposer.
   const primaryActionSendDisabledReason = activePendingProgress
-    ? attachmentBlockReason
+    ? activePendingIsEnded
+      ? "这一轮已经结束，无法继续回答。"
+      : attachmentBlockReason
     : sendDisabledReason;
   const primaryActionEnvironmentUnavailable =
     environmentUnavailable !== null ||
@@ -2268,6 +2288,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     : composerControlsCollapsed
       ? 0
       : expandedControlsIconOnlyBlockCount;
+  const showInlineReadinessBar =
+    !isComposerCollapsedMobile &&
+    multipleModelSelections === null &&
+    !projectSelectionRequired &&
+    !showProviderUnavailable &&
+    composerReadiness.block !== null &&
+    (composerReadiness.block.kind === "not_installed" ||
+      composerReadiness.block.kind === "unauthenticated" ||
+      composerReadiness.block.kind === "disabled");
+
   const composerControls = (
     <ComposerControlsBar
       environmentId={environmentId}
@@ -2326,8 +2356,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           variant: "default",
           icon: <ReplyIcon />,
           title: replyTo.subagents
-            ? `Replying to ${replyTo.subagents.map((subagent) => subagent.title).join(", ")}`
-            : "Replying to",
+            ? `正在回复 ${replyTo.subagents.map((subagent) => subagent.title).join("、")}`
+            : "正在回复",
           description: (
             <button
               type="button"
@@ -2343,7 +2373,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               {assistantCitationLabel(replyTo.citation)}
             </button>
           ),
-          dismissLabel: "Cancel reply",
+          dismissLabel: "取消回复",
           onDismiss: () => setComposerDraftReplyTo(composerDraftTarget, null),
         },
       ]
@@ -3172,6 +3202,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onToggleOption={onSelectActivePendingUserInputOption}
                     onAdvance={onAdvanceActivePendingUserInput}
                     onDismiss={onDismissActivePendingUserInput}
+                    onResendLastUserMessage={onResendLastUserMessage}
                   />
                 ) : null}
               </ComposerBanner.Root>
@@ -3220,7 +3251,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       theme={resolvedTheme}
                     />
                   ) : showProviderUnavailable ? (
-                    "请在设置中启用一个提供方"
+                    "请在设置中启用一个智能体"
                   ) : (
                     "随便问点什么…"
                   )}
@@ -3240,7 +3271,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     data-chat-composer-transition-actions="true"
                     className="ade-touch-target flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-64"
                     disabled={collapsedComposerPrimaryActionDisabled}
-                    aria-label={collapsedComposerPrimaryActionLabel}
+                    aria-describedby={showInlineReadinessBar ? composerReadinessId : undefined}
+                    aria-label={sendDisabledReason ?? collapsedComposerPrimaryActionLabel}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -3363,6 +3395,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     draftKey={composerDraftTargetKey}
                     // Switching threads lands focus here, so the label names the thread.
                     ariaLabel={activeThread ? `给 ${activeThread.title} 发消息` : "消息"}
+                    ariaDescribedBy={showInlineReadinessBar ? composerReadinessId : undefined}
                     suggestionListId={composerSuggestionListId}
                     activeSuggestionId={
                       composerSuggestionListVisible && activeComposerMenuItem
@@ -3405,7 +3438,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           : projectSelectionRequired
                             ? "请在上方选择项目以开始会话"
                             : showProviderUnavailable
-                              ? "请在设置中启用一个提供方后再发送消息"
+                              ? "请在设置中启用一个智能体后再发送消息"
                               : (offeredPromptSuggestion ??
                                 getComposerPlaceholder({
                                   isRunning: isTurnRunning && !isEditingQueuedMessage,
@@ -3428,7 +3461,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     disabled={
                       projectSelectionRequired ||
                       isChoiceOnlyPendingQuestion ||
-                      activePendingIsResponding
+                      activePendingIsResponding ||
+                      activePendingIsEnded
                     }
                   />
                 </ComposerContextActionsContext>
@@ -3460,6 +3494,47 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             <ComposerPromptLengthValidation
               message={providerInputSubmissionError ?? composerSubmissionError}
             />
+
+            {showInlineReadinessBar && composerReadiness.block ? (
+              <div
+                id={composerReadinessId}
+                role="status"
+                aria-live="polite"
+                data-chat-composer-readiness="true"
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border/60 px-4 py-2 text-xs text-muted-foreground"
+              >
+                <span className="min-w-0 [overflow-wrap:anywhere]">
+                  {composerReadiness.block.reason}
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {composerReadiness.block.primaryActionLabel ? (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() =>
+                        onOpenProviderSetup(composerReadiness.block?.instanceId ?? undefined)
+                      }
+                    >
+                      {composerReadiness.block.primaryActionLabel}
+                    </Button>
+                  ) : null}
+                  {composerReadiness.alternativeAgent ? (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => {
+                        const alt = composerReadiness.alternativeAgent;
+                        if (alt) onProviderModelSelect(alt.instanceId, alt.model);
+                      }}
+                    >
+                      换用 {composerReadiness.alternativeAgent.displayName}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             {isComposerCollapsedMobile ? null : (
               <div
@@ -3503,6 +3578,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     alternateShortcutLabel={alternateShortcutLabel}
                     isSendBusy={isSendBusy}
                     sendDisabledReason={primaryActionSendDisabledReason}
+                    {...(showInlineReadinessBar ? { sendBlockReasonId: composerReadinessId } : {})}
                     isEnvironmentUnavailable={primaryActionEnvironmentUnavailable}
                     isPreparingWorktree={isPreparingWorktree}
                     hasSendableContent={composerSendState.hasSendableContent}

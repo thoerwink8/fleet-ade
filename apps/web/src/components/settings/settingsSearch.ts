@@ -148,9 +148,7 @@ export function sourceControlHostSearchItems(
     return [
       {
         id: sourceControlHostSettingsSearchId(definition.kind),
-        title: credentials
-          ? `${definition.label} accounts and token`
-          : `${definition.label} credentials`,
+        title: credentials ? `${definition.label} 账户和 token` : `${definition.label} 凭证`,
         to: "/settings/projects" as const,
         searchTerms: [
           credentials
@@ -523,7 +521,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "运行中发送（排队／立即发送）",
     to: "/settings/threads",
     searchTerms: [
-      "排队 立即发送 运行中 发送 打断 queue steer running turn send default behavior composer",
+      "排队 立即发送 运行中 发送 打断",
+      "queue steer running turn send default behavior composer",
     ],
   },
   {

@@ -115,7 +115,7 @@ export function ComposerPermissionsSection(props: {
   const descriptionId = useId();
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
-      <div className="font-semibold text-muted-foreground text-meta">权限</div>
+      <div className="font-medium text-muted-foreground text-meta">权限</div>
       <MenuPrimitive.RadioGroup
         aria-label="权限"
         value={props.runtimeMode}
@@ -200,6 +200,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   alternateShortcutLabel: string | null;
   isSendBusy: boolean;
   sendDisabledReason: string | null;
+  sendBlockReasonId?: string | undefined;
   isEnvironmentUnavailable: boolean;
   hasSendableContent: boolean;
   canResume: boolean;
@@ -227,6 +228,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         alternateShortcutLabel={props.alternateShortcutLabel}
         isSendBusy={props.isSendBusy}
         sendDisabledReason={props.sendDisabledReason}
+        {...(props.sendBlockReasonId ? { sendBlockReasonId: props.sendBlockReasonId } : {})}
         isEnvironmentUnavailable={props.isEnvironmentUnavailable}
         isPreparingWorktree={props.isPreparingWorktree}
         hasSendableContent={props.hasSendableContent}

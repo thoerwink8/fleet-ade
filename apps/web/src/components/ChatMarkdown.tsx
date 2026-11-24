@@ -289,7 +289,7 @@ function CodexArtifactTemplateCard(props: {
           <Icon aria-hidden className="size-5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-row font-semibold text-foreground">
+          <div className="truncate text-row font-medium text-foreground">
             {props.template.displayName}
           </div>
           <div className="text-xs text-muted-foreground">{presentationLabel}</div>
@@ -982,7 +982,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         <p
           data-thread-find-ignore="true"
           data-markdown-alert-label=""
-          className={cn("flex items-center gap-1.5 font-semibold", alert.titleClassName)}
+          className={cn("flex items-center gap-1.5 font-medium", alert.titleClassName)}
         >
           <alert.Icon aria-hidden className="size-3.5 shrink-0" />
           {alert.label}

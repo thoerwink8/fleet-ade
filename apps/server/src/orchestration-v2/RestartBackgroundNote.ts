@@ -233,6 +233,8 @@ export function continuationStartRetryDelayMs(
   const failureClass = latestRootProviderFailure(run, projection.turnItems)?.class;
   if (
     failureClass === "usage_limit" ||
+    failureClass === "auth_error" ||
+    failureClass === "not_installed" ||
     failureClass === "permission_error" ||
     failureClass === "validation_error"
   )

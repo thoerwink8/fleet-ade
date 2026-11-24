@@ -126,7 +126,7 @@ export function TextGeneratorsSettings({
               description={
                 // Indented past the icon so it lines up with the name.
                 <span className="block truncate ps-7.5">
-                  {config.enabled ? "" : "Off · "}
+                  {config.enabled ? "" : "已关闭 · "}
                   {config.baseUrl.replace(/^https?:\/\//, "")}
                 </span>
               }
@@ -228,7 +228,7 @@ export function TextGeneratorsSettings({
   );
 }
 
-const STEPS = ["Connect", "使用"] as const;
+const STEPS = ["连接", "使用"] as const;
 
 /** Text tasks a generator can write, in the order the settings pages show them. */
 const TASKS = [
@@ -346,7 +346,7 @@ function TextGeneratorWizard({
               <fieldset disabled={checking} className="contents">
                 {existing === null ? (
                   <div className="grid gap-1.5">
-                    <span className="text-row font-semibold">服务</span>
+                    <span className="text-row font-medium">服务</span>
                     <div
                       role="radiogroup"
                       aria-label="服务"
@@ -380,7 +380,7 @@ function TextGeneratorWizard({
                                 badgeContent="none"
                               />
                             )}
-                            {candidate.id === "custom" ? "Custom" : candidate.label}
+                            {candidate.id === "custom" ? "自定义" : candidate.label}
                           </button>
                         );
                       })}

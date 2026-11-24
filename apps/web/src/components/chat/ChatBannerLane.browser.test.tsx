@@ -2,7 +2,7 @@ import { converter, modeOklch, modeRgb, useMode } from "culori/fn";
 import { CircleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { page, userEvent } from "vite-plus/test/browser";
+import { cdp, page, userEvent } from "vite-plus/test/browser";
 import {
   EnvironmentId,
   ProviderDriverKind,
@@ -72,8 +72,8 @@ function contrastRatio(first: string, second: string): number {
 
 const engineFailure: FleetEngineFailure = {
   kind: "unreachable",
-  title: "引擎不可用",
-  description: "连不上引擎，请检查引擎是否已启动。",
+  title: "连不上机群服务",
+  description: "机群服务没有响应，请重试，或去 设置 → 连接 查看。",
 };
 
 function warningProvider(message = "连接在路由上"): ServerProvider {
@@ -98,10 +98,12 @@ function LaneHarness({
   providerStatus = null,
   error = null,
   engine = null,
+  fleetEngineRetrying = false,
 }: {
   readonly providerStatus?: ServerProvider | null;
   readonly error?: string | null;
   readonly engine?: FleetEngineFailure | null;
+  readonly fleetEngineRetrying?: boolean;
 }) {
   const [threadError, setThreadError] = useState<string | null>(error);
   const [, setDismissTick] = useState(0);
@@ -112,6 +114,9 @@ function LaneHarness({
       <ChatBannerLane
         environmentId={environmentId}
         fleetEngineFailure={engine}
+        fleetEngineRetrying={fleetEngineRetrying}
+        onRetryFleetEngine={() => undefined}
+        onOpenFleetConnectionsSettings={() => undefined}
         onDismissFleetEngineFailure={() => undefined}
         providerStatus={providerStatus}
         providerStatusDismissalKey={getProviderStatusDismissalKey("env-banner", providerStatus)}
@@ -145,8 +150,8 @@ describe("alert fleet styling", () => {
       await using screen = await render(
         <Alert variant="error" controlAlignment="first-line">
           <CircleAlertIcon />
-          <AlertTitle>引擎不可用</AlertTitle>
-          <AlertDescription>连不上引擎，请检查引擎是否已启动。</AlertDescription>
+          <AlertTitle>连不上机群服务</AlertTitle>
+          <AlertDescription>机群服务没有响应，请重试，或去 设置 → 连接 查看。</AlertDescription>
         </Alert>,
       );
 
@@ -235,12 +240,15 @@ describe("chat banner lane", () => {
     expect(timeline.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(strip.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(getComputedStyle(strip).position).toBe("static");
-    expect(screen.container.textContent).toContain("连不上引擎，请检查引擎是否已启动。");
+    expect(screen.container.textContent).toContain(
+      "机群服务没有响应，请重试，或去 设置 → 连接 查看。",
+    );
   });
 
   it("takes no space once every banner is dismissed", async () => {
     await using screen = await render(<LaneHarness error="这一轮失败了。" />);
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("这一轮失败了。");
+    await expect.element(screen.getByRole("alert")).toBeVisible();
+    expect(screen.getByRole("alert").element().textContent).toContain("智能体出错了");
     await userEvent.click(screen.getByRole("button", { name: "关闭错误" }));
     await expect.element(screen.getByTestId("timeline")).toBeVisible();
     expect(screen.container.querySelector('[data-slot="chat-banner-lane"]')).toBeNull();
@@ -259,15 +267,15 @@ describe("chat banner lane", () => {
     const lane = screen.container.querySelector<HTMLElement>('[data-slot="chat-banner-lane"]')!;
     // Engine error appeared first, thread error second, so the thread error leads.
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(1);
-    expect(lane.querySelector('[data-slot="alert"]')!.textContent).toContain("这一轮失败了。");
+    expect(lane.querySelector('[data-slot="alert"]')!.textContent).toContain("智能体出错了");
     const summary = screen.getByRole("button", { name: "还有 2 条" });
     await expect.element(summary).toBeVisible();
 
     await userEvent.click(summary);
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(3);
     const text = lane.textContent!;
-    expect(text.indexOf("这一轮失败了。")).toBeLessThan(text.indexOf("引擎不可用"));
-    expect(text.indexOf("引擎不可用")).toBeLessThan(text.indexOf("提供方 Codex 状态"));
+    expect(text.indexOf("智能体出错了")).toBeLessThan(text.indexOf("连不上机群服务"));
+    expect(text.indexOf("连不上机群服务")).toBeLessThan(text.indexOf("Codex 出错了"));
     expect(screen.getByRole("button", { name: "收起" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "收起" }));
@@ -284,13 +292,13 @@ describe("chat banner lane", () => {
     await using screen = await render(
       <LaneHarness
         providerStatus={warningProvider(
-          "这个提供方的模型列表还没有准备好，稍后刷新就会补上，若一直如此请打开提供方设置检查登录状态。",
+          "这个智能体的模型列表还没有准备好，稍后刷新就会补上，若一直如此请打开智能体设置检查登录状态。",
         )}
       />,
     );
 
     const strip = screen.getByRole("alert").element();
-    const close = screen.getByRole("button", { name: "关闭提供方 Codex 的提示（warning）" });
+    const close = screen.getByRole("button", { name: "关闭 Codex 提示（warning）" });
     await vi.waitFor(() => {
       expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
       expect(strip.getBoundingClientRect().width).toBeLessThanOrEqual(390);
@@ -299,10 +307,76 @@ describe("chat banner lane", () => {
     expect(strip.scrollWidth).toBeLessThanOrEqual(strip.clientWidth + 1);
   });
 
+  it("renders 28px banner action buttons with >=44px coarse hit targets and retrying feedback at 390px", async () => {
+    const prev = { width: window.innerWidth, height: window.innerHeight };
+    const session = cdp();
+    await page.viewport(390, 844);
+    await session.send("Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 2,
+      mobile: true,
+    });
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    await session.send("Emulation.setEmulatedMedia", {
+      features: [
+        { name: "pointer", value: "coarse" },
+        { name: "hover", value: "none" },
+      ],
+    });
+    await using _pointer = {
+      async [Symbol.asyncDispose]() {
+        await session.send("Emulation.setEmulatedMedia", { features: [] });
+        await session.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+        await session.send("Emulation.clearDeviceMetricsOverride");
+        await page.viewport(prev.width, prev.height);
+      },
+    };
+
+    await using screen = await render(<LaneHarness engine={engineFailure} />);
+    await vi.waitFor(() => expect(window.matchMedia("(pointer: coarse)").matches).toBe(true));
+
+    const strip = screen.getByRole("alert").element();
+    const retryBtn = screen.getByRole("button", { name: "重试" }).element() as HTMLButtonElement;
+    const settingsBtn = screen
+      .getByRole("button", { name: "去 设置 → 连接 查看" })
+      .element() as HTMLButtonElement;
+
+    await vi.waitFor(() => {
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+      expect(strip.getBoundingClientRect().width).toBeLessThanOrEqual(390);
+      expect(Math.round(retryBtn.getBoundingClientRect().height)).toBe(28);
+      expect(Math.round(settingsBtn.getBoundingClientRect().height)).toBe(28);
+    });
+    expect(
+      Number.parseFloat(getComputedStyle(retryBtn, "::after").minHeight),
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      Number.parseFloat(getComputedStyle(settingsBtn, "::after").minHeight),
+    ).toBeGreaterThanOrEqual(44);
+    // The hit area reaches 20px above and below the 28px button, so a thumb that misses the
+    // painted edge still lands on the button.
+    for (const button of [retryBtn, settingsBtn]) {
+      const rect = button.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      for (const dy of [-20, 20]) {
+        const hit = document.elementFromPoint(x, rect.top + rect.height / 2 + dy);
+        expect(hit === button || button.contains(hit)).toBe(true);
+      }
+    }
+
+    await screen.rerender(<LaneHarness engine={engineFailure} fleetEngineRetrying />);
+    const retryingBtn = screen
+      .getByRole("button", { name: "正在重试…" })
+      .element() as HTMLButtonElement;
+    expect(retryingBtn.disabled).toBe(true);
+    expect(Math.round(retryingBtn.getBoundingClientRect().height)).toBe(28);
+  });
+
   it("keeps the provider warning's alert role and its dismissal key", async () => {
     const provider = warningProvider();
     await using screen = await render(<LaneHarness providerStatus={provider} />);
-    const strip = screen.getByText("提供方 Codex 状态").element().closest("[data-slot=alert]")!;
+    const strip = screen.getByText("Codex 出错了").element().closest("[data-slot=alert]")!;
     expect(strip.getAttribute("role")).toBe("alert");
     expect(getProviderStatusBannerKey(provider)).not.toBeNull();
     expect(

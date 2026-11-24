@@ -36,6 +36,7 @@ import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 
@@ -196,6 +197,122 @@ it.effect(
 
       expect(dispatched).toEqual(["message.dispatch"]);
     }).pipe(Effect.provide(layerTest));
+  },
+);
+
+it.effect(
+  "the dispatch chokepoint rejects uninstalled or signed-out instances and allows Antigravity unknown auth",
+  () => {
+    const threadId = ThreadId.make("thread:thread-management:chokepoint");
+    const uninstalledId = ProviderInstanceId.make("codex_missing");
+    const signedOutId = ProviderInstanceId.make("claude_signed_out");
+    const antigravityId = ProviderInstanceId.make("antigravity_unchecked");
+    const dispatched: Array<string> = [];
+    const registryLayer = Layer.mock(ProviderRegistry.ProviderRegistry)({
+      getProviders: Effect.succeed([
+        {
+          instanceId: uninstalledId,
+          driver: ProviderDriverKind.make("codex"),
+          displayName: "Codex",
+          enabled: true,
+          installed: false,
+          version: null,
+          status: "error",
+          auth: { status: "unknown" },
+          checkedAt: "2026-11-01T00:00:00.000Z",
+          models: [],
+          slashCommands: [],
+          skills: [],
+        },
+        {
+          instanceId: signedOutId,
+          driver: ProviderDriverKind.make("claudeAgent"),
+          displayName: "Claude",
+          enabled: true,
+          installed: true,
+          version: "1.0.0",
+          status: "error",
+          auth: { status: "unauthenticated" },
+          checkedAt: "2026-11-01T00:00:00.000Z",
+          models: [],
+          slashCommands: [],
+          skills: [],
+        },
+        {
+          instanceId: antigravityId,
+          driver: ProviderDriverKind.make("antigravity"),
+          displayName: "Antigravity",
+          enabled: true,
+          installed: true,
+          version: "1.0.0",
+          status: "warning",
+          auth: { status: "unknown" },
+          checkedAt: "2026-11-01T00:00:00.000Z",
+          models: [],
+          slashCommands: [],
+          skills: [],
+        },
+      ]),
+    });
+    const baseLayer = layerDispatchChokepointTest(
+      ServerSettings.layerTest({
+        providerInstances: {
+          [uninstalledId]: { driver: "codex", enabled: true },
+          [signedOutId]: { driver: "claudeAgent", enabled: true },
+          [antigravityId]: { driver: "antigravity", enabled: true },
+        },
+      }),
+    )(dispatched).pipe(Layer.provide(registryLayer));
+
+    return Effect.gen(function* () {
+      const threads = yield* ThreadManagementService.ThreadManagementService;
+      const missingErr = yield* Effect.flip(
+        threads.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make("cmd:uninstalled"),
+          threadId,
+          messageId: MessageId.make("msg:uninstalled"),
+          modelSelection: { instanceId: uninstalledId, model: "gpt-5" },
+          text: "Hello",
+          attachments: [],
+          dispatchMode: { type: "queue_after_active" },
+          createdBy: "user",
+          creationSource: "web",
+        }),
+      );
+      expect(missingErr).toBeInstanceOf(Orchestrator.OrchestratorCommandRejectedError);
+
+      const authErr = yield* Effect.flip(
+        threads.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make("cmd:signed-out"),
+          threadId,
+          messageId: MessageId.make("msg:signed-out"),
+          modelSelection: { instanceId: signedOutId, model: "claude-sonnet-4-6" },
+          text: "Hello",
+          attachments: [],
+          dispatchMode: { type: "queue_after_active" },
+          createdBy: "user",
+          creationSource: "web",
+        }),
+      );
+      expect(authErr).toBeInstanceOf(Orchestrator.OrchestratorCommandRejectedError);
+      expect(dispatched).toEqual([]);
+
+      yield* threads.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("cmd:antigravity"),
+        threadId,
+        messageId: MessageId.make("msg:antigravity"),
+        modelSelection: { instanceId: antigravityId, model: "gemini-2.5-pro" },
+        text: "Hello",
+        attachments: [],
+        dispatchMode: { type: "queue_after_active" },
+        createdBy: "user",
+        creationSource: "web",
+      });
+      expect(dispatched).toEqual(["message.dispatch"]);
+    }).pipe(Effect.provide(baseLayer));
   },
 );
 
