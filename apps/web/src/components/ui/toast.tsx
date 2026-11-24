@@ -809,7 +809,7 @@ function AnchoredToasts() {
                 <Toast.Root
                   className={cn(
                     "fa-toast relative overflow-visible text-balance text-popover-foreground text-xs transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
-                    tooltipStyle ? "rounded-md" : "rounded-lg",
+                    tooltipStyle && "rounded-md",
                   )}
                   data-slot="toast-popup"
                   toast={toast}
