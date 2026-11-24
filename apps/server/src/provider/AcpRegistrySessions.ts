@@ -133,7 +133,7 @@ const make = Effect.gen(function* () {
         (cause) =>
           new AcpRegistryOperationError({
             reason: "session_import_failed",
-            message: "Could not inspect the imported ACP session mapping.",
+            message: "无法检查导入的 ACP 运行实例映射。",
             cause,
           }),
       ),

@@ -1071,14 +1071,14 @@ describe("subagent worktree ownership", () => {
             ? "Settled for 0 days"
             : "Settled for 20 days"
           : scenario === "settle-grace"
-            ? "刚刚收尾"
+            ? "刚刚完成"
             : scenario === "recent-settle"
               ? "Settled for 0 of 8 days"
               : scenario === "recent-child-activity"
                 ? "Settled for 2 of 8 days"
                 : scenario === "running-child" || scenario === "pending-child"
                   ? "会话正在运行或有待处理的工作"
-                  : "尚未收尾",
+                  : "尚未完成",
       });
     }).pipe(Effect.provide(cleanupTestLayer)),
   );
@@ -1139,7 +1139,7 @@ describe("subagent worktree ownership", () => {
         yield* Deferred.succeed(fixture.resume, undefined);
         expect((yield* Fiber.join(run)).entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "检查后父会话的收尾状态已更改",
+          reason: "检查后父会话的完成状态已更改",
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
       }),
@@ -1282,8 +1282,8 @@ describe("subagent worktree ownership", () => {
                   : scenario === "recent-inactive"
                     ? "Inactive for 2 of 8 days"
                     : ["recent-grace", "recent-settle", "child-settled-now"].includes(scenario)
-                      ? "刚刚收尾"
-                      : "尚未收尾",
+                      ? "刚刚完成"
+                      : "尚未完成",
       });
     }).pipe(Effect.provide(cleanupTestLayer)),
   );
@@ -1584,7 +1584,7 @@ describe("deleted thread worktrees", () => {
           expect((yield* fixture.service.latestReport)?.entries[0]).toMatchObject({
             threadId: owner.id,
             outcome: "kept",
-            reason: "提供方会话仍未关闭",
+            reason: "智能体会话仍未关闭",
           });
           fixture.setSessionLive(false);
         }),
@@ -1814,7 +1814,7 @@ describe("deleted thread worktrees", () => {
       expect(report.entries[0]).toMatchObject({
         threadId: owner.id,
         outcome: "kept",
-        reason: "刚刚收尾",
+        reason: "刚刚完成",
       });
       expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
     }).pipe(Effect.provide(cleanupTestLayer)),
@@ -2286,7 +2286,7 @@ describe("orphan worktree reports", () => {
           const report = yield* fixture.service.runNow;
           expect(report.entries[0]).toMatchObject(
             platform === "win32"
-              ? { outcome: "kept", reason: "提供方会话仍未关闭" }
+              ? { outcome: "kept", reason: "智能体会话仍未关闭" }
               : { outcome: "removed" },
           );
         }),
@@ -2483,7 +2483,7 @@ describe("storage cleanup reports and local file policies", () => {
           const report = yield* Fiber.join(cleanup);
           expect(report.entries[0]).toMatchObject({
             outcome: "kept",
-            reason: "包含项目工作副本",
+            reason: "包含项目工作树",
           });
           expect(yield* fixture.fs.readFileString(`${fixture.worktree}/tracked.txt`)).toBe(
             "original\n",
@@ -2771,7 +2771,7 @@ describe("storage cleanup reports and local file policies", () => {
         const kept = yield* fixture.service.runNow;
         expect(kept.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "提供方会话仍未关闭",
+          reason: "智能体会话仍未关闭",
           bytes: null,
         });
         expect(walked.filter((directory) => directory.startsWith(root))).toEqual([]);
@@ -2794,7 +2794,7 @@ describe("storage cleanup reports and local file policies", () => {
         const report = yield* fixture.service.runNow;
         expect(report.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "提供方会话仍未关闭",
+          reason: "智能体会话仍未关闭",
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
       }),
@@ -2823,7 +2823,7 @@ describe("storage cleanup reports and local file policies", () => {
           threadId: "thread-1",
           threadTitle: "会话",
         });
-        expect(locked?.reason).toContain("Git index is locked");
+        expect(locked?.reason).toContain("Git 索引已锁定");
         expect(yield* fs.readFileString(`${worktree}/tracked.txt`)).toBe("original\n");
         yield* fs.remove(`${index.trim()}.lock`);
         const gitFile = yield* fs.readFileString(`${worktree}/.git`);
