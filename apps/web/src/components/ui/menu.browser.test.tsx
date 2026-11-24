@@ -35,7 +35,7 @@ function BasicMenu({ onSelect }: { onSelect?: (item: string) => void }) {
 }
 
 describe("Menu", () => {
-  it("uses fleet-design item height (32px at sm+, taller on narrow viewports) and 8px popup padding", async () => {
+  it("uses fleet-design item height (32px at sm+, 14px font, taller on narrow viewports) and solid 8px-padded popup", async () => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     await page.viewport(390, 844);
     await using _viewport = {
@@ -46,14 +46,21 @@ describe("Menu", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open" }));
     const popup = page.getByRole("menu");
     await expect.element(popup).toBeVisible();
+    const popupElement = popup.element();
     const item = page.getByRole("menuitem", { name: "First item" }).element();
 
     expect(item.getBoundingClientRect().height, "narrow item height").toBeGreaterThan(32);
-    expect(getComputedStyle(popup.element()).padding, "popup padding").toBe("8px");
+    expect(getComputedStyle(popupElement).padding, "popup padding").toBe("8px");
 
     await page.viewport(1280, 800);
+    const itemStyle = getComputedStyle(item);
+    const popupStyle = getComputedStyle(popupElement);
     expect(item.getBoundingClientRect().height, "sm+ item height").toBe(32);
-    expect(getComputedStyle(popup.element()).padding, "popup padding at sm+").toBe("8px");
+    expect(itemStyle.fontSize, "sm+ item font size").toBe("14px");
+    expect(popupStyle.padding, "popup padding at sm+").toBe("8px");
+    expect(popupStyle.backdropFilter, "popup backdropFilter").toBe("none");
+    expect(popupStyle.willChange, "popup willChange").toBe("auto");
+    expect(toRgb(popupStyle.backgroundColor)?.alpha ?? 1, "popup background alpha").toBe(1);
   });
 
   it("moves the highlight with arrow keys, selects with Enter, and closes on Escape restoring focus", async () => {

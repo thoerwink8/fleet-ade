@@ -1,6 +1,6 @@
 /* Menu — @fleet/design overrides.
-   Base UI puts data-slot/data-* state on the primitives; keep tweaks scoped to
-   the slots this component owns so .fa-* stays usable verbatim elsewhere. */
+   Base UI puts data-slot/data-* state on the primitives; keep overrides scoped
+   to menu slots so .fa-* stays usable verbatim elsewhere. */
 
 /* Narrow viewports (< 640px / sm) keep a 36px touch-friendly row height; sm+ uses --fa-ctrl (32px). */
 @media (max-width: 639.98px) {
@@ -11,6 +11,17 @@
     [data-slot="menu-sub-trigger"]
   ) {
     --fa-ctrl: 36px;
+  }
+}
+
+@media (pointer: coarse) {
+  :is(
+    [data-slot="menu-item"],
+    [data-slot="menu-checkbox-item"],
+    [data-slot="menu-radio-item"],
+    [data-slot="menu-sub-trigger"]
+  ) {
+    min-height: 44px;
   }
 }
 
@@ -27,7 +38,7 @@
   user-select: none;
 }
 
-.fa-item[data-density="touch"] {
+:is([data-slot="menu-item"], [data-slot="menu-sub-trigger"])[data-density="touch"] {
   --fa-ctrl: var(--fa-ctrl-lg);
 }
 
@@ -39,7 +50,7 @@
     [data-slot="menu-radio-item"],
     [data-slot="menu-sub-trigger"]
   ) {
-  min-width: calc(var(--anchor-width, 0px) + 1.25rem);
+  min-width: calc(var(--anchor-width, 0px) + var(--fa-space-5));
 }
 
 /* Base UI still lets pointer events hit disabled rows; suppress like before. */
@@ -80,4 +91,45 @@
 /* .end trailing content (shortcut, detail, submenu chevron) hugs the right edge. */
 .fa-item .end {
   margin-inline-start: auto;
+}
+
+/* Switch indicator on MenuCheckboxItem variant="switch" (no @fleet/design switch). */
+.ade-menu-switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  width: 28px;
+  height: 16px;
+  margin-inline-start: auto;
+  padding: 2px;
+  border-radius: var(--fa-radius-full);
+  background: var(--fa-border);
+  transition: background-color var(--fa-dur-fast) var(--fa-ease-out);
+}
+
+[data-slot="menu-checkbox-item"][data-checked] .ade-menu-switch {
+  background: var(--fa-accent);
+}
+
+[data-slot="menu-checkbox-item"][data-disabled] .ade-menu-switch {
+  background: var(--fa-border);
+}
+
+.ade-menu-switch__thumb {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--fa-radius-full);
+  background: var(--fa-bg);
+  transition: translate var(--fa-dur-fast) var(--fa-ease-out);
+}
+
+[data-slot="menu-checkbox-item"][data-checked] .ade-menu-switch__thumb {
+  translate: 12px 0;
+}
+
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  [data-slot="menu-checkbox-item"]:not([data-disabled]):not([aria-disabled="true"])[data-checked]
+  .ade-menu-switch {
+  background: var(--primary);
 }
