@@ -3,7 +3,8 @@
 .ade-number-field-group {
   gap: 0;
   padding: 0;
-  overflow: hidden;
+  height: auto;
+  overflow: visible;
 }
 
 [data-slot="number-field"][data-size="sm"] .ade-number-field-group {
@@ -68,6 +69,14 @@
 }
 
 .ade-number-field-input {
-  min-width: 0;
+  min-width: 3ch;
   text-align: center;
+}
+
+[data-slot="number-field"][data-size="sm"] .ade-number-field-input {
+  min-height: calc(var(--fa-ctrl-sm) - 2 * var(--fa-bw-1));
+}
+
+[data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-input {
+  min-height: calc(var(--fa-ctrl) - 2 * var(--fa-bw-1));
 }
