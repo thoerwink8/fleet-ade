@@ -10,6 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Path from "effect/Path";
+import * as PlatformError from "effect/PlatformError";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { SCAN_CACHE_FILE_NAME } from "./usage/usageScanCache.ts";
@@ -330,6 +331,41 @@ describe("storageCleanupAllocatedBytes", () => {
     expect(StorageCleanup.storageCleanupAllocatedBytes(info, isWindows)).toBe(expected);
   });
 });
+
+// A (linux) case needs a case-sensitive filesystem; real Windows and macOS folds case in realPath.
+const withHostCasing =
+  (platform: "win32" | "linux") =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.provideService(HostProcess.Platform, platform),
+      platform === "win32"
+        ? (self) => self
+        : Effect.provideServiceEffect(
+            FileSystem.FileSystem,
+            Effect.gen(function* () {
+              const fs = yield* FileSystem.FileSystem;
+              const path = yield* Path.Path;
+              return {
+                ...fs,
+                realPath: (target: string) =>
+                  fs.realPath(target).pipe(
+                    Effect.filterOrFail(
+                      (real) =>
+                        real === path.resolve(target) ||
+                        real.toLowerCase() !== path.resolve(target).toLowerCase(),
+                      () =>
+                        PlatformError.systemError({
+                          _tag: "NotFound",
+                          module: "FileSystem",
+                          method: "realPath",
+                          pathOrDescriptor: target,
+                        }),
+                    ),
+                  ),
+              };
+            }),
+          ),
+    );
 
 const allocatedBytes = (fs: FileSystem.FileSystem, file: string) =>
   Effect.all([fs.stat(file), HostProcess.isWindows]).pipe(
@@ -2151,9 +2187,7 @@ describe("orphan worktree reports", () => {
     (platform) =>
       runCleanupTest(
         Effect.gen(function* () {
-          const fixture = yield* cleanupFixture().pipe(
-            Effect.provideService(HostProcess.Platform, platform),
-          );
+          const fixture = yield* cleanupFixture().pipe(withHostCasing(platform));
           fixture.setThreads([]);
           const parent = fixture.path.join(fixture.config.worktreesDir, "repository");
           const referenced = fixture.path.join(parent, "Referenced");
@@ -2183,9 +2217,7 @@ describe("orphan worktree reports", () => {
     ([platform, field]) =>
       runCleanupTest(
         Effect.gen(function* () {
-          const fixture = yield* cleanupFixture().pipe(
-            Effect.provideService(HostProcess.Platform, platform),
-          );
+          const fixture = yield* cleanupFixture().pipe(withHostCasing(platform));
           const upper = fixture.worktree.toUpperCase();
           yield* fixture.openTerminal(
             field === "cwd"
@@ -2207,9 +2239,7 @@ describe("orphan worktree reports", () => {
     (platform) =>
       runCleanupTest(
         Effect.gen(function* () {
-          const fixture = yield* cleanupFixture().pipe(
-            Effect.provideService(HostProcess.Platform, platform),
-          );
+          const fixture = yield* cleanupFixture().pipe(withHostCasing(platform));
           fixture.setOpenSessionCwd(fixture.worktree.toUpperCase());
           const report = yield* fixture.service.runNow;
           expect(report.entries[0]).toMatchObject(
