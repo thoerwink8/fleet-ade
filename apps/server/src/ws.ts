@@ -2512,7 +2512,8 @@ export const layerWsRpc = (
             return yield* keybindings.removeKeybindingRule(rule);
           }),
         [WS_METHODS.serverRunStorageCleanup]: () => storageCleanup.runNow,
-        [WS_METHODS.serverPreviewStorageCleanup]: () => storageCleanup.preview,
+        [WS_METHODS.serverPreviewStorageCleanup]: ({ patch }) =>
+          patch === undefined ? storageCleanup.preview : storageCleanup.previewWithPatch(patch),
         [WS_METHODS.serverGetStorageCleanupReport]: () => storageCleanup.reports,
         [WS_METHODS.serverGetDatabaseStorage]: () => databaseStorage.status,
         [WS_METHODS.serverReclaimDatabaseSpace]: () => databaseStorage.requestReclaim,

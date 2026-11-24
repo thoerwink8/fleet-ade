@@ -215,4 +215,22 @@ describe("ScheduledTasksSettings", () => {
     await expect.element(dialog.getByRole("heading", { name: "新建任务" })).toBeInTheDocument();
     await expect.element(name).toHaveValue("My draft");
   });
+
+  it("keeps focus off Discard when an editor reopens with a restored draft", async () => {
+    setup();
+    await using _screen = await render(<ScheduledTasksSettings />);
+    await userEvent.click(page.getByRole("button", { name: "新建任务" }));
+    const dialog = page.getByRole("dialog");
+    const name = dialog.getByRole("textbox", { name: "名称" });
+    await userEvent.fill(name, "My draft");
+    await userEvent.keyboard("{Escape}");
+    await expect.element(dialog).not.toBeInTheDocument();
+
+    await userEvent.click(page.getByRole("button", { name: "新建任务" }));
+    await expect.element(dialog.getByText("已恢复上次未保存的修改。")).toBeVisible();
+    await expect.element(name).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    await expect.element(dialog.getByText("已恢复上次未保存的修改。")).toBeVisible();
+    await expect.element(name).toHaveValue("My draft");
+  });
 });
