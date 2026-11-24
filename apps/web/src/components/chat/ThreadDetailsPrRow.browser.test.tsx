@@ -186,8 +186,11 @@ it("merges with the last selected merge method", async () => {
     });
   await clickMerge(container);
   const dialog = document.querySelector('[role="alertdialog"]')!;
-  expect(dialog.textContent).toContain("将使用 squash 合并");
-  await clickMerge(dialog);
+  expect(dialog.textContent).toContain("合并 #1？");
+  expect(dialog.textContent).toContain("把 #1 的所有提交压成一个再合并。");
+  await [...dialog.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "压缩并合并")!
+    .click();
   expect(state.perform).toHaveBeenCalledWith("merge", "squash");
 });
 
@@ -292,44 +295,50 @@ it.each([
     thread: scratchProject,
     repository: "owner/repo",
     expected: "rebase",
+    expectedDescription: "把 #1 的提交逐个接到目标分支后面，不新增合并提交。",
   },
   {
     name: "the thread's own project when it holds the repository too",
     thread: repositoryClone,
     repository: "owner/repo",
     expected: "merge",
+    expectedDescription: "保留 #1 的每个提交，并新增一个合并提交。",
   },
   {
     name: "the thread's project when no project holds the repository",
     thread: scratchProject,
     repository: "owner/other",
     expected: "squash",
+    expectedDescription: "把 #1 的所有提交压成一个再合并。",
   },
-])("merges a linked pull request with $name", async ({ thread, repository, expected }) => {
-  await using screen = await setup();
-  state.mergeMethods = ["merge", "squash", "rebase"];
-  state.projects = [scratchProject, repositoryProject, repositoryClone];
-  state.projectMergeMethods = { scratch: "squash", repository: "rebase", clone: "merge" };
-  useUiStateStore.getState().setPullRequestMergeMethod("squash");
-  state.pullRequests = [
-    {
-      host: "github.com",
-      repository,
-      number: 1,
-      url: `https://github.com/${repository}/pull/1`,
-      source: "manual",
-      linkedAt: "2026-10-30T00:00:00.000Z",
-      snapshot: null,
-      stack: null,
-    },
-  ];
-  await act(async () => {
-    await screen.rerender(
-      <ThreadDetailsThreadPrRows threadRef={threadRef} project={thread as never} />,
+])(
+  "merges a linked pull request with $name",
+  async ({ thread, repository, expectedDescription }) => {
+    await using screen = await setup();
+    state.mergeMethods = ["merge", "squash", "rebase"];
+    state.projects = [scratchProject, repositoryProject, repositoryClone];
+    state.projectMergeMethods = { scratch: "squash", repository: "rebase", clone: "merge" };
+    useUiStateStore.getState().setPullRequestMergeMethod("squash");
+    state.pullRequests = [
+      {
+        host: "github.com",
+        repository,
+        number: 1,
+        url: `https://github.com/${repository}/pull/1`,
+        source: "manual",
+        linkedAt: "2026-10-30T00:00:00.000Z",
+        snapshot: null,
+        stack: null,
+      },
+    ];
+    await act(async () => {
+      await screen.rerender(
+        <ThreadDetailsThreadPrRows threadRef={threadRef} project={thread as never} />,
+      );
+    });
+    await clickButton(screen.container, "合并");
+    expect(document.querySelector('[role="alertdialog"]')!.textContent).toContain(
+      expectedDescription,
     );
-  });
-  await clickButton(screen.container, "合并");
-  expect(document.querySelector('[role="alertdialog"]')!.textContent).toContain(
-    `将使用 ${expected} 合并`,
-  );
-});
+  },
+);

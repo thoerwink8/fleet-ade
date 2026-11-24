@@ -22,6 +22,7 @@ import {
   ProviderDriverKind,
   type ProjectId,
   type ProviderInstanceConfig,
+  type ConfirmDialogOptions,
   type ProviderInstanceId,
   type ServerProvider,
   resolveEnvironmentMachineKind,
@@ -140,11 +141,12 @@ function providerInstanceName(instance: ProviderInstanceConfig): string {
 
 async function confirmProviderInstanceRemoval(
   question: string,
+  copy: Pick<ConfirmDialogOptions, "title" | "confirmLabel">,
   consequence = "",
 ): Promise<boolean> {
   const message = `${question}\nIts saved settings, including any custom binary path, will be removed.${consequence}`;
   const confirmed = await settlePromise(() =>
-    ensureLocalApi().dialogs.confirm(message, { variant: "destructive" }),
+    ensureLocalApi().dialogs.confirm(message, { ...copy, variant: "destructive" }),
   );
   return confirmed._tag === "Success" && confirmed.value;
 }
@@ -821,6 +823,7 @@ export function EnvironmentProviderSettings({
     async (instanceId: ProviderInstanceId, instance: ProviderInstanceConfig) => {
       const confirmed = await confirmProviderInstanceRemoval(
         `Remove the ${providerInstanceName(instance)} provider instance?`,
+        { title: "删除这个提供方实例？", confirmLabel: "删除" },
       );
       if (!confirmed) return;
       const updateResult = await persistProviderInstance({
@@ -866,6 +869,7 @@ export function EnvironmentProviderSettings({
       !resolveProviderInstanceEnabled({ driver: driverKind });
     const confirmed = await confirmProviderInstanceRemoval(
       `Reset the ${providerInstanceName(instance)} provider to its defaults?`,
+      { title: "把这个提供方恢复为默认？", confirmLabel: "恢复默认" },
       turnsOff ? " It will also be turned off." : "",
     );
     if (!confirmed) return;

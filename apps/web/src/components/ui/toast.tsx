@@ -83,6 +83,7 @@ function createBufferedToastManager(): BaseToastManager {
   const manager = Toast.createToastManager<ThreadToastData>();
   const listeners = new Set<ToastManagerListener>();
   const pending: ToastManagerEvent[] = [];
+  const openErrorToastIds = new Map<string, ReturnType<BaseToastManager["add"]>>();
   manager[" subscribe"]((event) => {
     if (listeners.size === 0) {
       pending.push(event);
@@ -93,10 +94,36 @@ function createBufferedToastManager(): BaseToastManager {
   return {
     ...manager,
     add(options) {
-      const timeout =
-        options.timeout ??
-        (hasVisibleToastAction(options.actionProps) ? ACTION_TOAST_DEFAULT_TIMEOUT_MS : undefined);
-      return manager.add(timeout === undefined ? options : { ...options, timeout });
+      const timeout = resolveToastTimeout(options);
+      const resolved = timeout === undefined ? options : { ...options, timeout };
+      if (resolved.type !== "error" || typeof resolved.title !== "string") {
+        return manager.add(resolved);
+      }
+      // The same failure again replaces the open one, so repeated errors do not pile up.
+      const key = JSON.stringify([
+        resolved.title,
+        resolved.data?.threadRef?.environmentId ?? null,
+        resolved.data?.threadRef?.threadId ?? resolved.data?.threadId ?? null,
+      ]);
+      const tracked = {
+        ...resolved,
+        onClose: () => {
+          openErrorToastIds.delete(key);
+          resolved.onClose?.();
+        },
+        onRemove: () => {
+          openErrorToastIds.delete(key);
+          resolved.onRemove?.();
+        },
+      };
+      const openId = openErrorToastIds.get(key);
+      if (openId !== undefined) {
+        manager.update(openId, tracked);
+        return openId;
+      }
+      const id = manager.add(tracked);
+      openErrorToastIds.set(key, id);
+      return id;
     },
     update(id, updates) {
       // `never` collapses the per-toast data generic our wrapper does not read.
@@ -116,17 +143,39 @@ function createBufferedToastManager(): BaseToastManager {
 
 const ACTION_TOAST_DEFAULT_TIMEOUT_MS = 8_000;
 const TOAST_DEFAULT_TIMEOUT_MS = 4_000;
+/** Base UI keeps a toast with timeout 0 until someone closes or replaces it. */
+const TOAST_STICKY_TIMEOUT_MS = 0;
 
-function withResolvedTimeout<
-  T extends { readonly timeout?: number | undefined; readonly actionProps?: unknown },
->(prevToast: { readonly timeout?: number | undefined }, updates: T): T {
-  if (updates.timeout !== undefined || prevToast.timeout !== undefined) {
-    return updates;
-  }
-  if (!hasVisibleToastAction(updates.actionProps)) {
-    return updates;
-  }
-  return { ...updates, timeout: ACTION_TOAST_DEFAULT_TIMEOUT_MS };
+type ToastTimeoutInput = {
+  readonly timeout?: number | undefined;
+  readonly type?: string | undefined;
+  readonly actionProps?: unknown;
+};
+
+// An error stays until dismissed or replaced; the rest time out, longer when they carry an action.
+function resolveToastTimeout(toast: ToastTimeoutInput): number | undefined {
+  if (toast.timeout !== undefined) return toast.timeout;
+  if (toast.type === "error") return TOAST_STICKY_TIMEOUT_MS;
+  return hasVisibleToastAction(toast.actionProps) ? ACTION_TOAST_DEFAULT_TIMEOUT_MS : undefined;
+}
+
+function withResolvedTimeout<T extends ToastTimeoutInput>(
+  prevToast: ToastTimeoutInput,
+  updates: T,
+): T {
+  if (updates.timeout !== undefined) return updates;
+  const prevStickyError =
+    prevToast.type === "error" && prevToast.timeout === TOAST_STICKY_TIMEOUT_MS;
+  if (prevToast.timeout !== undefined && !prevStickyError) return updates;
+  const timeout = resolveToastTimeout({
+    type: updates.type ?? prevToast.type,
+    actionProps: updates.actionProps,
+  });
+  if (timeout !== undefined) return { ...updates, timeout };
+  // An error that turns into something else gives up its sticky timeout.
+  return prevStickyError && updates.type !== undefined
+    ? { ...updates, timeout: TOAST_DEFAULT_TIMEOUT_MS }
+    : updates;
 }
 
 const toastManager = createBufferedToastManager();

@@ -39,6 +39,7 @@ import {
   classifyPullRequestChecks,
   describePullRequestChecks,
   isPullRequestConflicting,
+  pullRequestMergeConfirmCopy,
   resolvePullRequestMergeMethod,
   allowedPullRequestMergeMethods,
   resolveThreadPanelPullRequestAction,
@@ -196,6 +197,7 @@ export function ThreadDetailsPrRow({
     resolveProjectDefaultMergeMethod(),
     lastSelectedMergeMethod,
   );
+  const mergeCopy = pullRequestMergeConfirmCopy({ method: selectedMergeMethod, number });
 
   const handOff = (kind: "conflicts" | "findings", task: PullRequestThreadTask) => {
     if (composerTarget === undefined) {
@@ -394,7 +396,7 @@ export function ThreadDetailsPrRow({
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: `合并这个 ${terminology.singular}（${selectedMergeMethod}）`,
+                tooltip: `合并这个 ${terminology.singular}：${mergeCopy.rowTooltip}`,
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -524,10 +526,8 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>合并 {terminology.singular}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                将使用 {selectedMergeMethod} 合并 #{number}。
-              </AlertDialogDescription>
+              <AlertDialogTitle>{mergeCopy.title}</AlertDialogTitle>
+              <AlertDialogDescription>{mergeCopy.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" size="sm" />}>
@@ -541,7 +541,7 @@ export function ThreadDetailsPrRow({
                   void perform("merge", selectedMergeMethod);
                 }}
               >
-                合并
+                {mergeCopy.confirmLabel}
               </Button>
             </AlertDialogFooter>
           </AlertDialogPopup>

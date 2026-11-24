@@ -52,7 +52,11 @@ export function DesktopWebLinkCoordinator() {
       reportPairingFailure(error);
       return;
     }
-    const confirmed = (await requestConfirmDialog(`要添加位于 ${origin} 的后端吗？`)) ?? false;
+    const confirmed =
+      (await requestConfirmDialog("添加后会在这台设备上保存配对信息，可以随时在设置里移除。", {
+        title: `添加位于 ${origin} 的后端？`,
+        confirmLabel: "添加",
+      })) ?? false;
     if (!confirmed) return;
     const result = await connectPairingEnvironment({ pairingUrl });
     if (result._tag === "Failure") {

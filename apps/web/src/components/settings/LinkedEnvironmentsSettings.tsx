@@ -104,7 +104,7 @@ function LinkedEnvironmentRow({
   const forget = async () => {
     const confirmed = await (requestConfirmDialog(
       `Forget ${link.label}? Agents here stop working there. Revoke "Fleet ADE · …" in ${link.label}'s Connections settings to end the session there too.`,
-      { variant: "destructive" },
+      { title: `取消关联“${link.label}”？`, confirmLabel: "取消关联", variant: "destructive" },
     ) ?? Promise.resolve(false));
     if (!confirmed) return;
     setBusy(true);

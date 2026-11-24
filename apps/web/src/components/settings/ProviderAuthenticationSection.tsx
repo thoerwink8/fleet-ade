@@ -310,9 +310,10 @@ export function ProviderAuthenticationSection({
                 disabled={disabled || !auth}
                 onClick={() => {
                   void ensureLocalApi()
-                    .dialogs.confirm(
-                      `要退出 ${provider.displayName ?? provider.driver} 上的 ${environmentLabel} 登录吗？共用此登录的会话将停止运行，会话历史会保留。`,
-                    )
+                    .dialogs.confirm("共用此登录的会话将停止运行，会话历史会保留。", {
+                      title: `退出 ${provider.displayName ?? provider.driver} 在 ${environmentLabel} 的登录？`,
+                      confirmLabel: "退出登录",
+                    })
                     .then((confirmed) => {
                       if (confirmed) void run(() => logout(target));
                     });

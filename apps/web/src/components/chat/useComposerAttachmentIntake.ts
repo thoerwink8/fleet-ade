@@ -353,11 +353,11 @@ export function useComposerAttachmentIntake(input: {
       removeComposerImageFromDraft(imageId);
       return;
     }
-    const confirmation = requestConfirmDialog(
-      `要从消息中移除 ${image?.name ?? "这张图片"} 吗？
-正文中引用了它，移除后所有引用也会一并删除。`,
-      { variant: "destructive" },
-    );
+    const confirmation = requestConfirmDialog("正文里引用了它，移除后这些引用也会一并删除。", {
+      title: `移除“${image?.name ?? "这张图片"}”？`,
+      confirmLabel: "移除",
+      variant: "destructive",
+    });
     if (!confirmation) {
       removeComposerImageFromDraft(imageId);
       return;

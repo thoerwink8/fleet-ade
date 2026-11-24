@@ -8,6 +8,7 @@ import { AsyncResult, AtomRegistry } from "effect/reactivity";
 import {
   attachedTerminalSessionAtom,
   knownTerminalSessionsAtom,
+  resolveTerminalCloseTargets,
   selectKnownTerminalSessions,
 } from "./terminalSessions";
 
@@ -158,5 +159,33 @@ describe("attachedTerminalSessionAtom", () => {
 
     AtomRegistry.make().get(atom);
     expect(attachCalls).toEqual([{ environmentId: environmentA, input }]);
+  });
+});
+
+describe("resolveTerminalCloseTargets", () => {
+  it("marks a terminal running only when its summary says a subprocess is", () => {
+    const sessions = selectKnownTerminalSessions(
+      [
+        summary(threadA, "busy", { hasRunningSubprocess: true, label: "npm run dev" }),
+        summary(threadA, "idle", { hasRunningSubprocess: false }),
+      ],
+      environmentA,
+      threadA,
+    );
+    const terminals = [
+      { terminalId: "busy", label: "npm run dev" },
+      { terminalId: "idle", label: "终端 2" },
+      { terminalId: "new", label: "终端 3" },
+    ];
+    expect(resolveTerminalCloseTargets(sessions, terminals)).toEqual([
+      { label: "npm run dev", running: true },
+      { label: "终端 2", running: false },
+      { label: "终端 3", running: false },
+    ]);
+    expect(resolveTerminalCloseTargets(null, terminals).map((entry) => entry.running)).toEqual([
+      null,
+      null,
+      null,
+    ]);
   });
 });

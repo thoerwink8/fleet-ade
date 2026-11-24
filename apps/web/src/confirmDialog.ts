@@ -1,25 +1,30 @@
-import type { ConfirmDialogOptions, ConfirmDialogVariant } from "@t3tools/contracts";
+import type {
+  ConfirmDialogCheckbox,
+  ConfirmDialogChoice,
+  ConfirmDialogOptions,
+  ConfirmDialogVariant,
+} from "@t3tools/contracts";
+
+export const DEFAULT_CONFIRM_CANCEL_LABEL = "取消";
+
+type ConfirmDialogCopy = {
+  readonly message: string;
+  readonly title: string;
+  readonly confirmLabel: string;
+  readonly cancelLabel: string;
+  readonly variant: ConfirmDialogVariant;
+  readonly initialFocus: ConfirmDialogOptions["initialFocus"];
+  readonly checkbox: { readonly label: string; readonly checked: boolean } | null;
+};
 
 export type ConfirmDialogState =
   | { readonly status: "idle" }
-  | {
-      readonly status: "confirming";
-      readonly message: string;
-      readonly variant: ConfirmDialogVariant;
-      readonly initialFocus: ConfirmDialogOptions["initialFocus"];
-    }
-  | {
-      readonly status: "closing";
-      readonly message: string;
-      readonly variant: ConfirmDialogVariant;
-      readonly initialFocus: ConfirmDialogOptions["initialFocus"];
-    };
+  | ({ readonly status: "confirming" } & ConfirmDialogCopy)
+  | ({ readonly status: "closing" } & ConfirmDialogCopy);
 
 type PendingConfirmation = {
-  readonly message: string;
-  readonly variant: ConfirmDialogVariant;
-  readonly initialFocus: ConfirmDialogOptions["initialFocus"];
-  readonly resolve: (confirmed: boolean) => void;
+  readonly copy: ConfirmDialogCopy;
+  readonly resolve: (choice: ConfirmDialogChoice) => void;
 };
 
 const idleState: ConfirmDialogState = { status: "idle" };
@@ -36,10 +41,10 @@ function publish(next: ConfirmDialogState): void {
 }
 
 function resolvePendingConfirmations(confirmed: boolean): void {
-  activeConfirmation?.resolve(confirmed);
-  for (const confirmation of queuedConfirmations) {
-    confirmation.resolve(confirmed);
-  }
+  const settle = (confirmation: PendingConfirmation) =>
+    confirmation.resolve({ confirmed, checked: confirmation.copy.checkbox?.checked ?? false });
+  if (activeConfirmation) settle(activeConfirmation);
+  for (const confirmation of queuedConfirmations) settle(confirmation);
   activeConfirmation = null;
   queuedConfirmations = [];
 }
@@ -61,18 +66,25 @@ export function subscribeConfirmDialogHost(listener: () => void): () => void {
   };
 }
 
-/** Undefined means no themed host is available. */
-export function requestConfirmDialog(
+function enqueue(
   message: string,
-  options?: ConfirmDialogOptions,
-): Promise<boolean> | undefined {
+  options: ConfirmDialogOptions & { readonly checkbox?: ConfirmDialogCheckbox },
+): Promise<ConfirmDialogChoice> | undefined {
   if (listeners.size === 0) return undefined;
 
-  const confirmation = new Promise<boolean>((resolve) => {
+  return new Promise<ConfirmDialogChoice>((resolve) => {
     const pending = {
-      message,
-      variant: options?.variant ?? "default",
-      initialFocus: options?.initialFocus,
+      copy: {
+        message,
+        title: options.title,
+        confirmLabel: options.confirmLabel,
+        cancelLabel: options.cancelLabel ?? DEFAULT_CONFIRM_CANCEL_LABEL,
+        variant: options.variant ?? "default",
+        initialFocus: options.initialFocus,
+        checkbox: options.checkbox
+          ? { label: options.checkbox.label, checked: options.checkbox.defaultChecked ?? false }
+          : null,
+      },
       resolve,
     } satisfies PendingConfirmation;
     if (activeConfirmation || state.status === "closing") {
@@ -81,19 +93,33 @@ export function requestConfirmDialog(
     }
 
     activeConfirmation = pending;
-    publish({
-      status: "confirming",
-      message,
-      variant: pending.variant,
-      initialFocus: pending.initialFocus,
-    });
+    publish({ status: "confirming", ...pending.copy });
   });
+}
 
-  return confirmation;
+/** Undefined means no themed host is available. */
+export function requestConfirmDialog(
+  message: string,
+  options: ConfirmDialogOptions,
+): Promise<boolean> | undefined {
+  return enqueue(message, options)?.then((choice) => choice.confirmed);
+}
+
+/** Undefined means no themed host is available. */
+export function requestConfirmDialogWithCheckbox(
+  message: string,
+  options: ConfirmDialogOptions & { readonly checkbox: ConfirmDialogCheckbox },
+): Promise<ConfirmDialogChoice> | undefined {
+  return enqueue(message, options);
 }
 
 export function isConfirmDialogActive(): boolean {
   return state.status !== "idle" || activeConfirmation !== null || queuedConfirmations.length > 0;
+}
+
+export function setConfirmDialogChecked(checked: boolean): void {
+  if (state.status !== "confirming" || !state.checkbox) return;
+  publish({ ...state, checkbox: { ...state.checkbox, checked } });
 }
 
 export function respondToConfirmDialog(confirmed: boolean): void {
@@ -101,13 +127,9 @@ export function respondToConfirmDialog(confirmed: boolean): void {
 
   const confirmation = activeConfirmation;
   activeConfirmation = null;
-  confirmation.resolve(confirmed);
-  publish({
-    status: "closing",
-    message: state.message,
-    variant: state.variant,
-    initialFocus: state.initialFocus,
-  });
+  const { status: _status, ...copy } = state;
+  confirmation.resolve({ confirmed, checked: copy.checkbox?.checked ?? false });
+  publish({ status: "closing", ...copy });
 }
 
 export function completeConfirmDialogClose(): void {
@@ -120,12 +142,7 @@ export function completeConfirmDialogClose(): void {
   }
 
   activeConfirmation = next;
-  publish({
-    status: "confirming",
-    message: next.message,
-    variant: next.variant,
-    initialFocus: next.initialFocus,
-  });
+  publish({ status: "confirming", ...next.copy });
 }
 
 export function resetConfirmDialogForTests(): void {

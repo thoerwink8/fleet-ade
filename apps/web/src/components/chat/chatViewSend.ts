@@ -115,7 +115,8 @@ export async function startFanoutThread(input: {
                   onClick: () => {
                     void readLocalApi()
                       ?.dialogs.confirm(
-                        "上一次请求可能已在运行，请先查看它的会话。仍要再次发送吗？这可能会产生重复的会话。",
+                        "上一次请求可能已经在运行，请先查看它的会话。再发送一次可能会产生重复的会话。",
+                        { title: "再发送一次？", confirmLabel: "仍要发送" },
                       )
                       .then(
                         (confirmed) => {

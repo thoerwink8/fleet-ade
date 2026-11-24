@@ -4,6 +4,7 @@ import {
   completeConfirmDialogClose,
   readConfirmDialogState,
   respondToConfirmDialog,
+  setConfirmDialogChecked,
   subscribeConfirmDialogHost,
 } from "../confirmDialog";
 import {
@@ -17,39 +18,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
-
-type ConfirmationCopy = {
-  readonly title: string;
-  readonly description: string | null;
-};
-
-function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
-  const normalizedMessage = message.trim();
-  const lines = normalizedMessage.split("\n");
-  const questionLineIndex = lines.findIndex((line) => line.trim().endsWith("?"));
-
-  if (questionLineIndex >= 0) {
-    const title = lines[questionLineIndex]!.trim();
-    const description = lines
-      .filter((_, index) => index !== questionLineIndex)
-      .join("\n")
-      .trim();
-    return { title, description: description || null };
-  }
-
-  const questionMarkIndex = normalizedMessage.indexOf("?");
-  if (questionMarkIndex >= 0) {
-    return {
-      title: normalizedMessage.slice(0, questionMarkIndex + 1).trim(),
-      description: normalizedMessage.slice(questionMarkIndex + 1).trim() || null,
-    };
-  }
-
-  return {
-    title: "确认操作",
-    description: normalizedMessage || "此操作需要你的确认。",
-  };
-}
+import { Checkbox } from "./ui/checkbox";
 
 export function ConfirmDialogHost() {
   const state = useSyncExternalStore(
@@ -58,11 +27,12 @@ export function ConfirmDialogHost() {
     readConfirmDialogState,
   );
 
-  const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
-  const confirmVariant = state.status === "idle" ? "default" : state.variant;
-  const focusConfirm = state.status !== "idle" && state.initialFocus === "confirm";
+  const idle = state.status === "idle";
+  const confirmVariant = idle ? "default" : state.variant;
+  const focusConfirm = !idle && state.initialFocus === "confirm";
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
+  const confirmLabel = idle ? "" : state.confirmLabel;
 
   return (
     <AlertDialog
@@ -76,20 +46,29 @@ export function ConfirmDialogHost() {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>{copy.title}</AlertDialogTitle>
-          {copy.description ? (
+          <AlertDialogTitle>{idle ? "" : state.title}</AlertDialogTitle>
+          {!idle && state.message ? (
             <AlertDialogDescription className="whitespace-pre-line">
-              {copy.description}
+              {state.message}
             </AlertDialogDescription>
+          ) : null}
+          {!idle && state.checkbox ? (
+            <Checkbox
+              label={state.checkbox.label}
+              checked={state.checkbox.checked}
+              onCheckedChange={(checked) => setConfirmDialogChecked(checked === true)}
+            />
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {idle ? "" : state.cancelLabel}
+          </AlertDialogClose>
           {focusConfirm && confirmVariant === "default" ? (
-            <AlertDialogAction onClick={onConfirm}>确认</AlertDialogAction>
+            <AlertDialogAction onClick={onConfirm}>{confirmLabel}</AlertDialogAction>
           ) : (
             <Button variant={confirmVariant} onClick={onConfirm}>
-              确认
+              {confirmLabel}
             </Button>
           )}
         </AlertDialogFooter>

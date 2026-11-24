@@ -175,7 +175,8 @@ function ProviderSetupActions({
 
   async function removeRuntime() {
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `要从 ${environmentLabel} 移除下载的 Antigravity 运行环境吗？Google 登录和会话历史会保留。`,
+      `会从 ${environmentLabel} 删除已下载的运行环境。Google 登录和会话历史会保留，需要时可以重新安装。`,
+      { title: "移除 Antigravity 运行环境？", confirmLabel: "移除" },
     );
     if (confirmed) {
       await runCommand("正在移除运行环境", () => removeInstall(target));

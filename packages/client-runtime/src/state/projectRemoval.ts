@@ -30,10 +30,10 @@ export function planProjectRemoval<
   const targetKind = hasOtherMembers || !isWholeGroup ? "checkout" : "project";
   const singleMember = members.length === 1 ? members[0]! : null;
   const targetLabel = singleMember?.title ?? displayName;
+  const subject = targetKind === "checkout" ? `“${targetLabel}”这个条目` : `项目“${targetLabel}”`;
+  const confirmationTitle =
+    threadCount > 0 ? `移除${subject}并删除它的 ${threadCount} 个会话？` : `移除${subject}？`;
   const confirmationMessage = [
-    threadCount > 0
-      ? `Remove ${targetKind} "${targetLabel}" and delete its ${threadCount} thread${threadCount === 1 ? "" : "s"}?`
-      : `Remove ${targetKind} "${targetLabel}"?`,
     ...(singleMember
       ? [
           `路径：${singleMember.workspaceRoot}`,
@@ -49,5 +49,5 @@ export function planProjectRemoval<
     "此操作无法撤销。",
   ].join("\n");
 
-  return { projectThreads, isWholeGroup, targetKind, confirmationMessage };
+  return { projectThreads, isWholeGroup, targetKind, confirmationTitle, confirmationMessage };
 }

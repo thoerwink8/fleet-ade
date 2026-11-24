@@ -1,3 +1,4 @@
+import { sideChatDeleteConfirmCopy } from "../../lib/threadConfirmCopy";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
 import { resolveLatestMergeBackRun } from "@t3tools/client-runtime/state/thread-workflows";
@@ -95,12 +96,8 @@ export default function SideChatPane(props: {
     if (confirmThreadDelete) {
       const api = readLocalApi();
       if (!api) return;
-      const confirmed = await settlePromise(() =>
-        api.dialogs.confirm(
-          [`删除侧聊“${shell.title}”？`, "这会永久清除它的对话记录。"].join("\n"),
-          { variant: "destructive" },
-        ),
-      );
+      const copy = sideChatDeleteConfirmCopy(shell.title);
+      const confirmed = await settlePromise(() => api.dialogs.confirm(copy.message, copy.options));
       if (confirmed._tag === "Failure" || !confirmed.value) return;
     }
     setDeleting(true);

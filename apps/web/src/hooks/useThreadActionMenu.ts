@@ -23,6 +23,7 @@ import {
 import { titleRegenerationToast } from "../components/threadTitleRegenerationToast";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { copyThreadReference } from "../lib/copyThreadReference";
+import { threadArchiveConfirmCopy } from "../lib/threadConfirmCopy";
 import { exportThreadMarkdown } from "../lib/exportThreadMarkdown";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { threadEnvironment } from "../state/threads";
@@ -323,8 +324,9 @@ export function useThreadActionMenu(input: {
           return;
         case "archive": {
           if (confirmThreadArchive) {
+            const copy = threadArchiveConfirmCopy(thread.title);
             const confirmed = await settlePromise(() =>
-              api.dialogs.confirm(`归档会话“${thread.title}”？`),
+              api.dialogs.confirm(copy.message, copy.options),
             );
             if (confirmed._tag === "Failure" || !confirmed.value) return;
           }
@@ -343,16 +345,9 @@ export function useThreadActionMenu(input: {
           return;
         }
         case "delete": {
-          if (confirmThreadDelete) {
-            const confirmed = await settlePromise(() =>
-              api.dialogs.confirm(
-                [`删除会话“${thread.title}”？`, "这将永久清除此会话的对话历史。"].join("\n"),
-                { variant: "destructive" },
-              ),
-            );
-            if (confirmed._tag === "Failure" || !confirmed.value) return;
-          }
-          const deleted = await deleteThread(threadRef);
+          const deleted = await deleteThread(threadRef, {
+            confirmDeletion: { threadTitle: thread.title, always: confirmThreadDelete },
+          });
           if (
             deleted._tag === "Failure" &&
             !isAtomCommandInterrupted(deleted) &&

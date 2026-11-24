@@ -222,11 +222,11 @@ import {
   reduceCommandPaletteSearchState,
   type SearchOverlayMode,
 } from "./CommandPalette.logic";
+import { batchDeleteConfirmCopy } from "../lib/threadConfirmCopy";
 import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
 import {
   isSidebarHiddenThread,
   applyThreadBatch,
-  batchDeleteConfirmText,
   firstValidTimestampMs,
   resolveThreadAttention,
 } from "./Sidebar.logic";
@@ -1909,12 +1909,8 @@ function OpenCommandPaletteDialog(props: {
             icon: <FolderIcon className={ITEM_ICON_CLASS} />,
             run: async () => {
               const count = useThreadSelectionStore.getState().selectedThreadKeys.size;
-              const confirmed = await readLocalApi()?.dialogs.confirm(
-                batchDeleteConfirmText(count),
-                {
-                  variant: "destructive",
-                },
-              );
+              const copy = batchDeleteConfirmCopy(count);
+              const confirmed = await readLocalApi()?.dialogs.confirm(copy.message, copy.options);
               if (!confirmed) return;
               await runSelectionBatch("delete");
             },

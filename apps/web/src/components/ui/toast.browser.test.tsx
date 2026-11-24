@@ -109,6 +109,58 @@ describe("toastManager", () => {
     await act(() => vi.advanceTimersByTime(1));
     await expect.element(toast).not.toBeInTheDocument();
   });
+
+  it.each([
+    { name: "plain", actionProps: undefined },
+    { name: "with an action", actionProps: { children: "重试", onClick: () => {} } },
+  ])("keeps a $name error until it is dismissed while a success still times out", async (row) => {
+    await using _screen = await render(<ToastProvider>{null}</ToastProvider>);
+    using _timers = fakeTimers();
+
+    await act(() => {
+      toastManager.add({
+        type: "error",
+        title: `sticky failure ${row.name}`,
+        ...(row.actionProps ? { actionProps: row.actionProps } : {}),
+      });
+    });
+    const error = page.getByRole("dialog", { name: `sticky failure ${row.name}` });
+    await expect.element(error).toBeInTheDocument();
+    await act(() => {
+      toastManager.add({ type: "success", title: `short success ${row.name}` });
+    });
+    const success = page.getByRole("dialog", { name: `short success ${row.name}` });
+    await expect.element(success).toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTime(4_000));
+    await expect.element(success).not.toBeInTheDocument();
+    await act(() => vi.advanceTimersByTime(10 * 60_000));
+    await expect.element(error).toBeInTheDocument();
+
+    await userEvent.click(error.getByRole("button", { name: "关闭通知" }));
+    await expect.element(error).not.toBeInTheDocument();
+  });
+
+  it("replaces a repeated error and lets its follow-up result time out", async () => {
+    await using _screen = await render(<ToastProvider>{null}</ToastProvider>);
+    using _timers = fakeTimers();
+
+    const first = await act(() =>
+      toastManager.add({ type: "error", title: "无法重复提交", description: "第一次" }),
+    );
+    const second = await act(() =>
+      toastManager.add({ type: "error", title: "无法重复提交", description: "第二次" }),
+    );
+    expect(second).toBe(first);
+    await expect.element(page.getByText("第二次")).toBeInTheDocument();
+    expect(page.getByRole("dialog", { name: "无法重复提交" }).elements()).toHaveLength(1);
+
+    await act(() => {
+      toastManager.update(first, { type: "success", title: "已提交", description: "重试成功" });
+    });
+    await act(() => vi.advanceTimersByTime(4_000));
+    await expect.element(page.getByRole("dialog", { name: "已提交" })).not.toBeInTheDocument();
+  });
 });
 
 describe("toast colors", () => {
