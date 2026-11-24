@@ -1,6 +1,7 @@
 import {
   CheckpointId,
   CheckpointScopeId,
+  CommandId,
   latestProviderTurnForAttempt,
   type OrchestrationV2CheckCheckpointRestoreInput,
   type OrchestrationV2CheckCheckpointRestoreResult,
@@ -38,7 +39,7 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { ProjectionStoreV2 } from "./ProjectionStore.ts";
 import { GIT_INDEX_LOCKED_DETAIL } from "../vcs/VcsProcess.ts";
 import * as ProjectStore from "./ProjectStore.ts";
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { ProviderSessionManagerV2 } from "./ProviderSessionManager.ts";
 import { RuntimePolicyV2 } from "./RuntimePolicy.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
@@ -55,6 +56,7 @@ export class CheckpointRollbackExecutionError extends Schema.TaggedError<Checkpo
       "provider-turn-unavailable",
       "unexpected-failure",
       "shared-workspace",
+      "provider-turn-active",
     ]),
     threadId: ThreadId,
     providerThreadId: ProviderThreadId,
@@ -72,6 +74,8 @@ export class CheckpointRollbackExecutionError extends Schema.TaggedError<Checkpo
         return `Provider turn for rollback target ${this.checkpointId} is unavailable on provider thread ${this.providerThreadId}.`;
       case "shared-workspace":
         return SHARED_WORKSPACE_RESTORE_MESSAGE;
+      case "provider-turn-active":
+        return "The turn is still winding down. Try the rewind again.";
       case "unexpected-failure":
         return ROLLBACK_FAILED_MESSAGE;
     }
@@ -91,6 +95,34 @@ class CheckpointRestoreCheckError extends Schema.TaggedError<CheckpointRestoreCh
 }
 
 const isCheckpointRollbackExecutionError = Schema.is(CheckpointRollbackExecutionError);
+const isProviderAdapterRollbackThreadError = Schema.is(
+  ProviderAdapter.ProviderAdapterRollbackThreadError,
+);
+const isProviderAdapterProtocolError = Schema.is(ProviderAdapter.ProviderAdapterProtocolError);
+
+/** Claude and ACP refuse rollback while their in-memory turn is still set. */
+function providerTurnStillActive(cause: unknown): boolean {
+  if (typeof cause !== "object" || cause === null) return false;
+  const record = cause as {
+    readonly _tag?: unknown;
+    readonly reason?: unknown;
+    readonly cause?: unknown;
+  };
+  if (record._tag === "ProviderAdapterProtocolError" && record.reason === "previous_turn_active") {
+    return true;
+  }
+  if (
+    record._tag === "ProviderAdapterRollbackThreadError" ||
+    record._tag === "CheckpointRollbackExecutionError"
+  ) {
+    return providerTurnStillActive(record.cause);
+  }
+  return isProviderAdapterProtocolError(cause)
+    ? cause.reason === "previous_turn_active"
+    : isProviderAdapterRollbackThreadError(cause)
+      ? providerTurnStillActive(cause.cause)
+      : false;
+}
 const isVcsProcessExitError = Schema.is(VcsProcessExitError);
 const isCheckpointRestoreError = Schema.is(CheckpointRestoreError);
 
@@ -101,6 +133,7 @@ const isCheckpointRestoreError = Schema.is(CheckpointRestoreError);
  */
 export function rollbackFailureClientMessage(error: CheckpointRollbackExecutionError): string {
   if (error.reason === "shared-workspace") return SHARED_WORKSPACE_RESTORE_MESSAGE;
+  if (error.reason === "provider-turn-active") return error.message;
   const restoreCause = isCheckpointRestoreError(error.cause) ? error.cause.cause : undefined;
   return isVcsProcessExitError(restoreCause) && restoreCause.detail === GIT_INDEX_LOCKED_DETAIL
     ? GIT_INDEX_LOCKED_DETAIL
@@ -113,6 +146,8 @@ export function rollbackFailureCode(
   switch (error.reason) {
     case "shared-workspace":
       return "shared-workspace";
+    case "provider-turn-active":
+      return "provider-turn-active";
     case "rollback-target-invalid":
       return "checkpoint-unavailable";
     case "active-provider-changed":
@@ -134,6 +169,8 @@ export interface CheckpointRollbackServiceV2Shape {
     readonly checkpointId: CheckpointId;
     readonly scopeId: CheckpointScopeId;
     readonly restoreFiles?: boolean;
+    /** When set, the rollback transaction records this as `rollbackCompletedRequestId`. */
+    readonly commandId?: CommandId;
   }) => Effect.Effect<void, CheckpointRollbackExecutionError>;
   readonly checkRestoreSafety: (
     input: OrchestrationV2CheckCheckpointRestoreInput,
@@ -183,6 +220,7 @@ export const layer: Layer.Layer<
       readonly checkpointId: CheckpointId;
       readonly scopeId: CheckpointScopeId;
       readonly restoreFiles?: boolean;
+      readonly commandId?: CommandId;
     }) {
       const context = yield* projections.getCheckpointRollbackContext(input.threadId, input);
       const { providerThread, checkpoint, scope, targetAttempt, runsToRollback, staleCheckpoints } =
@@ -397,6 +435,26 @@ export const layer: Layer.Layer<
                 }) as Event,
             );
           const events: Array<OrchestrationV2DomainEvent> = [];
+          if (input.commandId !== undefined) {
+            // Read under the lock: the provider rollback above is slow, and `context.thread`
+            // would write back an edit made while it ran.
+            const current = yield* projections.getThread(input.threadId);
+            events.push(
+              yield* makeEvent({
+                type: "thread.metadata-updated",
+                threadId: input.threadId,
+                providerInstanceId: current.providerInstanceId,
+                occurredAt: now,
+                payload: {
+                  ...current,
+                  pendingRollback: null,
+                  rollbackFailure: null,
+                  rollbackCompletedRequestId: input.commandId,
+                  updatedAt: now,
+                },
+              }),
+            );
+          }
           events.push(
             yield* makeEvent({
               type: "provider-thread.updated",
@@ -543,7 +601,9 @@ export const layer: Layer.Layer<
               isCheckpointRollbackExecutionError(cause)
                 ? cause
                 : new CheckpointRollbackExecutionError({
-                    reason: "unexpected-failure",
+                    reason: providerTurnStillActive(cause)
+                      ? "provider-turn-active"
+                      : "unexpected-failure",
                     threadId: input.threadId,
                     providerThreadId: input.providerThreadId,
                     checkpointId: input.checkpointId,

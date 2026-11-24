@@ -8,7 +8,6 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import * as Stream from "effect/Stream";
 import { HttpServer } from "effect/http";
 import * as NetAddress from "effect/net/NetAddress";
 
@@ -24,11 +23,9 @@ import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ProviderRuntimeRecovery from "./orchestration-v2/ProviderRuntimeRecoveryService.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
-import * as ThreadLaunch from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "./orchestration-v2/ThreadManagementService.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ProjectService from "./project/ProjectService.ts";
-import * as ProviderRegistry from "./provider/ProviderRegistry.ts";
 import { ServerActivation } from "./serverActivation.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
@@ -114,7 +111,10 @@ it.effect("parks automatic pull until activation without delaying command readin
         prepareForShutdown: Effect.void,
         reconcile: () => Effect.succeed(recovery),
       }),
-      Layer.mock(Orchestrator.OrchestratorV2)({ recoverDelegatedTasks: Effect.void }),
+      Layer.mock(Orchestrator.OrchestratorV2)({
+        recoverDelegatedTasks: Effect.void,
+        resumePendingRollbacks: Effect.succeed(0),
+      }),
       Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({ shutdown: Effect.void }),
       Layer.mock(EffectWorker.OrchestrationEffectWorkerV2)({ runOnce: () => Effect.never }),
       Layer.mock(ServerLifecycleEvents.ServerLifecycleEvents)({
@@ -139,11 +139,6 @@ it.effect("parks automatic pull until activation without delaying command readin
       Layer.mock(ProjectService.ProjectService)({ snapshot: Effect.succeed(snapshot) }),
       Layer.mock(ThreadManagement.ThreadManagementService)({
         countThreads: () => Effect.succeed(0),
-      }),
-      Layer.mock(ThreadLaunch.ThreadLaunchService)({}),
-      Layer.mock(ProviderRegistry.ProviderRegistry)({
-        getProviders: Effect.succeed([]),
-        streamChanges: Stream.empty,
       }),
       Layer.mock(ServiceLauncherClient.ServiceLauncherClient)({
         managed: true,

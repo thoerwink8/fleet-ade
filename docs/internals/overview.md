@@ -90,6 +90,13 @@ capture workspace state without adding commits to the user's branch. A revert mu
 workspace state with the provider conversation. A provider that cannot roll back its conversation
 must reject that operation before changing the filesystem.
 
+A revert requested while a run is active stores a pending rewind on the thread, stops the run
+through the same command as Stop, and continues only once no run is active (`waiting` still counts
+as active). The rollback effect is enqueued in a later transaction than the run's terminal state,
+so the per-thread effect order puts the stopped turn's checkpoint capture ahead of it. The target
+is resolved from the turn count after the thread settles, because the capture may be what creates
+it.
+
 Thread settlement is server-owned. The
 [settlement service](../../apps/server/src/orchestration-v2/ThreadSettlementService.ts) evaluates PR
 and inactivity settings without a connected client. Merge notifications invalidate cached PR state

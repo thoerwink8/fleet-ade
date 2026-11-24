@@ -15,7 +15,7 @@ import {
   rememberCheckoutIsRepo,
 } from "./ChatView.logic";
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
-import { deriveProviderInstanceEntries } from "../providerInstances";
+import { deriveProviderInstanceEntries, NO_PROVIDER_MODEL_SELECTION } from "../providerInstances";
 import { evaluateProviderInstanceReadiness } from "./chat/composerProviderReadiness";
 import { ensureInlineContextReferences } from "../lib/composerContextReferences";
 import {
@@ -699,6 +699,26 @@ describe("resolveComposerProviderSelection", () => {
     });
 
     expect(selection.selectedProviderEntry).toBeUndefined();
+  });
+
+  it("picks a signed-in agent for an initial draft when no agent is explicitly selected", () => {
+    const unauthenticatedCodex = entry("codex", "codex", {
+      status: "error",
+      auth: { status: "unauthenticated" },
+    });
+    const authenticatedClaude = entry("claudeAgent", "claudeAgent", {
+      status: "ready",
+      auth: { status: "authenticated" },
+    });
+
+    const selection = resolveComposerProviderSelection({
+      entries: [unauthenticatedCodex, authenticatedClaude],
+      candidateInstanceIds: [null, undefined, NO_PROVIDER_MODEL_SELECTION.instanceId, undefined],
+      lockedProvider: null,
+      lockedInstanceId: null,
+    });
+
+    expect(selection.selectedProviderEntry?.instanceId).toBe(authenticatedClaude.instanceId);
   });
 });
 

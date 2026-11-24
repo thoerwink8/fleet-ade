@@ -1,18 +1,9 @@
 import {
   CommandId,
-  DEFAULT_MODEL,
-  DEFAULT_MODEL_BY_PROVIDER,
-  DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_SERVER_SETTINGS,
   isListedThreadLineage,
-  isProviderAvailable,
-  type ModelSelection,
   type Project,
   ProjectId,
-  ProviderInstanceId,
-  resolveProjectProviderInstanceEnabled,
-  type ServerProvider,
-  type ServerSettings as ServerSettingsContract,
   ThreadId,
 } from "@t3tools/contracts";
 import { formatHostForUrl, isWildcardHost } from "@t3tools/shared/hostClassification";
@@ -27,12 +18,10 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
-import * as Duration from "effect/Duration";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import * as Stream from "effect/Stream";
 
 import * as ServerConfig from "./config.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
@@ -44,8 +33,6 @@ import * as LegacyV1ThreadImporter from "./orchestration-v2/legacy/LegacyV1Threa
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as ProviderRuntimeRecovery from "./orchestration-v2/ProviderRuntimeRecoveryService.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
-import * as ProviderRegistry from "./provider/ProviderRegistry.ts";
-import * as ThreadLaunch from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "./orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "./project/ProjectService.ts";
 import * as GitVcsDriver from "./vcs/GitVcsDriver.ts";
@@ -148,136 +135,6 @@ export const makeCommandGate = Effect.gen(function* () {
   } satisfies CommandGate;
 });
 
-const AUTO_BOOTSTRAP_PROVIDER_WAIT_MS = 5_000;
-
-const getAutoBootstrapThreadModelSelection = (): ModelSelection => ({
-  instanceId: ProviderInstanceId.make("codex"),
-  model: DEFAULT_MODEL,
-});
-
-function isBootstrapProviderUsable(
-  provider: ServerProvider,
-  settings: Pick<ServerSettingsContract, "providerInstances" | "projectSettingsOverrides">,
-  projectId: ProjectId | null,
-): boolean {
-  const enabled = resolveProjectProviderInstanceEnabled(settings, projectId, provider.instanceId);
-  return (
-    enabled &&
-    provider.installed &&
-    isProviderAvailable(provider) &&
-    provider.status !== "error" &&
-    provider.auth.status !== "unauthenticated"
-  );
-}
-
-const isBootstrapProviderSettledForDefault = (provider: ServerProvider): boolean =>
-  provider.auth.status === "authenticated" ||
-  provider.auth.status === "unauthenticated" ||
-  !provider.installed ||
-  provider.status === "error" ||
-  !isProviderAvailable(provider);
-
-const getProviderDefaultModel = (provider: ServerProvider): string | undefined =>
-  provider.models.find((model) => model.isDefault && !model.isCustom)?.slug ??
-  provider.models.find((model) => !model.isCustom)?.slug ??
-  provider.models[0]?.slug ??
-  DEFAULT_MODEL_BY_PROVIDER[provider.driver];
-
-const hasSettledBootstrapProviders = (
-  providers: ReadonlyArray<ServerProvider>,
-  settings: ServerSettingsContract,
-  project: Pick<Project, "id" | "defaultModelSelection">,
-): boolean => {
-  if (providers.length === 0) return false;
-  const enabledProviders = providers.filter((provider) =>
-    resolveProjectProviderInstanceEnabled(settings, project.id, provider.instanceId),
-  );
-  if (enabledProviders.length === 0) return true;
-  const defaultInstanceId = resolveProjectSettings(settings, project.id, project).settings
-    .defaultModelSelection?.instanceId;
-  if (defaultInstanceId) {
-    const defaultProvider = enabledProviders.find(
-      (provider) => provider.instanceId === defaultInstanceId,
-    );
-    if (defaultProvider && !isBootstrapProviderSettledForDefault(defaultProvider)) {
-      return false;
-    }
-  }
-  return (
-    enabledProviders.some(
-      (provider) => provider.auth.status === "authenticated" && provider.installed,
-    ) || enabledProviders.every(isBootstrapProviderSettledForDefault)
-  );
-};
-
-export function resolveAutoBootstrapThreadModelSelection(input: {
-  readonly settings: ServerSettingsContract;
-  readonly project: Pick<Project, "id" | "defaultModelSelection">;
-  readonly providers: ReadonlyArray<ServerProvider>;
-}): ModelSelection {
-  const configuredDefault =
-    resolveProjectSettings(input.settings, input.project.id, input.project).settings
-      .defaultModelSelection ?? null;
-  if (input.providers.length === 0) {
-    return configuredDefault ?? getAutoBootstrapThreadModelSelection();
-  }
-
-  const usableProviders = input.providers.filter((provider) =>
-    isBootstrapProviderUsable(provider, input.settings, input.project.id),
-  );
-  if (configuredDefault !== null) {
-    const defaultProvider = usableProviders.find(
-      (provider) => provider.instanceId === configuredDefault.instanceId,
-    );
-    if (defaultProvider) {
-      return configuredDefault;
-    }
-  }
-
-  const preferredProvider =
-    usableProviders.find(
-      (provider) => provider.status === "ready" && provider.auth.status === "authenticated",
-    ) ??
-    usableProviders.find((provider) => provider.auth.status === "authenticated") ??
-    usableProviders.find((provider) => provider.status === "ready") ??
-    usableProviders[0];
-  if (preferredProvider) {
-    const model = getProviderDefaultModel(preferredProvider);
-    if (model) {
-      return {
-        instanceId: preferredProvider.instanceId,
-        model,
-      };
-    }
-  }
-
-  return configuredDefault ?? getAutoBootstrapThreadModelSelection();
-}
-
-const readBootstrapProviders = Effect.fn("serverRuntimeStartup.readBootstrapProviders")(function* (
-  providerRegistry: ProviderRegistry.ProviderRegistry["Service"],
-  settings: ServerSettingsContract,
-  project: Pick<Project, "id" | "defaultModelSelection">,
-) {
-  const initialProviders = yield* providerRegistry.getProviders;
-  if (hasSettledBootstrapProviders(initialProviders, settings, project)) {
-    return initialProviders;
-  }
-  const latestProvidersRef = yield* Ref.make(initialProviders);
-  yield* Stream.merge(
-    providerRegistry.streamChanges,
-    Stream.fromEffect(providerRegistry.getProviders),
-  ).pipe(
-    Stream.tap((nextProviders) => Ref.set(latestProvidersRef, nextProviders)),
-    Stream.filter((nextProviders) =>
-      hasSettledBootstrapProviders(nextProviders, settings, project),
-    ),
-    Stream.runHead,
-    Effect.timeoutOption(Duration.millis(AUTO_BOOTSTRAP_PROVIDER_WAIT_MS)),
-  );
-  return yield* Ref.get(latestProvidersRef);
-});
-
 interface AutoBootstrapWelcomeTargets {
   readonly bootstrapProjectId?: ProjectId;
   readonly bootstrapThreadId?: ThreadId;
@@ -354,59 +211,6 @@ const resolveWelcomeBase = Effect.gen(function* () {
   } as const;
 });
 
-const launchAutoBootstrapThread = Effect.fn("serverRuntimeStartup.launchAutoBootstrapThread")(
-  function* (project: Pick<Project, "id" | "defaultModelSelection">) {
-    const random = yield* SecureRandom.SecureRandom;
-    const threads = yield* ThreadManagement.ThreadManagementService;
-    const threadLaunch = yield* ThreadLaunch.ThreadLaunchService;
-    const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
-    const serverSettings = yield* ServerSettings.ServerSettingsService;
-
-    const settings = yield* serverSettings.getSettings;
-    const providers = yield* readBootstrapProviders(providerRegistry, settings, project);
-    const existingThread = (yield* threads.listActiveShellIndex()).find(
-      (thread) => thread.projectId === project.id && isListedThreadLineage(thread.lineage),
-    );
-    if (existingThread !== undefined) {
-      return;
-    }
-
-    const modelSelection = resolveAutoBootstrapThreadModelSelection({
-      settings,
-      project,
-      providers,
-    });
-    yield* threadLaunch
-      .launch({
-        commandId: CommandId.make(yield* random.uuidV4()),
-        projectId: project.id,
-        title: "新建会话",
-        modelSelection,
-        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
-        runtimeMode: resolveProjectSettings(settings, project.id, project).settings
-          .defaultRuntimeMode,
-        workspaceStrategy: { type: "root" },
-        createdBy: "system",
-        creationSource: "server",
-      })
-      .pipe(
-        // The bootstrap thread is optional; its launch must not fail startup.
-        Effect.catchTags({
-          ThreadManagementProviderInstanceDisabledError: (error) =>
-            Effect.logInfo("Skipped bootstrap thread because its provider instance is disabled", {
-              projectId: project.id,
-              instanceId: error.instanceId,
-            }).pipe(Effect.as(undefined)),
-          ThreadLaunchError: (error) =>
-            Effect.logWarning("Failed to launch bootstrap thread", {
-              projectId: project.id,
-              operation: error.operation,
-            }).pipe(Effect.as(undefined)),
-        }),
-      );
-  },
-);
-
 const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
   const randomUUID = random.uuidV4();
@@ -425,25 +229,11 @@ const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
       title: path.basename(serverConfig.cwd) || "project",
       workspaceRoot: serverConfig.cwd,
     });
+    bootstrapProjectId = project.id;
     const existingThread = (yield* threads.listActiveShellIndex()).find(
       (thread) => thread.projectId === project.id && isListedThreadLineage(thread.lineage),
     );
-    if (existingThread === undefined) {
-      bootstrapProjectId = project.id;
-      yield* launchAutoBootstrapThread(project).pipe(
-        Effect.withSpan("server.startup.welcome.autobootstrap-thread"),
-        Effect.catchCause((cause) =>
-          Cause.hasInterruptsOnly(cause)
-            ? Effect.void
-            : Effect.logWarning("Deferred bootstrap thread launch failed", {
-                projectId: project.id,
-                cause: Cause.pretty(cause),
-              }),
-        ),
-        Effect.forkScoped,
-      );
-    } else {
-      bootstrapProjectId = project.id;
+    if (existingThread !== undefined) {
       bootstrapThreadId = existingThread.id;
     }
   }
@@ -527,12 +317,14 @@ const runOrderedV2StartupPhases = Effect.fn("serverRuntimeStartup.runOrderedV2St
     readonly importLegacyShells: Effect.Effect<Import, ImportError, ImportContext>;
     readonly recover: Effect.Effect<Recovery, RecoveryError, RecoveryContext>;
     readonly recoverDelegatedTasks: Effect.Effect<void, DelegationError, DelegationContext>;
+    readonly resumePendingRollbacks: Effect.Effect<number, DelegationError, DelegationContext>;
     readonly startEffectWorker: Effect.Effect<void, WorkerError, WorkerContext>;
     readonly autoBootstrap: Effect.Effect<Bootstrap, BootstrapError, BootstrapContext>;
   }) {
     yield* input.importLegacyShells;
     const recovery = yield* input.recover;
     yield* input.recoverDelegatedTasks;
+    yield* input.resumePendingRollbacks;
     yield* input.startEffectWorker;
     const bootstrap = yield* input.autoBootstrap;
     return { recovery, bootstrap } as const;
@@ -644,6 +436,10 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       recoverDelegatedTasks: runStartupPhase(
         "orchestration-v2.delegated-tasks.recover",
         orchestrator.recoverDelegatedTasks,
+      ),
+      resumePendingRollbacks: runStartupPhase(
+        "orchestration-v2.pending-rollbacks.resume",
+        orchestrator.resumePendingRollbacks,
       ),
       startEffectWorker: runStartupPhase(
         "orchestration-v2.effect-worker.start",

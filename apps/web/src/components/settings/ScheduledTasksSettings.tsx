@@ -86,6 +86,7 @@ import { useSettingsScope } from "./SettingsScopeContext";
 import { EnvironmentRow, useEnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsGroup } from "./SettingsGroup";
 import { settingsScopeEnvironmentLabel, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
+import { requestScheduledTaskDelete } from "./scheduledTaskDeleteUndoClient";
 import {
   SCHEDULED_TASK_TEMPLATES,
   WEBHOOK_SIGNATURE_DEFAULTS,
@@ -786,6 +787,9 @@ function ScheduledTaskRow({
   const canOperate = useAtomValue(
     serverEnvironment.upsertScheduledTask.permissionAtom(environmentId),
   );
+  const canUndoDelete =
+    useEnvironment(environmentId)?.serverConfig?.environment.capabilities
+      .scheduledTaskUndoDelete === true;
   const [busy, setBusy] = useState(false);
   const [deliveriesOpen, setDeliveriesOpen] = useState(false);
   const isWebhook = task.schedule.type === "webhook";
@@ -795,18 +799,13 @@ function ScheduledTaskRow({
   const run = useAtomCommand(serverEnvironment.runScheduledTaskNow, {
     label: "scheduled task run now",
   });
-  const remove = useAtomCommand(serverEnvironment.deleteScheduledTask, {
-    label: "scheduled task delete",
-  });
-  const act = async (action: "toggle" | "run" | "delete") => {
+  const act = async (action: "toggle" | "run") => {
     if (busy || !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
     setBusy(true);
     const result =
       action === "toggle"
         ? await toggle({ environmentId, input: { id: task.id, enabled: !task.enabled } })
-        : action === "run"
-          ? await run({ environmentId, input: { id: task.id } })
-          : await remove({ environmentId, input: { id: task.id } });
+        : await run({ environmentId, input: { id: task.id } });
     setBusy(false);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add(
@@ -885,7 +884,12 @@ function ScheduledTaskRow({
                 </MenuItem>
               )}
               <MenuSeparator />
-              <MenuItem onClick={() => void act("delete")}>
+              <MenuItem
+                onClick={() => {
+                  if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
+                  requestScheduledTaskDelete(environmentId, task, canUndoDelete);
+                }}
+              >
                 <Trash2Icon />
                 删除
               </MenuItem>

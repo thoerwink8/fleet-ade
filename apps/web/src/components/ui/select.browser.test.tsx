@@ -216,6 +216,7 @@ describe("Select", () => {
     expect(itemStyle.backgroundColor).not.toBe(resolvedBackground("--accent"));
     expect(getComputedStyle(selected.querySelector(".tick")!).visibility).toBe("visible");
 
+    await expect.element(page.getByRole("option", { name: "Alpha" })).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     const highlighted = page.getByRole("option", { name: "Bravo" }).element();
     await vi.waitFor(() => expect(highlighted.hasAttribute("data-highlighted")).toBe(true));
@@ -270,6 +271,7 @@ describe("Select", () => {
       const disabled = screen.getByRole("combobox", { name: "disabled" }).element();
       await userEvent.click(screen.getByRole("combobox", { name: "enabled" }));
       await expect.element(page.getByRole("listbox")).toBeVisible();
+      await expect.element(page.getByRole("option", { name: "Alpha" })).toHaveFocus();
       await userEvent.keyboard("{ArrowDown}");
       const selected = page.getByRole("option", { name: "Alpha" }).element();
       const highlighted = page.getByRole("option", { name: "Bravo" }).element();
@@ -350,6 +352,9 @@ describe("Select", () => {
     const trigger = screen.getByRole("combobox", { name: "Letter" });
     await userEvent.click(trigger);
     await expect.element(page.getByRole("listbox")).toBeVisible();
+    // The highlighted option is focused a frame after the list is shown. ArrowDown
+    // before that is taken as "jump to the first item", which is already selected.
+    await expect.element(page.getByRole("option", { name: "Alpha" })).toHaveFocus();
 
     await userEvent.keyboard("{ArrowDown}");
     await vi.waitFor(() =>

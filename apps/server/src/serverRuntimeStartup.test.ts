@@ -1,17 +1,12 @@
 import { assert, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import {
-  CommandId,
-  DEFAULT_MODEL,
   DEFAULT_SERVER_SETTINGS,
   EnvironmentId,
   ProjectId,
-  ProviderDriverKind,
-  ProviderInstanceId,
   ThreadId,
-  type ModelSelection,
+  type OrchestrationV2AppThreadLineage,
   type ServerLifecycleStreamEvent,
-  type ServerProvider,
 } from "@t3tools/contracts";
 import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
@@ -25,8 +20,6 @@ import * as Fiber from "effect/Fiber";
 import * as Ref from "effect/Ref";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import * as Stream from "effect/Stream";
-import * as TestClock from "effect/testing/TestClock";
 
 import * as GitVcsDriver from "./vcs/GitVcsDriver.ts";
 
@@ -42,201 +35,215 @@ import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ProviderRuntimeRecovery from "./orchestration-v2/ProviderRuntimeRecoveryService.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
-import * as ThreadLaunch from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "./orchestration-v2/ThreadManagementService.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ProjectService from "./project/ProjectService.ts";
-import * as ProviderRegistry from "./provider/ProviderRegistry.ts";
 import { ServerActivation } from "./serverActivation.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerSettings from "./serverSettings.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 
-it.effect.each([
-  "disabled-codex",
-  "disabled-default",
-  "launch-failure",
-  "project-failure",
-] as const)("keeps bootstrap launch failures separate from project failures: %s", (scenario) =>
+const makeStartupTestDependencies = Effect.fn("makeStartupTestDependencies")(function* (input: {
+  readonly autoBootstrapProjectFromCwd: boolean;
+  readonly projectId: ProjectId;
+  readonly events: ServerLifecycleStreamEvent[];
+  readonly readyPublished?: Deferred.Deferred<void>;
+  readonly failProjectBootstrap?: boolean;
+  readonly onBootstrap?: () => void;
+  readonly activeShells?: ReadonlyArray<{
+    readonly id: ThreadId;
+    readonly projectId: ProjectId;
+    readonly lineage: Pick<OrchestrationV2AppThreadLineage, "relationshipToParent" | "sideChat">;
+  }>;
+}) {
+  const recovery = {
+    terminalizedRuns: 0,
+    stoppedSessions: 0,
+    closedRequests: 0,
+    retiredEffects: 0,
+    requeuedEffects: 0,
+  };
+  const imports = { importedThreadCount: 0, importedMessageCount: 0 };
+  return Layer.mergeAll(
+    NodeCrypto.layer,
+    Path.layer,
+    Layer.mock(ServerConfig.ServerConfig)({
+      ...(yield* ServerConfig.deriveServerPaths("/bootstrap-project", undefined).pipe(
+        Effect.provide(Path.layer),
+      )),
+      baseDir: "/bootstrap-project",
+      logLevel: "Error",
+      traceMinLevel: "Info",
+      traceTimingEnabled: false,
+      traceBatchWindowMs: 200,
+      traceMaxBytes: 1024,
+      traceMaxFiles: 1,
+      otlpTracesUrl: undefined,
+      otlpMetricsUrl: undefined,
+      otlpLogsUrl: undefined,
+      otlpTracesExport: DEFAULT_SIGNAL_EXPORT,
+      otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
+      otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
+      otelEnvironment: OtelEnvironment.none,
+      staticDir: undefined,
+      devAllowedOrigins: [],
+      desktopBootstrapToken: undefined,
+      logWebSocketEvents: false,
+      tailscaleServeEnabled: false,
+      tailscaleServePort: 443,
+      mode: "web",
+      cwd: "/bootstrap-project",
+      host: "localhost",
+      port: 3773,
+      devUrl: undefined,
+      noBrowser: true,
+      startupPresentation: "browser",
+      autoBootstrapProjectFromCwd: input.autoBootstrapProjectFromCwd,
+    }),
+    Layer.mock(Keybindings.Keybindings)({ start: Effect.void }),
+    Layer.mock(LegacyV1ThreadImporter.LegacyV1ThreadImporter)({
+      pendingThreadCount: Effect.succeed(0),
+      reconcileShells: Effect.succeed(imports),
+      importPendingTranscripts: Effect.succeed(imports),
+    }),
+    Layer.mock(ProviderRuntimeRecovery.ProviderRuntimeRecoveryService)({
+      recover: Effect.succeed(recovery),
+      prepareForShutdown: Effect.void,
+      reconcile: () => Effect.succeed(recovery),
+    }),
+    Layer.mock(Orchestrator.OrchestratorV2)({
+      recoverDelegatedTasks: Effect.void,
+      resumePendingRollbacks: Effect.succeed(0),
+    }),
+    Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({ shutdown: Effect.void }),
+    Layer.mock(EffectWorker.OrchestrationEffectWorkerV2)({ runOnce: () => Effect.never }),
+    Layer.mock(ServerLifecycleEvents.ServerLifecycleEvents)({
+      publish: (event) =>
+        Effect.gen(function* () {
+          const published = { ...event, sequence: input.events.length + 1 };
+          input.events.push(published);
+          if (published.type === "ready" && input.readyPublished) {
+            yield* Deferred.succeed(input.readyPublished, undefined);
+          }
+          return published;
+        }),
+    }),
+    Layer.mock(ServerSettings.ServerSettingsService)({
+      start: Effect.void,
+      getSettings: Effect.succeed(DEFAULT_SERVER_SETTINGS),
+    }),
+    Layer.mock(ServerEnvironment.ServerEnvironment)({
+      getDescriptor: Effect.succeed({
+        environmentId: EnvironmentId.make("bootstrap-environment"),
+        label: "Test environment",
+        platform: { os: "linux", arch: "x64" },
+        serverVersion: "0.0.0-test",
+        capabilities: { repositoryIdentity: true },
+      }),
+    }),
+    Layer.mock(ProjectStore.ProjectStoreV2)({}),
+    Layer.mock(ProjectService.ProjectService)({
+      bootstrap: () => {
+        input.onBootstrap?.();
+        return input.failProjectBootstrap
+          ? Effect.die("project bootstrap failed")
+          : Effect.succeed({
+              created: true,
+              project: {
+                id: input.projectId,
+                title: "项目",
+                workspaceRoot: "/bootstrap-project",
+                repositoryIdentity: null,
+                faviconPath: null,
+                scripts: [],
+                createdAt: "2026-01-01T00:00:00Z",
+                updatedAt: "2026-01-01T00:00:00Z",
+                deletedAt: null,
+                defaultModelSelection: null,
+              },
+            });
+      },
+    }),
+    Layer.mock(ThreadManagement.ThreadManagementService)({
+      countThreads: () => Effect.succeed(input.activeShells?.length ?? 0),
+      listActiveShellIndex: () => Effect.succeed((input.activeShells ?? []) as never),
+    }),
+    Layer.mock(ServiceLauncherClient.ServiceLauncherClient)({
+      managed: false,
+      protocol: undefined,
+      prepareTrial: () => Effect.undefined,
+    }),
+    Layer.mock(GitVcsDriver.GitVcsDriver)({}),
+    FileSystem.layerNoop({}),
+    Layer.mock(ServerSecretStore.ServerSecretStore)({ get: () => Effect.succeedNone }),
+    Layer.mock(EnvironmentAuth.EnvironmentAuth)({}),
+    Layer.mock(ExternalLauncher.ExternalLauncher)({}),
+    Layer.mock(HttpServer.HttpServer)({
+      address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 3773),
+    }),
+  );
+});
+
+it.effect("bootstraps the cwd project without creating an empty thread on a fresh directory", () =>
   Effect.gen(function* () {
     const projectId = ProjectId.make("bootstrap-project");
-    const instanceId = ProviderInstanceId.make(
-      scenario === "disabled-default" ? "custom" : "codex",
-    );
     const events: ServerLifecycleStreamEvent[] = [];
-    const launchAttempted = yield* Deferred.make<void>();
-    const recovery = {
-      terminalizedRuns: 0,
-      stoppedSessions: 0,
-      closedRequests: 0,
-      retiredEffects: 0,
-      requeuedEffects: 0,
-    };
-    const imports = { importedThreadCount: 0, importedMessageCount: 0 };
-    const dependencies = Layer.mergeAll(
-      NodeCrypto.layer,
-      Path.layer,
-      Layer.mock(ServerConfig.ServerConfig)({
-        ...(yield* ServerConfig.deriveServerPaths("/bootstrap-project", undefined).pipe(
-          Effect.provide(Path.layer),
-        )),
-        baseDir: "/bootstrap-project",
-        logLevel: "Error",
-        traceMinLevel: "Info",
-        traceTimingEnabled: false,
-        traceBatchWindowMs: 200,
-        traceMaxBytes: 1024,
-        traceMaxFiles: 1,
-        otlpTracesUrl: undefined,
-        otlpMetricsUrl: undefined,
-        otlpLogsUrl: undefined,
-        otlpTracesExport: DEFAULT_SIGNAL_EXPORT,
-        otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
-        otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
-        otelEnvironment: OtelEnvironment.none,
-        staticDir: undefined,
-        devAllowedOrigins: [],
-        desktopBootstrapToken: undefined,
-        logWebSocketEvents: false,
-        tailscaleServeEnabled: false,
-        tailscaleServePort: 443,
-        mode: "web",
-        cwd: "/bootstrap-project",
-        host: "localhost",
-        port: 3773,
-        devUrl: undefined,
-        noBrowser: true,
-        startupPresentation: "browser",
-        autoBootstrapProjectFromCwd: true,
-      }),
-      Layer.mock(Keybindings.Keybindings)({ start: Effect.void }),
-      Layer.mock(LegacyV1ThreadImporter.LegacyV1ThreadImporter)({
-        pendingThreadCount: Effect.succeed(0),
-        reconcileShells: Effect.succeed(imports),
-        importPendingTranscripts: Effect.succeed(imports),
-      }),
-      Layer.mock(ProviderRuntimeRecovery.ProviderRuntimeRecoveryService)({
-        recover: Effect.succeed(recovery),
-        prepareForShutdown: Effect.void,
-        reconcile: () => Effect.succeed(recovery),
-      }),
-      Layer.mock(Orchestrator.OrchestratorV2)({ recoverDelegatedTasks: Effect.void }),
-      Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({ shutdown: Effect.void }),
-      Layer.mock(EffectWorker.OrchestrationEffectWorkerV2)({ runOnce: () => Effect.never }),
-      Layer.mock(ServerLifecycleEvents.ServerLifecycleEvents)({
-        publish: (event) =>
-          Effect.sync(() => {
-            const published = { ...event, sequence: events.length + 1 };
-            events.push(published);
-            return published;
-          }),
-      }),
-      Layer.mock(ServerSettings.ServerSettingsService)({
-        start: Effect.void,
-        getSettings: Effect.succeed({
-          ...DEFAULT_SERVER_SETTINGS,
-          defaultModelSelection:
-            scenario === "disabled-default" ? { instanceId, model: "custom-model" } : null,
-          providerInstances: {
-            [instanceId]: {
-              driver: ProviderDriverKind.make("codex"),
-              enabled: false,
-              config: {},
-            },
-          },
-        }),
-      }),
-      Layer.mock(ServerEnvironment.ServerEnvironment)({
-        getDescriptor: Effect.succeed({
-          environmentId: EnvironmentId.make("bootstrap-environment"),
-          label: "Test environment",
-          platform: { os: "linux", arch: "x64" },
-          serverVersion: "0.0.0-test",
-          capabilities: { repositoryIdentity: true },
-        }),
-      }),
-      Layer.mock(ProjectStore.ProjectStoreV2)({}),
-      Layer.mock(ProjectService.ProjectService)({
-        bootstrap: () =>
-          scenario === "project-failure"
-            ? Effect.die("project bootstrap failed")
-            : Effect.succeed({
-                created: true,
-                project: {
-                  id: projectId,
-                  title: "项目",
-                  workspaceRoot: "/bootstrap-project",
-                  repositoryIdentity: null,
-                  faviconPath: null,
-                  scripts: [],
-                  createdAt: "2026-01-01T00:00:00Z",
-                  updatedAt: "2026-01-01T00:00:00Z",
-                  deletedAt: null,
-                  defaultModelSelection:
-                    scenario === "disabled-default" ? { instanceId, model: "custom-model" } : null,
-                },
-              }),
-      }),
-      Layer.mock(ThreadManagement.ThreadManagementService)({
-        countThreads: () => Effect.succeed(0),
-        listActiveShellIndex: () => Effect.succeed([]),
-      }),
-      Layer.mock(ThreadLaunch.ThreadLaunchService)({
-        launch: (input) =>
-          Effect.gen(function* () {
-            assert.equal(input.modelSelection.instanceId, instanceId);
-            yield* Deferred.succeed(launchAttempted, undefined);
-            return yield* scenario === "launch-failure"
-              ? Effect.fail(
-                  new ThreadLaunch.ThreadLaunchError({
-                    operation: "create-thread",
-                    commandId: CommandId.make("bootstrap-command"),
-                    projectId,
-                    cause: "test launch failure",
-                  }),
-                )
-              : Effect.fail(
-                  new ThreadManagement.ThreadManagementProviderInstanceDisabledError({
-                    projectId,
-                    instanceId,
-                  }),
-                );
-          }),
-      }),
-      Layer.mock(ServiceLauncherClient.ServiceLauncherClient)({
-        managed: false,
-        protocol: undefined,
-        prepareTrial: () => Effect.undefined,
-      }),
-      Layer.mock(GitVcsDriver.GitVcsDriver)({}),
-      FileSystem.layerNoop({}),
-      Layer.mock(ServerSecretStore.ServerSecretStore)({ get: () => Effect.succeedNone }),
-      Layer.mock(EnvironmentAuth.EnvironmentAuth)({}),
-      Layer.mock(ExternalLauncher.ExternalLauncher)({}),
-      Layer.mock(ProviderRegistry.ProviderRegistry)({
-        getProviders: Effect.succeed([]),
-        streamChanges: Stream.empty,
-      }),
-      Layer.mock(HttpServer.HttpServer)({
-        address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 3773),
-      }),
-    );
+    const readyPublished = yield* Deferred.make<void>();
+    let bootstrapCalls = 0;
+
+    const dependencies = yield* makeStartupTestDependencies({
+      autoBootstrapProjectFromCwd: true,
+      projectId,
+      events,
+      readyPublished,
+      onBootstrap: () => {
+        bootstrapCalls += 1;
+      },
+      activeShells: [],
+    });
+
     yield* Effect.gen(function* () {
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       yield* startup.markHttpListening;
       const ready = yield* Effect.exit(startup.awaitCommandReady);
-      assert.equal(Exit.isSuccess(ready), scenario !== "project-failure");
+      yield* Deferred.await(readyPublished);
+
+      assert.equal(Exit.isSuccess(ready), true);
+      assert.equal(bootstrapCalls, 1);
+
       const welcome = events.find((event) => event.type === "welcome");
-      if (scenario === "project-failure") {
-        assert.isUndefined(welcome);
-      } else {
-        assert.isDefined(welcome);
-        if (welcome?.type === "welcome") {
-          assert.equal(welcome.payload.bootstrapProjectId, projectId);
-          assert.isUndefined(welcome.payload.bootstrapThreadId);
-        }
-        yield* Deferred.await(launchAttempted);
+      assert.isDefined(welcome);
+      if (welcome?.type === "welcome") {
+        assert.equal(welcome.payload.bootstrapProjectId, projectId);
+        assert.isUndefined(welcome.payload.bootstrapThreadId);
       }
+      assert.isDefined(events.find((event) => event.type === "ready"));
+    }).pipe(
+      Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
+      Effect.provideService(ServerActivation, Effect.never),
+    );
+  }),
+);
+
+it.effect("fails command readiness without publishing welcome when project bootstrap fails", () =>
+  Effect.gen(function* () {
+    const projectId = ProjectId.make("bootstrap-project");
+    const events: ServerLifecycleStreamEvent[] = [];
+
+    const dependencies = yield* makeStartupTestDependencies({
+      autoBootstrapProjectFromCwd: true,
+      projectId,
+      events,
+      failProjectBootstrap: true,
+    });
+
+    yield* Effect.gen(function* () {
+      const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
+      yield* startup.markHttpListening;
+      const ready = yield* Effect.exit(startup.awaitCommandReady);
+
+      assert.equal(Exit.isFailure(ready), true);
+      assert.isUndefined(events.find((event) => event.type === "welcome"));
     }).pipe(
       Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
       Effect.provideService(ServerActivation, Effect.never),
@@ -347,498 +354,130 @@ it.effect("automatic pull only updates enabled, behind, clean default-branch che
   }),
 );
 
-function makeBootstrapProvider(input: {
-  readonly instanceId: string;
-  readonly driver: "codex" | "claudeAgent";
-  readonly installed?: boolean;
-  readonly status?: ServerProvider["status"];
-  readonly authStatus?: ServerProvider["auth"]["status"];
-  readonly enabled?: boolean;
-  readonly availability?: ServerProvider["availability"];
-  readonly modelSlug: string;
-}): ServerProvider {
-  return {
-    instanceId: ProviderInstanceId.make(input.instanceId),
-    driver: ProviderDriverKind.make(input.driver),
-    enabled: input.enabled ?? true,
-    installed: input.installed ?? true,
-    version: "1.0.0",
-    status: input.status ?? "ready",
-    auth: { status: input.authStatus ?? "authenticated" },
-    checkedAt: "2026-11-24T00:00:00.000Z",
-    ...(input.availability ? { availability: input.availability } : {}),
-    models: [
-      {
-        slug: input.modelSlug,
-        name: input.modelSlug,
-        isCustom: false,
-        isDefault: true,
-        capabilities: {},
-      },
-    ],
-    slashCommands: [],
-    skills: [],
-  };
-}
+it.effect(
+  "resolves bootstrapThreadId to an existing listed thread on the cwd project without creating another",
+  () =>
+    Effect.gen(function* () {
+      const projectId = ProjectId.make("bootstrap-project");
+      const otherProjectId = ProjectId.make("other-project");
+      const existingThreadId = ThreadId.make("existing-thread");
+      const events: ServerLifecycleStreamEvent[] = [];
 
-it("prefers settings default if logged in, else falls back to the first logged-in agent on first bootstrap", () => {
-  const project = {
-    id: ProjectId.make("bootstrap-project"),
-    defaultModelSelection: null,
-  };
-  const unauthenticatedCodex = makeBootstrapProvider({
-    instanceId: "codex",
-    driver: "codex",
-    status: "warning",
-    authStatus: "unauthenticated",
-    modelSlug: DEFAULT_MODEL,
-  });
-  const notInstalledCodex = makeBootstrapProvider({
-    instanceId: "codex",
-    driver: "codex",
-    installed: false,
-    status: "warning",
-    authStatus: "unknown",
-    modelSlug: DEFAULT_MODEL,
-  });
-  const authenticatedClaude = makeBootstrapProvider({
-    instanceId: "claudeAgent",
-    driver: "claudeAgent",
-    status: "ready",
-    authStatus: "authenticated",
-    modelSlug: "claude-opus-4-6",
-  });
-  const authenticatedCodex = makeBootstrapProvider({
-    instanceId: "codex",
-    driver: "codex",
-    status: "ready",
-    authStatus: "authenticated",
-    modelSlug: DEFAULT_MODEL,
-  });
-
-  assert.deepStrictEqual(
-    ServerRuntimeStartup.resolveAutoBootstrapThreadModelSelection({
-      settings: {
-        ...DEFAULT_SERVER_SETTINGS,
-        defaultModelSelection: {
-          instanceId: ProviderInstanceId.make("codex"),
-          model: DEFAULT_MODEL,
-        },
-      },
-      project,
-      providers: [unauthenticatedCodex, authenticatedClaude],
-    }),
-    {
-      instanceId: ProviderInstanceId.make("claudeAgent"),
-      model: "claude-opus-4-6",
-    },
-  );
-
-  assert.deepStrictEqual(
-    ServerRuntimeStartup.resolveAutoBootstrapThreadModelSelection({
-      settings: DEFAULT_SERVER_SETTINGS,
-      project,
-      providers: [notInstalledCodex, authenticatedClaude],
-    }),
-    {
-      instanceId: ProviderInstanceId.make("claudeAgent"),
-      model: "claude-opus-4-6",
-    },
-  );
-
-  assert.deepStrictEqual(
-    ServerRuntimeStartup.resolveAutoBootstrapThreadModelSelection({
-      settings: {
-        ...DEFAULT_SERVER_SETTINGS,
-        defaultModelSelection: {
-          instanceId: ProviderInstanceId.make("codex"),
-          model: "custom-codex-model",
-        },
-      },
-      project,
-      providers: [authenticatedCodex, authenticatedClaude],
-    }),
-    {
-      instanceId: ProviderInstanceId.make("codex"),
-      model: "custom-codex-model",
-    },
-  );
-
-  assert.deepStrictEqual(
-    ServerRuntimeStartup.resolveAutoBootstrapThreadModelSelection({
-      settings: DEFAULT_SERVER_SETTINGS,
-      project,
-      providers: [unauthenticatedCodex, notInstalledCodex],
-    }),
-    {
-      instanceId: ProviderInstanceId.make("codex"),
-      model: DEFAULT_MODEL,
-    },
-  );
-});
-
-const makeDeferredBootstrapDependencies = Effect.fn("makeDeferredBootstrapDependencies")(
-  function* (input: {
-    readonly projectId: ProjectId;
-    readonly threadId: ThreadId;
-    readonly initialProviders: ReadonlyArray<ServerProvider>;
-    readonly streamChanges: Stream.Stream<ReadonlyArray<ServerProvider>>;
-    readonly listActiveShellIndex?: () => ReturnType<
-      ThreadManagement.ThreadManagementService["Service"]["listActiveShellIndex"]
-    >;
-    readonly events: ServerLifecycleStreamEvent[];
-    readonly launchedSelections: ModelSelection[];
-    readonly launchedDeferred: Deferred.Deferred<void>;
-  }) {
-    const recovery = {
-      terminalizedRuns: 0,
-      stoppedSessions: 0,
-      closedRequests: 0,
-      retiredEffects: 0,
-      requeuedEffects: 0,
-    };
-    const imports = { importedThreadCount: 0, importedMessageCount: 0 };
-    return Layer.mergeAll(
-      NodeCrypto.layer,
-      Path.layer,
-      Layer.mock(ServerConfig.ServerConfig)({
-        ...(yield* ServerConfig.deriveServerPaths("/bootstrap-project", undefined).pipe(
-          Effect.provide(Path.layer),
-        )),
-        baseDir: "/bootstrap-project",
-        logLevel: "Error",
-        traceMinLevel: "Info",
-        traceTimingEnabled: false,
-        traceBatchWindowMs: 200,
-        traceMaxBytes: 1024,
-        traceMaxFiles: 1,
-        otlpTracesUrl: undefined,
-        otlpMetricsUrl: undefined,
-        otlpLogsUrl: undefined,
-        otlpTracesExport: DEFAULT_SIGNAL_EXPORT,
-        otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
-        otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
-        otelEnvironment: OtelEnvironment.none,
-        staticDir: undefined,
-        devAllowedOrigins: [],
-        desktopBootstrapToken: undefined,
-        logWebSocketEvents: false,
-        tailscaleServeEnabled: false,
-        tailscaleServePort: 443,
-        mode: "web",
-        cwd: "/bootstrap-project",
-        host: "localhost",
-        port: 3773,
-        devUrl: undefined,
-        noBrowser: true,
-        startupPresentation: "browser",
+      const dependencies = yield* makeStartupTestDependencies({
         autoBootstrapProjectFromCwd: true,
-      }),
-      Layer.mock(Keybindings.Keybindings)({ start: Effect.void }),
-      Layer.mock(LegacyV1ThreadImporter.LegacyV1ThreadImporter)({
-        pendingThreadCount: Effect.succeed(0),
-        reconcileShells: Effect.succeed(imports),
-        importPendingTranscripts: Effect.succeed(imports),
-      }),
-      Layer.mock(ProviderRuntimeRecovery.ProviderRuntimeRecoveryService)({
-        recover: Effect.succeed(recovery),
-        prepareForShutdown: Effect.void,
-        reconcile: () => Effect.succeed(recovery),
-      }),
-      Layer.mock(Orchestrator.OrchestratorV2)({ recoverDelegatedTasks: Effect.void }),
-      Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({ shutdown: Effect.void }),
-      Layer.mock(EffectWorker.OrchestrationEffectWorkerV2)({ runOnce: () => Effect.never }),
-      Layer.mock(ServerLifecycleEvents.ServerLifecycleEvents)({
-        publish: (event) =>
-          Effect.sync(() => {
-            const published = { ...event, sequence: input.events.length + 1 };
-            input.events.push(published);
-            return published;
-          }),
-      }),
-      Layer.mock(ServerSettings.ServerSettingsService)({
-        start: Effect.void,
-        getSettings: Effect.succeed(DEFAULT_SERVER_SETTINGS),
-      }),
-      Layer.mock(ServerEnvironment.ServerEnvironment)({
-        getDescriptor: Effect.succeed({
-          environmentId: EnvironmentId.make("bootstrap-environment"),
-          label: "Test environment",
-          platform: { os: "linux", arch: "x64" },
-          serverVersion: "0.0.0-test",
-          capabilities: { repositoryIdentity: true },
-        }),
-      }),
-      Layer.mock(ProjectStore.ProjectStoreV2)({}),
-      Layer.mock(ProjectService.ProjectService)({
-        bootstrap: () =>
-          Effect.succeed({
-            created: true,
-            project: {
-              id: input.projectId,
-              title: "项目",
-              workspaceRoot: "/bootstrap-project",
-              repositoryIdentity: null,
-              faviconPath: null,
-              scripts: [],
-              createdAt: "2026-01-01T00:00:00Z",
-              updatedAt: "2026-01-01T00:00:00Z",
-              deletedAt: null,
-              defaultModelSelection: null,
-            },
-          }),
-      }),
-      Layer.mock(ThreadManagement.ThreadManagementService)({
-        countThreads: () => Effect.succeed(0),
-        listActiveShellIndex: input.listActiveShellIndex ?? (() => Effect.succeed([])),
-      }),
-      Layer.mock(ThreadLaunch.ThreadLaunchService)({
-        launch: (launchInput) =>
-          Effect.sync(() => {
-            input.launchedSelections.push(launchInput.modelSelection);
-          }).pipe(
-            Effect.andThen(Deferred.succeed(input.launchedDeferred, undefined)),
-            Effect.as({ threadId: input.threadId } as never),
-          ),
-      }),
-      Layer.mock(ServiceLauncherClient.ServiceLauncherClient)({
-        managed: false,
-        protocol: undefined,
-        prepareTrial: () => Effect.undefined,
-      }),
-      Layer.mock(GitVcsDriver.GitVcsDriver)({}),
-      FileSystem.layerNoop({}),
-      Layer.mock(ServerSecretStore.ServerSecretStore)({ get: () => Effect.succeedNone }),
-      Layer.mock(EnvironmentAuth.EnvironmentAuth)({}),
-      Layer.mock(ExternalLauncher.ExternalLauncher)({}),
-      Layer.mock(ProviderRegistry.ProviderRegistry)({
-        getProviders: Effect.succeed(input.initialProviders),
-        streamChanges: input.streamChanges,
-      }),
-      Layer.mock(HttpServer.HttpServer)({
-        address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 3773),
-      }),
+        projectId,
+        events,
+        activeShells: [
+          {
+            id: ThreadId.make("other-project-thread"),
+            projectId: otherProjectId,
+            lineage: { relationshipToParent: null, sideChat: false } as never,
+          },
+          {
+            id: ThreadId.make("subagent-thread"),
+            projectId,
+            lineage: { relationshipToParent: "subagent", sideChat: false } as never,
+          },
+          {
+            id: existingThreadId,
+            projectId,
+            lineage: { relationshipToParent: null, sideChat: false } as never,
+          },
+        ],
+      });
+
+      yield* Effect.gen(function* () {
+        const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
+        yield* startup.markHttpListening;
+        const ready = yield* Effect.exit(startup.awaitCommandReady);
+
+        assert.equal(Exit.isSuccess(ready), true);
+        const welcome = events.find((event) => event.type === "welcome");
+        assert.isDefined(welcome);
+        if (welcome?.type === "welcome") {
+          assert.equal(welcome.payload.bootstrapProjectId, projectId);
+          assert.equal(welcome.payload.bootstrapThreadId, existingThreadId);
+        }
+      }).pipe(
+        Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
+        Effect.provideService(ServerActivation, Effect.never),
+      );
+    }),
+);
+
+it.effect("omits bootstrapThreadId when the cwd project only has unlisted threads", () =>
+  Effect.gen(function* () {
+    const projectId = ProjectId.make("bootstrap-project");
+    const events: ServerLifecycleStreamEvent[] = [];
+
+    const dependencies = yield* makeStartupTestDependencies({
+      autoBootstrapProjectFromCwd: true,
+      projectId,
+      events,
+      activeShells: [
+        {
+          id: ThreadId.make("subagent-thread"),
+          projectId,
+          lineage: { relationshipToParent: "subagent", sideChat: false } as never,
+        },
+        {
+          id: ThreadId.make("side-chat-thread"),
+          projectId,
+          lineage: { relationshipToParent: null, sideChat: true } as never,
+        },
+      ],
+    });
+
+    yield* Effect.gen(function* () {
+      const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
+      yield* startup.markHttpListening;
+      const ready = yield* Effect.exit(startup.awaitCommandReady);
+
+      assert.equal(Exit.isSuccess(ready), true);
+      const welcome = events.find((event) => event.type === "welcome");
+      assert.isDefined(welcome);
+      if (welcome?.type === "welcome") {
+        assert.equal(welcome.payload.bootstrapProjectId, projectId);
+        assert.isUndefined(welcome.payload.bootstrapThreadId);
+      }
+    }).pipe(
+      Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
+      Effect.provideService(ServerActivation, Effect.never),
     );
-  },
+  }),
 );
 
-it.effect(
-  "publishes welcome and signals command readiness before provider probes settle, then launches the bootstrap thread",
-  () =>
-    Effect.gen(function* () {
-      const projectId = ProjectId.make("bootstrap-project");
-      const threadId = ThreadId.make("bootstrap-thread");
-      const events: ServerLifecycleStreamEvent[] = [];
-      const launchedSelections: ModelSelection[] = [];
-      const streamSubscribed = yield* Deferred.make<void>();
-      const nextProvidersDeferred = yield* Deferred.make<ReadonlyArray<ServerProvider>>();
-      const launchedDeferred = yield* Deferred.make<void>();
-      const initialCodex = makeBootstrapProvider({
-        instanceId: "codex",
-        driver: "codex",
-        status: "ready",
-        authStatus: "unknown",
-        modelSlug: DEFAULT_MODEL,
-      });
-      const settledProviders = [
-        makeBootstrapProvider({
-          instanceId: "codex",
-          driver: "codex",
-          status: "warning",
-          authStatus: "unauthenticated",
-          modelSlug: DEFAULT_MODEL,
-        }),
-        makeBootstrapProvider({
-          instanceId: "claudeAgent",
-          driver: "claudeAgent",
-          status: "ready",
-          authStatus: "authenticated",
-          modelSlug: "claude-opus-4-6",
-        }),
-      ] as const;
+it.effect("skips project bootstrap when autoBootstrapProjectFromCwd is false", () =>
+  Effect.gen(function* () {
+    const projectId = ProjectId.make("bootstrap-project");
+    const events: ServerLifecycleStreamEvent[] = [];
+    let bootstrapCalls = 0;
 
-      const dependencies = yield* makeDeferredBootstrapDependencies({
-        projectId,
-        threadId,
-        initialProviders: [initialCodex],
-        streamChanges: Stream.fromEffect(
-          Deferred.succeed(streamSubscribed, undefined).pipe(
-            Effect.andThen(Deferred.await(nextProvidersDeferred)),
-          ),
-        ),
-        events,
-        launchedSelections,
-        launchedDeferred,
-      });
+    const dependencies = yield* makeStartupTestDependencies({
+      autoBootstrapProjectFromCwd: false,
+      projectId,
+      events,
+      onBootstrap: () => {
+        bootstrapCalls += 1;
+      },
+    });
 
-      yield* Effect.gen(function* () {
-        const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
-        yield* startup.markHttpListening;
-        // Readiness and welcome must settle immediately even while probes are still blocked.
-        yield* startup.awaitCommandReady;
+    yield* Effect.gen(function* () {
+      const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
+      yield* startup.markHttpListening;
+      const ready = yield* Effect.exit(startup.awaitCommandReady);
 
-        const welcome = events.find((event) => event.type === "welcome");
-        assert.isDefined(welcome);
-        if (welcome?.type === "welcome") {
-          assert.equal(welcome.payload.bootstrapProjectId, projectId);
-          assert.isUndefined(welcome.payload.bootstrapThreadId);
-        }
-        assert.deepStrictEqual(launchedSelections, []);
-
-        yield* Deferred.await(streamSubscribed);
-        yield* Deferred.succeed(nextProvidersDeferred, settledProviders);
-        yield* Deferred.await(launchedDeferred);
-      }).pipe(
-        Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
-        Effect.provideService(ServerActivation, Effect.never),
-      );
-
-      assert.deepStrictEqual(launchedSelections, [
-        {
-          instanceId: ProviderInstanceId.make("claudeAgent"),
-          model: "claude-opus-4-6",
-        },
-      ]);
-    }),
-);
-
-it.effect(
-  "does not delay welcome or command readiness when provider probes never settle and falls back after 5s",
-  () =>
-    Effect.gen(function* () {
-      const projectId = ProjectId.make("bootstrap-project");
-      const threadId = ThreadId.make("bootstrap-thread");
-      const events: ServerLifecycleStreamEvent[] = [];
-      const launchedSelections: ModelSelection[] = [];
-      const streamSubscribed = yield* Deferred.make<void>();
-      const unsettledProbes = yield* Deferred.make<ReadonlyArray<ServerProvider>>();
-      const launchedDeferred = yield* Deferred.make<void>();
-      const initialCodex = makeBootstrapProvider({
-        instanceId: "codex",
-        driver: "codex",
-        status: "ready",
-        authStatus: "unknown",
-        modelSlug: DEFAULT_MODEL,
-      });
-
-      const dependencies = yield* makeDeferredBootstrapDependencies({
-        projectId,
-        threadId,
-        initialProviders: [initialCodex],
-        streamChanges: Stream.fromEffect(
-          Deferred.succeed(streamSubscribed, undefined).pipe(
-            Effect.andThen(Deferred.await(unsettledProbes)),
-          ),
-        ),
-        events,
-        launchedSelections,
-        launchedDeferred,
-      });
-
-      yield* Effect.gen(function* () {
-        const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
-        yield* startup.markHttpListening;
-        yield* startup.awaitCommandReady;
-
-        const welcome = events.find((event) => event.type === "welcome");
-        assert.isDefined(welcome);
-        if (welcome?.type === "welcome") {
-          assert.equal(welcome.payload.bootstrapProjectId, projectId);
-          assert.isUndefined(welcome.payload.bootstrapThreadId);
-        }
-
-        yield* Deferred.await(streamSubscribed);
-        assert.equal(yield* Deferred.isDone(launchedDeferred), false);
-
-        yield* TestClock.adjust("5 seconds");
-        yield* Deferred.await(launchedDeferred);
-      }).pipe(
-        Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
-        Effect.provideService(ServerActivation, Effect.never),
-      );
-
-      assert.deepStrictEqual(launchedSelections, [
-        {
-          instanceId: ProviderInstanceId.make("codex"),
-          model: DEFAULT_MODEL,
-        },
-      ]);
-    }),
-);
-
-it.effect(
-  "skips deferred bootstrap thread creation if a thread was created before probes settle",
-  () =>
-    Effect.gen(function* () {
-      const projectId = ProjectId.make("bootstrap-project");
-      const threadId = ThreadId.make("bootstrap-thread");
-      const events: ServerLifecycleStreamEvent[] = [];
-      const launchedSelections: ModelSelection[] = [];
-      const streamSubscribed = yield* Deferred.make<void>();
-      const nextProvidersDeferred = yield* Deferred.make<ReadonlyArray<ServerProvider>>();
-      const launchedDeferred = yield* Deferred.make<void>();
-      const recheckDone = yield* Deferred.make<void>();
-      let listCalls = 0;
-
-      const initialCodex = makeBootstrapProvider({
-        instanceId: "codex",
-        driver: "codex",
-        status: "ready",
-        authStatus: "unknown",
-        modelSlug: DEFAULT_MODEL,
-      });
-      const settledProviders = [
-        makeBootstrapProvider({
-          instanceId: "claudeAgent",
-          driver: "claudeAgent",
-          status: "ready",
-          authStatus: "authenticated",
-          modelSlug: "claude-opus-4-6",
-        }),
-      ] as const;
-
-      const dependencies = yield* makeDeferredBootstrapDependencies({
-        projectId,
-        threadId,
-        initialProviders: [initialCodex],
-        streamChanges: Stream.fromEffect(
-          Deferred.succeed(streamSubscribed, undefined).pipe(
-            Effect.andThen(Deferred.await(nextProvidersDeferred)),
-          ),
-        ),
-        listActiveShellIndex: () =>
-          Effect.gen(function* () {
-            listCalls += 1;
-            if (listCalls === 1) {
-              return [];
-            }
-            yield* Deferred.succeed(recheckDone, undefined);
-            return [
-              {
-                id: ThreadId.make("user-created-thread"),
-                projectId,
-                lineage: { relationshipToParent: null, sideChat: false },
-              } as never,
-            ];
-          }),
-        events,
-        launchedSelections,
-        launchedDeferred,
-      });
-
-      yield* Effect.gen(function* () {
-        const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
-        yield* startup.markHttpListening;
-        yield* startup.awaitCommandReady;
-        yield* Deferred.await(streamSubscribed);
-        yield* Deferred.succeed(nextProvidersDeferred, settledProviders);
-        yield* Deferred.await(recheckDone);
-        yield* Effect.yieldNow;
-      }).pipe(
-        Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
-        Effect.provideService(ServerActivation, Effect.never),
-      );
-
-      assert.deepStrictEqual(launchedSelections, []);
-    }),
+      assert.equal(Exit.isSuccess(ready), true);
+      assert.equal(bootstrapCalls, 0);
+      const welcome = events.find((event) => event.type === "welcome");
+      assert.isDefined(welcome);
+      if (welcome?.type === "welcome") {
+        assert.isUndefined(welcome.payload.bootstrapProjectId);
+        assert.isUndefined(welcome.payload.bootstrapThreadId);
+      }
+    }).pipe(
+      Effect.provide(ServerRuntimeStartup.layerWithOptions().pipe(Layer.provide(dependencies))),
+      Effect.provideService(ServerActivation, Effect.never),
+    );
+  }),
 );
