@@ -91,7 +91,7 @@
   --font-size-dialog-title: 1rem;
   --line-height-dialog-title: 1.5rem;
   --thread-details-panel-width: 17.5rem;
-  /* The prompt on phones: iOS zooms into any input under 16px on focus. */
+  /* Below 640px the composer is at least 16px: iOS zooms on focus under that. */
   --font-size-prompt-touch: max(var(--font-size-prompt, 1rem), 16px);
   /* Horizontal gutter shared by the page header and the chat column, clear of
      the device's safe area. */

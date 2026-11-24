@@ -1,13 +1,32 @@
+import { createRef } from "react";
 import { converter } from "culori/fn";
 import { describe, expect, it } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 import { render } from "../../../test/render";
+import {
+  ComposerPromptEditorTiptap,
+  type ComposerPromptEditorHandle,
+} from "../ComposerPromptEditorTiptap";
 import { applyThemePalette, EMBER_THEME, GROVE_THEME } from "../../themePalette";
+import { Autocomplete, AutocompleteInput } from "./autocomplete";
+import { Combobox, ComboboxInput } from "./combobox";
+import { Command, CommandInput } from "./command";
 import { Input } from "./input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "./input-group";
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from "./number-field";
+import { SidebarInput } from "./sidebar";
 import { Textarea } from "./textarea";
+
+const DESKTOP_TYPE = "14px";
+const NARROW_TYPE = "16px";
 
 const toRgb = converter("rgb");
 
@@ -65,6 +84,17 @@ describe("Input, Textarea, and InputGroup", () => {
 
       await userEvent.keyboard("{Tab}");
       await expect.element(defaultInput).toHaveFocus();
+
+      for (const [label, element] of [
+        ["default", defaultInput],
+        ["sm", smallInput],
+        ["compact", compactInput],
+        ["lg", largeInput],
+        ["textarea", textarea],
+        ["grouped", groupedInput],
+      ] as const) {
+        expect(getComputedStyle(element).fontSize, `sm+ ${label} type`).toBe(DESKTOP_TYPE);
+      }
 
       root.classList.add("no-transitions");
       for (const [appearance, expectedBg, expectedDanger, expectedRing] of [
@@ -131,6 +161,16 @@ describe("Input, Textarea, and InputGroup", () => {
         getComputedStyle(root).getPropertyValue("--fa-ctrl-lg").trim(),
       );
       expect(getComputedStyle(groupFrame).height, "narrow group height").toBe("36px");
+      for (const [label, element] of [
+        ["default", defaultInput],
+        ["sm", smallInput],
+        ["compact", compactInput],
+        ["lg", largeInput],
+        ["textarea", textarea],
+        ["grouped", groupedInput],
+      ] as const) {
+        expect(getComputedStyle(element).fontSize, `narrow ${label} type`).toBe(NARROW_TYPE);
+      }
     } finally {
       root.classList.remove("no-transitions");
       applyThemePalette("system", "light");
@@ -272,6 +312,80 @@ describe("Input, Textarea, and InputGroup", () => {
       applyThemePalette("system", "light");
       root.classList.remove("dark");
       delete root.dataset.theme;
+    }
+  });
+
+  it("uses 16px type below 640px and today's type from 640px up", async () => {
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    await page.viewport(1280, 800);
+    await using _viewport = {
+      [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+    };
+    const editorRef = createRef<ComposerPromptEditorHandle>();
+    await using screen = await render(
+      <div className="space-y-3 p-4">
+        <NumberField defaultValue={1}>
+          <NumberFieldGroup>
+            <NumberFieldDecrement aria-label="减少" />
+            <NumberFieldInput aria-label="数量" />
+            <NumberFieldIncrement aria-label="增加" />
+          </NumberFieldGroup>
+        </NumberField>
+        <Combobox items={["甲"]}>
+          <ComboboxInput aria-label="组合框" />
+        </Combobox>
+        <Autocomplete items={["甲"]}>
+          <AutocompleteInput aria-label="自动完成" />
+        </Autocomplete>
+        <Command items={["甲"]}>
+          <CommandInput aria-label="命令面板搜索" autoFocus={false} />
+        </Command>
+        <SidebarInput aria-label="搜索会话" type="search" />
+        <ComposerPromptEditorTiptap
+          ariaLabel="消息"
+          contextRecords={new Map()}
+          cursor={0}
+          disabled={false}
+          editorRef={editorRef}
+          onChange={() => {}}
+          onPaste={() => {}}
+          placeholder=""
+          skills={[]}
+          value=""
+        />
+      </div>,
+    );
+
+    const numberInput = screen.getByRole("textbox", { name: "数量" }).element();
+    const comboboxInput = screen.getByRole("combobox", { name: "组合框" }).element();
+    const autocompleteInput = screen.getByRole("combobox", { name: "自动完成" }).element();
+    const commandInput = screen.getByRole("combobox", { name: "命令面板搜索" }).element();
+    const sidebarInput = screen.getByRole("searchbox", { name: "搜索会话" }).element();
+    const composer = page.getByTestId("composer-editor");
+    await expect.element(composer).toBeVisible();
+    const composerInput = composer.element();
+    const uiProbe = document.createElement("span");
+    uiProbe.className = "text-ui";
+    document.body.append(uiProbe);
+    const sidebarDesktop = getComputedStyle(uiProbe).fontSize;
+    uiProbe.remove();
+
+    const fields = [
+      ["number", numberInput, DESKTOP_TYPE],
+      ["combobox", comboboxInput, DESKTOP_TYPE],
+      ["autocomplete", autocompleteInput, DESKTOP_TYPE],
+      ["command", commandInput, DESKTOP_TYPE],
+      ["sidebar", sidebarInput, sidebarDesktop],
+      ["composer", composerInput, DESKTOP_TYPE],
+    ] as const;
+
+    for (const width of [1280, 390] as const) {
+      await page.viewport(width, 800);
+      for (const [label, element, desktop] of fields) {
+        expect(getComputedStyle(element).fontSize, `${width} ${label}`).toBe(
+          width === 390 ? NARROW_TYPE : desktop,
+        );
+      }
     }
   });
 });
