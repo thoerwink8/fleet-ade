@@ -20,22 +20,6 @@
   border-radius: var(--fa-radius-lg);
 }
 
-/* Under the fill: join selectors clear this border without a second visible line. */
-.ade-composer-banner::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  border: 1px solid var(--fa-border);
-  border-radius: inherit;
-  background: none;
-  background-image: none;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
 .ade-composer-banner-title {
   color: var(--fa-fg);
   font-weight: 500;

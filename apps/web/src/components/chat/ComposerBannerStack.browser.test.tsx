@@ -37,7 +37,7 @@ it("leaves the next attachment its own top edge when there are no notices", asyn
     </ComposerBanner.Column>,
   );
 
-  const surface = getComputedStyle(screen.getByTestId("drawer").element(), "::before");
+  const surface = getComputedStyle(screen.getByTestId("drawer").element());
   expect(surface.borderTopWidth).toBe("1px");
   expect(surface.borderTopLeftRadius).not.toBe("0px");
 });
@@ -231,7 +231,6 @@ it("paints an opaque neutral surface, with tone only on the mark", async () => {
       const banner = screen.container.querySelector<HTMLElement>("[data-variant='error']");
       if (!banner) throw new Error(`missing banner at ${where}`);
       const paint = getComputedStyle(banner);
-      const edge = getComputedStyle(banner, "::before");
       expect(colorAlpha(paint.backgroundColor), where).toBe(1);
       expect(paint.backgroundImage, where).toBe("none");
       expect(paint.backdropFilter || "none", where).toBe("none");
@@ -240,10 +239,7 @@ it("paints an opaque neutral surface, with tone only on the mark", async () => {
       expect(paint.borderTopWidth, where).toBe("1px");
       expect(parseFloat(paint.borderTopLeftRadius), where).toBe(radius);
       expect(parseFloat(paint.borderBottomLeftRadius), where).toBe(0);
-      expect(edge.borderTopWidth, where).toBe("1px");
-      expect(edge.backdropFilter || "none", where).toBe("none");
-      expect(edge.getPropertyValue("-webkit-backdrop-filter") || "none", where).toBe("none");
-      expect(edge.backgroundImage, where).toBe("none");
+      expect(getComputedStyle(banner, "::before").content, where).toBe("none");
 
       const title = banner.querySelector(".ade-composer-banner-title");
       const description = banner.querySelector(".ade-composer-banner-secondary");
@@ -276,7 +272,6 @@ it("paints an opaque neutral surface, with tone only on the mark", async () => {
   expect(getComputedStyle(neutral).backgroundColor).toBe(getComputedStyle(error).backgroundColor);
   expect(getComputedStyle(neutral).borderTopWidth).toBe("0px");
   expect(parseFloat(getComputedStyle(neutral).borderTopLeftRadius)).toBe(0);
-  expect(getComputedStyle(neutral, "::before").borderTopWidth).toBe("0px");
   expect(parseFloat(getComputedStyle(error).borderTopLeftRadius)).toBe(radius);
 });
 
