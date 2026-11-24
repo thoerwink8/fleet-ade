@@ -105,19 +105,19 @@ other watch events. See [Linked PRs](#linked-prs) for the monitoring rules.
 
 PR sharing is off by default. In Settings → Connections → PR sharing,
 choose **Read PRs** or **Read and act** for each
-environment you trust to share its source control access.
-Enable both the original environment and the environment answering its requests on this client.
-**Read and act** can use broader permissions than the original environment's credential;
-only enable it for environments you control and trust. Changing a saved endpoint or removing an
-environment clears its permission.
+computer you trust to share its source control access.
+Enable both the original computer and the computer answering its requests on this client.
+**Read and act** can use broader permissions than the original computer's credential;
+only enable it for computers you control and trust. Changing a saved endpoint or removing a
+computer clears its permission.
 
 Diffs, linked PR status, and permitted source-control reads can then use another connected
-environment signed in to the same account on the same host. Each needs a project on that host.
-A connected local environment is preferred for actions and can answer slow or failed reads.
-Browsers need a paired environment to use its GitHub credentials.
-Credentials stay on their machines. Previously verified credentials remain usable for routing
+computer signed in to the same account on the same host. Each needs a project on that host.
+A connected local computer is preferred for actions and can answer slow or failed reads.
+Browsers need a paired computer to use its GitHub credentials.
+Credentials stay on their computers. Previously verified credentials remain usable for routing
 for ten minutes during a GitHub outage; new credentials must be verified first. Listings, diffs,
-and checkout or PR creation from Git actions continue to use the project's environment.
+and checkout or PR creation from Git actions continue to use the project's computer.
 
 ## Troubleshooting
 
@@ -183,4 +183,4 @@ the scope and merge strategy. GitHub rebases the remaining stack after merging.
 **Rebase stack** updates remote branches from bottom to top without changing your local checkout.
 It can rewrite history and restart checks. If a layer fails, earlier updates remain; resolve that
 layer before retrying. GitHub may require manual conflict resolution after a lower layer is amended,
-even when its changes look independent. Stack actions require an environment that supports them.
+even when its changes look independent. Stack actions require a computer that supports them.

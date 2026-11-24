@@ -624,7 +624,7 @@ export function makeBrowserPullRequestRoutingPermissions(
         else browser.localStorage.setItem(key, encodeStoredPullRequestRoutingPermission(value));
         browser.dispatchEvent(new Event(PULL_REQUEST_ROUTING_CHANGED));
       },
-      catch: (cause) => catalogError("save PR routing permissions in", cause),
+      catch: (cause) => catalogError("保存 PR 共享权限到", cause),
     });
   return PullRequestRoutingPermissions.of({
     get: Effect.fn("PullRequestRoutingPermissions.get")(function (entry) {

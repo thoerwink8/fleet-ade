@@ -51,32 +51,16 @@ const HARD_BANNED_TERMS: ReadonlyArray<HardBannedRule> = [
   { label: "配对 URL", pattern: /配对\s*URL/i },
   { label: "默认引用", pattern: /默认引用/ },
   { label: "各不相同", pattern: /各不相同/ },
-  { label: "待批准", pattern: /待批准/ },
+  { label: "待批准", pattern: /(?<!等)待批准/ },
   { label: "待输入", pattern: /待输入/ },
   { label: "forget", pattern: /\bforget\b/i },
 ];
 
-// Cleaned directories/files covered by this guard; subsequent batches add their paths here.
+// Cleaned directories covered by this guard (`apps/web/src`, `packages/client-runtime/src`, `packages/shared/src`).
 const CLEANED_DIRS = [
-  "apps/web/src/components/chat",
-  "apps/web/src/components/sidebar",
-  "apps/web/src/hooks",
+  "apps/web/src",
   "packages/client-runtime/src",
   "packages/shared/src",
-] as const;
-
-const CLEANED_ROOT_COMPONENT_DIR = "apps/web/src/components";
-
-const CLEANED_FILES = [
-  "apps/web/src/components/settings/SettingsPanels.tsx",
-  "apps/web/src/components/settings/KeybindingsSettings.tsx",
-  "apps/web/src/components/settings/KeybindingsSettings.logic.ts",
-  "apps/web/src/composerPlaceholder.ts",
-  "apps/web/src/session-logic.ts",
-  "apps/web/src/environments/primary/auth.ts",
-  "apps/web/src/lib/bootError.ts",
-  "apps/web/src/lib/openPullRequestLink.ts",
-  "apps/web/src/state/queries.ts",
 ] as const;
 
 // Exact sentences that stay in cleaned paths, keyed by file. A new old term in the same file is still reported.
@@ -85,15 +69,6 @@ const EXEMPT_TEXTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "packages/client-runtime/src/state/turnItemPresentation.ts": ["正在准备工作区"],
   // Server-generated background task summary asserted by server tests.
   "packages/shared/src/orchestrationV2PendingBackgroundWork.ts": ["Watching pull request #"],
-  // Settings-only permission scope descriptions; B7b cleans them and removes these entries.
-  "packages/shared/src/authScopeOptions.ts": [
-    "读取会话、状态、检查点和配置。",
-    "管理提供方",
-    "配置、安装、登录和更新提供方与用量来源。",
-    "提交、推送，管理分支和仓库，以及修改 pull request。",
-    "浏览主机文件、搜索工作区、查看本地改动。",
-    "编辑工作区文件并将计划保存到磁盘。",
-  ],
 };
 
 function normalizeRel(filePath: string, rootDir?: string): string {
@@ -105,18 +80,6 @@ function collectCleanedFiles(rootDir: string): string[] {
   const files: string[] = [];
   for (const dir of CLEANED_DIRS) {
     walk(NodePath.join(rootDir, dir), files);
-  }
-  const componentsRoot = NodePath.join(rootDir, CLEANED_ROOT_COMPONENT_DIR);
-  if (NodeFS.existsSync(componentsRoot)) {
-    for (const entry of NodeFS.readdirSync(componentsRoot, { withFileTypes: true })) {
-      if (entry.isFile()) {
-        files.push(NodePath.join(componentsRoot, entry.name));
-      }
-    }
-  }
-  for (const file of CLEANED_FILES) {
-    const full = NodePath.join(rootDir, file);
-    if (NodeFS.existsSync(full)) files.push(full);
   }
   return [...new Set(files)].filter(included).toSorted();
 }

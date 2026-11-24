@@ -1,39 +1,39 @@
 # Settings and project overrides
 
 On web and desktop, the "Applying settings for …" sentence at the top of Settings pages picks
-the project and environment a change applies to. Pages that only hold device preferences, such as
-Appearance, don't show it. They start at **All projects** and **All environments**
+the project and computer a change applies to. Pages that only hold device preferences, such as
+Appearance, don't show it. They start at **All projects** and **All computers**
 and stay selected as you move between categories or search for a setting.
 
 Preferences saved on this device, such as appearance and confirmations, always
-show and ignore the selection. Everything else is stored on a server. Choose one environment to
-edit its settings, or leave **All environments** to edit every connected environment at once.
-Offline environments keep their current values; this is a bulk edit, not a synced global default.
+show and ignore the selection. Everything else is stored on a computer's background service. Choose one computer to
+edit its settings, or leave **All computers** to edit every connected computer at once.
+Offline computers keep their current values; this is a bulk edit, not a synced global default.
 
-Choose a project to override settings for it on the selected environments. A layers icon beside
-each server row's title shows where the value comes from: the built-in default, the environment,
-or a project override. Click it to see that chain on every selected environment. An override can
+Choose a project to override settings for it on the selected computers. A layers icon beside
+each server row's title shows where the value comes from: the built-in default, the computer,
+or a project override. Click it to see that chain on every selected computer. An override can
 be reset to inherit again. Settings that cannot be overridden by a project are shown read-only
 while a project is selected.
 
-When the selected environments disagree, the control shows **Multiple values differ** in place of a value and the
-layers icon turns amber. Picking a value applies it to every selected environment.
+When the selected computers disagree, the control shows **Multiple values differ** in place of a value and the
+layers icon turns amber. Picking a value applies it to every selected computer.
 
-Changing an environment value never touches a project's own override. When projects override the
+Changing a computer value never touches a project's own override. When projects override the
 setting you are editing, the layers icon counts them and the chain lists each one with its value:
-click a project to jump to it, or **Reset all** to make those projects follow the environment
+click a project to jump to it, or **Reset all** to make those projects follow the computer
 again.
 
-Providers and diagnostics are per machine: they show one environment at a time, the primary
+Agents and diagnostics are per computer: they show one computer at a time, the primary
 one until you pick another. Every other setting fans out to the selection.
 
-With a project selected, a provider's switch in **Settings → Agents** turns it on or off for
-that project only, in either direction: a provider off on the machine can be used in one project,
+With a project selected, an agent's switch in **Settings → Agents** turns it on or off for
+that project only, in either direction: an agent off on the computer can be used in one project,
 and one on everywhere can be kept out of another. That project's model pickers follow the switch,
-and no new turn there can start on a provider it turned off, including queued messages and
+and no new turn there can start on an agent it turned off, including queued messages and
 follow-ups from delegated tasks. A turn already running when the switch flips finishes. A delegated
 task's result still lands in its parent thread, which sees it on its next turn. Reset returns the project to the
-machine's setting. Every other provider setting stays per machine.
+computer's setting. Every other agent setting stays per computer.
 
 ## Pin and archive projects
 
@@ -51,7 +51,7 @@ back.
 
 Open **Settings → Code** to rename a project across its connected checkouts and see where they live.
 
-A project on several machines must have every machine connected to pin or archive it.
+A project on several computers must have every computer connected to pin or archive it.
 
 ## Worktree branch names
 
@@ -63,19 +63,19 @@ are replaced with hyphens. Custom instructions are appended to
 the naming prompt and can specify issue IDs, namespaces, and casing.
 
 These settings apply to automatically named new worktree branches. Select a project
-to override its environment defaults. Worktree directories keep their original names.
+to override its computer defaults. Worktree directories keep their original names.
 If generation fails, or a custom name is invalid or already taken, the temporary
 branch name remains.
 
 ## Scheduled tasks
 
 Open **Settings → Scheduled tasks** to create scheduled tasks or manage existing
-ones across your connected environments. Use the settings filter to narrow the
-list by environment or project. Each task runs on the environment you choose,
-using its project, model, and workspace settings. Fixed-time schedules use that
-environment's time zone, which may differ from your device's. Choose **Once**
+ones across your connected computers. Use the settings filter to narrow the
+list by computer or project. Each task runs on the computer you choose,
+using its project, model, and directory settings. Fixed-time schedules use that
+computer's time zone, which may differ from your device's. Choose **Once**
 to run a task a single time at a date and time in your own time zone. If the
-environment is offline then, the task runs when it is back.
+computer is offline then, the task runs when it is back.
 
 Under **Destination**, choose where runs go. **New thread each run** keeps every
 run separate. The two one-thread choices start a thread on the first run and post
@@ -98,7 +98,7 @@ Leaving an edited form asks before discarding unsaved changes.
 In **Settings → Scheduled tasks**, choose **On webhook**
 as a task's schedule to run it whenever another service calls its URL, such as
 GitHub on a new PR or a CI job that failed. The URL is reachable over
-the routes configured for the environment; without a reachable route, the editor
+the routes configured for the computer; without a reachable route, the editor
 shows only the URL's path. **Rotate** replaces the URL and the old one stops working.
 
 The prompt decides what the agent sees. Placeholders pull values out of the
@@ -149,7 +149,7 @@ always replace the persisted payload. Coalesced updates count toward a separate
 On desktop and web, pick **Deliveries** from a task's menu to see recent
 requests and the prompt each one produced.
 
-If the environment is offline, the sender gets an error and nothing runs;
+If the computer is offline, the sender gets an error and nothing runs;
 redeliver from the sender, such as GitHub's **Recent Deliveries**, once it is
 back. To skip requests that waited too long, set **Skip requests older
 than** on the task.
@@ -157,43 +157,43 @@ than** on the task.
 ## Defaults and inheritance
 
 Threads contains the model and directory mode for new threads. Source control contains automatic pull,
-the default PR merge method, and text generation. The same rows edit environment defaults or project overrides depending on the
+the default PR merge method, and text generation. The same rows edit computer defaults or project overrides depending on the
 project crumb.
 
 The Projects category, under Code, holds the project's name, icon, actions,
 checkouts and removal. Actions belong to a project: editing them creates the project's own list
-on each selected environment, and reset returns to the environment's shared list. A project's
-`t3.json` actions can be imported there. When a project has several checkouts on one environment,
+on each selected computer, and reset returns to the computer's shared list. A project's
+`t3.json` actions can be imported there. When a project has several checkouts on one computer,
 choose one in the scope line at the top to see or change only that checkout's settings.
 
 Settings a repository can also declare in `t3.json`, such as the directory mode for new threads,
-resolve in one order: a project override, then the environment setting, then `t3.json`, then the
+resolve in one order: a project override, then the computer setting, then `t3.json`, then the
 built-in default. Leave a setting on **Inherit** to let the next tier decide.
 
 New worktrees initialize git submodules recursively. If that step is slow because the repository
 declares many nested submodules, set **Submodules** in **Settings → Code** under Advanced (with the project
 selected to override it there) to **Top level only** to stop at the ones the repository declares
 itself, or **Skip** to leave them for a setup script. It resolves in the same order as the
-workspace default: a `"worktreeSubmodules"` value in the `t3.json` of the branch being checked out
-applies when the project and environment are both on **Inherit**.
+directory mode default: a `"worktreeSubmodules"` value in the `t3.json` of the branch being checked out
+applies when the project and computer are both on **Inherit**.
 
 ## Worktree location
 
 New worktrees go in the `worktrees` folder of the T3 home directory. To put them somewhere else,
 such as another drive, set **Settings → Code → Worktree location** to an absolute path like
-`D:\worktrees` or `~/worktrees`. The setting is per machine. Existing worktrees stay where they
+`D:\worktrees` or `~/worktrees`. The setting is per computer. Existing worktrees stay where they
 are, and cleanup covers both the default folder and the custom one.
 
 ## Storage cleanup
 
-Open **Settings → Code → Cleanup** to enable automatic cleanup on one machine or all connected
-environments. Policies are off by default and run on the server at startup, when changed, and
-hourly. Offline machines keep their existing policies.
+Open **Settings → Code → Cleanup** to enable automatic cleanup on one computer or all connected
+computers. Policies are off by default and run on the server at startup, when changed, and
+hourly. Offline computers keep their existing policies.
 
 Select a project to set **Automatic worktree cleanup** to **Inherit**, **Off**, or **Custom**.
-Inherit follows each machine's rules; Off keeps that project's worktrees until you remove them
+Inherit follows each computer's rules; Off keeps that project's worktrees until you remove them
 manually. Custom applies separate worktree rules to the selected project or checkout. Log
-retention remains machine-wide.
+retention remains computer-wide.
 
 Worktrees can be removed after a chosen number of inactive days, after a thread is marked complete, after
 merging, or when they have no commits beyond the default branch and their thread is completed or
@@ -237,7 +237,7 @@ from the icon palette, derived from the saved project name. For example, `Nebula
 ## Keep the default branch current
 
 In Source control, enable **Automatically pull** to keep the default-branch checkout up to date
-with its configured upstream. Choose an environment to set the default or a project to override it.
+with its configured upstream. Choose a computer to set the default or a project to override it.
 
 Fleet ADE only pulls when it can fast-forward and the checkout has no changed files, untracked files,
 or local commits. It skips checkouts on another branch or without an upstream. If a checkout has
