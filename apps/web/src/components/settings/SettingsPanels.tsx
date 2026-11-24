@@ -226,7 +226,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["流式响应"]
       : []),
     ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks
-      ? ["提供方更新检查"]
+      ? ["智能体更新检查"]
       : []),
     ...(settings.continueThreadsAfterServerUpdate !==
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
@@ -1243,7 +1243,7 @@ function ScopedCompactIdleThreadsRow() {
       settingKeys={["idleCompaction", "compactIdleThreads"]}
       mixed={idleCompaction.mixed}
       {...searchableSetting("compact-idle-threads")}
-      description="空闲且超过 200,000 token 的 Claude 会话何时压缩：在你回来后、提示缓存即将过期前，或从不压缩。每个 Claude 提供方都可以单独覆盖此设置。"
+      description="空闲且超过 200,000 token 的 Claude 会话何时压缩：在你回来后、提示缓存即将过期前，或从不压缩。每个 Claude 账号都可以单独覆盖此设置。"
       resetAction={
         globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) ? (
           <SettingResetButton
@@ -1590,7 +1590,7 @@ export function ThreadsSettingsPanel() {
           serverScoped
           settingKeys={["textGenerationModelSelection"]}
           {...searchableSetting("text-generation-model")}
-          description="用于生成会话标题和其他文本。版本控制有单独的设置。“提供方”中添加的文本生成器也会显示在这里。"
+          description="用于生成会话标题和其他文本。版本控制有单独的设置。“智能体”中添加的文本生成器也会显示在这里。"
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (
               <SettingResetButton
@@ -1610,7 +1610,7 @@ export function ThreadsSettingsPanel() {
                 请连接一台电脑以选择其文本生成模型。
               </span>
             ) : !hasTextGenerationProvider ? (
-              <span className="text-sm text-muted-foreground">没有可用的文本生成提供方。</span>
+              <span className="text-sm text-muted-foreground">没有可用的文本生成智能体。</span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
                 <ProviderModelPicker
@@ -1760,12 +1760,12 @@ export function MaintenanceSettingsPanel() {
           serverScoped
           settingKeys={["enableProviderUpdateChecks"]}
           {...searchableSetting("provider-update-checks")}
-          description="检查已安装的提供方 CLI 是否有新版本。"
+          description="检查已安装的智能体 CLI 是否有新版本。"
           resetAction={
             settings.enableProviderUpdateChecks !==
             DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
               <SettingResetButton
-                label="提供方更新检查"
+                label="智能体更新检查"
                 onClick={() =>
                   updateSettings({
                     enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -1781,7 +1781,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
-              aria-label="检查提供方版本"
+              aria-label="检查智能体版本"
             />
           }
         />

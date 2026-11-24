@@ -211,7 +211,7 @@ export function ThreadLineageWorkflowRow({
                     <>
                       {status === "失败" ? <SectionHeaderStatus>失败</SectionHeaderStatus> : null}
                       <span className="shrink-0 text-2xs font-normal tabular-nums">
-                        {phase.settledCount}/{phase.members.length} 个代理
+                        {phase.settledCount}/{phase.members.length} 个智能体
                       </span>
                       <span className="shrink-0 text-2xs font-normal tabular-nums empty:hidden">
                         <AgentElapsed agent={phaseElapsed(phase)} />

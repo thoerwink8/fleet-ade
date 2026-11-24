@@ -468,8 +468,8 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "usage.period.month": "用量：30 天",
   "usage.period.quarter": "用量：90 天",
   "modelPicker.toggle": "模型选择器：开关",
-  "modelPicker.previousProvider": "模型选择器：上一个提供方",
-  "modelPicker.nextProvider": "模型选择器：下一个提供方",
+  "modelPicker.previousProvider": "模型选择器：上一个智能体",
+  "modelPicker.nextProvider": "模型选择器：下一个智能体",
   "thread.stop": "会话：停止",
   "thread.steerQueuedMessage": "排队：立即发送第一条排队消息",
   "thread.editQueuedMessage": "排队：编辑最后一条排队消息",
@@ -494,7 +494,7 @@ export function commandLabel(command: KeybindingCommand): string {
   const raw = String(command);
   if (/^(thread|modelPicker)\.jump\.\d+$/.test(raw)) {
     const [prefix, , n] = raw.split(".");
-    return prefix === "thread" ? `会话：跳到第 ${n} 条` : `模型选择器：跳到第 ${n} 个提供方`;
+    return prefix === "thread" ? `会话：跳到第 ${n} 条` : `模型选择器：跳到第 ${n} 个智能体`;
   }
   if (raw.startsWith("script.") && raw.endsWith(".run")) {
     return `运行脚本：${titleCaseCommandSegment(raw.slice("script.".length, -".run".length))}`;

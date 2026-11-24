@@ -82,7 +82,7 @@ describe("usageProgress", () => {
         [partway, environment("b", { isPending: true, summary: summary(["grok", "antigravity"]) })],
         options,
       ),
-    ).toEqual({ dimmed: false, label: "正在更新 2 个提供方…" });
+    ).toEqual({ dimmed: false, label: "正在更新 2 个智能体…" });
     expect(usageProgress([{ ...partway, isPending: false }], options)).toEqual({
       dimmed: false,
       label: null,

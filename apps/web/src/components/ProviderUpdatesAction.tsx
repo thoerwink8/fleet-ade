@@ -49,7 +49,7 @@ export function useCheckProviderUpdates() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "无法检查提供方更新",
+        title: "无法检查智能体更新",
         description: <span className="whitespace-pre-line">{lines.join("\n")}</span>,
       }),
     );

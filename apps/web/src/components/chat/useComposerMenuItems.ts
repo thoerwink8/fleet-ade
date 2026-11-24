@@ -285,7 +285,7 @@ export function useComposerMenuItems({
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "运行提供方命令",
+        description: command.description ?? command.input?.hint ?? "运行智能体命令",
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -319,7 +319,7 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} 技能` : "运行提供方技能"),
+          (skill.scope ? `${skill.scope} 技能` : "运行智能体技能"),
       }));
     }
     if (
@@ -406,7 +406,7 @@ export function useComposerMenuItems({
         exactPullRequestLookup.isPending));
   const emptyState = (() => {
     if (composerTriggerKind === "skill") {
-      return "未找到技能。试试输入 / 浏览提供方命令。";
+      return "未找到技能。试试输入 / 浏览智能体命令。";
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {

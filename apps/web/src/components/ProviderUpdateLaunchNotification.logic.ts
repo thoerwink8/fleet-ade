@@ -99,7 +99,7 @@ export function getProviderRestartNotice(
 }
 
 function getProviderUpdatedDescription(providerCount: number): string {
-  return providerCount === 1 ? "新会话将使用更新后的提供方。" : "新会话将使用更新后的提供方。";
+  return providerCount === 1 ? "新会话将使用更新后的智能体。" : "新会话将使用更新后的智能体。";
 }
 
 function getProviderFailedUpdateTitle(
@@ -220,7 +220,7 @@ export function getProviderUpdateRunOutcome(
     const error = squashAtomCommandFailure(run.result);
     return {
       status: "failed",
-      line: `${label}: ${error instanceof Error ? error.message : "提供方更新失败。"}`,
+      line: `${label}: ${error instanceof Error ? error.message : "智能体更新失败。"}`,
     };
   }
   const provider = run.result.value.providers.find(
@@ -232,7 +232,7 @@ export function getProviderUpdateRunOutcome(
     ? { status: "updated", message: restartNotice ? `${label}: ${restartNotice}` : null }
     : {
         status: "failed",
-        line: `${label}: ${updateState?.message ?? "提供方更新未完成。"}`,
+        line: `${label}: ${updateState?.message ?? "智能体更新未完成。"}`,
       };
 }
 
@@ -260,7 +260,7 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
   if (failureLines.length === 0) {
     return {
       type: "success",
-      title: settled.length === 1 ? "提供方已更新" : `已更新 ${settled.length} 个提供方`,
+      title: settled.length === 1 ? "智能体已更新" : `已更新 ${settled.length} 个智能体`,
       description: successMessages.join("\n") || getProviderUpdatedDescription(settled.length),
     };
   }
@@ -268,10 +268,10 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
     type: "error",
     title:
       failureLines.length < settled.length
-        ? `${failureLines.length} 个提供方中有 ${settled.length} 个更新失败`
+        ? `${failureLines.length} 个智能体中有 ${settled.length} 个更新失败`
         : settled.length === 1
-          ? "提供方更新失败"
-          : "提供方更新失败",
+          ? "智能体更新失败"
+          : "智能体更新失败",
     description: [...failureLines, ...successMessages].join("\n"),
   };
 }
@@ -338,7 +338,7 @@ export function getProviderUpdateSidebarPillView(
       title:
         activeProviders.length === 1
           ? `正在更新 ${activeProviderName}`
-          : `正在更新 ${activeProviders.length} 个提供方`,
+          : `正在更新 ${activeProviders.length} 个智能体`,
       description: `${formatProviderList(activeProviders)} 正在更新。`,
     };
   }
@@ -390,8 +390,8 @@ export function getProviderUpdateSidebarPillView(
       title:
         unchangedProviders.length === 1
           ? `${unchangedProviderName} 仍需更新`
-          : `${unchangedProviders.length} 个提供商仍需更新`,
-      description: `${formatProviderList(unchangedProviders)} 似乎仍为旧版本，请前往提供商设置查看详情。`,
+          : `${unchangedProviders.length} 个智能体仍需更新`,
+      description: `${formatProviderList(unchangedProviders)} 似乎仍为旧版本，请前往智能体设置查看详情。`,
       dismissible: true,
     });
   }
@@ -413,7 +413,7 @@ export function getProviderUpdateSidebarPillView(
       title:
         succeededProviders.length === 1
           ? getProviderUpdatedTitle(succeededProvider)
-          : `已更新 ${succeededProviders.length} 个提供方`,
+          : `已更新 ${succeededProviders.length} 个智能体`,
       description:
         [...new Set(succeededProviders.map(getProviderRestartNotice).filter(Boolean))].join("\n") ||
         getProviderUpdatedDescription(succeededProviders.length),

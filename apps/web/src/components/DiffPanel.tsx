@@ -1347,7 +1347,7 @@ export default function DiffPanel({
             )}
             {!renderablePatch && toolCallPreview && toolCallPreview.content.length > 0 ? (
               <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
-                <p className="text-muted-foreground">提供方记录了文件内容，但没有差异。</p>
+                <p className="text-muted-foreground">智能体记录了文件内容，但没有差异。</p>
                 {toolCallPreview.content.map(({ label, text }) => (
                   <div key={label} className="space-y-1">
                     <p className="text-muted-foreground">{label}</p>

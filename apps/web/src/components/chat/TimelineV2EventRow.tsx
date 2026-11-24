@@ -81,7 +81,7 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
     };
   });
   const summary = subagentGroupSummary(agents);
-  const label = `${members.length} 个子代理`;
+  const label = `${members.length} 个子智能体`;
   const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
   const activeCount = agents.filter(({ status }) => isOrchestrationV2WorkActive(status)).length;
   const doneCount = agents.filter(({ status }) => status === "completed").length;

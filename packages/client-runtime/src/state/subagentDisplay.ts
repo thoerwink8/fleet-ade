@@ -17,7 +17,7 @@ export function subagentGroupSummary(
     ({ status }) => status === "pending" || status === "running" || status === "waiting",
   );
   return {
-    label: `${active ? "启动了" : "运行了"} ${members.length} 个子代理`,
+    label: `${active ? "启动了" : "运行了"} ${members.length} 个子智能体`,
     active,
     failed: members.some(({ status }) => status === "failed"),
   };

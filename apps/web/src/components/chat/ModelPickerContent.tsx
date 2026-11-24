@@ -879,7 +879,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               ? {
                   disabledInstanceIds: lockedDisabledInstanceIds,
                   getDisabledInstanceTooltip: (entry: ProviderInstanceEntry) =>
-                    `${entry.displayName} 在这个会话里不可用。请新开一个会话再切换提供方。`,
+                    `${entry.displayName} 在这个会话里不可用。请新开一个会话再切换智能体。`,
                 }
               : {})}
           />

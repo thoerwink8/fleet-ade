@@ -209,7 +209,7 @@ export function describeUpdateCapsule(
 }
 
 export const RUN_STATUS_LABELS: Record<UpdateRunMachineStatus, string> = {
-  providers: "正在更新智能体提供方",
+  providers: "正在更新智能体",
   waiting: "waiting",
   downloading: "downloading",
   restarting: "restarting",

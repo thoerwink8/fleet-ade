@@ -120,7 +120,7 @@ function UpdateEverythingDialogContent({
             </>
           ) : null}
           {version !== null && providerCount > 0 ? " · " : null}
-          {providerCount > 0 ? `${providerCount} 个提供方更新` : null}
+          {providerCount > 0 ? `${providerCount} 个智能体更新` : null}
           {checking ? `${version !== null || providerCount > 0 ? " · " : ""}正在继续检查…` : null}
         </AlertDialogDescription>
       </AlertDialogHeader>
@@ -131,7 +131,7 @@ function UpdateEverythingDialogContent({
             <div className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs">
               <span>电脑</span>
               <span>Fleet ADE</span>
-              <span>智能体提供方</span>
+              <span>智能体</span>
               <span />
             </div>
             {updating.map((row) => (

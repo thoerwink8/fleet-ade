@@ -80,7 +80,7 @@ export class ThreadArchiveBlockedError extends Schema.TaggedError<ThreadArchiveB
   },
 ) {
   override get message(): string {
-    return "提供方仍在运行时无法归档。";
+    return "智能体仍在运行时无法归档。";
   }
 }
 

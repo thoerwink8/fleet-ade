@@ -350,7 +350,7 @@ describe("getProviderUpdateRunToastView", () => {
       getProviderUpdateRunToastView([
         run("Linux", "opencode", AsyncResult.success({ providers: [restarted] })),
       ]),
-    ).toMatchObject({ description: "新会话将使用更新后的提供方。" });
+    ).toMatchObject({ description: "新会话将使用更新后的智能体。" });
   });
 
   it("lists every failed update and ignores interrupted ones", () => {
@@ -385,7 +385,7 @@ describe("getProviderUpdateRunToastView", () => {
 
     expect(view).toEqual({
       type: "error",
-      title: "2 个提供方中有 3 个更新失败",
+      title: "2 个智能体中有 3 个更新失败",
       description: "Mac Studio · Claude: npm exited with code 1.\nLaptop · Codex: WebSocket closed",
     });
   });

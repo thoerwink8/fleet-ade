@@ -1110,7 +1110,7 @@ function OpenCommandPaletteDialog(props: {
               }
             />
             <TooltipPopup align="end" side="left">
-              {disabledHint ?? "打开“设置 → 代码”以配置此提供方。"}
+              {disabledHint ?? "打开“设置 → 代码”以配置此托管平台。"}
             </TooltipPopup>
           </Tooltip>
         </span>

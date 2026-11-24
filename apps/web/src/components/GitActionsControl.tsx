@@ -209,7 +209,7 @@ function getPublishProviderReadiness(input: {
   if (!discovered) {
     return {
       ready: false,
-      hint: "无法获取提供方状态。请打开“设置 → 代码”并重新扫描。",
+      hint: "无法获取托管平台状态。请打开“设置 → 代码”并重新扫描。",
     };
   }
   if (discovered.status !== "available") {
@@ -623,7 +623,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
               id="publish-provider-cards-label"
               className="text-meta font-medium text-foreground"
             >
-              提供方
+              托管平台
             </span>
             <RadioGroup
               value={publishProvider}
@@ -664,7 +664,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                           }
                         />
                         <TooltipPopup side="top" align="end">
-                          {readiness.hint ?? "打开“设置 → 代码”以配置此提供方。"}
+                          {readiness.hint ?? "打开“设置 → 代码”以配置此托管平台。"}
                         </TooltipPopup>
                       </Tooltip>
                     </div>

@@ -804,8 +804,8 @@ export function getStartedThreadModelChangeBlockReason(input: {
     return null;
   }
   return {
-    title: "新建会话以切换提供方",
-    description: "此会话开始后不支持切换提供方。",
+    title: "新建会话以切换智能体",
+    description: "此会话开始后不支持切换智能体。",
   };
 }
 

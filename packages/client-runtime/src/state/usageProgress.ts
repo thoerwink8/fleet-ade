@@ -33,7 +33,7 @@ export function updatingProvidersLabel(
 ) {
   return providers.length === 1
     ? `正在更新 ${providerLabel(providers[0]!)}…`
-    : `正在更新 ${providers.length} 个提供方…`;
+    : `正在更新 ${providers.length} 个智能体…`;
 }
 
 export function usageProgress(

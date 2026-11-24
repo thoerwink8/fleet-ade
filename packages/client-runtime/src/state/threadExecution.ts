@@ -501,7 +501,7 @@ const BACKGROUND_WORK_KINDS: Record<
   BackgroundWorkKind,
   { readonly order: number; readonly singular: string; readonly measure: string }
 > = {
-  subagent: { order: 0, singular: "子代理", measure: "个" },
+  subagent: { order: 0, singular: "子智能体", measure: "个" },
   command: { order: 1, singular: "后台命令", measure: "条" },
   monitor: { order: 2, singular: "监控任务", measure: "个" },
   background_task: { order: 3, singular: "后台任务", measure: "个" },
