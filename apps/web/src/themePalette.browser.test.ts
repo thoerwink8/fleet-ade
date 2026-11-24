@@ -102,6 +102,25 @@ describe("standard painted theme colors", () => {
       root.classList.remove("dark");
       root.dataset.theme = "light";
       expect(getComputedStyle(document.body).backgroundColor).toBe("rgb(255, 255, 255)");
+      expectCloseColor(
+        getComputedStyle(document.body).color,
+        resolvedCssVariable("--fa-fg"),
+        "light body color == --fa-fg",
+      );
+      expect(
+        contrastRatio(
+          getComputedStyle(document.body).color,
+          getComputedStyle(document.body).backgroundColor,
+        ),
+        "light body contrast",
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(
+          resolvedCssVariable("--muted-foreground"),
+          getComputedStyle(document.body).backgroundColor,
+        ),
+        "light muted-foreground contrast",
+      ).toBeGreaterThanOrEqual(4.5);
 
       await using screen = await render(createElement(Button, null, "Action"));
       expect(getComputedStyle(screen.getByRole("button").element()).backgroundColor).toBe(
@@ -111,6 +130,25 @@ describe("standard painted theme colors", () => {
       root.classList.add("dark");
       root.dataset.theme = "dark";
       expect(getComputedStyle(document.body).backgroundColor).toBe("rgb(24, 24, 27)");
+      expectCloseColor(
+        getComputedStyle(document.body).color,
+        resolvedCssVariable("--fa-fg"),
+        "dark body color == --fa-fg",
+      );
+      expect(
+        contrastRatio(
+          getComputedStyle(document.body).color,
+          getComputedStyle(document.body).backgroundColor,
+        ),
+        "dark body contrast",
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(
+          resolvedCssVariable("--muted-foreground"),
+          getComputedStyle(document.body).backgroundColor,
+        ),
+        "dark muted-foreground contrast",
+      ).toBeGreaterThanOrEqual(4.5);
 
       for (const theme of [GROVE_THEME, EMBER_THEME]) {
         for (const appearance of ["light", "dark"] as const) {

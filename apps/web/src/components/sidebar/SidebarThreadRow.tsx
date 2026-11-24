@@ -978,15 +978,21 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       "[&:not(:hover):not(:focus-within)_*]:text-secondary-label",
     props.isActive
       ? variant === "card"
-        ? "border-sidebar-row-current-border bg-sidebar-row-current text-sidebar-foreground"
-        : "bg-sidebar-row-active text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60"
+        ? "ade-sidebar-row-current border-sidebar-row-current-border bg-sidebar-row-current text-sidebar-foreground"
+        : "ade-sidebar-row-current bg-sidebar-row-active text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60"
       : isSelected || props.sweepAction !== null
         ? "bg-sidebar-row-selected text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60"
         : hasUnsentDraft
           ? cn(draftSurfaceClassName, "text-sidebar-foreground")
           : shouldRecede && variant !== "card"
-            ? "text-sidebar-muted-foreground/75 hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-            : "bg-transparent text-sidebar-foreground hover:bg-sidebar-row-hover",
+            ? cn(
+                "text-sidebar-muted-foreground/75",
+                !attentionDisabled && "hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+              )
+            : cn(
+                "bg-transparent text-sidebar-foreground",
+                !attentionDisabled && "hover:bg-sidebar-row-hover",
+              ),
     shouldRecede &&
       (status === "preparing" || status === "working") &&
       "opacity-70 transition-opacity hover:opacity-100 focus-within:opacity-100 motion-reduce:transition-none",

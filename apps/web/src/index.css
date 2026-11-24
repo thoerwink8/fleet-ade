@@ -1049,8 +1049,8 @@
   --sidebar-row-hover: var(--fa-hover);
   --sidebar-row-active: var(--card);
   --sidebar-row-selected: var(--fa-selected);
-  --sidebar-row-current: color-mix(in srgb, var(--primary) 8%, var(--card));
-  --sidebar-row-current-border: color-mix(in srgb, var(--primary) 20%, var(--border));
+  --sidebar-row-current: var(--fa-selected);
+  --sidebar-row-current-border: transparent;
   --sidebar-border: var(--border);
   --sidebar-stage-fade: var(--sidebar);
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
@@ -1066,8 +1066,6 @@
     --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
     --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
     --sidebar-row-active: var(--accent);
-    --sidebar-row-current: color-mix(in srgb, var(--primary) 16%, var(--card));
-    --sidebar-row-current-border: color-mix(in srgb, var(--primary) 30%, transparent);
     --terminal-cursor: rgb(180 203 255);
     --terminal-selection-background: rgb(180 203 255 / 25%);
   }
@@ -1081,6 +1079,12 @@
 
   @variant dark {
     --sidebar-row-active: color-mix(in srgb, var(--contrast-foreground) 11%, transparent);
+  }
+}
+
+@layer components {
+  .ade-sidebar-row-current:not([data-disabled]):not([aria-disabled="true"]):hover {
+    background-image: linear-gradient(var(--sidebar-row-hover), var(--sidebar-row-hover));
   }
 }
 

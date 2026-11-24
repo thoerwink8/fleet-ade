@@ -22,7 +22,7 @@ function expectCloseColor(actualValue: string, expectedValue: string, label: str
 }
 
 describe("Input, Textarea, and InputGroup", () => {
-  it("renders 32px height at sm and above, 34px on narrow viewports, error border with --fa-danger, and fleet focus ring", async () => {
+  it("renders 32px height at sm and above, 36px on narrow viewports, 4px-grid sizes, error border with --fa-danger, and fleet focus ring", async () => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     await page.viewport(1280, 800);
     await using _viewport = {
@@ -35,6 +35,8 @@ describe("Input, Textarea, and InputGroup", () => {
         <div className="space-y-3 p-4">
           <Input aria-label="Default input" />
           <Input aria-label="Small input" size="sm" />
+          <Input aria-label="Compact input" size="compact" />
+          <Input aria-label="Large input" size="lg" />
           <Input aria-label="Invalid input" aria-invalid="true" />
           <Textarea aria-label="Multiline notes" />
           <InputGroup>
@@ -50,6 +52,8 @@ describe("Input, Textarea, and InputGroup", () => {
 
       const defaultInput = screen.getByRole("textbox", { name: "Default input" }).element();
       const smallInput = screen.getByRole("textbox", { name: "Small input" }).element();
+      const compactInput = screen.getByRole("textbox", { name: "Compact input" }).element();
+      const largeInput = screen.getByRole("textbox", { name: "Large input" }).element();
       const invalidInput = screen.getByRole("textbox", { name: "Invalid input" }).element();
       const textarea = screen.getByRole("textbox", { name: "Multiline notes" }).element();
       const groupedInput = screen.getByRole("textbox", { name: "Grouped input" }).element();
@@ -70,15 +74,27 @@ describe("Input, Textarea, and InputGroup", () => {
         root.classList.toggle("dark", appearance === "dark");
         root.dataset.theme = appearance;
         const style = getComputedStyle(defaultInput);
-        expect(style.height, `${appearance} sm+ height`).toBe("32px");
+        expect(style.height, `${appearance} sm+ height`).toBe(
+          getComputedStyle(root).getPropertyValue("--fa-ctrl").trim(),
+        );
         expect(style.borderRadius, `${appearance} radius`).toBe("8px");
         expect(style.backgroundColor, `${appearance} bg`).toBe(expectedBg);
         expect(style.outlineStyle, `${appearance} focus ring style`).toBe("solid");
         expect(style.outlineWidth, `${appearance} focus ring width`).toBe("2px");
         expect(style.outlineColor, `${appearance} focus ring color`).toBe(expectedRing);
 
-        expect(getComputedStyle(smallInput).height, `${appearance} sm size height`).toBe("28px");
-        expect(getComputedStyle(groupFrame).height, `${appearance} group height`).toBe("32px");
+        expect(getComputedStyle(smallInput).height, `${appearance} sm size height`).toBe(
+          getComputedStyle(root).getPropertyValue("--fa-ctrl-sm").trim(),
+        );
+        expect(getComputedStyle(compactInput).height, `${appearance} compact size height`).toBe(
+          getComputedStyle(root).getPropertyValue("--fa-ctrl-sm").trim(),
+        );
+        expect(getComputedStyle(largeInput).height, `${appearance} lg size height`).toBe(
+          getComputedStyle(root).getPropertyValue("--fa-ctrl-lg").trim(),
+        );
+        expect(getComputedStyle(groupFrame).height, `${appearance} group height`).toBe(
+          getComputedStyle(root).getPropertyValue("--fa-ctrl").trim(),
+        );
         expect(getComputedStyle(invalidInput).borderColor, `${appearance} invalid border`).toBe(
           expectedDanger,
         );
@@ -96,15 +112,25 @@ describe("Input, Textarea, and InputGroup", () => {
       await userEvent.keyboard("{Tab}");
       await userEvent.keyboard("{Tab}");
       await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Tab}");
       await expect.element(groupedInput).toHaveFocus();
       expect(getComputedStyle(groupFrame).outlineStyle).toBe("solid");
       expect(getComputedStyle(groupFrame).outlineWidth).toBe("2px");
 
       // Narrow viewport (<640px) keeps taller touch-friendly heights without shrinking mobile inputs.
       await page.viewport(390, 844);
-      expect(getComputedStyle(defaultInput).height, "narrow default height").toBe("34px");
-      expect(getComputedStyle(smallInput).height, "narrow sm height").toBe("30px");
-      expect(getComputedStyle(groupFrame).height, "narrow group height").toBe("34px");
+      expect(getComputedStyle(defaultInput).height, "narrow default height").toBe("36px");
+      expect(getComputedStyle(smallInput).height, "narrow sm height").toBe(
+        getComputedStyle(root).getPropertyValue("--fa-ctrl").trim(),
+      );
+      expect(getComputedStyle(compactInput).height, "narrow compact height").toBe(
+        getComputedStyle(root).getPropertyValue("--fa-ctrl-sm").trim(),
+      );
+      expect(getComputedStyle(largeInput).height, "narrow lg height").toBe(
+        getComputedStyle(root).getPropertyValue("--fa-ctrl-lg").trim(),
+      );
+      expect(getComputedStyle(groupFrame).height, "narrow group height").toBe("36px");
     } finally {
       root.classList.remove("no-transitions");
       applyThemePalette("system", "light");
