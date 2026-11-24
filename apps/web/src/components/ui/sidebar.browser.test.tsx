@@ -186,6 +186,85 @@ it("keeps closed mobile sheet contents mounted and reports the sheet only while 
   expect(document.querySelector('[data-mobile="true"]')?.textContent).toContain("Sheet contents");
 });
 
+function MobileLayoutTrigger() {
+  const { isMobile, openMobile } = useSidebar();
+  return (
+    <div className={isMobile && openMobile ? "hidden" : undefined}>
+      <SidebarTrigger />
+    </div>
+  );
+}
+
+it("caps mobile drawer width to leave a scrim strip that closes the drawer, blocks click-through, and restores opener focus", async () => {
+  const prev = { width: window.innerWidth, height: window.innerHeight };
+  await page.viewport(390, 844);
+  await using _viewport = {
+    [Symbol.asyncDispose]: () => page.viewport(prev.width, prev.height),
+  };
+  const onBackgroundClick = vi.fn();
+
+  await using screen = await render(
+    <SidebarProvider>
+      <Sidebar>
+        <span>Drawer contents</span>
+        <button type="button">Drawer action</button>
+      </Sidebar>
+      <SidebarInset>
+        <MobileLayoutTrigger />
+        <MobileSheetMountedProbe />
+        <div style={{ height: "2000px" }}>
+          <button
+            type="button"
+            onClick={onBackgroundClick}
+            style={{ position: "fixed", right: 4, top: 300, width: 40, height: 80 }}
+          >
+            Behind scrim
+          </button>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>,
+    { router: false /* no routes involved */ },
+  );
+
+  const trigger = screen.container.querySelector<HTMLButtonElement>(
+    '[data-slot="sidebar-trigger"]',
+  )!;
+  const sheetMounted = screen.getByLabelText("Sheet mounted");
+
+  await userEvent.click(trigger);
+  await expect.element(sheetMounted).toHaveTextContent("true");
+
+  const popup = document.querySelector<HTMLElement>(
+    '[data-mobile="true"][data-sidebar="sidebar"]',
+  )!;
+  const backdrop = document.querySelector<HTMLElement>('[data-slot="sheet-backdrop"]')!;
+  expect(popup).not.toBeNull();
+  expect(backdrop).not.toBeNull();
+
+  const popupRect = popup.getBoundingClientRect();
+  expect(Math.round(popupRect.width)).toBeLessThanOrEqual(window.innerWidth - 48);
+  expect(getComputedStyle(backdrop).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+
+  const stripX = window.innerWidth - 16;
+  expect(document.elementFromPoint(stripX, 340)).toBe(backdrop);
+
+  const overflowLocked =
+    getComputedStyle(document.documentElement).overflowY === "hidden" ||
+    getComputedStyle(document.body).overflowY === "hidden";
+  expect(overflowLocked).toBe(true);
+
+  await userEvent.click(backdrop, { position: { x: stripX, y: 340 } });
+  await expect.element(sheetMounted).toHaveTextContent("false");
+  expect(onBackgroundClick).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+
+  await userEvent.click(trigger);
+  await expect.element(sheetMounted).toHaveTextContent("true");
+  await userEvent.keyboard("{Escape}");
+  await expect.element(sheetMounted).toHaveTextContent("false");
+  await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+});
+
 it("opens the mobile sheet without a transition while panel animations are off", async () => {
   await page.viewport(390, 844);
   await using screen = await render(

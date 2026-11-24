@@ -198,9 +198,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   };
 
   const shortcutLabel = useVisibleShortcutLabel(
-    props.keybindings
-      ? shortcutLabelForCommand(props.keybindings, "modelPicker.toggle")
-      : null,
+    props.keybindings ? shortcutLabelForCommand(props.keybindings, "modelPicker.toggle") : null,
   );
   const selectedEntries = props.selectedModels?.map((selection) => {
     const entry = props.instanceEntries.find(

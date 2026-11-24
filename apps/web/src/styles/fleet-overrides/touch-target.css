@@ -28,7 +28,6 @@
   .fa-btn,
   [data-slot="toggle"],
   [data-slot="composer-control"],
-  [data-slot="thread-details-control"],
   .ade-touch-target--bordered {
     --ade-touch-border: var(--fa-bw-1, 1px);
   }
@@ -62,8 +61,8 @@
     column-gap: var(--ade-touch-gap);
   }
 
-  .ade-touch-row > :is(.fa-btn, .ade-touch-target)::after,
-  .ade-touch-row > * :is(.fa-btn, .ade-touch-target)::after {
+  .ade-touch-row > :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after,
+  .ade-touch-row > * :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after {
     left: auto;
     right: auto;
     inset-inline-start: min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2));
@@ -76,16 +75,22 @@
     transform: translateY(-50%);
   }
 
-  .ade-touch-row > :not(:first-child):is(.fa-btn, .ade-touch-target)::after,
-  .ade-touch-row > :not(:first-child) :is(.fa-btn, .ade-touch-target)::after {
+  .ade-touch-row
+    > :not(:first-child):is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after,
+  .ade-touch-row
+    > :not(:first-child)
+    :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after {
     inset-inline-start: max(
       min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2)),
       calc(-0.5 * var(--ade-touch-gap, 0px) - var(--ade-touch-border, 0px))
     );
   }
 
-  .ade-touch-row > :not(:last-child):is(.fa-btn, .ade-touch-target)::after,
-  .ade-touch-row > :not(:last-child) :is(.fa-btn, .ade-touch-target)::after {
+  .ade-touch-row
+    > :not(:last-child):is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after,
+  .ade-touch-row
+    > :not(:last-child)
+    :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after {
     inset-inline-end: max(
       min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2)),
       calc(-0.5 * var(--ade-touch-gap, 0px) - var(--ade-touch-border, 0px))

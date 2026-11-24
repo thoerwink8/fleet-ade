@@ -169,7 +169,12 @@ function createSidebarOpenStore(defaultOpen: boolean, storageKey: string | undef
     mobileOpener = element;
   };
   const setOpenMobile = (openMobile: boolean) => {
-    if (openMobile && !state.openMobile && mobileOpener === null && typeof document !== "undefined") {
+    if (
+      openMobile &&
+      !state.openMobile &&
+      mobileOpener === null &&
+      typeof document !== "undefined"
+    ) {
       mobileOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
     if (openMobile !== state.openMobile) publish({ ...state, openMobile });
