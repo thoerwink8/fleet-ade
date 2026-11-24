@@ -1,0 +1,19 @@
+/* Alert slots on fleet-design's status strip: the title is the medium body
+   colour, the description the muted role; only the leading icon carries the
+   semantic colour set by .fa-strip--danger|warning|info|success. */
+.fa-strip[data-slot="alert"] [data-slot="alert-title"] {
+  color: var(--fa-fg);
+  font-weight: 500;
+}
+
+.fa-strip[data-slot="alert"] [data-slot="alert-description"] {
+  color: var(--fa-fg-muted);
+}
+
+/* The collapsed "还有 N 条" row keeps a 44px touch target on coarse pointers. */
+@media (pointer: coarse) {
+  .fa-strip__sum {
+    min-height: 44px;
+    height: auto;
+  }
+}

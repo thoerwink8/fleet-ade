@@ -4,7 +4,7 @@ import {
   CHATGPT_WORKSPACE_USAGE_LIMIT_CODE,
 } from "@t3tools/shared/usageLimits";
 import { memo } from "react";
-import { Alert, AlertAction, AlertDescription } from "../ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { OpenAI } from "../Icons";
@@ -54,6 +54,17 @@ export function isThreadErrorBannerDismissedForSession(bannerKey: string | null)
   return bannerKey !== null && sessionDismissedThreadErrorBannerKeys.has(bannerKey);
 }
 
+function isChatGptUsageLimitError(errorCode?: string | null): boolean {
+  return errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE || errorCode === CHATGPT_USAGE_LIMIT_CODE;
+}
+
+export function getThreadErrorBannerVariant(
+  errorClass?: OrchestrationV2ProviderFailureClass | null,
+  errorCode?: string | null,
+): "warning" | "error" {
+  return errorClass === "usage_limit" || isChatGptUsageLimitError(errorCode) ? "warning" : "error";
+}
+
 export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   error,
   onDismiss,
@@ -66,35 +77,28 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   onDismiss?: () => void;
 }) {
   if (!error) return null;
-  const chatGptLimit =
-    errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE || errorCode === CHATGPT_USAGE_LIMIT_CODE;
-  const variant = errorClass === "usage_limit" || chatGptLimit ? "warning" : "error";
+  const chatGptLimit = isChatGptUsageLimitError(errorCode);
+  const variant = getThreadErrorBannerVariant(errorClass, errorCode);
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[min(48rem,calc(100%-2rem))] pt-3">
-      <Alert variant={variant} surface="glass" controlAlignment="first-line" data-variant={variant}>
-        {chatGptLimit ? (
-          <OpenAI className="size-4 text-foreground!" aria-hidden="true" />
-        ) : (
-          <CircleAlertIcon />
-        )}
+    <Alert variant={variant} controlAlignment="first-line">
+      {chatGptLimit ? <OpenAI className="size-4" aria-hidden="true" /> : <CircleAlertIcon />}
+      {chatGptLimit ? (
+        <AlertTitle>已达到 ChatGPT 用量上限</AlertTitle>
+      ) : (
         <AlertDescription>
-          {chatGptLimit ? (
-            <p className="text-row font-semibold">已达到 ChatGPT 用量上限</p>
-          ) : (
-            <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
-          )}
+          <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
         </AlertDescription>
-        {(chatGptLimit || onDismiss) && (
-          <AlertAction>
-            {chatGptLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
-            {onDismiss ? (
-              <Button variant="ghost" size="icon-xs" aria-label="关闭错误" onClick={onDismiss}>
-                <XIcon />
-              </Button>
-            ) : null}
-          </AlertAction>
-        )}
-      </Alert>
-    </div>
+      )}
+      {(chatGptLimit || onDismiss) && (
+        <AlertAction>
+          {chatGptLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
+          {onDismiss ? (
+            <Button variant="ghost-muted" size="icon-sm" aria-label="关闭错误" onClick={onDismiss}>
+              <XIcon />
+            </Button>
+          ) : null}
+        </AlertAction>
+      )}
+    </Alert>
   );
 });
