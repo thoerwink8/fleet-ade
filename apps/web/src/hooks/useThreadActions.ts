@@ -974,6 +974,7 @@ export function useThreadActions() {
           type: "error",
           title: toast.title,
           description: toast.description,
+          data: { copyText: toast.detail },
         }),
       );
       // Cleanup has its own toast; reporting its failure would falsely imply deletion failed.
@@ -1211,6 +1212,7 @@ export function useThreadActions() {
             type: "error",
             title: toast.title,
             description: toast.description,
+            data: { copyText: toast.detail },
           }),
         );
       }

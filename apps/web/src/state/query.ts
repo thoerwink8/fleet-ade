@@ -3,6 +3,7 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useContext } from "react";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 
 const EMPTY_ASYNC_RESULT_ATOM = Atom.make(AsyncResult.initial<never, never>(false)).pipe(
   Atom.withLabel("web-environment-query:empty"),
@@ -19,7 +20,7 @@ export interface EnvironmentQueryView<A, E = unknown> {
 }
 
 export function formatEnvironmentQueryError(cause: Cause.Cause<unknown>): string {
-  const error = Cause.squash(cause);
+  const error = describeRequestFailure(cause);
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
     : "电脑请求失败。";

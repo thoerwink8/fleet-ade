@@ -362,6 +362,9 @@ const withGitFileProtocol = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       Effect.provideService(HostProcess.Environment, { ...env, GIT_ALLOW_PROTOCOL: "file" }),
     ),
   );
+// Git interprets GIT_SSH_COMMAND through sh, which eats the backslashes of Windows paths;
+// forward slashes survive and quoting keeps paths with spaces in one word.
+const gitSshCommand = (scriptPath: string) => `"${scriptPath.replaceAll("\\", "/")}"`;
 
 const initRepoWithCommit = (
   cwd: string,
@@ -2405,7 +2408,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
               operation: "GitVcsDriver.test.sshRefusal",
               cwd,
               args: ["fetch", "origin"],
-              env: { LC_ALL: "C", GIT_SSH_COMMAND: fakeSsh },
+              env: { LC_ALL: "C", GIT_SSH_COMMAND: gitSshCommand(fakeSsh) },
             })
             .pipe(Effect.flip);
 
@@ -2437,7 +2440,7 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
             operation: "GitVcsDriver.test.osPermission",
             cwd,
             args: ["fetch", "origin"],
-            env: { LC_ALL: "C", GIT_SSH_COMMAND: fakeSsh },
+            env: { LC_ALL: "C", GIT_SSH_COMMAND: gitSshCommand(fakeSsh) },
           })
           .pipe(Effect.flip);
 
@@ -2964,7 +2967,11 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         const cwd = yield* makeTmpDir();
         yield* initRepoWithCommit(cwd);
         const driver = yield* GitVcsDriver.GitVcsDriver;
-        yield* writeTextFile(cwd, ":(exclude)after.ts", "literal pathspec contents\n");
+        // Windows filenames cannot contain a colon, so the exclude-magic probe is impossible there;
+        // a bracket glob exercises the same literal-pathspec treatment and is legal on both.
+        const magicFile =
+          (yield* HostProcess.Platform) === "win32" ? "[a]fter.ts" : ":(exclude)after.ts";
+        yield* writeTextFile(cwd, magicFile, "literal pathspec contents\n");
         yield* writeTextFile(cwd, "ordinary.ts", "ordinary contents\n");
         const indexBefore = yield* git(cwd, ["ls-files", "--stage"]);
 
@@ -2976,14 +2983,14 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         const scoped = yield* driver.getReviewDiffPreview({
           cwd,
           file: {
-            path: ":(exclude)after.ts",
+            path: magicFile,
             previousPath: null,
             sourceKind: "working-tree",
           },
         });
         const scopedSource = scoped.sources.find((source) => source.kind === "working-tree")!;
         assert.deepStrictEqual(scopedSource.files, [
-          { path: ":(exclude)after.ts", previousPath: null, additions: 1, deletions: 0 },
+          { path: magicFile, previousPath: null, additions: 1, deletions: 0 },
         ]);
         assert.include(scopedSource.diff, "+literal pathspec contents");
         assert.notInclude(scopedSource.diff, "ordinary.ts");
@@ -4382,7 +4389,10 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
       Effect.gen(function* () {
         const path = yield* Path.Path;
         // A root basename ending in whitespace catches a root lookup that trims Git's output.
-        const cwd = path.join(yield* makeTmpDir(), "repo ");
+        // Windows cannot spawn any process inside such a directory (CreateProcess drops
+        // trailing spaces), so there the nested-directory flow runs under a plain name.
+        const rootName = (yield* HostProcess.Platform) === "win32" ? "repo" : "repo ";
+        const cwd = path.join(yield* makeTmpDir(), rootName);
         yield* (yield* FileSystem.FileSystem).makeDirectory(cwd);
         yield* initRepoWithCommit(cwd);
         yield* writeTextFile(cwd, "nested/tracked.txt", "one\n");
@@ -5930,7 +5940,8 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
           assert.equal(yield* git(created.worktree.path, ["branch", "--show-current"]), branch);
           assert.include(
             yield* git(cwd, ["-c", "core.quotePath=false", "worktree", "list", "--porcelain"]),
-            `worktree ${created.worktree.path}`,
+            // `git worktree list` prints forward slashes even on Windows.
+            `worktree ${created.worktree.path.replaceAll("\\", "/")}`,
           );
           folders.add(folder);
         }

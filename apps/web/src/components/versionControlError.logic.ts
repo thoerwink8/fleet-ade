@@ -13,6 +13,8 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
+
 const VersionControlError = Schema.Union([
   GitManagerServiceError,
   VcsError,
@@ -21,14 +23,14 @@ const VersionControlError = Schema.Union([
 ]);
 export type VersionControlError = typeof VersionControlError.Type;
 
-/** Title, what to do next, and the raw detail, kept apart so each place can lay them out. */
+/** Title, next step, raw detail for disclosure/copy, and whether guidance replaces inline detail. */
 export interface VersionControlErrorPresentation {
   readonly title: string;
   readonly nextStep?: string;
   readonly detail: string;
+  readonly collapseDetail: boolean;
 }
-
-/** The same three parts, plus one sentence for places that can only show a single string. */
+/** The same presentation, plus one string for places that cannot render a disclosure. */
 export interface VersionControlErrorToastPresentation extends VersionControlErrorPresentation {
   readonly description: string;
 }
@@ -204,9 +206,29 @@ function providerNextStep(action: string): string {
   }
 }
 
-/** One sentence for a single string, such as a toast description: next step, then the detail. */
-export function joinNextStepAndDetail(nextStep: string | undefined, detail: string): string {
-  return nextStep === undefined ? detail : `${nextStep}详情：${detail}`;
+function hasChineseErrorExplanation(error: {
+  readonly _tag: string;
+  readonly reason?: string | undefined;
+}): boolean {
+  return (
+    (error._tag !== "GitCommandError" && error._tag !== "GitManagerError") ||
+    error.reason !== undefined
+  );
+}
+
+/** Classified guidance replaces raw output; unclassified Git output remains visible. */
+export function versionControlErrorDescription(
+  error: Pick<VersionControlErrorPresentation, "nextStep" | "detail" | "collapseDetail">,
+): string {
+  if (error.collapseDetail) return error.nextStep ?? error.detail;
+  return error.nextStep === undefined ? error.detail : `${error.nextStep}详情：${error.detail}`;
+}
+
+export function versionControlErrorDetailMode(
+  error: Pick<VersionControlErrorPresentation, "detail" | "collapseDetail">,
+): "disclosure" | "inline" | "hidden" {
+  if (error.detail.length === 0) return "hidden";
+  return error.collapseDetail ? "disclosure" : "inline";
 }
 
 export function describeVersionControlError(
@@ -222,7 +244,11 @@ export function describeVersionControlError(
       ? (operationName ??
         (error._tag === "GitPullRequestMaterializationError" ? "检出 PR" : fallbackAction))
       : COMMAND_ACTIONS[typedAction];
-  const base = { title: `无法${action}`, detail: detailOf(error) } as const;
+  const base = {
+    title: `无法${action}`,
+    detail: detailOf(error),
+    collapseDetail: hasChineseErrorExplanation(error),
+  } as const;
 
   switch (error._tag) {
     case "GitCommandError":
@@ -301,6 +327,7 @@ export function describeVersionControlError(
         title: "无法登录托管平台",
         nextStep: SIGN_IN_NEXT_STEPS[error.reason],
         detail: error.detail,
+        collapseDetail: true,
       };
     default:
       return assertNever(error);
@@ -316,12 +343,17 @@ export function presentVersionControlError(
     const presentation = describeVersionControlError(error, fallbackAction, options);
     return {
       ...presentation,
-      description: joinNextStepAndDetail(presentation.nextStep, presentation.detail),
+      description: versionControlErrorDescription(presentation),
     };
   }
+  const failure = describeRequestFailure(error);
   const detail =
-    typeof error === "string" ? error : error instanceof Error ? error.message : "发生错误。";
-  return { title: `无法${fallbackAction}`, detail, description: detail };
+    typeof failure === "string"
+      ? failure
+      : failure instanceof Error
+        ? failure.message
+        : "发生错误。";
+  return { title: `无法${fallbackAction}`, detail, collapseDetail: false, description: detail };
 }
 
 /** Snapshot reasons are free strings from the server, so only own keys count as known. */
@@ -369,10 +401,11 @@ export function presentVcsSnapshotFailure(
     title: `无法${action}`,
     nextStep: snapshotNextStep(failure, action),
     detail: failure.detail,
+    collapseDetail: hasChineseErrorExplanation(failure),
   };
   return {
     ...presentation,
-    description: joinNextStepAndDetail(presentation.nextStep, presentation.detail),
+    description: versionControlErrorDescription(presentation),
   };
 }
 

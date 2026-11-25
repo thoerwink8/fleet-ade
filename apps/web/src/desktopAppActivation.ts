@@ -9,6 +9,8 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
+
 export interface DesktopAppActivationProject {
   readonly id: ProjectId;
   readonly environmentId: EnvironmentId;
@@ -51,7 +53,8 @@ function desktopPlatformToEnvironmentOs(
 }
 
 function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message.trim().length > 0 ? error.message : fallback;
+  const failure = describeRequestFailure(error);
+  return failure instanceof Error && failure.message.trim().length > 0 ? failure.message : fallback;
 }
 
 export async function handleDesktopAppActivationRequest(

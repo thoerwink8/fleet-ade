@@ -35,6 +35,7 @@ import {
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import * as Persistence from "../platform/persistence.ts";
 import * as RpcSession from "./session.ts";
+import { describeRequestFailure } from "../errors/transport.ts";
 import { makeEnvironmentServerConfigState } from "../state/server.ts";
 import { applyServerConfigProjection } from "../state/serverConfigProjection.ts";
 
@@ -436,6 +437,36 @@ describe("RpcSessionFactory", () => {
       const lateProbe = yield* Effect.forkChild(session.probe);
       yield* TestClock.adjust("999 millis");
       expect(lateProbe.pollUnsafe()?._tag).toBe("Failure");
+    }).pipe(Effect.scoped, Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("fails a request in flight when its socket closes", () =>
+    Effect.gen(function* () {
+      const { factory, sockets } = yield* makeFactory();
+      const session = yield* factory.connect(PREPARED);
+      const readyFiber = yield* Effect.forkChild(session.ready);
+      const socket = yield* awaitSocket(sockets);
+      socket.open();
+      yield* completeInitialConfig(socket);
+      yield* Fiber.join(readyFiber);
+
+      const probeFiber = yield* Effect.forkChild(session.probe);
+      yield* awaitRequest(socket, 1);
+      // The server restarts while the request is unanswered.
+      socket.close(1006);
+      const exit = yield* Fiber.join(probeFiber).pipe(Effect.exit);
+
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        // The probe fails with the raw socket close, not an interrupt.
+        const squashed = Cause.squash(exit.cause);
+        expect(squashed).toBeInstanceOf(Error);
+        expect((squashed as Error).message).toBe("SocketCloseError: 1006");
+        // The presentation layer must replace it with the shared sentence.
+        expect(describeRequestFailure(exit.cause)).toEqual(
+          new Error("连接已断开，内容已保留，恢复后再试。"),
+        );
+      }
     }).pipe(Effect.scoped, Effect.provide(TestClock.layer())),
   );
 

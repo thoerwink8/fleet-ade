@@ -12,6 +12,7 @@ import {
   sourceControlClients,
   type ChangeRequestTerminology,
 } from "@t3tools/client-runtime/source-control-clients";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import * as Schema from "effect/Schema";
 import {
   GitCommandError,
@@ -48,7 +49,10 @@ import {
   visibleThreadPullRequests,
 } from "@t3tools/client-runtime/thread-pull-requests";
 
-import { describeVersionControlError, joinNextStepAndDetail } from "../versionControlError.logic";
+import {
+  describeVersionControlError,
+  versionControlErrorDescription,
+} from "../versionControlError.logic";
 import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/reviewCommentContext";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
@@ -1355,12 +1359,13 @@ const TOOL_NOISE = [
 const FAILURE_DETAIL_MAX_LENGTH = 320;
 
 export function readableFailure(failure: unknown, hint: string): string {
-  const raw = isPullRequestOperationError(failure)
-    ? failure.detail
-    : failure instanceof Error
-      ? failure.message
-      : typeof failure === "string"
-        ? failure
+  const reported = describeRequestFailure(failure);
+  const raw = isPullRequestOperationError(reported)
+    ? reported.detail
+    : reported instanceof Error
+      ? reported.message
+      : typeof reported === "string"
+        ? reported
         : "";
   const detail = raw.trim();
   if (detail.length === 0 || TOOL_NOISE.some((pattern) => pattern.test(detail))) return hint;
@@ -1379,8 +1384,8 @@ export function checkoutFailureDescription(failure: unknown): string {
   // Filter and cut the diagnostic on its own; the next step must not make noise look like content.
   const detail = readableFailure(failure.detail, "");
   if (detail.length === 0) return hint;
-  const { nextStep } = describeVersionControlError(failure);
-  return joinNextStepAndDetail(nextStep, detail);
+  const presentation = describeVersionControlError(failure);
+  return versionControlErrorDescription({ ...presentation, detail });
 }
 
 export function resolveBaseFreshness(detail: {

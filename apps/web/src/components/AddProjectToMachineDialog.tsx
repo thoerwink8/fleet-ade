@@ -53,6 +53,7 @@ import { Label } from "./ui/label";
 import { MiddleTruncate } from "./ui/middle-truncate";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
 import { Toggle, ToggleGroup } from "./ui/toggle-group";
+import { VersionControlErrorDetail } from "./VersionControlErrorDetail";
 import {
   presentVersionControlError,
   type VersionControlErrorToastPresentation,
@@ -188,6 +189,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
       setError({
         title: "无法开始克隆",
         detail: "请选择另一台电脑上的文件夹。",
+        collapseDetail: false,
         description: "请选择另一台电脑上的文件夹。",
       });
       return;
@@ -391,9 +393,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
               <div className="text-destructive-foreground text-sm">
                 <p className="font-medium">{error.title}</p>
                 {error.nextStep ? <p className="mt-0.5">{error.nextStep}</p> : null}
-                {error.detail.length > 0 ? (
-                  <p className="mt-0.5 whitespace-pre-wrap">{error.detail}</p>
-                ) : null}
+                <VersionControlErrorDetail error={error} className="mt-0.5" />
               </div>
             ) : null}
           </DialogPanel>

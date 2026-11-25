@@ -2,6 +2,7 @@ import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/enviro
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { requestCustomSnooze } from "../components/CustomSnoozeDialog";
 import { attentionDismissVisitedAt } from "../components/Sidebar.logic";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -72,11 +73,12 @@ import {
 } from "./useThreadActions";
 
 function failureToast(title: string, error: unknown) {
+  const failure = describeRequestFailure(error);
   toastManager.add(
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "发生错误。",
+      description: failure instanceof Error ? failure.message : "发生错误。",
     }),
   );
 }

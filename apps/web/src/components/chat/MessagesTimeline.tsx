@@ -99,6 +99,7 @@ import {
   isTimelineMinimapRowVisible,
   resolveTimelineMinimapVisibleRange,
   resolveTimelineMinimapHitStripWidth,
+  resolveEstimatedTimelineItemSize,
   TIMELINE_MINIMAP_TARGET_OFFSET,
   timelineTurnFoldRunIdsByEntryId,
   liveAnswerPreview,
@@ -689,6 +690,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const screenReaderAnnouncements = useClientSettings(
     (settings) => settings.screenReaderAnnouncements,
   );
+  const fontScale = useClientSettings((settings) => settings.fontScale);
   const toolCallVisibility =
     findActive && preferredToolCallVisibility === "zen" ? "hideAll" : preferredToolCallVisibility;
   const revealedMessageId = citationRequest?.citation.messageId ?? null;
@@ -1666,6 +1668,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
             ref={attachTimelineViewportElement}
             className="relative h-full min-h-0"
             data-assistant-citation-viewport="true"
+            data-reading-area="true"
           >
             {onCiteAssistantText && citationThreadRef ? (
               <AssistantSelectionToolbar
@@ -1681,7 +1684,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               keyExtractor={keyExtractor}
               getItemType={getItemType}
               renderItem={renderItem}
-              estimatedItemSize={90}
+              estimatedItemSize={resolveEstimatedTimelineItemSize(fontScale)}
               initialScrollAtEnd={
                 !findActive && citationRequest === null && rememberedPosition?.atEnd !== false
               }

@@ -1105,9 +1105,8 @@ function RevertUserMessageButton({
   );
 }
 
-const COLLAPSED_USER_MESSAGE_FADE_HEIGHT_REM = 1.75;
-
-const COLLAPSED_USER_MESSAGE_FADE_MASK = `linear-gradient(to bottom, black calc(100% - ${COLLAPSED_USER_MESSAGE_FADE_HEIGHT_REM}rem), transparent)`;
+const COLLAPSED_USER_MESSAGE_FADE_MASK =
+  "linear-gradient(to bottom, black calc(100% - var(--reading-fold-fade-height)), transparent)";
 
 const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(props: {
   text: string;
@@ -1131,7 +1130,10 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
       {hasVisibleBody ? (
         <div
           ref={revealRef}
-          className={cn("relative", isCollapsed && "max-h-44 overflow-hidden")}
+          className={cn(
+            "relative",
+            isCollapsed && "max-h-(--reading-fold-max-height) overflow-hidden",
+          )}
           data-user-message-body="true"
           data-thread-find-text="true"
           data-thread-find-fold={isCollapsed ? "" : undefined}

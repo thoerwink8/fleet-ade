@@ -62,7 +62,8 @@ import {
   type TurnItemId,
 } from "@t3tools/contracts";
 import type { ThreadRunSummary } from "@t3tools/client-runtime/state/shell";
-import type { ToolCallVisibility } from "@t3tools/contracts/settings";
+import type { FontScale, ToolCallVisibility } from "@t3tools/contracts/settings";
+import { READING_FONT_SCALES } from "../../appearanceFonts";
 import { resolveT3McpToolDefinition } from "@t3tools/shared/t3McpToolPresentation";
 import { compactDynamicToolOutput } from "@t3tools/shared/toolOutput";
 import { htmlRenderReferencesEqual, type HtmlRenderReference } from "@t3tools/shared/htmlRender";
@@ -2930,6 +2931,10 @@ export function handoffRunsSignature(runs: ReadonlyArray<HandoffTimelineRun>): s
         `${run.id}\0${run.providerInstanceId}\0${run.ordinal}\0${run.modelSelection.instanceId}\0${run.modelSelection.model}`,
     )
     .join("\n");
+}
+
+export function resolveEstimatedTimelineItemSize(scale: FontScale): number {
+  return Math.round(90 * (READING_FONT_SCALES[scale].prose / READING_FONT_SCALES.standard.prose));
 }
 
 // Expanded-id sets can be rebuilt during render; comparing them by content keeps

@@ -1081,7 +1081,7 @@ function ComposerPromptEditorTiptapInner(
 
   const editorAttributes = {
     class: cn(
-      "composer-tiptap -m-1 block max-h-52 min-h-[calc(2lh+--spacing(2))] overflow-y-auto p-1 whitespace-pre-wrap wrap-break-word bg-transparent leading-prompt text-foreground focus:outline-none",
+      "composer-tiptap -m-1 block max-h-[calc(9.5lh+--spacing(2))] min-h-[calc(2lh+--spacing(2))] overflow-y-auto p-1 whitespace-pre-wrap wrap-break-word bg-transparent leading-prompt text-foreground focus:outline-none",
       className,
     ),
     "data-testid": "composer-editor",
@@ -1836,8 +1836,9 @@ function ComposerPromptEditorTiptapInner(
       <ComposerContextRecordsContext value={contextRecords}>
         <ComposerCitationCommentContext value={citationCommentActions}>
           <div
+            data-reading-area="true"
             className={cn(
-              "relative flow-root font-(family-name:--font-composer,var(--font-sans)) text-(length:--font-size-prompt,var(--text-sm)) max-sm:text-(length:--font-size-prompt-touch)",
+              "relative flow-root font-(family-name:--font-composer,var(--font-sans)) text-(length:--font-size-prompt,var(--text-sm)) max-sm:text-(length:--font-size-prompt-touch) pointer-coarse:text-(length:--font-size-prompt-touch)",
               containerClassName,
             )}
           >

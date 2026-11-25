@@ -11,6 +11,7 @@ import { MiddleTruncate } from "./ui/middle-truncate";
 import { Button } from "./ui/button";
 import { ComboboxTrigger } from "./ui/combobox";
 
+import { VersionControlErrorDetail } from "./VersionControlErrorDetail";
 import { presentVersionControlError } from "./versionControlError.logic";
 export function WorktreeBaseBranchPicker({
   environmentId,
@@ -68,7 +69,7 @@ export function WorktreeBaseBranchPicker({
       {errorPresentation.nextStep ? (
         <span className="block">{errorPresentation.nextStep}</span>
       ) : null}
-      <span className="block">{errorPresentation.detail}</span>
+      <VersionControlErrorDetail error={errorPresentation} />
     </>
   ) : branches.isPending && branches.data === null ? (
     "正在加载分支…"

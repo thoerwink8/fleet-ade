@@ -33,6 +33,7 @@ import {
   liveAnswerPreview,
   deriveMessagesTimelineRowsWithState,
   resolveAssistantMessageCopyState,
+  resolveEstimatedTimelineItemSize,
   type MessagesTimelineRow,
   workEntryDisplayLabel,
 } from "./MessagesTimeline.logic";
@@ -5118,5 +5119,13 @@ describe("subagent continued by a later turn", () => {
     expect(readGroup?.kind === "work-toggle" && readGroup.summary).toBe("读了 2 个文件");
     const viewed = rows.find((row) => row.kind === "viewed-images");
     expect(viewed?.kind === "viewed-images" && viewed.paths).toEqual(["/repo/docs/shot-a.png"]);
+  });
+});
+
+describe("resolveEstimatedTimelineItemSize", () => {
+  it("scales estimated virtual item size proportionally to reading prose size", () => {
+    expect(resolveEstimatedTimelineItemSize("standard")).toBe(90);
+    expect(resolveEstimatedTimelineItemSize("comfortable")).toBe(96);
+    expect(resolveEstimatedTimelineItemSize("large")).toBe(102);
   });
 });
