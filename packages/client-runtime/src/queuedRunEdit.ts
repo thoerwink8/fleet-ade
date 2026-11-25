@@ -53,12 +53,12 @@ function runLeftQueue(runs: ReadonlyArray<QueuedRunStatus> | null, runId: RunId)
  * draft is empty, and is dropped otherwise so it never overwrites the user's
  * other work.
  */
+/** A displaced edit with unsaved recoverable content is always moved to the prompt stash. */
 export function resolveQueuedEditExit(input: {
   readonly editChanged: boolean;
-  readonly threadDraftEmpty: boolean;
-}): "kept" | "discarded" | "clean" {
-  if (!input.editChanged) return "clean";
-  return input.threadDraftEmpty ? "kept" : "discarded";
+  readonly hasRecoverableContent: boolean;
+}): "stash" | "clean" {
+  return input.editChanged && input.hasRecoverableContent ? "stash" : "clean";
 }
 
 /**

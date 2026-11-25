@@ -59,6 +59,7 @@ import {
 import { useAtomCommand } from "../../state/use-atom-command";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import type { ChatComposerHandle } from "./ChatComposer";
+import { formatAutoStashNoticeDescription } from "./composerAutoStash";
 import { fileAttachmentCapabilityBlockReason } from "./composerAttachmentFiles";
 import { prepareQueuedEditAttachments, recoverQueuedMessageEdit } from "./queuedMessageEdit";
 import type { EditQueuedRunRequest } from "./QueuedRunsControl";
@@ -284,32 +285,67 @@ export function useQueuedRunEdit(input: {
               get(environmentThreadDetails.quietThreadAtom(threadRef))?.projection.runs ?? null,
           ),
         }),
-        // The run started or was cancelled from another client. A changed
-        // edit moves into the thread's own draft when that draft is empty;
-        // otherwise it is dropped. Edits outlive navigation, so the toast is
-        // unscoped and names the thread: the user may be anywhere by now.
+        // The run started or was cancelled from another client. Any changed edit moves
+        // into the prompt stash regardless of the thread draft state, and the toast names
+        // the thread because edits outlive navigation.
         onRunLeftQueue: (_, edit) => {
-          const recovery = recoverQueuedMessageEdit({
-            editTarget: queuedRunEditDraftId(routeThreadRef, edit.runId),
-            threadTarget: threadDraftTarget,
+          const editTarget = queuedRunEditDraftId(routeThreadRef, edit.runId);
+          void recoverQueuedMessageEdit({
+            environmentId,
+            editTarget,
+            dedupeKey: `${editKey}:${edit.runId}`,
             originalText: edit.originalText,
             removedExistingAttachment: edit.removedExistingAttachment === true,
+            existingAttachments: edit.existingAttachments,
+            context: edit.context,
+          }).then((recovery) => {
+            if (recovery.outcome === "clean" || recovery.outcome === "duplicate") return;
+            const title = appAtomRegistry.get(
+              environmentThreadShells.threadShellAtom(threadRef),
+            )?.title;
+            const where = title === undefined ? "" : `（“${title}”）`;
+            if (recovery.outcome === "unsaved-attachments-only") {
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: "这条消息已不在排队中",
+                  description: `未保存的编辑内容${where}中的附件未能存入暂存：${recovery.unsavedFileNames.join("、")}（需重新添加）。`,
+                  data: { hideCopyButton: true },
+                }),
+              );
+              return;
+            }
+            const hasWarnings =
+              recovery.unsavedFileNames.length > 0 ||
+              recovery.droppedImageNames.length > 0 ||
+              recovery.unreadableImageNames.length > 0 ||
+              recovery.overflowed ||
+              !recovery.durable;
+            let toastId: string | null = null;
+            toastId =
+              toastManager.add(
+                stackedThreadToast({
+                  type: hasWarnings ? "warning" : "info",
+                  title: "这条消息已不在排队中",
+                  description: formatAutoStashNoticeDescription({
+                    prefix: `未保存的编辑内容${where}已放进暂存；点「恢复」或打开输入框上方的「暂存」即可取回。`,
+                    unsavedFileNames: recovery.unsavedFileNames,
+                    droppedImageNames: recovery.droppedImageNames,
+                    unreadableImageNames: recovery.unreadableImageNames,
+                    overflowed: recovery.overflowed,
+                    durable: recovery.durable,
+                  }),
+                  data: { hideCopyButton: true },
+                  actionProps: {
+                    children: "恢复",
+                    onClick: () => {
+                      if (toastId) toastManager.close(toastId);
+                      void composerRef.current?.restoreStashEntry(recovery.entryId);
+                    },
+                  },
+                }),
+              ) ?? null;
           });
-          if (recovery === "clean") return;
-          const title = appAtomRegistry.get(
-            environmentThreadShells.threadShellAtom(threadRef),
-          )?.title;
-          const where = title === undefined ? "" : `（“${title}”）`;
-          toastManager.add(
-            stackedThreadToast({
-              type: recovery === "kept" ? "info" : "warning",
-              title: "这条消息已不在排队中",
-              description:
-                recovery === "kept"
-                  ? `未保存的编辑内容${where}已保留在输入框中。`
-                  : `未保存的编辑内容${where}已丢弃。`,
-            }),
-          );
         },
       },
     );
