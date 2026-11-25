@@ -32,6 +32,7 @@ import {
 import * as GitManager from "./GitManager.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import { resolveGitCommandAction, type KnownGitCommandOperation } from "../vcs/gitCommandAction.ts";
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 
 export class GitWorkflowService extends Context.Service<
@@ -214,7 +215,7 @@ export const make = Effect.gen(function* () {
   });
 
   const ensureGitCommand = Effect.fn("GitWorkflowService.ensureGitCommand")(function* (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
   ) {
     const handle = yield* registry.resolve({ cwd }).pipe(
@@ -222,6 +223,7 @@ export const make = Effect.gen(function* () {
         (cause) =>
           new GitCommandError({
             operation,
+            action: resolveGitCommandAction(operation),
             command: "vcs-route",
             cwd,
             detail: "Failed to resolve the VCS driver for this Git command.",
@@ -254,12 +256,13 @@ export const make = Effect.gen(function* () {
 
   const detectGitRepositoryForCommand = Effect.fn(
     "GitWorkflowService.detectGitRepositoryForCommand",
-  )(function* (operation: string, cwd: string) {
+  )(function* (operation: KnownGitCommandOperation, cwd: string) {
     const handle = yield* registry.detect({ cwd }).pipe(
       Effect.mapError(
         (cause) =>
           new GitCommandError({
             operation,
+            action: resolveGitCommandAction(operation),
             command: "vcs-route",
             cwd,
             detail: "Failed to detect a VCS repository for this Git command.",
@@ -362,6 +365,7 @@ export const make = Effect.gen(function* () {
       if (result.exitCode === 1) return null;
       return yield* new GitCommandError({
         operation: "GitWorkflowService.currentBranch",
+        action: resolveGitCommandAction("GitWorkflowService.currentBranch"),
         command: "git symbolic-ref",
         cwd,
         argumentCount: 3,

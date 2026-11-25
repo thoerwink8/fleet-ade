@@ -1,4 +1,8 @@
-import { ProviderSetupError, TextGenerationError } from "@t3tools/contracts";
+import {
+  ProviderSetupError,
+  TextGenerationError,
+  type TextGenerationFailureReason,
+} from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -19,12 +23,24 @@ import {
 } from "../provider/antigravityAuthSupport.ts";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
+import { classifyTextGenerationCliFailure } from "@t3tools/provider-core/server/textGenerationUtils";
 
 const ANTIGRAVITY_TIMEOUT_MS = 180_000;
 const MAX_OUTPUT_CHARS = 128_000;
 const isTextGenerationError = Schema.is(TextGenerationError);
 const isProviderSetupError = Schema.is(ProviderSetupError);
 const isNativeSessionId = Schema.is(Schema.String.check(Schema.isUUID(4)));
+const extractAntigravityErrorText = (cause: unknown): string => {
+  if (typeof cause === "object" && cause !== null) {
+    if ("errorMessage" in cause && typeof cause.errorMessage === "string") {
+      return cause.errorMessage;
+    }
+    if ("detail" in cause && typeof cause.detail === "string") {
+      return cause.detail;
+    }
+  }
+  return cause instanceof Error ? cause.message : "";
+};
 const Configuration = Schema.Record(Schema.String, Schema.Unknown);
 const decodeConfiguration = Schema.decodeEffect(Schema.fromJsonString(Configuration));
 const decodeConfigurationObject = Schema.decodeUnknownEffect(Configuration);
@@ -141,6 +157,7 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
         if (!(yield* available)) {
           return yield* new TextGenerationError({
             operation,
+            reason: "unavailable",
             detail:
               "Antigravity text generation is unavailable for profiles with global hooks or MCP configuration. Select another system model.",
           });
@@ -308,6 +325,7 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
               Effect.fail(
                 new TextGenerationError({
                   operation,
+                  reason: "timeout",
                   detail: "Antigravity text generation timed out.",
                 }),
               ),
@@ -322,19 +340,31 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
     },
     (effect, input) =>
       effect.pipe(
-        Effect.mapError((cause) =>
-          isTextGenerationError(cause)
-            ? cause
-            : new TextGenerationError({
-                operation: input.operation,
-                detail: isProviderSetupError(cause)
-                  ? cause.detail
-                  : isAntigravitySignInRequiredError(cause)
-                    ? ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE
-                    : "Antigravity text generation failed.",
-                cause,
-              }),
-        ),
+        Effect.mapError((cause) => {
+          if (isTextGenerationError(cause)) {
+            return cause;
+          }
+          const detail = isProviderSetupError(cause)
+            ? cause.detail
+            : isAntigravitySignInRequiredError(cause)
+              ? ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE
+              : "Antigravity text generation failed.";
+          const reason: TextGenerationFailureReason | undefined = isAntigravitySignInRequiredError(
+            cause,
+          )
+            ? "unauthenticated"
+            : isProviderSetupError(cause)
+              ? cause.operation === "install"
+                ? "not_installed"
+                : (classifyTextGenerationCliFailure(cause.detail) ?? "unavailable")
+              : classifyTextGenerationCliFailure(extractAntigravityErrorText(cause));
+          return new TextGenerationError({
+            operation: input.operation,
+            ...(reason ? { reason } : {}),
+            detail,
+            cause,
+          });
+        }),
         Effect.scoped,
       ),
   );

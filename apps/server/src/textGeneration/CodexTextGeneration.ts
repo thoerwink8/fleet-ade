@@ -25,6 +25,7 @@ import {
 } from "../provider/codexLaunchArgs.ts";
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import {
+  classifyTextGenerationCliFailure,
   normalizeCliError,
   toJsonSchemaObject,
 } from "@t3tools/provider-core/server/textGenerationUtils";
@@ -243,9 +244,19 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     const runCodexCommand = Effect.fn("runCodexJson.runCodexCommand")(function* () {
       const resolved = resolveRuntime
         ? yield* resolveRuntime.pipe(
-            Effect.mapError(
-              (cause) => new TextGenerationError({ operation, detail: cause.detail }),
-            ),
+            Effect.mapError((cause) => {
+              const reason =
+                cause.operation === "install"
+                  ? "not_installed"
+                  : cause.operation === "runtime"
+                    ? "unavailable"
+                    : classifyTextGenerationCliFailure(cause.detail);
+              return new TextGenerationError({
+                operation,
+                ...(reason ? { reason } : {}),
+                detail: cause.detail,
+              });
+            }),
           )
         : undefined;
       const effectiveConfig = resolved?.config ?? codexConfig;
@@ -357,8 +368,12 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
         const stderrDetail = stderr.trim();
         const stdoutDetail = stdout.trim();
         const detail = stderrDetail.length > 0 ? stderrDetail : stdoutDetail;
+        const reason = classifyTextGenerationCliFailure(
+          detail.length > 0 ? detail : `${stderrDetail}\n${stdoutDetail}`,
+        );
         return yield* new TextGenerationError({
           operation,
+          ...(reason ? { reason } : {}),
           detail:
             detail.length > 0
               ? `Codex CLI command failed: ${detail}`
@@ -379,7 +394,11 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
           Option.match({
             onNone: () =>
               Effect.fail(
-                new TextGenerationError({ operation, detail: "Codex CLI request timed out." }),
+                new TextGenerationError({
+                  operation,
+                  reason: "timeout",
+                  detail: "Codex CLI request timed out.",
+                }),
               ),
             onSome: () => Effect.void,
           }),

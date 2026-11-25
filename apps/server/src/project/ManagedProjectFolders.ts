@@ -5,6 +5,7 @@ import {
   ProjectId,
   type ThreadId,
   VcsProcessSpawnError,
+  type VcsSnapshotFailure,
 } from "@t3tools/contracts";
 import { newProjectFolderName } from "@t3tools/shared/path";
 import * as Cause from "effect/Cause";
@@ -25,6 +26,8 @@ import * as Schema from "effect/Schema";
 import * as ServerConfig from "../config.ts";
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import { classifyGitFailure } from "../vcs/GitVcsDriverCore.ts";
+import { clampVcsSnapshotFailureDetail, toVcsSnapshotFailure } from "../vcs/vcsSnapshotFailure.ts";
 import * as ProjectService from "./ProjectService.ts";
 
 export class ScratchUnavailableError extends Schema.TaggedError<ScratchUnavailableError>()(
@@ -122,6 +125,7 @@ export class ManagedProjectFolders extends Context.Service<
         readonly projectId: ProjectId;
         readonly workspaceRoot: string;
         readonly commitError?: string;
+        readonly commitFailure?: VcsSnapshotFailure;
       },
       NamedProjectError
     >;
@@ -454,10 +458,29 @@ const make = Effect.gen(function* () {
         timeoutMs: 30_000,
       })
       .pipe(
-        Effect.map((result) =>
-          result.exitCode === 0 ? undefined : describeCommitFailure(result.stderr),
-        ),
-        Effect.catch((error) => Effect.succeed(error.message)),
+        Effect.map((result) => {
+          if (result.exitCode === 0) return undefined;
+          const reason = classifyGitFailure(result.stderr, result.stdout);
+          const rawDetail =
+            result.stderr.trim() || result.stdout.trim() || "Git could not make the first commit.";
+          return {
+            commitError: describeCommitFailure(result.stderr),
+            commitFailure: {
+              _tag: "GitCommandError",
+              operation: "ManagedProjectFolders.commit",
+              action: "commit" as const,
+              ...(reason !== null ? { reason } : {}),
+              detail: clampVcsSnapshotFailureDetail(rawDetail),
+            },
+          };
+        }),
+        Effect.catch((error) => {
+          const commitFailure = toVcsSnapshotFailure(error, { action: "commit" });
+          return Effect.succeed({
+            commitError: error.message,
+            ...(commitFailure === undefined ? {} : { commitFailure }),
+          });
+        }),
       );
   });
 
@@ -474,7 +497,7 @@ const make = Effect.gen(function* () {
         .uuidV4()
         .pipe(Effect.mapError((cause) => new NamedProjectCreateError({ workspaceRoot, cause }))),
     ]).pipe(Effect.onExit((exit) => (Exit.isSuccess(exit) ? Effect.void : removeFolder)));
-    const [commitError, id] = prepared;
+    const [commitResult, id] = prepared;
     const project = yield* projects
       .create({
         commandId: CommandId.make(`named-project:${id}`),
@@ -497,7 +520,14 @@ const make = Effect.gen(function* () {
     return {
       projectId: project.id,
       workspaceRoot,
-      ...(commitError === undefined ? {} : { commitError }),
+      ...(commitResult === undefined
+        ? {}
+        : {
+            commitError: commitResult.commitError,
+            ...(commitResult.commitFailure === undefined
+              ? {}
+              : { commitFailure: commitResult.commitFailure }),
+          }),
     };
   });
 

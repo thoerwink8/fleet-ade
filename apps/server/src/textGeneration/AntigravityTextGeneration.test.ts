@@ -456,9 +456,10 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
     {
       code: -32000,
       detail: "请先在设置里登录 Antigravity，再继续。",
+      reason: "unauthenticated" as const,
     },
-    { code: -32603, detail: "Antigravity text generation failed." },
-  ])("maps ACP error $code from the prompt request to a fixed detail", ({ code, detail }) =>
+    { code: -32603, detail: "Antigravity text generation failed.", reason: undefined },
+  ])("maps ACP error $code from the prompt request to a fixed detail", ({ code, detail, reason }) =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture({
         prompt: () =>
@@ -468,6 +469,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         .generateThreadTitle(fixture.titleInput)
         .pipe(Effect.flip);
       expect(error.detail).toBe(detail);
+      expect(error.reason).toBe(reason);
       expect(error.detail).not.toContain("Raw provider failure text.");
       yield* fixture.assertCleaned;
     }),
@@ -560,6 +562,12 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         .generateThreadTitle(fixture.titleInput)
         .pipe(Effect.exit);
       expect(Exit.isSuccess(result)).toBe(available);
+      if (Exit.isFailure(result)) {
+        const failure = yield* fixture.textGeneration
+          .generateThreadTitle(fixture.titleInput)
+          .pipe(Effect.flip);
+        expect(failure.reason).toBe("unavailable");
+      }
       expect(fixture.state.workspaces.length).toBe(available ? 1 : 0);
       yield* fixture.assertCleaned;
     }),
@@ -572,6 +580,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         .generateThreadTitle(fixture.titleInput)
         .pipe(Effect.flip);
       expect(error._tag).toBe("TextGenerationError");
+      expect(error.reason).toBe("unauthenticated");
       expect(error.detail).toBe("Sign in before starting Antigravity.");
       expect(fixture.state.workspaces).toEqual([]);
       yield* fixture.assertCleaned;

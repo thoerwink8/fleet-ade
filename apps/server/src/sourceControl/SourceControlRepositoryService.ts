@@ -265,6 +265,7 @@ export const make = Effect.gen(function* () {
                 new SourceControlRepositoryError({
                   operation: "cloneRepository",
                   provider: SourceControlProviderKind.make("unknown"),
+                  reason: "path_already_exists",
                   detail: "Destination path already exists and is not a directory.",
                   cause,
                 }),
@@ -274,6 +275,7 @@ export const make = Effect.gen(function* () {
           return yield* new SourceControlRepositoryError({
             operation: "cloneRepository",
             provider: SourceControlProviderKind.make("unknown"),
+            reason: "path_already_exists",
             detail: "Destination path already exists and is not empty.",
           });
         }

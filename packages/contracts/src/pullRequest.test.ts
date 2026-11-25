@@ -5,10 +5,15 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   PullRequestDetail,
   PullRequestListResult,
+  PullRequestOperationError,
   resolvePullRequestAuthorFilter,
 } from "./pullRequest.ts";
 
 const decodeDetail = Schema.decodeUnknownSync(Schema.toCodecJson(PullRequestDetail));
+const decodeOperationError = Schema.decodeUnknownSync(
+  Schema.toCodecJson(PullRequestOperationError),
+);
+const encodeOperationError = Schema.encodeSync(Schema.toCodecJson(PullRequestOperationError));
 
 const LIST_RESULT: PullRequestListResult = {
   viewers: { "github.com": "bilal", "gitlab.com": "bilal.hassan" },
@@ -145,5 +150,39 @@ describe("resolvePullRequestAuthorFilter", () => {
   it("passes any other login through trimmed", () => {
     expect(resolvePullRequestAuthorFilter(" ana ", "bilal")).toBe("ana");
     expect(resolvePullRequestAuthorFilter("meredith", "bilal")).toBe("meredith");
+  });
+});
+
+describe("PullRequestOperationError", () => {
+  it("round-trips rate-limited and decodes legacy or unknown reasons cleanly", () => {
+    const rateLimited = decodeOperationError(
+      encodeOperationError(
+        new PullRequestOperationError({
+          operation: "diff",
+          detail: "github requests to github.com are paused until the rate limit resets.",
+          reason: "rate-limited",
+        }),
+      ),
+    );
+    expect(rateLimited.reason).toBe("rate-limited");
+    expect(rateLimited.detail).toBe(
+      "github requests to github.com are paused until the rate limit resets.",
+    );
+
+    const legacy = decodeOperationError({
+      _tag: "PullRequestOperationError",
+      operation: "diff",
+      detail: "failed",
+    });
+    expect(legacy.reason).toBeUndefined();
+
+    const newerServer = decodeOperationError({
+      _tag: "PullRequestOperationError",
+      operation: "diff",
+      detail: "failed",
+      reason: "added_by_a_newer_server",
+    });
+    expect(newerServer.reason).toBeUndefined();
+    expect(newerServer.detail).toBe("failed");
   });
 });

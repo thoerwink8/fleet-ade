@@ -1,4 +1,8 @@
-import type { TextGeneratorKind, TextGeneratorModel } from "@t3tools/contracts";
+import {
+  TextGenerationFailureReason,
+  type TextGeneratorKind,
+  type TextGeneratorModel,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import {
@@ -19,7 +23,11 @@ export interface TextGeneratorConnection {
 /** Why a model API call failed, worded for the person who configured it. */
 export class TextGeneratorRequestError extends Schema.TaggedError<TextGeneratorRequestError>()(
   "TextGeneratorRequestError",
-  { detail: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  {
+    detail: Schema.String,
+    reason: Schema.optional(TextGenerationFailureReason),
+    cause: Schema.optional(Schema.Defect()),
+  },
 ) {}
 
 export interface TextGeneratorDriver {
@@ -46,6 +54,14 @@ const ApiErrorBody = Schema.Struct({
   error: Schema.Struct({ message: Schema.String }),
 });
 const decodeApiErrorBody = Schema.decodeUnknownOption(ApiErrorBody);
+
+const classifyHttpStatus = (status: number): TextGenerationFailureReason | undefined => {
+  if (status === 401 || status === 403) return "unauthenticated";
+  if (status === 429) return "rate_limited";
+  if (status === 408 || status === 504) return "timeout";
+  if (status === 502 || status === 503 || status === 529) return "unavailable";
+  return undefined;
+};
 
 const describeStatus = (label: string, status: number, message: string | undefined) => {
   const reason =
@@ -78,6 +94,7 @@ const sendJson = Effect.fn("TextGenerator.sendJson")(function* <S extends Schema
       (cause) =>
         new TextGeneratorRequestError({
           detail: `Couldn't reach ${label}. Check the base URL and your connection.`,
+          reason: "network",
           cause,
         }),
     ),
@@ -87,8 +104,10 @@ const sendJson = Effect.fn("TextGenerator.sendJson")(function* <S extends Schema
     const message = decodeApiErrorBody(body).pipe((option) =>
       option._tag === "Some" ? option.value.error.message : undefined,
     );
+    const reason = classifyHttpStatus(response.status);
     return yield* new TextGeneratorRequestError({
       detail: describeStatus(label, response.status, message),
+      ...(reason ? { reason } : {}),
     });
   }
   return yield* Schema.decodeUnknownEffect(schema)(body).pipe(
@@ -110,7 +129,10 @@ const withTimeout =
         duration,
         orElse: () =>
           Effect.fail(
-            new TextGeneratorRequestError({ detail: `${label} took too long to respond.` }),
+            new TextGeneratorRequestError({
+              detail: `${label} took too long to respond.`,
+              reason: "timeout",
+            }),
           ),
       }),
     );

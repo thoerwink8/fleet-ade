@@ -46,7 +46,7 @@ const ACTION_NEXT_STEPS: Readonly<Record<string, string>> = {
   提交: "请确认已选择要提交的改动，且没有未解决的冲突，然后重试。",
 };
 
-const GIT_REASON_NEXT_STEPS: Record<GitCommandFailureReason, string> = {
+const GIT_REASON_NEXT_STEPS: Partial<Record<GitCommandFailureReason, string>> = {
   authentication_failed: "请检查托管平台的登录状态和访问权限，然后重试。",
   branch_already_exists: "请换一个分支名称，或选择已有分支。",
   branch_checked_out_in_worktree: "请选择其他分支，或先移除已检出该分支的工作树。",
@@ -177,7 +177,8 @@ export function describeVersionControlError(
       return {
         ...base,
         nextStep:
-          error.reason === undefined ? actionNextStep(action) : GIT_REASON_NEXT_STEPS[error.reason],
+          (error.reason === undefined ? undefined : GIT_REASON_NEXT_STEPS[error.reason]) ??
+          actionNextStep(action),
       };
     case "TextGenerationError":
       return { ...base, nextStep: "请检查智能体的登录状态和可用性，然后重试。" };

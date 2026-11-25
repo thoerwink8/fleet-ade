@@ -1,5 +1,7 @@
 import {
   EnvironmentAuthInvalidError,
+  PullRequestOperationError,
+  PullRequestUnavailableError,
   type PullRequestDiffInput,
   type PullRequestDiffResult,
 } from "@t3tools/contracts";
@@ -29,7 +31,13 @@ export class PullRequestDiffCredentialRejectedError extends Schema.TaggedError<P
   }
 }
 
+const isPullRequestDiffDomainError = Schema.is(
+  Schema.Union([PullRequestOperationError, PullRequestUnavailableError]),
+);
+
 export type PullRequestDiffLoadError =
+  | PullRequestOperationError
+  | PullRequestUnavailableError
   | RemoteEnvironmentRequestError
   | PullRequestDiffCredentialRejectedError;
 
@@ -46,6 +54,7 @@ const fetchEnvironmentPullRequestDiff = Effect.fn(
     method: "POST",
     url: (urls) => urls.diff(),
     timeoutMs: input.timeoutMs ?? DEFAULT_PULL_REQUEST_DIFF_TIMEOUT_MS,
+    passthrough: isPullRequestDiffDomainError,
     request: ({ client, headers }) => client.diff({ payload: input.diff, headers }),
   }).pipe(
     Effect.mapError((error) =>

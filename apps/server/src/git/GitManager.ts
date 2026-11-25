@@ -1797,6 +1797,7 @@ export const make = Effect.gen(function* () {
                 if (result.exitCode === 1) return Effect.succeed(null);
                 return new GitCommandError({
                   operation: "GitManager.findPublishedBranchRemote.ancestor",
+                  action: "checkout_pr",
                   command: "git merge-base --is-ancestor",
                   cwd,
                   exitCode: result.exitCode,
@@ -2904,6 +2905,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "preparePullRequestThread",
         cwd,
+        reason: "working_tree_dirty",
         detail: `This repository has uncommitted changes. Commit or stash them before checking out pull request #${pullRequestNumber} here, or check it out in its own folder.`,
       });
     }

@@ -27,7 +27,16 @@ import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 
 import type { ComposerTrigger } from "../../composer-logic";
 import type { DraftId } from "../../composerDraftStore";
+import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { basenameOfPath } from "../../pierre-icons";
+import { selectThreadRightPanelState, useRightPanelStore } from "../../rightPanelStore";
+import { useClosedViewStore } from "../../closedViewStore";
+import {
+  buildEmptyPathQueryEntries,
+  collectRecentThreadFilePaths,
+  getRecentComposerPaths,
+  resolveComposerPathMenuState,
+} from "./composerPathSuggestions.logic";
 import {
   getProviderSkillsForSlashMenu,
   getProviderSlashCommandsForSlashMenu,
@@ -42,7 +51,12 @@ import {
   type EnvironmentQueryTarget,
 } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
-import { useComposerPathSearch, useDebouncedValue, useThreadSearch } from "~/state/queries";
+import {
+  useComposerPathSearch,
+  useComposerRootEntries,
+  useDebouncedValue,
+  useThreadSearch,
+} from "~/state/queries";
 import {
   matchesPullRequestQuery,
   rankPullRequestMatches,
@@ -122,6 +136,15 @@ export function useComposerMenuItems({
   const settledPullRequestTextQuery =
     pullRequestTextQuery === debouncedPullRequestTextQuery ? pullRequestTextQuery : null;
   const isPathTrigger = composerTriggerKind === "path";
+  const trimmedPathQuery = pathTriggerQuery.trim();
+  const isEmptyPathQuery = isPathTrigger && trimmedPathQuery.length === 0;
+  const activeThreadRef =
+    activeThreadId !== null ? scopeThreadRef(environmentId, activeThreadId) : null;
+  const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
+  const rightPanelState = useRightPanelStore((state) =>
+    selectThreadRightPanelState(state.byThreadKey, activeThreadRef),
+  );
+  const closedViews = useClosedViewStore((state) => state.entries);
   const environmentThreadShells = useVisibleThreadShells(isPathTrigger);
   // Mounts older settled threads matching the mention, which shells may leave out.
   useThreadSearch(isPathTrigger ? [environmentId] : [], pathTriggerQuery, { titlesOnly: true });
@@ -135,8 +158,13 @@ export function useComposerMenuItems({
   }));
   const workspaceEntries = useComposerPathSearch({
     environmentId,
-    cwd: isPathTrigger ? gitCwd : null,
-    query: isPathTrigger ? pathTriggerQuery : null,
+    cwd: isPathTrigger && !isEmptyPathQuery ? gitCwd : null,
+    query: isPathTrigger && !isEmptyPathQuery ? pathTriggerQuery : null,
+  });
+  const rootEntries = useComposerRootEntries({
+    environmentId,
+    cwd: gitCwd,
+    enabled: isEmptyPathQuery,
   });
 
   const pullRequestListTargets =
@@ -200,6 +228,39 @@ export function useComposerMenuItems({
   const items = ((): ComposerCommandItem[] => {
     if (!composerTrigger) return [];
     if (composerTrigger.kind === "path") {
+      const activeRightPanelSurface = rightPanelState.surfaces.find(
+        (surface) => surface.id === rightPanelState.activeSurfaceId,
+      );
+      const openSurfaces = activeRightPanelSurface
+        ? [
+            activeRightPanelSurface,
+            ...rightPanelState.surfaces.filter(
+              (surface) => surface.id !== activeRightPanelSurface.id,
+            ),
+          ]
+        : rightPanelState.surfaces;
+      const closedSurfaces = activeThreadKey
+        ? closedViews.flatMap((entry) =>
+            scopedThreadKey(entry.threadRef) === activeThreadKey ? [entry.surface] : [],
+          )
+        : [];
+      const recentFilePaths = isEmptyPathQuery
+        ? collectRecentThreadFilePaths({
+            cwd: gitCwd,
+            recentPicks: getRecentComposerPaths(environmentId, gitCwd),
+            openSurfaces,
+            closedSurfaces,
+          })
+        : [];
+      const suggestedPathEntries = isEmptyPathQuery
+        ? buildEmptyPathQueryEntries({
+            recentFilePaths,
+            rootEntries: rootEntries.entries,
+          })
+        : workspaceEntries.entries;
+      const pathSearchTarget = isEmptyPathQuery
+        ? { environmentId, cwd: gitCwd, query: "" }
+        : workspaceEntries.searchedTarget;
       return [
         ...matchComposerThreadItems({
           shells: environmentThreadShells,
@@ -222,12 +283,12 @@ export function useComposerMenuItems({
           modelOptionsByInstance: modelMentions.modelOptionsByInstance,
           query: composerTrigger.query,
         }),
-        ...workspaceEntries.entries.map((entry) => ({
+        ...suggestedPathEntries.map((entry) => ({
           id: `path:${entry.kind}:${entry.path}`,
           type: "path" as const,
           path: entry.path,
           pathKind: entry.kind,
-          searchTarget: workspaceEntries.searchedTarget,
+          searchTarget: pathSearchTarget,
           label: basenameOfPath(entry.path),
           description: entry.path.slice(0, Math.max(0, entry.path.lastIndexOf("/"))),
         })),
@@ -393,8 +454,13 @@ export function useComposerMenuItems({
     }
     return [];
   })();
+  const pathMenuState = resolveComposerPathMenuState({
+    query: pathTriggerQuery,
+    isRootPending: rootEntries.isPending,
+    isSearchPending: workspaceEntries.isPending,
+  });
   const isLoading =
-    (composerTriggerKind === "path" && pathTriggerQuery.length > 0 && workspaceEntries.isPending) ||
+    (composerTriggerKind === "path" && pathMenuState.isLoading) ||
     ((composerTriggerKind === "skill" || composerTriggerKind === "slash-command") &&
       workspaceSkillsScanning) ||
     (composerTriggerKind === "pull-request" &&
@@ -404,6 +470,7 @@ export function useComposerMenuItems({
         pullRequestTextQuery !== debouncedPullRequestTextQuery ||
         pullRequestTriggerNumber !== debouncedPullRequestNumber ||
         exactPullRequestLookup.isPending));
+  const loadingState = composerTriggerKind === "path" ? pathMenuState.loadingStateText : undefined;
   const emptyState = (() => {
     if (composerTriggerKind === "skill") {
       return "未找到技能。试试输入 / 浏览智能体命令。";
@@ -422,8 +489,8 @@ export function useComposerMenuItems({
         ? `没有匹配 ${composerTrigger.query} 的 PR。`
         : "这个仓库中没有 PR。";
     }
-    return composerTriggerKind === "path" ? "没有匹配的文件或文件夹。" : "没有匹配的命令。";
+    return composerTriggerKind === "path" ? pathMenuState.emptyStateText : "没有匹配的命令。";
   })();
 
-  return { items, isLoading, emptyState };
+  return { items, isLoading, loadingState, emptyState };
 }

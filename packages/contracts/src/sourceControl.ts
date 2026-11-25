@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ForwardCompatibleOptional, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { VcsDriverKind } from "./vcs.ts";
 
 /** Accept unknown hosts so clients can fall back to generic presentation. */
@@ -262,11 +262,15 @@ export class SourceControlSignInError extends Schema.TaggedError<SourceControlSi
   }
 }
 
+export const SourceControlRepositoryFailureReason = Schema.Literals(["path_already_exists"]);
+export type SourceControlRepositoryFailureReason = typeof SourceControlRepositoryFailureReason.Type;
+
 export class SourceControlRepositoryError extends Schema.TaggedError<SourceControlRepositoryError>()(
   "SourceControlRepositoryError",
   {
     provider: SourceControlProviderKind,
     operation: Schema.String,
+    reason: ForwardCompatibleOptional(SourceControlRepositoryFailureReason),
     detail: Schema.String,
     cause: Schema.optional(Schema.Defect()),
   },

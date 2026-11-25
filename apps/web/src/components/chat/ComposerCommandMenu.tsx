@@ -111,7 +111,8 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
   resolvedTheme: "light" | "dark";
   isLoading: boolean;
   triggerKind: ComposerTriggerKind | null;
-  emptyStateText?: string;
+  loadingStateText?: string | undefined;
+  emptyStateText?: string | undefined;
   activeItemId: string | null;
   onHighlightedItemChange: (itemId: string | null) => void;
   onSelect: (item: ComposerCommandItem) => void;
@@ -167,11 +168,12 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
           <div className="px-5 pt-3.5 pb-7">
             <p className="text-secondary-label text-xs">
               {props.isLoading
-                ? props.triggerKind === "skill" || props.triggerKind === "slash-command"
-                  ? "正在搜索项目技能…"
-                  : props.triggerKind === "pull-request"
-                    ? "正在查找 PR…"
-                    : "正在搜索项目文件…"
+                ? (props.loadingStateText ??
+                  (props.triggerKind === "skill" || props.triggerKind === "slash-command"
+                    ? "正在搜索项目技能…"
+                    : props.triggerKind === "pull-request"
+                      ? "正在查找 PR…"
+                      : "正在搜索项目文件…"))
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"
                     ? "未找到技能。试试输入 / 浏览智能体命令。"

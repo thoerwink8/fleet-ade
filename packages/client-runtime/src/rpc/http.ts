@@ -113,10 +113,14 @@ export const makeEnvironmentHttpApiUrlBuilder = (httpBaseUrl: string) =>
     baseUrl: remoteApiBaseUrl(httpBaseUrl),
   });
 
-const failRemoteRequest = (
+const failRemoteRequest = <Pass = never>(
   requestUrl: string,
   cause: unknown,
-): Effect.Effect<never, RemoteEnvironmentRequestError> => {
+  passthrough?: (error: unknown) => error is Pass,
+): Effect.Effect<never, RemoteEnvironmentRequestError | Pass> => {
+  if (passthrough?.(cause)) {
+    return Effect.fail(cause);
+  }
   if (isRemoteEnvironmentAuthTimeoutError(cause)) {
     return Effect.fail(cause);
   }
@@ -153,11 +157,12 @@ const failRemoteRequest = (
   );
 };
 
-export const executeEnvironmentHttpRequest = <A, E, R>(
+export const executeEnvironmentHttpRequest = <A, E, R, Pass = never>(
   requestUrl: string,
   timeoutMs: number,
   request: Effect.Effect<A, E, R>,
-): Effect.Effect<A, RemoteEnvironmentRequestError, R> =>
+  options?: { readonly passthrough?: ((error: unknown) => error is Pass) | undefined },
+): Effect.Effect<A, RemoteEnvironmentRequestError | Pass, R> =>
   request.pipe(
     Effect.timeoutOption(Duration.millis(timeoutMs)),
     Effect.flatMap(
@@ -166,5 +171,5 @@ export const executeEnvironmentHttpRequest = <A, E, R>(
         onSome: Effect.succeed,
       }),
     ),
-    Effect.catch((cause) => failRemoteRequest(requestUrl, cause)),
+    Effect.catch((cause) => failRemoteRequest(requestUrl, cause, options?.passthrough)),
   );
