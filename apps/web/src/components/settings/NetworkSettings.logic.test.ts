@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { effectiveRouteSentence } from "./NetworkSettings.logic";
+import { effectiveRouteSentence, proxyUrlError } from "./NetworkSettings.logic";
 
 describe("effectiveRouteSentence", () => {
   it("says the chosen direct line once", () => {
@@ -51,5 +51,35 @@ describe("effectiveRouteSentence", () => {
         detail: "56879 是 reclaude 专用端口，不拿来做线路，已按直连",
       }),
     ).toBe("当前走直连，因为 56879 是 reclaude 专用端口，不拿来做线路。");
+  });
+});
+
+describe("proxyUrlError", () => {
+  const reason = "地址要写成 http://主机:端口";
+
+  it.each([
+    "",
+    "   ",
+    "http://127.0.0.1:7890",
+    "https://proxy.example.com:8443",
+    "127.0.0.1:7890",
+    "proxy.example.com:1080",
+    "http://[::1]:8080",
+    // The server treats a scheme-less //host:port as http, so the client must too.
+    "//127.0.0.1:7890",
+  ])("accepts %s", (input) => {
+    expect(proxyUrlError(input)).toBeNull();
+  });
+
+  it.each([
+    "not a url",
+    "http://127.0.0.1",
+    "http://127.0.0.1:",
+    "socks5://127.0.0.1:1080",
+    "http://user:pass@127.0.0.1:7890",
+    "http://user@127.0.0.1:7890",
+    "ftp://example.com:21",
+  ])("rejects %s with the format reason", (input) => {
+    expect(proxyUrlError(input)).toBe(reason);
   });
 });

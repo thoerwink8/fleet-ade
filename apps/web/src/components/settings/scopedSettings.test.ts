@@ -14,6 +14,7 @@ import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {
   persistScopedSettingsPatch,
+  scopedSettingsFailureMessage,
   planProjectOverridesClear,
   planScopedSettingsClear,
   planScopedSettingsPatch,
@@ -553,6 +554,32 @@ describe("scoped settings mixed values", () => {
     const second = environment("Second", { settings: { sourceControlWritingStyle: { ...style } } });
     const targets = resolveScopedSettingsTargets(all, [first, second]);
     expect(scopedSettingsAreMixed(targets, ["sourceControlWritingStyle"])).toBe(false);
+  });
+});
+
+describe("scopedSettingsFailureMessage", () => {
+  const interrupted = "连接已断开，内容已保留，恢复后重新保存";
+
+  it.each([
+    [new Error("All fibers interrupted without error")],
+    [new Error("All fibers interrupted without errors")],
+    [new Error("interrupted")],
+    [new Error("Request interrupted")],
+  ])("maps an interruption to the reconnect sentence", (error) => {
+    expect(scopedSettingsFailureMessage(error)).toBe(interrupted);
+  });
+
+  it("maps an interrupt-only cause to the reconnect sentence", () => {
+    expect(scopedSettingsFailureMessage(Cause.squash(Cause.interrupt(1)))).toBe(interrupted);
+  });
+
+  it.each([
+    [new Error("Disconnected during save"), "Disconnected during save"],
+    [new Error("ECONNRESET"), "ECONNRESET"],
+    ["plain text", "保存失败，请重新连接后再保存。"],
+    [undefined, "保存失败，请重新连接后再保存。"],
+  ])("keeps an unrecognized error as is", (error, expected) => {
+    expect(scopedSettingsFailureMessage(error)).toBe(expected);
   });
 });
 

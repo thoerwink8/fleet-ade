@@ -6,6 +6,7 @@ import { resolvePastedPath } from "@t3tools/shared/path";
 import { act, render } from "../../test/render";
 import { parseSessionLimitDraft } from "../components/settings/SettingsPanels.logic";
 import { DraftInput, DraftTextarea } from "../components/ui/draft-input";
+import { anchoredToastManager } from "../components/ui/toast";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -122,6 +123,28 @@ describe("settings draft commits", () => {
     await userEvent.tab();
 
     expect(saved).toBe(4);
+  });
+
+  it("keeps the draft marked invalid when the commit returns a reason", async () => {
+    const add = vi.spyOn(anchoredToastManager, "add");
+    const commit = vi.fn((next: string) =>
+      next.includes(":") ? undefined : "地址要写成 http://主机:端口",
+    );
+    await using screen = await render(<DraftInput type="text" value="" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await userEvent.type(input, "bad");
+    await userEvent.tab();
+    await expect.element(input).toHaveValue("bad");
+    await expect.element(input).toHaveAttribute("aria-invalid", "true");
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "地址要写成 http://主机:端口", type: "error" }),
+    );
+
+    await input.click();
+    await userEvent.type(input, ":1");
+    await userEvent.tab();
+    expect(commit).toHaveBeenLastCalledWith("bad:1");
+    await expect.element(input).not.toHaveAttribute("aria-invalid");
   });
 
   it("keeps the typed text when the asynchronous save fails and clears it once it saves", async () => {

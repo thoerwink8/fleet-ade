@@ -304,8 +304,7 @@ function ProjectDetail({
   const renameGroup = (nextTitle: string) => {
     const title = nextTitle.trim();
     if (!title) {
-      toastManager.add({ type: "warning", title: "项目名称不能为空" });
-      return false;
+      return "项目名称不能为空";
     }
     if (!projectGroupTitleNeedsUpdate(group.memberProjects, title, true)) return;
     return updateAllMembers({ title }, "无法重命名项目").then(

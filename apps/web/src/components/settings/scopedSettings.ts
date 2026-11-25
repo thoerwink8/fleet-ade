@@ -449,6 +449,15 @@ function droppedSettingKeys(write: ScopedServerWrite, saved: ServerSettings | un
   );
 }
 
+const INTERRUPTED_SAVE_MESSAGE = "连接已断开，内容已保留，恢复后重新保存";
+const UNKNOWN_SAVE_MESSAGE = "保存失败，请重新连接后再保存。";
+
+/** Maps a transport failure to a sentence the user can act on. */
+export function scopedSettingsFailureMessage(error: unknown): string {
+  if (error instanceof Error && /interrupted/i.test(error.message)) return INTERRUPTED_SAVE_MESSAGE;
+  return error instanceof Error ? error.message : UNKNOWN_SAVE_MESSAGE;
+}
+
 export async function persistScopedSettingsPatch(
   plan: ReturnType<typeof planScopedSettingsPatch>,
   persistServer: (input: {
@@ -495,7 +504,7 @@ export async function persistScopedSettingsPatch(
     return [
       {
         ...environment,
-        message: error instanceof Error ? error.message : "保存失败，请重新连接后再保存。",
+        message: scopedSettingsFailureMessage(error),
       },
     ];
   });

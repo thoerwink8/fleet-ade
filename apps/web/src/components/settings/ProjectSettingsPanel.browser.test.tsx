@@ -380,6 +380,16 @@ describe("project settings permissions", () => {
     expect(nameInput(screen).value).toBe("Renamed");
   });
 
+  it("keeps an emptied project name marked invalid without saving it", async () => {
+    setup();
+    await using screen = await mountPanel();
+    await userEvent.clear(nameInput(screen));
+    await userEvent.keyboard("{Enter}");
+    expect(state.update).not.toHaveBeenCalled();
+    expect(nameInput(screen).value).toBe("");
+    expect(nameInput(screen).getAttribute("aria-invalid")).toBe("true");
+  });
+
   it("stops before the next member if its grant is revoked during an earlier update", async () => {
     setup();
     const firstUpdate = deferred<AsyncResult.Success<void>>();
