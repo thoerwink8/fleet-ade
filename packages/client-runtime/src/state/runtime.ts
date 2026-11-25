@@ -17,6 +17,7 @@ import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 
+import { describeRequestFailure } from "../errors/transport.ts";
 import type { ConnectionAttemptError, SupervisorConnectionState } from "../connection/model.ts";
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import {
@@ -379,7 +380,7 @@ export function isAtomCommandInterrupted(result: AtomCommandResult<unknown, unkn
 export function squashAtomCommandFailure(result: {
   readonly cause: Cause.Cause<unknown>;
 }): unknown {
-  return Cause.squash(result.cause);
+  return describeRequestFailure(result.cause);
 }
 
 export async function settleAsyncResult<A, E>(
