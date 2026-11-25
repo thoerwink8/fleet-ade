@@ -12,7 +12,7 @@ import { createEnvironmentRpcCommand } from "@t3tools/client-runtime/state/runti
 import { connectionAtomRuntime } from "../../connection/runtime";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
+import { DraftInput } from "../ui/draft-input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -65,9 +65,7 @@ export function NetworkSettingsPanel() {
   const [probing, setProbing] = useState(false);
   const seenLine = useRef(networkKey);
 
-  const save = (next: NetworkSettings) => {
-    updateSettings({ network: next });
-  };
+  const save = (next: NetworkSettings) => updateSettings({ network: next });
 
   const loadRoute = useEffectEvent(
     (id: NonNullable<typeof environmentId>, isStale: () => boolean) => {
@@ -145,12 +143,12 @@ export function NetworkSettingsPanel() {
             description="写成 http://主机:端口。"
             control={
               <div className="w-full min-w-0">
-                <Input
+                <DraftInput
                   size="sm"
                   aria-label="代理地址"
                   value={network.proxyUrl}
                   placeholder="http://127.0.0.1:7890"
-                  onChange={(event) => save({ ...network, proxyUrl: event.target.value })}
+                  onCommit={(next) => save({ ...network, proxyUrl: next })}
                 />
               </div>
             }
@@ -163,12 +161,12 @@ export function NetworkSettingsPanel() {
           description="逗号分隔。本机地址始终不走代理。"
           control={
             <div className="w-full min-w-0">
-              <Input
+              <DraftInput
                 size="sm"
                 aria-label="不走代理的地址"
                 value={network.noProxy}
                 placeholder="example.com"
-                onChange={(event) => save({ ...network, noProxy: event.target.value })}
+                onCommit={(next) => save({ ...network, noProxy: next })}
               />
             </div>
           }
@@ -209,12 +207,12 @@ export function NetworkSettingsPanel() {
           description="公司中间人代理的根证书路径。证书不受信任时填这里。留空就只用系统已经信任的证书。这不是某个智能体自带的证书。"
           control={
             <div className="w-full min-w-0">
-              <Input
+              <DraftInput
                 size="sm"
                 aria-label="额外信任的根证书"
                 value={network.extraCaCertPath}
                 placeholder="D:\certs\corp-root.pem"
-                onChange={(event) => save({ ...network, extraCaCertPath: event.target.value })}
+                onCommit={(next) => save({ ...network, extraCaCertPath: next })}
               />
             </div>
           }
@@ -267,17 +265,17 @@ export function NetworkSettingsPanel() {
                     </SelectPopup>
                   </Select>
                   {override.line === "custom" ? (
-                    <Input
+                    <DraftInput
                       size="sm"
                       aria-label={`${label}的代理地址`}
                       value={override.proxyUrl}
                       placeholder="http://127.0.0.1:7890"
-                      onChange={(event) =>
+                      onCommit={(next) =>
                         save({
                           ...network,
                           agentOverrides: {
                             ...network.agentOverrides,
-                            [driver]: { ...override, line: "custom", proxyUrl: event.target.value },
+                            [driver]: { ...override, line: "custom", proxyUrl: next },
                           },
                         })
                       }
