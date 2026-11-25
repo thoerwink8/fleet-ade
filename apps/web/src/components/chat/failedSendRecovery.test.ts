@@ -1,4 +1,4 @@
-import { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { threadContextRecord } from "@t3tools/shared/composerContextReferences";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -179,6 +179,7 @@ describe("recoverFailedComposerSend", () => {
         prefix: "",
         suffix: "",
       },
+      itemId: TurnItemId.make("item-1"),
       subagents: [],
     });
 

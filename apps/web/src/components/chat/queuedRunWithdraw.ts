@@ -22,6 +22,7 @@ import {
 import { readAttachmentUpload } from "../../lib/attachmentUploadQueue";
 import type { AttachmentUploadState } from "../../lib/attachmentUploadState";
 import {
+  asKnownContextRecord,
   isResponseContextRecord,
   previewAnnotationFromRecord,
   reviewCommentFromRecord,
@@ -137,7 +138,9 @@ export async function recoverWithdrawnQueuedRun(
   const reviewComments: ReviewCommentContext[] = [];
   const previewAnnotations: PreviewAnnotationPayload[] = [];
 
-  for (const record of records) {
+  for (const candidate of records) {
+    const record = asKnownContextRecord(candidate);
+    if (!record) continue;
     if ((record.kind === "image" || record.kind === "file") && "attachmentId" in record) {
       localIdByAttachmentId.set(
         record.attachmentId,

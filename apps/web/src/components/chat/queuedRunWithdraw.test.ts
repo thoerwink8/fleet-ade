@@ -1,8 +1,7 @@
-import { EnvironmentId, MessageId, RunId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, RunId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
-  formatComposerContextReference,
   threadContextRecord,
 } from "@t3tools/shared/composerContextReferences";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -18,6 +17,7 @@ import {
   terminalContextRecord,
   threadContextReference,
 } from "../../lib/composerContextRecords";
+import { formatInlineContextReference } from "../../lib/composerContextReferences";
 import type { TerminalContextDraft } from "../../lib/terminalContext";
 import {
   MAX_STASH_ENTRIES,
@@ -135,6 +135,7 @@ describe("recoverWithdrawnQueuedRun", () => {
         prefix: "",
         suffix: "",
       },
+      itemId: TurnItemId.make("item-1"),
       subagents: [],
     });
     const imageFile = new File(["img"], "shot.png", { type: "image/png" });
@@ -153,7 +154,7 @@ describe("recoverWithdrawnQueuedRun", () => {
       mimeType: "text/markdown",
       sizeBytes: docFile.size,
     };
-    const inlineText = `${formatComposerContextReference({ kind: "response", contextId: replyTo.contextId, label: replyTo.label })} check ${formatComposerContextReference(threadContextReference(threadCtx))} ${formatComposerContextReference({ kind: "file", contextId: "file_local-doc" as never, label: "spec.md" })}`;
+    const inlineText = `${formatInlineContextReference({ kind: "response", contextId: replyTo.contextId, label: replyTo.label })} check ${formatInlineContextReference(threadContextReference(threadCtx))} ${formatInlineContextReference({ kind: "file", contextId: "file_local-doc" as never, label: "spec.md" })}`;
 
     const result = await recoverWithdrawnQueuedRun(
       {
