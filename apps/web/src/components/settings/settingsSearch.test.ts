@@ -258,6 +258,9 @@ describe("searchSettings", () => {
       ["立即删除", "storage-delete-now"],
       ["智能体", "providers"],
       ["运行中发送", "follow-up-behavior"],
+      ["指挥", "commander"],
+      ["同时派出上限", "commander-dispatch-concurrency-limit"],
+      ["指挥写码模型", "commander-dispatch-code"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);
     }

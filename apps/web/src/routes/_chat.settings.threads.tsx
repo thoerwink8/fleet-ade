@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ArchivedThreadsPanel } from "../components/settings/ArchivedThreadsPanel";
+import { CommanderSettingsSection } from "../components/settings/CommanderSettings";
 import { ChatSettingsPanel, ThreadsSettingsPanel } from "../components/settings/SettingsPanels";
 import {
   SettingsEnvironmentScopeGate,
@@ -13,6 +14,7 @@ function SettingsThreadsRoute() {
       <ChatSettingsPanel />
       <SettingsEnvironmentScopeGate>
         <ThreadsSettingsPanel />
+        <CommanderSettingsSection />
       </SettingsEnvironmentScopeGate>
       <ArchivedThreadsPanel />
     </SettingsPageContainer>
