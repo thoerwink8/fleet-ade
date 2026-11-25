@@ -47,6 +47,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
           type: "error",
           title: presentation.title,
           description: presentation.description,
+          data: { copyText: presentation.detail },
         }),
       );
     }

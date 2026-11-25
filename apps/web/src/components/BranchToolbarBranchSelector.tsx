@@ -492,6 +492,7 @@ export function BranchToolbarBranchSelector({
             type: "error",
             title: presentation.title,
             description: presentation.description,
+            data: { copyText: presentation.detail },
           }),
         );
       }
@@ -535,6 +536,7 @@ export function BranchToolbarBranchSelector({
             type: "error",
             title: presentation.title,
             description: presentation.description,
+            data: { copyText: presentation.detail },
           }),
         );
       }

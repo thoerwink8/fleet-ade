@@ -58,6 +58,7 @@ export function useNewProject() {
             type: "error",
             title: presentation.title,
             description: `${presentation.description} 之后也可以在 Git 菜单中选择“发布仓库”。`,
+            data: { copyText: presentation.detail },
           }),
         );
       }

@@ -238,6 +238,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
             type: "error",
             title: presentation.title,
             description: presentation.description,
+            data: { copyText: presentation.detail },
           }),
         );
       }

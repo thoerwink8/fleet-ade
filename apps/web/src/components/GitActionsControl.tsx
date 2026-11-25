@@ -1329,7 +1329,7 @@ export default function GitActionsControl({
           title: presentation.title,
           description: presentation.description,
           timeout: errorToastTiming.timeout,
-          ...(scopedToastData !== undefined ? { data: scopedToastData } : {}),
+          data: { ...scopedToastData, copyText: presentation.detail },
         }),
       );
       return false;
@@ -1411,7 +1411,7 @@ export default function GitActionsControl({
               title: presentation.title,
               description: presentation.description,
               timeout: errorToastTiming.timeout,
-              ...(threadToastData !== undefined ? { data: threadToastData } : {}),
+              data: { ...threadToastData, copyText: presentation.detail },
             }),
           );
           return;
@@ -1535,7 +1535,7 @@ export default function GitActionsControl({
           type: "error",
           title: presentation.title,
           description: presentation.description,
-          ...(threadToastData !== undefined ? { data: threadToastData } : {}),
+          data: { ...threadToastData, copyText: presentation.detail },
         }),
       );
     })();

@@ -43,6 +43,8 @@ export type ThreadToastData = {
   onClose?: (() => void) | undefined;
   dismissAfterVisibleMs?: number;
   hideCopyButton?: boolean;
+  /** Raw text the copy button puts on the clipboard when the description shows only guidance. */
+  copyText?: string;
   /** Tells apart errors that share a title and wording but are not the same failure (e.g. two sessions). */
   dedupeKey?: string;
   additionalActions?: ReadonlyArray<{
@@ -408,7 +410,9 @@ function deriveToastBodyDescriptor(toast: {
     toast.data?.secondaryActionVariant ?? "secondary";
   const copyErrorText =
     toast.type === "error" && typeof toast.description === "string" && !toast.data?.hideCopyButton
-      ? toast.description
+      ? toast.data?.copyText !== undefined && toast.data.copyText.length > 0
+        ? toast.data.copyText
+        : toast.description
       : null;
   const hasAdditionalActions = (toast.data?.additionalActions?.length ?? 0) > 0;
   const hasSecondaryAction = toast.data?.secondaryActionProps !== undefined;
