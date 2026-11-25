@@ -9,10 +9,34 @@ import {
   resolveFoldThresholdPx,
 } from "./useTallEnoughToFold.logic";
 
-function readFoldThresholdPx(content: HTMLElement): number {
-  const rootRemPx =
+let cachedRootRemPx: number | null = null;
+let cachedThresholdByScope = new WeakMap<Element, number>();
+let observingDocumentRoot = false;
+const rootMutationSubscribers = new Set<() => void>();
+
+function ensureDocumentRootObserver(): void {
+  if (observingDocumentRoot || typeof MutationObserver === "undefined") return;
+  observingDocumentRoot = true;
+  new MutationObserver(() => {
+    cachedRootRemPx = null;
+    cachedThresholdByScope = new WeakMap();
+    for (const notify of rootMutationSubscribers) notify();
+  }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["style", "class"],
+  });
+}
+
+function readRootRemPx(): number {
+  if (cachedRootRemPx !== null) return cachedRootRemPx;
+  cachedRootRemPx =
     Number.parseFloat(getComputedStyle(document.documentElement).fontSize) ||
     SHELL_BASE_FONT_SIZE_PX;
+  return cachedRootRemPx;
+}
+
+function measureFoldThresholdPx(content: HTMLElement): number {
+  const rootRemPx = readRootRemPx();
   const styles = getComputedStyle(content);
   const proseFontSizePx =
     parseCssLengthPx(styles.getPropertyValue("--font-size-prose"), rootRemPx) ??
@@ -23,6 +47,19 @@ function readFoldThresholdPx(content: HTMLElement): number {
     parseLineHeightMultiplier(styles.lineHeight, proseFontSizePx) ??
     READING_FONT_SCALES.standard.proseLineHeight;
   return resolveFoldThresholdPx({ proseFontSizePx, proseLineHeight });
+}
+
+function readFoldThresholdPx(content: HTMLElement): number {
+  ensureDocumentRootObserver();
+  if (content.style.getPropertyValue("--font-size-prose").trim().length > 0) {
+    return measureFoldThresholdPx(content);
+  }
+  const scope = content.closest("[data-reading-area]") ?? document.documentElement;
+  const cached = cachedThresholdByScope.get(scope);
+  if (cached !== undefined) return cached;
+  const measured = measureFoldThresholdPx(content);
+  cachedThresholdByScope.set(scope, measured);
+  return measured;
 }
 
 /**
@@ -47,19 +84,13 @@ export function useTallEnoughToFold(enabled = true) {
         last?.borderBoxSize?.[0]?.blockSize ?? last?.contentRect.height ?? content.offsetHeight;
       update(height);
     });
-    const observer =
-      typeof MutationObserver !== "undefined"
-        ? new MutationObserver(() => {
-            update(content.offsetHeight);
-          })
-        : null;
-    observer?.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["style", "class"],
-    });
+    const onRootMutation = () => {
+      update(content.offsetHeight);
+    };
+    rootMutationSubscribers.add(onRootMutation);
     return () => {
       stopResize();
-      observer?.disconnect();
+      rootMutationSubscribers.delete(onRootMutation);
     };
   }, [enabled]);
   return { ref, tallEnough: enabled && tallEnough };

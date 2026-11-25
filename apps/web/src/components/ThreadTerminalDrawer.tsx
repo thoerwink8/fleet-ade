@@ -688,11 +688,6 @@ function TerminalSessionViewport({
       terminalRef.current = terminal;
       terminal.input.setAttribute("data-workspace-focus-default", "");
       terminal.input.readOnly = !hasTerminalWriteAccess();
-      // Reapply font settings hydrated during loading, when terminalRef was null.
-      const currentFont = terminalFontRef.current;
-      if (currentFont.size !== setupFont.size) {
-        void terminal.setFont({ size: currentFont.size });
-      }
       const latestSession = readTerminalSession();
       terminal.setSharedGrid(latestSession.grid);
       const initialOutput = readTerminalOutputUpdate(
