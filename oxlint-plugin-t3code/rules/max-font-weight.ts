@@ -3,11 +3,15 @@ import * as Option from "effect/Option";
 
 import { getPropertyName, unwrapExpression } from "../utils.ts";
 
+const HEAVY_VALUE = /^(?:bold|bolder|([1-9]\d{2,3}))$/iu;
+const FONT_SHORTHAND_SIZE_TOKEN =
+  /^(?:(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|pt|ch|ex|vw|vh|vmin|vmax|cm|mm|in|pc|q|lh|rlh|dvh|svh|lvh|cqw|cqh|cqi|cqb)|(?:calc|clamp|min|max|var)\(|(?:xxx?-small|xxx?-large|xx?-small|xx?-large|small|medium|large|smaller|larger))(?:\/|$)/iu;
 const NAMED_HEAVY_WEIGHT = /^font-(?:semibold|bold|extrabold|black)$/u;
 const ARBITRARY_FONT_WEIGHT = /^font-\[(?:(?:weight|number):)?(bold|bolder|([1-9]\d{2,3}))\]$/iu;
 const ARBITRARY_CSS_FONT_WEIGHT = /^\[font-weight:(bold|bolder|([1-9]\d{2,3}))\]$/iu;
 const INLINE_CSS_WEIGHT =
   /font-weight\s*:\s*(bold|bolder|([1-9]\d{2,3}))(?=\s*(?:!important)?\s*(?:[;}"'`]|$))/giu;
+const INLINE_CSS_FONT_SHORTHAND = /(?<![-\w])font\s*:\s*([^;}"'`\n]+)/giu;
 const STYLE_STRING_VALUE = /^\s*(bold|bolder|([1-9]\d{2,3}))\s*$/iu;
 
 const formatMessage = (offender: string) =>
@@ -28,6 +32,19 @@ function stripVariants(token: string): string {
 function isHeavyNumericOrKeyword(keywordOrNumber: string | undefined, digits: string | undefined) {
   if (digits !== undefined) return Number(digits) > 500;
   return keywordOrNumber !== undefined;
+}
+
+function hasHeavyFontShorthand(rawValue: string): boolean {
+  const cleaned = rawValue.replace(/!\s*important\b/iu, "").trim();
+  for (const token of cleaned.split(/\s+/u)) {
+    if (!token) continue;
+    if (FONT_SHORTHAND_SIZE_TOKEN.test(token)) break;
+    const parsed = HEAVY_VALUE.exec(token);
+    if (parsed && isHeavyNumericOrKeyword(parsed[0], parsed[1])) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function heavyTextOffenders(text: string): string[] {
@@ -52,6 +69,16 @@ function heavyTextOffenders(text: string): string[] {
     match = INLINE_CSS_WEIGHT.exec(text)
   ) {
     if (isHeavyNumericOrKeyword(match[1], match[2])) {
+      found.push(match[0].trim());
+    }
+  }
+  INLINE_CSS_FONT_SHORTHAND.lastIndex = 0;
+  for (
+    let match = INLINE_CSS_FONT_SHORTHAND.exec(text);
+    match !== null;
+    match = INLINE_CSS_FONT_SHORTHAND.exec(text)
+  ) {
+    if (match[1] !== undefined && hasHeavyFontShorthand(match[1])) {
       found.push(match[0].trim());
     }
   }

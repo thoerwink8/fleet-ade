@@ -207,9 +207,9 @@ export function ComposerControlsBar(props: {
       triggerClassName={cn(
         "group/model-trigger",
         MODEL_TRIGGER_STATES,
-        // One quiet 13px control: the model name in the foreground, effort and the rest in grey.
-        "rounded-md bg-foreground/4 font-normal text-secondary-label text-ui sm:text-ui [&_[data-chat-provider-model-picker-label]]:font-medium [&_[data-chat-provider-model-picker-label]]:text-foreground",
-        composerControlsCollapsed ? "min-w-13 shrink text-xs!" : "min-w-13",
+        // One quiet 14px control: the model name in the foreground, effort and the rest in grey.
+        "rounded-md bg-foreground/4 font-normal text-secondary-label text-row sm:text-row [&_[data-chat-provider-model-picker-label]]:font-medium [&_[data-chat-provider-model-picker-label]]:text-foreground",
+        composerControlsCollapsed ? "min-w-13 shrink" : "min-w-13",
       )}
       triggerSuffix={effort.suffix}
       triggerDetail={effort.detail}

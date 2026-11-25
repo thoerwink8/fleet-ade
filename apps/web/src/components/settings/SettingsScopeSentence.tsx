@@ -79,7 +79,7 @@ export function SettingsScopeSentence() {
     onChange: scope.selectScope,
   };
   return (
-    <p className="-mb-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-ui text-muted-foreground sm:-mb-2">
+    <p className="-mb-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-row text-muted-foreground sm:-mb-2">
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="shrink-0">正在为</span>
         <ProjectScopeMenu {...props} />
