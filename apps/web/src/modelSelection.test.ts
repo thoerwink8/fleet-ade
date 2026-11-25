@@ -471,6 +471,60 @@ describe("instance-scoped model selection", () => {
     });
   });
 
+  describe("acpRegistry catalog gaps", () => {
+    it("preserves the selected model while acpRegistry only reports the pre-probe default placeholder", () => {
+      const instanceId = ProviderInstanceId.make("acp_replay");
+      const providers: ServerProvider[] = [
+        {
+          ...provider({
+            provider: ProviderDriverKind.make("acpRegistry"),
+            instanceId: "acp_replay",
+            models: [],
+          }),
+          models: [
+            {
+              slug: "default",
+              name: "Default",
+              isCustom: false,
+              isDefault: true,
+              capabilities: {},
+            },
+          ],
+        },
+      ];
+
+      expect(
+        resolveAppModelSelectionForInstance(
+          instanceId,
+          settingsWithProviderInstances(),
+          providers,
+          "showcase",
+          { preserveUnavailableSelection: true },
+        ),
+      ).toBe("showcase");
+      expect(
+        resolveAppModelSelectionForInstance(
+          instanceId,
+          settingsWithProviderInstances(),
+          providers,
+          "showcase",
+        ),
+      ).toBe("default");
+
+      const entry = deriveProviderInstanceEntries(providers)[0]!;
+      expect(
+        getAppModelOptionsForInstance(settingsWithProviderInstances(), entry, "showcase"),
+      ).toEqual([
+        expect.objectContaining({ slug: "default", name: "Default" }),
+        expect.objectContaining({
+          slug: "showcase",
+          name: "showcase",
+          isUnavailable: true,
+        }),
+      ]);
+    });
+  });
+
   it("falls back from an explicit draft with a missing model", () => {
     const instanceId = ProviderInstanceId.make("codex");
     const driver = ProviderDriverKind.make("codex");

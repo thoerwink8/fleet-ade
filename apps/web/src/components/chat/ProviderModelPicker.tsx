@@ -1,5 +1,4 @@
 import {
-  ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
   type EnvironmentId,
   type ProviderDriverKind,
@@ -10,11 +9,18 @@ import { Badge } from "../ui/badge";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
+import {
+  formatModelDisplayName,
+  resolveModelDisplayName,
+} from "@t3tools/client-runtime/model-display";
 import { ModelPickerContent, resolveModelPickerSelectedModel } from "./ModelPickerContent";
-import { retainedModelWhileProviderLocked } from "./ProviderModelPicker.logic";
+import {
+  resolveModelPickerTriggerDisplay,
+  retainedModelWhileProviderLocked,
+} from "./ProviderModelPicker.logic";
 import { ChatGptSharingControl } from "./ChatGptSharingControl";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
-import { ModelEsque, getDisplayModelName, getTriggerDisplayModelName } from "./providerIconUtils";
+import { type ModelEsque } from "./providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
 import { takeOpenTarget, useComposerMenuProps } from "./composerEventScope";
@@ -130,22 +136,16 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
 
   const activeInstanceId = props.activeInstanceId;
   const selectedInstanceOptions = props.modelOptionsByInstance.get(activeInstanceId) ?? [];
-  const selectedModel =
-    resolveModelPickerSelectedModel({
-      driverKind: activeEntry?.driverKind,
-      model: props.model,
-      options: selectedInstanceOptions,
-    }) ??
-    retainedModelWhileProviderLocked(activeEntry, props.model) ??
-    (activeEntry?.driverKind === "antigravity" ? undefined : selectedInstanceOptions[0]);
-  const triggerTitle = selectedModel
-    ? getTriggerDisplayModelName(selectedModel, activeEntry?.driverKind)
-    : props.model === ANTIGRAVITY_DEFAULT_MODEL
-      ? "选择模型"
-      : props.model || "选择模型";
-  const triggerLabel = selectedModel
-    ? `${getDisplayModelName(selectedModel)}${selectedModel.isUnavailable ? "（不可用）" : ""}`
-    : triggerTitle;
+  const {
+    triggerTitle,
+    triggerLabel,
+    isUnavailable: isSelectedModelUnavailable,
+  } = resolveModelPickerTriggerDisplay({
+    driverKind: activeEntry?.driverKind,
+    model: props.model,
+    options: selectedInstanceOptions,
+    retainedModel: retainedModelWhileProviderLocked(activeEntry, props.model),
+  });
   const showInstanceBadge =
     activeEntry !== null && shouldShowInstanceBadge(activeEntry, props.instanceEntries);
 
@@ -209,14 +209,19 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
       model: selection.model,
       options: props.modelOptionsByInstance.get(selection.instanceId) ?? [],
     });
-    const unavailable = model?.isUnavailable ? " (Unavailable)" : "";
+    const unavailable = model?.isUnavailable ? "（不可用）" : "";
+    const modelLabel = model
+      ? formatModelDisplayName(model)
+      : resolveModelDisplayName({
+          driverKind: entry?.driverKind,
+          model: selection.model,
+          models: entry?.models,
+        }) || selection.model;
     return {
       ...selection,
       entry,
-      label: model
-        ? `${getTriggerDisplayModelName(model, entry?.driverKind)}${unavailable}`
-        : selection.model,
-      fullLabel: model ? `${getDisplayModelName(model)}${unavailable}` : selection.model,
+      label: `${modelLabel}${unavailable}`,
+      fullLabel: `${modelLabel}${unavailable}`,
     };
   });
   const multipleLabel = selectedEntries
@@ -399,7 +404,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
             </Tooltip>
           )}
           {props.triggerSuffix}
-          {selectedModel?.isUnavailable && !selectedEntries && props.triggerLabel === undefined ? (
+          {isSelectedModelUnavailable && !selectedEntries && props.triggerLabel === undefined ? (
             <Badge variant="outline" size="sm">
               不可用
             </Badge>

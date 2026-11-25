@@ -31,6 +31,10 @@
       "types": "./src/modelSearch.ts",
       "default": "./src/modelSearch.ts"
     },
+    "./model-display": {
+      "types": "./src/modelDisplay.ts",
+      "default": "./src/modelDisplay.ts"
+    },
     "./image-attachment-size": {
       "types": "./src/imageAttachmentSize.ts",
       "default": "./src/imageAttachmentSize.ts"
