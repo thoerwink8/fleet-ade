@@ -139,25 +139,48 @@ export function buildEmptyPathQueryEntries(input: {
   return combined;
 }
 
+/**
+ * Drops remembered paths whose first segment is gone from the root listing. The listing only
+ * covers the root, so a path inside a surviving directory passes unchecked. Callers skip this
+ * until the listing has loaded, or every recent path would vanish on failure.
+ */
+export function filterRecentPathsMissingFromRoot(input: {
+  readonly recentFilePaths: ReadonlyArray<string>;
+  readonly rootEntries: ReadonlyArray<ProjectEntry>;
+}): string[] {
+  const rootPaths = new Set(input.rootEntries.map((entry) => entry.path));
+  return input.recentFilePaths.filter((recentPath) => {
+    const firstSegment = recentPath.split("/", 1)[0] ?? recentPath;
+    return rootPaths.has(firstSegment);
+  });
+}
+
 export function resolveComposerPathMenuState(input: {
   readonly query: string;
   readonly isRootPending: boolean;
   readonly isSearchPending: boolean;
+  readonly hasRootError?: boolean | undefined;
+  readonly hasSearchError?: boolean | undefined;
 }): {
   readonly isLoading: boolean;
   readonly loadingStateText: string;
   readonly emptyStateText: string;
+  readonly hasError: boolean;
 } {
   if (input.query.trim().length === 0) {
     return {
       isLoading: input.isRootPending,
       loadingStateText: "正在加载项目文件…",
-      emptyStateText: "当前项目目录下暂无文件。",
+      emptyStateText:
+        input.hasRootError === true ? "无法读取项目文件。" : "当前项目目录下暂无文件。",
+      hasError: input.hasRootError === true,
     };
   }
   return {
     isLoading: input.isSearchPending,
     loadingStateText: "正在搜索项目文件…",
-    emptyStateText: "没有匹配的文件或文件夹。",
+    emptyStateText:
+      input.hasSearchError === true ? "无法搜索项目文件。" : "没有匹配的文件或文件夹。",
+    hasError: input.hasSearchError === true,
   };
 }

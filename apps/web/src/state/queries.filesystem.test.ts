@@ -77,6 +77,7 @@ vi.mock("./query", () => ({
     isPending:
       atom === state.sessionAtom &&
       (state.sessionWaiting || (state.session === null && state.sessionError === null)),
+    isSuccess: atom === state.listAtom || atom === state.searchAtom || atom === state.contentAtom,
     refresh: vi.fn(),
   }),
 }));

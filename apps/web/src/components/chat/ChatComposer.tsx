@@ -1178,6 +1178,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     isLoading: isComposerMenuLoading,
     loadingState: composerMenuLoadingState,
     emptyState: composerMenuEmptyState,
+    emptyStateError: composerMenuEmptyStateError,
   } = useComposerMenuItems({
     composerTrigger,
     environmentId,
@@ -3977,6 +3978,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     triggerKind={composerTriggerKind}
                     loadingStateText={composerMenuLoadingState}
                     emptyStateText={composerMenuEmptyState}
+                    emptyStateError={composerMenuEmptyStateError}
                     activeItemId={activeComposerMenuItem?.id ?? null}
                     onHighlightedItemChange={onComposerMenuItemHighlightedStable}
                     onSelect={onSelectComposerItemStable}

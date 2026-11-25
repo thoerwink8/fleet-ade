@@ -5,6 +5,7 @@ import {
   buildEmptyPathQueryEntries,
   clearRecentComposerPaths,
   collectRecentThreadFilePaths,
+  filterRecentPathsMissingFromRoot,
   getRecentComposerPaths,
   rememberRecentComposerPath,
   resolveComposerPathMenuState,
@@ -69,6 +70,25 @@ describe("composerPathSuggestions logic", () => {
       { path: "package.json", kind: "file" },
     ]);
   });
+  it("drops recent paths missing from the loaded root listing but keeps survivors", () => {
+    expect(
+      filterRecentPathsMissingFromRoot({
+        recentFilePaths: ["src/index.ts", "gone/deleted.ts", "README.md", "old-root-file.txt"],
+        rootEntries: [
+          { path: "src", kind: "directory" },
+          { path: "README.md", kind: "file" },
+          { path: "node_modules", kind: "directory", ignored: true },
+        ],
+      }),
+    ).toEqual(["src/index.ts", "README.md"]);
+
+    expect(
+      filterRecentPathsMissingFromRoot({
+        recentFilePaths: ["docs/guide.md"],
+        rootEntries: [],
+      }),
+    ).toEqual([]);
+  });
 
   it("shows loading state on empty @ query while pending and never reports no-match during load", () => {
     expect(
@@ -81,6 +101,7 @@ describe("composerPathSuggestions logic", () => {
       isLoading: true,
       loadingStateText: "正在加载项目文件…",
       emptyStateText: "当前项目目录下暂无文件。",
+      hasError: false,
     });
 
     expect(
@@ -93,6 +114,7 @@ describe("composerPathSuggestions logic", () => {
       isLoading: false,
       loadingStateText: "正在加载项目文件…",
       emptyStateText: "当前项目目录下暂无文件。",
+      hasError: false,
     });
 
     expect(
@@ -105,6 +127,7 @@ describe("composerPathSuggestions logic", () => {
       isLoading: true,
       loadingStateText: "正在搜索项目文件…",
       emptyStateText: "没有匹配的文件或文件夹。",
+      hasError: false,
     });
 
     expect(
@@ -117,6 +140,46 @@ describe("composerPathSuggestions logic", () => {
       isLoading: false,
       loadingStateText: "正在搜索项目文件…",
       emptyStateText: "没有匹配的文件或文件夹。",
+      hasError: false,
     });
+  });
+
+  it("reports read failures as failures instead of an empty or no-match state", () => {
+    expect(
+      resolveComposerPathMenuState({
+        query: "",
+        isRootPending: false,
+        isSearchPending: false,
+        hasRootError: true,
+      }),
+    ).toEqual({
+      isLoading: false,
+      loadingStateText: "正在加载项目文件…",
+      emptyStateText: "无法读取项目文件。",
+      hasError: true,
+    });
+
+    expect(
+      resolveComposerPathMenuState({
+        query: "foo",
+        isRootPending: false,
+        isSearchPending: false,
+        hasSearchError: true,
+      }),
+    ).toEqual({
+      isLoading: false,
+      loadingStateText: "正在搜索项目文件…",
+      emptyStateText: "无法搜索项目文件。",
+      hasError: true,
+    });
+
+    expect(
+      resolveComposerPathMenuState({
+        query: "",
+        isRootPending: true,
+        isSearchPending: false,
+        hasRootError: true,
+      }).isLoading,
+    ).toBe(true);
   });
 });

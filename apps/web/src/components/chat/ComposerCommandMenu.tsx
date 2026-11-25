@@ -29,6 +29,7 @@ import { memo, useLayoutEffect, useRef, useState } from "react";
 import { type ComposerSlashCommand, type ComposerTriggerKind } from "../../composer-logic";
 import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { Command, CommandGroup, CommandItem, CommandList } from "../ui/command";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
@@ -113,6 +114,7 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
   triggerKind: ComposerTriggerKind | null;
   loadingStateText?: string | undefined;
   emptyStateText?: string | undefined;
+  emptyStateError?: { readonly message: string; readonly retry: () => void } | null | undefined;
   activeItemId: string | null;
   onHighlightedItemChange: (itemId: string | null) => void;
   onSelect: (item: ComposerCommandItem) => void;
@@ -165,7 +167,7 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             </CommandGroup>
           </CommandList>
         ) : (
-          <div className="px-5 pt-3.5 pb-7">
+          <div className="flex flex-col items-start gap-2 px-5 pt-3.5 pb-7">
             <p className="text-secondary-label text-xs">
               {props.isLoading
                 ? (props.loadingStateText ??
@@ -181,6 +183,16 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
                       ? "没有匹配的文件或文件夹。"
                       : "没有匹配的命令。"))}
             </p>
+            {!props.isLoading && props.emptyStateError ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="secondary"
+                onClick={props.emptyStateError.retry}
+              >
+                立即重试
+              </Button>
+            ) : null}
           </div>
         )}
       </ComposerBanner.Surface>
