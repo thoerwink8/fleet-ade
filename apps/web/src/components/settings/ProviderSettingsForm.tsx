@@ -250,7 +250,7 @@ function ProviderCommandArguments({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="secondary"
           onClick={() => updateArguments([...rows, makeCommandArgumentDraftRow("")])}
         >
           <PlusIcon />
@@ -278,8 +278,9 @@ function ProviderCommandArguments({
               />
               <Button
                 type="button"
-                size="icon-micro"
-                variant="ghost-destructive"
+                size="xs"
+                icon
+                variant="danger-ghost"
                 onClick={() =>
                   updateArguments(rows.filter((current) => current.id !== argument.id))
                 }
@@ -391,8 +392,9 @@ function SecretSettingsControl({
       {configured ? (
         <Button
           type="button"
-          size="icon-sm"
-          variant="ghost-destructive"
+          size="sm"
+          icon
+          variant="danger-ghost"
           onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
           aria-label={`清除 ${field.label}`}
         >
@@ -574,8 +576,9 @@ function ProviderSettingsFieldRow({
           {secretConfigured ? (
             <Button
               type="button"
-              size="icon-sm"
-              variant="ghost-destructive"
+              size="sm"
+              icon
+              variant="danger-ghost"
               onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
               aria-label={`清除 ${field.label}`}
             >

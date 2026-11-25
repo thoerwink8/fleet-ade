@@ -295,7 +295,8 @@ export function PullRequestDetailPanel({
         <div className="mr-4 flex h-7 shrink-0 select-none items-center justify-end gap-1">
           {onClose ? (
             <Button
-              size="icon-xs"
+              size="xs"
+              icon
               variant="ghost"
               aria-label={`折叠 ${terminology.singular} 面板`}
               onClick={onClose}

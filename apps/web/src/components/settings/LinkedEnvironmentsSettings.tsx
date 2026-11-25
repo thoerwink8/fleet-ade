@@ -153,7 +153,7 @@ function LinkedEnvironmentRow({
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
             <Button
               size="xs"
-              variant="destructive-outline"
+              variant="danger-secondary"
               disabled={busy}
               onClick={() => void forget()}
             >
@@ -263,7 +263,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
     >
       <DialogTrigger
         render={
-          <Button size="xs" variant="default">
+          <Button size="xs" variant="primary">
             <PlusIcon className="size-3" />
             关联
           </Button>
@@ -353,7 +353,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
           </form>
         </DialogPanel>
         <DialogFooter variant="bare">
-          <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
+          <DialogClose disabled={busy} render={<Button variant="secondary" type="button" />}>
             取消
           </DialogClose>
           <Button form={formId} type="submit" disabled={busy || !ready}>

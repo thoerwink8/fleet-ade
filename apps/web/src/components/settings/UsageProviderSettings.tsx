@@ -38,7 +38,7 @@ export function UsageProviderSettings({
         {...searchableSetting("usage-providers")}
         headerAction={
           !readOnly ? (
-            <Button size="xs" variant="outline" onClick={() => setAdding(true)}>
+            <Button size="xs" variant="secondary" onClick={() => setAdding(true)}>
               <PlusIcon className="size-3" aria-hidden />
               添加中转站
             </Button>
@@ -109,9 +109,9 @@ function RemoveUsageProviderButton({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
             <Button
-              variant="destructive"
+              variant="danger"
               onClick={() => {
                 setOpen(false);
                 onConfirm();

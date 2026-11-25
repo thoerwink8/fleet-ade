@@ -362,7 +362,7 @@ export function WorktreeSetupCard({
         <Button
           type="button"
           size="xs"
-          variant="ghost-muted"
+          variant="muted"
           aria-expanded={detailsOpen}
           onClick={() => setDetailsOpen((open) => !open)}
         >
@@ -370,19 +370,19 @@ export function WorktreeSetupCard({
           详情
         </Button>
         {showTerminal ? (
-          <Button type="button" size="xs" variant="ghost-muted" onClick={onOpenTerminal}>
+          <Button type="button" size="xs" variant="muted" onClick={onOpenTerminal}>
             <TerminalIcon aria-hidden />
             打开终端
           </Button>
         ) : null}
         {onWorkLocally ? (
-          <Button type="button" size="xs" variant="ghost-muted" onClick={onWorkLocally}>
+          <Button type="button" size="xs" variant="muted" onClick={onWorkLocally}>
             <LaptopIcon aria-hidden />
             在本地工作
           </Button>
         ) : null}
         {onCancel && running ? (
-          <Button type="button" size="xs" variant="ghost-muted" onClick={onCancel}>
+          <Button type="button" size="xs" variant="muted" onClick={onCancel}>
             <XIcon aria-hidden />
             取消
           </Button>

@@ -40,7 +40,8 @@ export function ScrollToEndButton(props: {
         onPointerDown={(event) => event.preventDefault()}
         onClick={props.onScrollToEnd}
         className="pointer-events-auto"
-        size="icon"
+        size="md"
+        icon
         variant="glass"
       >
         <ArrowDownIcon className="size-4" />

@@ -61,7 +61,7 @@ function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentI
               </p>
               <p className="break-all font-mono text-xs">{mcpUrl}</p>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 disabled={!connected}
                 onClick={() => copyToClipboard(mcpUrl)}

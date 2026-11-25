@@ -33,7 +33,7 @@ export function ThreadDetailsItemsRow() {
           <MenuTrigger
             render={
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="w-full justify-between sm:w-40"
                 aria-label={`会话详情：已启用 ${enabled}/${THREAD_DETAILS_ITEMS.length} 项`}

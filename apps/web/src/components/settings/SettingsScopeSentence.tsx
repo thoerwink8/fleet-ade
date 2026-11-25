@@ -142,7 +142,7 @@ function ScopeMenu({
   const trigger = (
     <Trigger
       aria-label={`${ariaLabel}: ${label}`}
-      render={<Button variant="outline" size="sm" />}
+      render={<Button variant="secondary" size="sm" />}
       className="min-w-0 max-w-72"
     >
       {icon}

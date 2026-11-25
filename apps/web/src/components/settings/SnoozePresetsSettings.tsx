@@ -290,8 +290,9 @@ function SnoozePresetList(props: {
                 <span className="truncate">{preview.text}</span>
               )}
               <Button
-                variant="ghost-muted"
-                size="icon-sm"
+                variant="muted"
+                size="sm"
+                icon
                 aria-label={`移除暂缓选项 ${index + 1}`}
                 onClick={() => props.onRemove(index)}
               >
@@ -306,8 +307,8 @@ function SnoozePresetList(props: {
       </p>
       <div>
         <Button
-          variant="ghost-muted"
-          size="compact"
+          variant="muted"
+          size="sm"
           disabled={props.presets.length >= MAX_SNOOZE_PRESETS}
           onClick={props.onAdd}
         >

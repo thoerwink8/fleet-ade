@@ -255,7 +255,7 @@ function ProjectIconPickerBody({
         )}
       </DialogPanel>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           取消
         </Button>
         <Button onClick={save} disabled={mode === "monogram" && !validMonogram}>

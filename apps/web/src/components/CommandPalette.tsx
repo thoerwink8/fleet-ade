@@ -1120,7 +1120,7 @@ function OpenCommandPaletteDialog(props: {
               render={
                 <Button
                   variant="warning-outline"
-                  size="micro"
+                  size="xs"
                   onClick={() => {
                     openSourceControlSettings();
                   }}

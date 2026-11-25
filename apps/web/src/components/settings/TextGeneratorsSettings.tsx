@@ -95,7 +95,7 @@ export function TextGeneratorsSettings({
         {...searchableSetting("text-generators")}
         headerAction={
           !readOnly ? (
-            <Button size="xs" variant="outline" onClick={() => setEditing("new")}>
+            <Button size="xs" variant="secondary" onClick={() => setEditing("new")}>
               <PlusIcon className="size-3" aria-hidden />
               添加生成器
             </Button>
@@ -137,8 +137,9 @@ export function TextGeneratorsSettings({
                       <MenuTrigger
                         render={
                           <Button
-                            size="icon-sm"
-                            variant="ghost-muted"
+                            size="sm"
+                            icon
+                            variant="muted"
                             aria-label={`${name} 的更多操作`}
                           />
                         }
@@ -211,9 +212,9 @@ export function TextGeneratorsSettings({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
             <Button
-              variant="destructive"
+              variant="danger"
               onClick={() => {
                 if (removing !== null) updateSettings({ textGenerators: { [removing]: null } });
                 setRemoving(null);
@@ -476,7 +477,7 @@ function TextGeneratorWizard({
         >
           {step === 0 ? (
             <>
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="secondary" onClick={onClose}>
                 取消
               </Button>
               <Button onClick={() => void connect()} disabled={!canConnect || checking}>
@@ -578,7 +579,7 @@ function TextGenerationTaskPicker({
         {testable ? (
           <Button
             size="xs"
-            variant="outline"
+            variant="secondary"
             aria-busy={testing}
             disabled={testing}
             onClick={() => void test()}
@@ -734,7 +735,7 @@ function TextGeneratorModelsDialog({
         </DialogPanel>
         <DialogFooter variant="bare">
           <Button
-            variant="outline"
+            variant="secondary"
             aria-busy={refreshing}
             disabled={refreshing}
             onClick={() => void refresh()}

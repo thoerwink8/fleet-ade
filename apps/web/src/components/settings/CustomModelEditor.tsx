@@ -166,8 +166,9 @@ export function CustomModelEditor({
         默认
       </label>
       <Button
-        size="icon-micro"
-        variant="ghost-muted"
+        size="xs"
+        icon
+        variant="muted"
         aria-label="移除候选项"
         onClick={() =>
           updateDescriptor(descriptor.key, {
@@ -245,8 +246,9 @@ export function CustomModelEditor({
           </SelectPopup>
         </Select>
         <Button
-          size="icon-micro"
-          variant="ghost-muted"
+          size="xs"
+          icon
+          variant="muted"
           aria-label={`移除选项 ${index + 1}`}
           onClick={() => removeDescriptor(descriptor.key)}
         >
@@ -259,7 +261,7 @@ export function CustomModelEditor({
           <Button
             type="button"
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             className="-ml-2 self-start"
             onClick={() =>
               updateDescriptor(descriptor.key, {
@@ -335,7 +337,7 @@ export function CustomModelEditor({
                 key={preset.id}
                 type="button"
                 size="xs"
-                variant="ghost-muted"
+                variant="muted"
                 className={cn("-ml-2 first:ml-0")}
                 onClick={() => addDescriptor(descriptorFromPreset(preset))}
               >
@@ -346,7 +348,7 @@ export function CustomModelEditor({
           <Button
             type="button"
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             onClick={() => addDescriptor(emptyEditorDescriptor())}
           >
             <PlusIcon className="size-3" />
@@ -358,7 +360,7 @@ export function CustomModelEditor({
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" onClick={handleSave}>
+        <Button size="sm" variant="secondary" onClick={handleSave}>
           保存
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>

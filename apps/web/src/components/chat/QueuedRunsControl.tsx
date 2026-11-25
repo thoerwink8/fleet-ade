@@ -302,7 +302,7 @@ export function QueuedRunsControl({
                       <TooltipTrigger render={<span className="flex shrink-0" />}>
                         <Button
                           size="xs"
-                          variant="ghost-muted"
+                          variant="muted"
                           disabled={
                             item.runId === null ||
                             busyRunId !== null ||
@@ -349,8 +349,9 @@ export function QueuedRunsControl({
                       {/* The span keeps the tooltip, and its reason, on a disabled button. */}
                       <TooltipTrigger render={<span className="flex shrink-0" />}>
                         <Button
-                          size="icon-xs"
-                          variant="ghost-muted"
+                          size="xs"
+                          icon
+                          variant="muted"
                           aria-label="编辑排队消息"
                           disabled={
                             item.runId === null ||
@@ -382,7 +383,7 @@ export function QueuedRunsControl({
                         render={
                           <Button
                             size="xs"
-                            variant="ghost-muted"
+                            variant="muted"
                             aria-label="撤回排队消息"
                             disabled={item.runId === null || busyRunId !== null}
                             onClick={() => {

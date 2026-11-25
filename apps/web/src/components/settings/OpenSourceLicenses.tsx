@@ -93,9 +93,10 @@ function LicenseNoticeRow({
               aria-label={`查看 ${entry.name} 的项目源码`}
               className="me-3 shrink-0 sm:me-4"
               render={<a href={entry.sourceUrl} rel="noreferrer noopener" target="_blank" />}
-              size="icon-micro"
+              size="xs"
+              icon
               title="项目源码"
-              variant="ghost-muted"
+              variant="muted"
             >
               <ExternalLinkIcon aria-hidden className="size-3" />
             </Button>
@@ -156,9 +157,10 @@ function LicenseHeaderAction({
               <Button
                 aria-label="搜索开源许可"
                 onClick={() => onSearchOpenChange(true)}
-                size="icon-micro"
+                size="xs"
+                icon
                 type="button"
-                variant="ghost-muted"
+                variant="muted"
               >
                 <SearchIcon className="size-3" />
               </Button>
@@ -211,7 +213,7 @@ function LicenseManifestError({ message, onRetry }: { message: string; onRetry: 
           {message}
         </p>
       </div>
-      <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+      <Button type="button" size="xs" variant="secondary" onClick={onRetry}>
         重试
       </Button>
     </div>

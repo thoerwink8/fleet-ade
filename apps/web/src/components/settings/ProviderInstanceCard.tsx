@@ -323,8 +323,9 @@ function ProviderEnvironmentFieldRow(props: {
           {props.variable ? (
             <Button
               type="button"
-              size="icon-sm"
-              variant="ghost-destructive"
+              size="sm"
+              icon
+              variant="danger-ghost"
               onClick={() => props.onRemove(props.field)}
               aria-label={`清除 ${props.field.label}`}
             >
@@ -438,7 +439,7 @@ export function ProviderEnvironmentSection(props: {
       title="变量"
       description="各智能体的 API 密钥、基础 URL 和其他 CLI 设置。"
       control={
-        <Button type="button" size="sm" variant="outline" onClick={addVariable}>
+        <Button type="button" size="sm" variant="secondary" onClick={addVariable}>
           <PlusIcon className="size-3" />
           添加变量
         </Button>
@@ -463,8 +464,9 @@ export function ProviderEnvironmentSection(props: {
             const removeButton = (
               <Button
                 type="button"
-                size="icon-micro"
-                variant="ghost-destructive"
+                size="xs"
+                icon
+                variant="danger-ghost"
                 onClick={() => removeVariable(variable.id)}
                 aria-label={`移除环境变量 ${variable.name || index + 1}`}
               >
@@ -478,8 +480,9 @@ export function ProviderEnvironmentSection(props: {
                     render={
                       <Button
                         type="button"
-                        size="icon-micro"
-                        variant="ghost-muted"
+                        size="xs"
+                        icon
+                        variant="muted"
                         disabled={variable.valueRedacted === true}
                         onClick={() => {
                           const sensitive = !variable.sensitive;
@@ -592,8 +595,9 @@ function ProjectOverrideInheritance({
             <PopoverTrigger
               render={
                 <Button
-                  size="icon-micro"
-                  variant="ghost-muted"
+                  size="xs"
+                  icon
+                  variant="muted"
                   aria-label="此项目已覆盖设置。查看此值的来源"
                 />
               }
@@ -962,8 +966,9 @@ export function ProviderInstanceCard({
               render={
                 <Button
                   type="button"
-                  size={mode === "list" ? "icon-micro" : "icon-xs"}
-                  variant="ghost-muted"
+                  size="xs"
+                  icon
+                  variant="muted"
                   className={mode === "list" ? "pointer-events-auto relative shrink-0" : undefined}
                   aria-label={`${updateProgress ? "正在更新" : versionAdvisory.title}，查看详情`}
                 >
@@ -1005,7 +1010,7 @@ export function ProviderInstanceCard({
             <Button
               type="button"
               size="xs"
-              variant="outline"
+              variant="secondary"
               className="w-full"
               disabled={isUpdating}
               onClick={onRunVersionAction}
@@ -1054,8 +1059,9 @@ export function ProviderInstanceCard({
                   render={
                     <Button
                       type="button"
-                      size="icon-xs"
-                      variant="ghost-muted"
+                      size="xs"
+                      icon
+                      variant="muted"
                       className="shrink-0"
                       onClick={() => copyToClipboard(updateCommand, { providerName: displayName })}
                       aria-label="复制更新命令"
@@ -1174,8 +1180,9 @@ export function ProviderInstanceCard({
         {onDelete ? (
           <Button
             type="button"
-            size="icon-xs"
-            variant="ghost-destructive"
+            size="xs"
+            icon
+            variant="danger-ghost"
             disabled={readOnly}
             onClick={onDelete}
             aria-label={`移除智能体 ${instanceId}`}
@@ -1220,7 +1227,7 @@ export function ProviderInstanceCard({
               />
             }
             size="xs"
-            variant="outline"
+            variant="secondary"
             className="w-fit"
             disabled={readOnly}
           >

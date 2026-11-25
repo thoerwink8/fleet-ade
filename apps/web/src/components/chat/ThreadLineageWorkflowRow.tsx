@@ -156,7 +156,8 @@ export function ThreadLineageWorkflowRow({
               <TooltipTrigger
                 render={
                   <ThreadDetailsControl
-                    size="icon-xs"
+                    size="xs"
+                    icon
                     variant="ghost"
                     part="icon"
                     tone="destructive"

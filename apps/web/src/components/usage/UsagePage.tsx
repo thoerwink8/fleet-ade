@@ -436,7 +436,8 @@ export function UsagePage() {
           aria-label={showingLimits ? "刷新限制" : "刷新用量"}
           aria-busy={isRefreshing}
           disabled={isRefreshing || (!showingLimits && !canReadDiagnostics)}
-          size="icon-sm"
+          size="sm"
+          icon
           variant="ghost"
         >
           <RefreshIcon size="sm" refreshing={isRefreshing} />
@@ -497,7 +498,8 @@ export function UsagePage() {
           aria-label={showingLimits ? "刷新限制" : "刷新用量"}
           aria-busy={isRefreshing}
           disabled={isRefreshing || (!showingLimits && !canReadDiagnostics)}
-          size="icon-sm"
+          size="sm"
+          icon
           variant="ghost"
         >
           <RefreshIcon size="sm" refreshing={isRefreshing} />

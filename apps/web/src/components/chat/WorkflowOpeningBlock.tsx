@@ -231,7 +231,7 @@ function WorkflowScript(props: { readonly script: string }) {
           <Button
             type="button"
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             aria-expanded={expanded}
             data-scroll-anchor-ignore
             onClick={() => setExpanded((value) => !value)}

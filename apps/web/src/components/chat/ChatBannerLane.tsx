@@ -128,8 +128,9 @@ export function ChatBannerLane(props: {
             <Button
               aria-label="关闭机群服务故障提示"
               onClick={onDismissFleetEngineFailure}
-              size="icon-sm"
-              variant="ghost-muted"
+              size="sm"
+              icon
+              variant="muted"
             >
               <XIcon />
             </Button>

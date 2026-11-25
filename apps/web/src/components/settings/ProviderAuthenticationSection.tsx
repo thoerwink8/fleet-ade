@@ -233,7 +233,7 @@ export function ProviderAuthenticationSection({
             <>
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={disabled}
                 onClick={() => void openBrowser()}
               >
@@ -244,8 +244,9 @@ export function ProviderAuthenticationSection({
                   render={
                     <Button
                       aria-label="复制登录链接"
-                      size="icon-sm"
-                      variant="ghost-muted"
+                      size="sm"
+                      icon
+                      variant="muted"
                       disabled={disabled}
                       onClick={() => {
                         // Copy during the click to retain clipboard activation; consent must still be
@@ -270,7 +271,7 @@ export function ProviderAuthenticationSection({
             {needsExternalSetup && provider.setup?.documentationUrl ? (
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 render={
                   <a href={provider.setup.documentationUrl} target="_blank" rel="noreferrer" />
                 }
@@ -280,7 +281,7 @@ export function ProviderAuthenticationSection({
             ) : active && auth?.flowId ? (
               <Button
                 size="sm"
-                variant="ghost-muted"
+                variant="muted"
                 aria-label="取消登录"
                 disabled={disabled}
                 onClick={() =>
@@ -294,7 +295,7 @@ export function ProviderAuthenticationSection({
             ) : !active && !needsExternalSetup && provider.setup?.canAuthenticate !== false ? (
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={disabled || !provider.enabled || !provider.installed || !auth}
                 onClick={() =>
                   void run(() =>
@@ -436,7 +437,7 @@ export function ProviderAuthenticationSection({
               <Button
                 type="submit"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 className="w-fit"
                 disabled={disabled}
               >
@@ -476,7 +477,7 @@ export function ProviderAuthenticationSection({
               <Button
                 type="submit"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 className="w-fit"
                 disabled={disabled || !values.callback?.trim()}
               >

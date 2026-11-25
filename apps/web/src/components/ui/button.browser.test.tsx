@@ -17,15 +17,45 @@ import { Badge } from "./badge";
 import { Button, type ButtonSize } from "./button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./menu";
 
-const SIZE_GROUPS = [
-  ["--fa-ctrl", ["default", "multiline", "icon"]],
+type ButtonSizeCase = {
+  readonly label: string;
+  readonly size: ButtonSize;
+  readonly icon?: boolean;
+  readonly multiline?: boolean;
+};
+
+const SIZE_GROUPS: ReadonlyArray<readonly [string, ReadonlyArray<ButtonSizeCase>]> = [
+  [
+    "--fa-ctrl",
+    [
+      { label: "md", size: "md" },
+      { label: "md multiline", size: "md", multiline: true },
+      { label: "md icon", size: "md", icon: true },
+    ],
+  ],
   [
     "--fa-ctrl-sm",
-    ["sm", "action", "compact", "sm-pill", "sm-multiline", "icon-sm", "icon-sm-pill"],
+    [
+      { label: "sm", size: "sm" },
+      { label: "sm multiline", size: "sm", multiline: true },
+      { label: "sm icon", size: "sm", icon: true },
+    ],
   ],
-  ["--fa-ctrl-xs", ["xs", "micro", "icon-xs", "icon-micro", "icon-tiny"]],
-  ["--fa-ctrl-lg", ["lg", "xl", "icon-lg", "icon-xl"]],
-] as const satisfies ReadonlyArray<readonly [string, ReadonlyArray<ButtonSize>]>;
+  [
+    "--fa-ctrl-xs",
+    [
+      { label: "xs", size: "xs" },
+      { label: "xs icon", size: "xs", icon: true },
+    ],
+  ],
+  [
+    "--fa-ctrl-lg",
+    [
+      { label: "lg", size: "lg" },
+      { label: "lg icon", size: "lg", icon: true },
+    ],
+  ],
+];
 
 function resolveStyle(prop: "height" | "backgroundColor", value: string): string {
   const probe = document.createElement("div");
@@ -76,33 +106,39 @@ describe("Button", () => {
         await page.viewport(width, height);
         await using screen = await render(
           <div className="flex flex-wrap items-center gap-2 p-4">
-            {SIZE_GROUPS.flatMap(([, sizes]) =>
-              sizes.map((size) => (
-                <Button key={size} size={size} aria-label={size}>
-                  {size.startsWith("icon") ? <PlusIcon /> : size}
+            {SIZE_GROUPS.flatMap(([, cases]) =>
+              cases.map(({ label, size, icon, multiline }) => (
+                <Button
+                  key={label}
+                  size={size}
+                  icon={icon ?? false}
+                  multiline={multiline ?? false}
+                  aria-label={label}
+                >
+                  {icon ? <PlusIcon /> : label}
                 </Button>
               )),
             )}
           </div>,
         );
         const baseFont = getComputedStyle(
-          screen.getByRole("button", { name: "default" }).element(),
+          screen.getByRole("button", { name: "md" }).element(),
         ).fontSize;
-        for (const [token, sizes] of SIZE_GROUPS) {
+        for (const [token, cases] of SIZE_GROUPS) {
           const expected = resolveStyle("height", `var(${token})`);
-          for (const size of sizes) {
-            const style = getComputedStyle(screen.getByRole("button", { name: size }).element());
-            expect(style.fontSize, `${width}px ${size} fontSize`).toBe(baseFont);
-            if (size.endsWith("multiline")) {
-              expect(style.minHeight, `${width}px ${size} minHeight`).toBe(expected);
-              expect(style.whiteSpace, `${width}px ${size} whiteSpace`).toBe("normal");
+          for (const { label, icon, multiline } of cases) {
+            const style = getComputedStyle(screen.getByRole("button", { name: label }).element());
+            expect(style.fontSize, `${width}px ${label} fontSize`).toBe(baseFont);
+            if (multiline) {
+              expect(style.minHeight, `${width}px ${label} minHeight`).toBe(expected);
+              expect(style.whiteSpace, `${width}px ${label} whiteSpace`).toBe("normal");
               // One line of text must still land exactly on the control height.
-              expect(style.height, `${width}px ${size} single-line height`).toBe(expected);
+              expect(style.height, `${width}px ${label} single-line height`).toBe(expected);
             } else {
-              expect(style.height, `${width}px ${size} height`).toBe(expected);
+              expect(style.height, `${width}px ${label} height`).toBe(expected);
             }
-            if (size.startsWith("icon")) {
-              expect(style.width, `${width}px ${size} width`).toBe(expected);
+            if (icon) {
+              expect(style.width, `${width}px ${label} width`).toBe(expected);
             }
           }
         }
@@ -119,20 +155,20 @@ describe("Button", () => {
         <div className="flex flex-wrap gap-2 p-4">
           <Button>Enabled Primary</Button>
           <Button disabled>Disabled Primary</Button>
-          <Button render={<a href="#disabled" />} aria-disabled="true" variant="outline">
+          <Button render={<a href="#disabled" />} aria-disabled="true" variant="secondary">
             Disabled Link
           </Button>
           <Button variant="ghost" aria-expanded="true">
             Expanded Trigger
           </Button>
-          <Button variant="ghost-muted" aria-pressed="true">
+          <Button variant="muted" aria-pressed="true">
             Pressed Toggle
           </Button>
-          <Button variant="outline">Neutral Outline</Button>
+          <Button variant="secondary">Neutral Outline</Button>
           <Button variant="glass">Solid Glass</Button>
           <div data-chat-header="">
-            <Button variant="outline">Header Enabled</Button>
-            <Button variant="outline" disabled>
+            <Button variant="secondary">Header Enabled</Button>
+            <Button variant="secondary" disabled>
               Header Disabled
             </Button>
           </div>
@@ -193,10 +229,10 @@ describe("Button", () => {
     await using _pointer = await emulateCoarsePointer();
     await using screen = await render(
       <div className="flex items-center gap-12 p-12">
-        <Button size="icon-micro" aria-label="Touch Micro">
+        <Button size="xs" icon aria-label="Touch Micro">
           <PlusIcon />
         </Button>
-        <Button size="icon-micro" touchTarget="compact" aria-label="Touch Compact">
+        <Button size="xs" icon touchTarget="compact" aria-label="Touch Compact">
           <PlusIcon />
         </Button>
       </div>,
@@ -393,16 +429,16 @@ describe("destructive contrast", () => {
     const root = document.documentElement;
     await using _screen = await render(
       <div className="flex flex-col gap-4 p-4">
-        <Button variant="destructive" data-contrast="filled">
+        <Button variant="danger" data-contrast="filled">
           删除
         </Button>
-        <Button variant="destructive-outline" data-contrast="outline">
+        <Button variant="danger-secondary" data-contrast="outline">
           删除项目
         </Button>
-        <Button variant="ghost-destructive" data-contrast="ghost">
+        <Button variant="danger-ghost" data-contrast="ghost">
           移除
         </Button>
-        <Button variant="destructive" disabled data-contrast="disabled">
+        <Button variant="danger" disabled data-contrast="disabled">
           已禁用
         </Button>
         <Menu open>

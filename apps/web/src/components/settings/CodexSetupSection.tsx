@@ -167,7 +167,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           !existingAuthenticated && !existingReady && !existingChecking ? (
             <Button
               size="sm"
-              variant="ghost-muted"
+              variant="muted"
               disabled={props.existingCliDisabled}
               onClick={() => props.onModeChange("existing")}
             >
@@ -182,12 +182,12 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           title={props.displayName || props.provider?.displayName || "Codex"}
           description={<CodexSignInDescription />}
           control={
-            <Button size="sm" variant="outline" className="min-w-44" disabled>
+            <Button size="sm" variant="secondary" className="min-w-44" disabled>
               打开登录页面
             </Button>
           }
           secondaryControl={
-            <Button size="sm" variant="ghost-muted" disabled>
+            <Button size="sm" variant="muted" disabled>
               取消
             </Button>
           }
@@ -663,7 +663,7 @@ function ManagedCodexSetup({
   const waitingControl = (
     <Button
       size="sm"
-      variant={remoteWeb ? "default" : "outline"}
+      variant={remoteWeb ? "primary" : "secondary"}
       className={presentation === "onboarding" ? "min-w-44" : undefined}
       disabled={
         handoffQuery.data?.phase === "finished"
@@ -727,7 +727,7 @@ function ManagedCodexSetup({
             />
           </div>
           <Button
-            variant="outline"
+            variant="secondary"
             type="submit"
             disabled={pending || readOnly || !callbackUrl.trim()}
           >
@@ -738,7 +738,7 @@ function ManagedCodexSetup({
           <div>
             <Button
               size="xs"
-              variant="ghost-muted"
+              variant="muted"
               onClick={() => void ensureLocalApi().shell.openExternal(url)}
             >
               尝试在浏览器中登录
@@ -749,7 +749,7 @@ function ManagedCodexSetup({
         {handoffUrl ? (
           <details>
             <summary className="cursor-pointer">其他连接方式</summary>
-            <Button className="mt-2" size="sm" variant="outline" render={<a href={handoffUrl} />}>
+            <Button className="mt-2" size="sm" variant="secondary" render={<a href={handoffUrl} />}>
               使用 Fleet ADE 桌面版自动返回
             </Button>
           </details>
@@ -885,7 +885,7 @@ function ManagedCodexSetup({
             (authActive && !finishingSignIn) || installActive ? (
               <Button
                 size="sm"
-                variant="ghost-muted"
+                variant="muted"
                 disabled={pending || readOnly}
                 onClick={() => {
                   abortOperation();
@@ -904,7 +904,7 @@ function ManagedCodexSetup({
             ) : !authActive && !authenticated && hasSavedAccount ? (
               <Button
                 size="sm"
-                variant="ghost-muted"
+                variant="muted"
                 disabled={unavailable || busy}
                 onClick={() => void setup("chatgpt-change-account")}
               >
@@ -913,7 +913,7 @@ function ManagedCodexSetup({
             ) : !authActive && !authenticated && allowExistingCli ? (
               <Button
                 size="sm"
-                variant="ghost-muted"
+                variant="muted"
                 disabled={readOnly || busy || existingCliDisabled}
                 onClick={() => onModeChange("existing")}
               >
@@ -983,7 +983,7 @@ function ManagedCodexSetup({
                 {updateAvailable ? (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={unavailable || busy}
                     onClick={() =>
                       void run(() => startInstall({ environmentId, input: { instanceId } }))
@@ -994,7 +994,7 @@ function ManagedCodexSetup({
                 ) : null}
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={unavailable || busy}
                   onClick={() => setAccountPickerOpen(true)}
                 >

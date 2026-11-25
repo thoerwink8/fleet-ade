@@ -1812,7 +1812,7 @@ export function MaintenanceSettingsPanel() {
                 <Link to="/settings/diagnostics" search={{ machine: environmentId ?? undefined }} />
               }
               size="sm"
-              variant="outline"
+              variant="secondary"
             >
               查看诊断
             </Button>
@@ -1848,7 +1848,7 @@ export function AboutSettingsPanel() {
             <Button
               render={<Link to="/settings/open-source-licenses" />}
               size="sm"
-              variant="outline"
+              variant="secondary"
             >
               查看许可证
             </Button>

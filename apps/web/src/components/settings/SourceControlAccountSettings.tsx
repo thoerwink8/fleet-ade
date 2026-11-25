@@ -99,8 +99,9 @@ export function SourceControlAccountSettings({
           登录，或关闭某个主机。
         </p>
         <Button
-          size="icon-xs"
-          variant="ghost-muted"
+          size="xs"
+          icon
+          variant="muted"
           onClick={() => setRevealed((current) => !current)}
           aria-label={revealed ? `隐藏 ${label} 账户` : `显示 ${label} 账户`}
           aria-pressed={revealed}
@@ -202,7 +203,7 @@ export function SourceControlAccountSettings({
                 </p>
                 <Button
                   size="xs"
-                  variant="outline"
+                  variant="secondary"
                   disabled={saving}
                   onClick={() => void save(group.host, { account: null })}
                 >

@@ -562,7 +562,7 @@ export function PullRequestFiltersMenu({
   ];
   return (
     <Menu onOpenChange={onOpenChange}>
-      <MenuTrigger render={<Button variant="outline" />}>
+      <MenuTrigger render={<Button variant="secondary" />}>
         <ListFilterIcon className="size-4" />
         <span>筛选条件</span>
         {filterCount > 0 ? (

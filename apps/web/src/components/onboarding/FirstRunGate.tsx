@@ -23,7 +23,7 @@ function FirstRunRecovery({ retrying = false }: { readonly retrying?: boolean })
         <Button
           className="mt-5"
           size="sm"
-          variant="outline"
+          variant="secondary"
           disabled={retrying}
           onClick={() => {
             void ensureClientSettingsHydrated().catch(() => undefined);

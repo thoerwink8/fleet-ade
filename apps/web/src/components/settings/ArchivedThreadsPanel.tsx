@@ -257,7 +257,7 @@ export function ArchivedThreadsPanel() {
             headerAction={
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => void unarchiveGroup(projectThreads)}
               >
@@ -291,8 +291,9 @@ export function ArchivedThreadsPanel() {
                             render={
                               <Button
                                 type="button"
-                                variant={action === "delete" ? "destructive-outline" : "outline"}
-                                size="icon-sm"
+                                variant={action === "delete" ? "danger-secondary" : "secondary"}
+                                size="sm"
+                                icon
                                 aria-label={`${label} ${thread.title}`}
                                 disabled={pendingKeys.has(threadKey)}
                                 onClick={() => void handleThreadAction(action, thread)}

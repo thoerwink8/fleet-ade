@@ -142,7 +142,7 @@ export function ProviderUpdatesAction() {
         render={
           <Button
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             disabled={isPending}
             onClick={() => void handleUpdate()}
           >
