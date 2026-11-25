@@ -41,6 +41,11 @@ import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import { resolveProjectFileBackedSetting } from "@t3tools/shared/projectSettings";
 import { gitCommandDuration, gitCommandsTotal, withMetrics } from "../observability/Metrics.ts";
 import * as GitVcsDriver from "./GitVcsDriver.ts";
+import {
+  inferGitCommandAction,
+  resolveGitCommandAction,
+  type KnownGitCommandOperation,
+} from "./gitCommandAction.ts";
 import { removeEmptyDirectory, type RemoveEmptyDirectoryError } from "./removeEmptyDirectory.ts";
 import {
   explicitBareRepositoryEnv,
@@ -337,11 +342,16 @@ export function splitNullSeparatedGitStdoutPaths(
 
 // Checkout/worktree add parse leading dashes as options; pre-2.44 Git cannot guard with --end-of-options.
 // A lone - still means previous checkout.
-const refuseOptionLikeRefName = (operation: string, cwd: string, refName: string | undefined) =>
+const refuseOptionLikeRefName = (
+  operation: KnownGitCommandOperation,
+  cwd: string,
+  refName: string | undefined,
+) =>
   refName !== undefined && refName !== "-" && refName.startsWith("-")
     ? Effect.fail(
         new GitCommandError({
           operation,
+          action: resolveGitCommandAction(operation),
           command: "git",
           cwd,
           detail: "Ref names cannot start with '-'.",
@@ -442,8 +452,10 @@ function deriveLocalBranchNameFromRemoteRef(branchName: string): string | null {
 function gitCommandContext(
   input: Pick<GitVcsDriver.ExecuteGitInput, "operation" | "cwd" | "args">,
 ) {
+  const action = inferGitCommandAction(input.operation);
   return {
     operation: input.operation,
+    ...(action === undefined ? {} : { action }),
     command: "git",
     cwd: input.cwd,
     argumentCount: input.args.length,
@@ -452,6 +464,10 @@ function gitCommandContext(
 
 // Stderr can echo credentials from argv/URLs; classify fixed patterns without exposing matched text.
 const GIT_FAILURE_REASON_PATTERNS: ReadonlyArray<readonly [RegExp, GitCommandFailureReason]> = [
+  [
+    /^fatal: unable to create ['"](?:[^\r\n]*[/\\])?index\.lock['"]: file exists\.?$/im,
+    "index_locked",
+  ],
   [/would clobber existing tag/i, "tag_would_be_clobbered"],
   [/is already (?:used by worktree at|checked out at)/i, "branch_checked_out_in_worktree"],
   [/a branch named .+ already exists/i, "branch_already_exists"],
@@ -459,6 +475,19 @@ const GIT_FAILURE_REASON_PATTERNS: ReadonlyArray<readonly [RegExp, GitCommandFai
   [/'refs\/[^'\n]+' exists; cannot create 'refs\//i, "ref_name_conflict"],
   // The same prefix also reports permission errors, which retrying cannot fix.
   [/could not lock config file .+: File exists/i, "config_locked"],
+  [
+    /^(?:fatal: unable to auto-detect email address|fatal: empty ident name|fatal: no (?:name|email) was given|error: author identity unknown)/im,
+    "author_identity_unknown",
+  ],
+  [
+    /^(?:error: (?:committing|pulling|merging|reverting|cherry-picking) is not possible because you have unmerged files\.?|fatal: exiting because of an unresolved conflict\.?|error: you need to resolve your current index first)/im,
+    "merge_conflict",
+  ],
+  [/^fatal: not possible to fast-forward, aborting\.?$/im, "not_fast_forward"],
+  [
+    /^(?:error: your local changes to the following files would be overwritten by (?:checkout|merge|switch):|error: the following untracked working tree files would be overwritten by (?:checkout|merge|switch):|error: please commit your changes or stash them before you (?:switch branches|merge)\.?|error: cannot pull with rebase: you have unstaged changes\.?|error: your index contains uncommitted changes\.?|error: entry ['"][^'\r\n]+['"] not uptodate\. cannot merge\.?|fatal: ['"][^'\r\n]+['"] contains modified or untracked files, use --force to delete it)/im,
+    "working_tree_dirty",
+  ],
   [
     /(?:authentication failed|could not read Username|could not read Password|permission denied \([a-z-]+(?:,[a-z-]+)*\)|permission denied, please try again)/i,
     "authentication_failed",
@@ -514,8 +543,11 @@ const GIT_DIAGNOSTIC_LINE_PATTERN = /^(?:fatal|error):|^!\s|^\s+!\s/;
 // SSH credential refusals are unprefixed; Git's later generic error would otherwise misclassify them as unreachable.
 const SSH_TRANSPORT_REFUSAL_PATTERN =
   /Permission denied \((?:publickey|password|keyboard-interactive)|Permission denied, please try again|Host key verification failed/i;
+// `git merge`, `git cherry-pick` and `git revert` write conflict banners to stdout with empty stderr.
+const GIT_STDOUT_CONFLICT_PATTERN =
+  /^CONFLICT \([^)\r\n]+\):[\s\S]*^Automatic merge failed; fix conflicts/m;
 
-function classifyGitFailure(stderr: string): GitCommandFailureReason | null {
+export function classifyGitFailure(stderr: string, stdout = ""): GitCommandFailureReason | null {
   const diagnostics = stderr
     .split(/\r?\n/)
     .filter(
@@ -524,12 +556,16 @@ function classifyGitFailure(stderr: string): GitCommandFailureReason | null {
         (!/^remote:/.test(line) && SSH_TRANSPORT_REFUSAL_PATTERN.test(line)),
     )
     .join("\n");
-  if (diagnostics.length === 0) return null;
-  if (isNonRepositoryGitStderr(diagnostics)) return "not_a_repository";
-  for (const [pattern, reason] of GIT_FAILURE_REASON_PATTERNS) {
-    if (!pattern.test(diagnostics)) continue;
-    if (reason === "ref_not_found" && GIT_NOT_A_COMMIT_PATTERN.test(diagnostics)) continue;
-    return reason;
+  if (diagnostics.length > 0) {
+    if (isNonRepositoryGitStderr(diagnostics)) return "not_a_repository";
+    for (const [pattern, reason] of GIT_FAILURE_REASON_PATTERNS) {
+      if (!pattern.test(diagnostics)) continue;
+      if (reason === "ref_not_found" && GIT_NOT_A_COMMIT_PATTERN.test(diagnostics)) continue;
+      return reason;
+    }
+  }
+  if (GIT_STDOUT_CONFLICT_PATTERN.test(stdout)) {
+    return "merge_conflict";
   }
   return null;
 }
@@ -954,6 +990,24 @@ const collectOutput = Effect.fnUntraced(function* (
   };
 });
 
+function classifyGitSpawnFailure(cause: unknown, cwd: string): GitCommandFailureReason | undefined {
+  if (PlatformError.isPlatformError(cause)) {
+    if (
+      cause.reason._tag === "NotFound" &&
+      cause.reason.method === "spawn" &&
+      cause.reason.pathOrDescriptor !== cwd
+    ) {
+      return "executable_not_found";
+    }
+    return undefined;
+  }
+  if (typeof cause === "object" && cause !== null && "code" in cause && cause.code === "ENOENT") {
+    const errorPath = "path" in cause && typeof cause.path === "string" ? cause.path : undefined;
+    return errorPath === cwd ? undefined : "executable_not_found";
+  }
+  return undefined;
+}
+
 /** Windows Git needs core.longpaths beyond MAX_PATH (260); OS LongPathsEnabled alone is insufficient. */
 export const windowsLongPathConfigEnv = (
   platform: NodeJS.Platform,
@@ -1000,6 +1054,8 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         const baseEnv = {
           ...hostEnv,
           ...unsetInheritedRepositoryEnv(hostEnv, hostPlatform),
+          // English diagnostics without overriding LC_CTYPE, which hooks inherit.
+          LANGUAGE: "C",
           // Concurrent status polls must not take index.lock to save refreshed indexes.
           GIT_OPTIONAL_LOCKS: "0",
           ...input.env,
@@ -1008,12 +1064,15 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         const env = { ...baseEnv, ...explicitBareRepositoryEnv(baseEnv, hostPlatform) };
         const spawnEnv = { ...env, ...windowsLongPathConfigEnv(hostPlatform, env) };
         const resolved = yield* resolveSpawnCommand("git", [], { env: spawnEnv });
-        const spawnError = (cause: unknown) =>
-          new GitCommandError({
+        const spawnError = (cause: unknown) => {
+          const reason = classifyGitSpawnFailure(cause, commandInput.cwd);
+          return new GitCommandError({
             ...gitCommandContext(commandInput),
+            ...(reason === undefined ? {} : { reason }),
             detail: "Failed to spawn Git process.",
             cause,
           });
+        };
         // cmd wrappers truncate multiline commits; leave git.cmd handling to Node lookup.
         const executable = resolved.shell ? "git" : resolved.command;
         const child = yield* commandSpawner
@@ -1080,7 +1139,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         yield* trace2Monitor.flush;
 
         if (!input.allowNonZeroExit && exitCode !== 0) {
-          const reason = classifyGitFailure(stderr.text);
+          const reason = classifyGitFailure(stderr.text, stdout.text);
           return yield* new GitCommandError({
             ...gitCommandContext(commandInput),
             ...(reason === null ? {} : { reason }),
@@ -1168,7 +1227,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     );
 
   const executeGit = (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
     args: readonly string[],
     options: ExecuteGitOptions = {},
@@ -1195,7 +1254,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         if (options.allowNonZeroExit || result.exitCode === 0) {
           return Effect.succeed(result);
         }
-        const reason = classifyGitFailure(result.stderr);
+        const reason = classifyGitFailure(result.stderr, result.stdout);
         return Effect.fail(
           new GitCommandError({
             ...gitCommandContext({ operation, cwd, args }),
@@ -1210,7 +1269,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     );
 
   const executeGitWithStableDiagnostics = (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
     args: readonly string[],
     options: ExecuteGitOptions = {},
@@ -1225,7 +1284,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     });
 
   const runGit = (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
     args: readonly string[],
     options: ExecuteGitOptions = {},
@@ -1233,7 +1292,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     executeGit(operation, cwd, args, options).pipe(Effect.asVoid);
 
   const runGitStdout = (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
     args: readonly string[],
     allowNonZeroExit = false,
@@ -1244,7 +1303,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
 
   // Pre-2.36 Git rejects worktree list -z; normalize its line fallback to NUL records.
   const executeWorktreeList = Effect.fn("executeWorktreeList")(function* (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
     gitArgs: readonly string[],
     options: ExecuteGitOptions = {},
@@ -1260,7 +1319,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   });
 
   const runGitStdoutWithOptions = (
-    operation: string,
+    operation: KnownGitCommandOperation,
     cwd: string,
     args: readonly string[],
     options: ExecuteGitOptions = {},
@@ -1447,12 +1506,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       if (isNonRepositoryGitStderr(stderr)) {
         return null;
       }
+      const reason = classifyGitFailure(commonDirResult.stderr, commonDirResult.stdout);
       return yield* new GitCommandError({
         ...gitCommandContext({
           operation: "GitVcsDriver.resolveRepositoryPaths.commonDir",
           cwd,
           args: ["rev-parse", "--git-common-dir"],
         }),
+        ...(reason === null ? {} : { reason }),
         detail: "Failed to resolve the Git common directory.",
         exitCode: commonDirResult.exitCode,
         stdoutLength: commonDirResult.stdout.length,
@@ -2069,12 +2130,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         return NON_REPOSITORY_REMOTE_STATUS_DETAILS;
       }
       if (!isUnbornHeadStderr(branchResult.stderr)) {
+        const reason = classifyGitFailure(branchResult.stderr, branchResult.stdout);
         return yield* new GitCommandError({
           ...gitCommandContext({
             operation: "GitVcsDriver.statusDetailsRemote.branch",
             cwd,
             args: ["rev-parse", "--symbolic-full-name", "HEAD"],
           }),
+          ...(reason === null ? {} : { reason }),
           detail: "Git branch lookup failed.",
           exitCode: branchResult.exitCode,
           stdoutLength: branchResult.stdout.length,
@@ -2173,26 +2236,30 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     if (indexResult === null) return NON_REPOSITORY_STATUS_DETAILS;
     if (indexResult.exitCode === 0) {
       const lockPath = `${path.resolve(cwd, indexResult.stdout.trim())}.lock`;
-      const lockError = new GitCommandError({
+      const lockContext = {
         operation: "GitVcsDriver.statusDetails.indexPath",
+        action: resolveGitCommandAction("GitVcsDriver.statusDetails.indexPath"),
         command: "git",
         cwd,
-        detail: "Git index is locked. Status will resume when the index lock is removed.",
-      });
+      } as const;
       // Status can succeed while locked, repeatedly running LFS clean filters without caching.
       if (
         yield* fileSystem.exists(lockPath).pipe(
           Effect.mapError(
             (cause) =>
               new GitCommandError({
-                ...lockError,
+                ...lockContext,
                 detail: "Failed to check the Git index lock.",
                 cause,
               }),
           ),
         )
       ) {
-        return yield* lockError;
+        return yield* new GitCommandError({
+          ...lockContext,
+          reason: "index_locked",
+          detail: "Git index is locked. Status will resume when the index lock is removed.",
+        });
       }
     }
     const repositoryPaths = yield* resolveRepositoryPaths(cwd).pipe(
@@ -2248,6 +2315,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                 ],
               );
             }
+            const reason = classifyGitFailure(result.stderr, result.stdout);
             return Effect.fail(
               new GitCommandError({
                 ...gitCommandContext({
@@ -2255,6 +2323,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                   cwd,
                   args: ["diff-index", "-M", "--numstat", "-z", "HEAD", "--"],
                 }),
+                ...(reason === null ? {} : { reason }),
                 detail: "git diff-index HEAD --numstat failed.",
                 exitCode: result.exitCode,
                 stdoutLength: result.stdout.length,
@@ -2286,12 +2355,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       if (isNonRepositoryGitStderr(statusResult.stderr)) {
         return NON_REPOSITORY_STATUS_DETAILS;
       }
+      const reason = classifyGitFailure(statusResult.stderr, statusResult.stdout);
       return yield* new GitCommandError({
         ...gitCommandContext({
           operation: "GitVcsDriver.statusDetails.status",
           cwd,
           args: statusArgs,
         }),
+        ...(reason === null ? {} : { reason }),
         detail: "Git status failed.",
         exitCode: statusResult.exitCode,
         stdoutLength: statusResult.stdout.length,
@@ -2512,6 +2583,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             (cause) =>
               new GitCommandError({
                 operation: "GitVcsDriver.commit.mergeHead",
+                action: resolveGitCommandAction("GitVcsDriver.commit.mergeHead"),
                 command: "git commit",
                 cwd,
                 detail: "Could not check whether a merge, cherry-pick or revert is in progress.",
@@ -2524,6 +2596,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           const { operation } = inProgress.value;
           return yield* new GitCommandError({
             operation: "GitVcsDriver.commit",
+            action: resolveGitCommandAction("GitVcsDriver.commit"),
             command: "git commit",
             cwd,
             detail: `Cannot commit selected files during a ${operation}. Commit all files to finish the ${operation}.`,
@@ -2593,6 +2666,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               (cause) =>
                 new GitCommandError({
                   operation: "GitVcsDriver.commit.conflictMarkers",
+                  action: resolveGitCommandAction("GitVcsDriver.commit.conflictMarkers"),
                   command: "git commit",
                   cwd,
                   detail: `Could not check ${file} for conflict markers.`,
@@ -2608,8 +2682,10 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         if (conflicted.length > 0) {
           return yield* new GitCommandError({
             operation: "GitVcsDriver.commit",
+            action: resolveGitCommandAction("GitVcsDriver.commit"),
             command: "git commit",
             cwd,
+            reason: "merge_conflict",
             detail: `Cannot commit with unresolved merge conflicts in ${conflicted.join(", ")}. Resolve them, then commit.`,
           });
         }
@@ -2750,6 +2826,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           PlatformError: (cause) =>
             new GitCommandError({
               operation: "GitVcsDriver.prepareCommitContext",
+              action: resolveGitCommandAction("GitVcsDriver.prepareCommitContext"),
               command: "git",
               cwd,
               detail: "Failed to prepare the temporary commit index.",
@@ -3136,7 +3213,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }
     }
     if (result.exitCode !== 0) {
-      const reason = classifyGitFailure(result.stderr);
+      const reason = classifyGitFailure(result.stderr, result.stdout);
       return yield* new GitCommandError({
         ...gitCommandContext({ operation: "GitVcsDriver.pullCurrentBranch.pull", cwd, args }),
         ...(reason === null ? {} : { reason }),
@@ -3376,6 +3453,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           Effect.fail(
             new GitCommandError({
               operation: "GitVcsDriver.prepareReviewIndex",
+              action: resolveGitCommandAction("GitVcsDriver.prepareReviewIndex"),
               cwd,
               command: "git diff",
               detail: "Could not prepare the review index.",
@@ -3478,6 +3556,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     ) {
       return yield* new GitCommandError({
         operation: "GitVcsDriver.readBranchChangeTotals",
+        action: resolveGitCommandAction("GitVcsDriver.readBranchChangeTotals"),
         command: "git ls-files",
         cwd,
         detail: remembered.detail,
@@ -3507,6 +3586,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }
       return yield* new GitCommandError({
         operation: "GitVcsDriver.readBranchChangeTotals",
+        action: resolveGitCommandAction("GitVcsDriver.readBranchChangeTotals"),
         command: "git ls-files",
         cwd,
         detail: untracked.unavailable,
@@ -3532,6 +3612,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     if (result.exitCode !== 0) {
       return yield* new GitCommandError({
         operation: "GitVcsDriver.readBranchChangeTotals",
+        action: resolveGitCommandAction("GitVcsDriver.readBranchChangeTotals"),
         command: "git diff --numstat",
         cwd,
         detail: "Could not read Changes totals.",
@@ -3550,6 +3631,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const reviewCommitError = (cwd: string, detail: string) =>
     new GitCommandError({
       operation: "GitVcsDriver.reviewCommit",
+      action: resolveGitCommandAction("GitVcsDriver.reviewCommit"),
       command: "git cat-file",
       cwd,
       detail,
@@ -3724,6 +3806,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           (cause) =>
             new GitCommandError({
               operation: "GitVcsDriver.getReviewDiffPreview.hash",
+              action: resolveGitCommandAction("GitVcsDriver.getReviewDiffPreview.hash"),
               command: "crypto.digest SHA-256",
               cwd,
               detail: "Failed to hash review diff.",
@@ -3814,6 +3897,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }
       return yield* new GitCommandError({
         operation: "GitVcsDriver.getReviewDiffPreview.stat",
+        action: resolveGitCommandAction("GitVcsDriver.getReviewDiffPreview.stat"),
         cwd,
         command: "git diff --numstat",
         detail: "Could not read complete diff statistics.",
@@ -3917,6 +4001,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   ) =>
     new GitCommandError({
       operation: "GitVcsDriver.getReviewDiffFileContents",
+      action: resolveGitCommandAction("GitVcsDriver.getReviewDiffFileContents"),
       command: "git",
       cwd: input.cwd,
       detail,
@@ -3952,14 +4037,21 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     input: ReviewDiffFileContentsInput,
     repositoryRoot: string,
   ) {
-    const fileError = (stage: string, detail: string, cause?: unknown) =>
-      new GitCommandError({
-        operation: `GitVcsDriver.getReviewDiffFileContents.workingTree.${stage}`,
+    const fileError = (
+      stage: "path.resolve" | "fs.realPath" | "fs.stat" | "fs.readFile",
+      detail: string,
+      cause?: unknown,
+    ) => {
+      const operation = `GitVcsDriver.getReviewDiffFileContents.workingTree.${stage}` as const;
+      return new GitCommandError({
+        operation,
+        action: resolveGitCommandAction(operation),
         command: stage,
         cwd: input.cwd,
         detail,
         ...(cause === undefined ? {} : { cause }),
       });
+    };
     const requestedPath = path.resolve(repositoryRoot, input.newPath);
     if (!isPathWithinRoot(repositoryRoot, requestedPath)) {
       return yield* fileError(
@@ -4100,7 +4192,10 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   // `git branch` writes a remote start point's upstream itself and fails outright if the
   // config is locked, so tracking is recorded afterwards by a write that retries.
   const createBranchAt = Effect.fn("createBranchAt")(function* (
-    operation: string,
+    operation:
+      | "GitVcsDriver.createBranch"
+      | "GitVcsDriver.createWorktree.createBranch"
+      | "GitVcsDriver.fetchRemoteBranch.materialize",
     input: GitVcsDriver.GitCreateBranchInput,
     fallbackErrorDetail: string,
   ) {
@@ -4556,6 +4651,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       if (parentDir === null) {
         return yield* new GitCommandError({
           operation: "GitVcsDriver.createWorktree",
+          action: resolveGitCommandAction("GitVcsDriver.createWorktree"),
           command: "git worktree add",
           cwd: input.cwd,
           detail: `The worktree location "${options?.worktreesDirectory}" must be an absolute folder on this machine, not a drive root. Change it in Settings → Code → Worktree location.`,
@@ -4916,23 +5012,24 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       );
     };
     const fetchAll = runFetch(args).pipe(
-      Effect.flatMap((result) =>
-        result.exitCode === 0
-          ? Effect.void
-          : Effect.fail(
-              new GitCommandError({
-                ...gitCommandContext({
-                  operation: "GitVcsDriver.fetchRemote",
-                  cwd: input.cwd,
-                  args,
-                }),
-                detail: fetchFailureDetail(result.stderr) ?? options.fallbackErrorDetail,
-                ...(result.exitCode === null ? {} : { exitCode: result.exitCode }),
-                stdoutLength: result.stdout.length,
-                stderrLength: result.stderr.length,
-              }),
-            ),
-      ),
+      Effect.flatMap((result) => {
+        if (result.exitCode === 0) return Effect.void;
+        const reason = classifyGitFailure(result.stderr, result.stdout);
+        return Effect.fail(
+          new GitCommandError({
+            ...gitCommandContext({
+              operation: "GitVcsDriver.fetchRemote",
+              cwd: input.cwd,
+              args,
+            }),
+            ...(reason === null ? {} : { reason }),
+            detail: fetchFailureDetail(result.stderr) ?? options.fallbackErrorDetail,
+            ...(result.exitCode === null ? {} : { exitCode: result.exitCode }),
+            stdoutLength: result.stdout.length,
+            stderrLength: result.stderr.length,
+          }),
+        );
+      }),
     );
     if (input.refName === undefined) {
       return yield* fetchAll.pipe(Effect.as(true));
@@ -4954,12 +5051,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     ) {
       return false;
     }
+    const reason = classifyGitFailure(result.stderr, result.stdout);
     return yield* new GitCommandError({
       ...gitCommandContext({
         operation: "GitVcsDriver.fetchRemote",
         cwd: input.cwd,
         args: scopedArgs,
       }),
+      ...(reason === null ? {} : { reason }),
       detail: fetchFailureDetail(result.stderr) ?? options.fallbackErrorDetail,
       ...(result.exitCode === null ? {} : { exitCode: result.exitCode }),
       stdoutLength: result.stdout.length,
@@ -5171,12 +5270,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     yield* Effect.logWarning(
       `GitVcsDriver.removeWorktree: git worktree remove exited with code ${result.exitCode} for ${input.path} (stderr length ${result.stderr.length}).`,
     );
+    const reason = classifyGitFailure(result.stderr, result.stdout);
     return yield* new GitCommandError({
       ...gitCommandContext({
         operation: "GitVcsDriver.removeWorktree",
         cwd: input.cwd,
         args: result.args,
       }),
+      ...(reason === null ? {} : { reason }),
       detail: "git worktree remove failed",
       ...(result.exitCode === null ? {} : { exitCode: result.exitCode }),
       stdoutLength: result.stdout.length,

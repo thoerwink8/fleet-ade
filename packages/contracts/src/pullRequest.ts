@@ -5,6 +5,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 
 import {
   ForwardCompatibleArray,
+  ForwardCompatibleOptional,
   IsoDateTime,
   NonNegativeInt,
   PositiveInt,
@@ -840,12 +841,15 @@ export class PullRequestUnavailableError extends Schema.TaggedError<PullRequestU
   }
 }
 
+export const PullRequestOperationFailureReason = Schema.Literals(["not-found", "rate-limited"]);
+export type PullRequestOperationFailureReason = typeof PullRequestOperationFailureReason.Type;
+
 export class PullRequestOperationError extends Schema.TaggedError<PullRequestOperationError>()(
   "PullRequestOperationError",
   {
     operation: Schema.String,
     detail: TrimmedNonEmptyString,
-    reason: Schema.optional(Schema.Literal("not-found")),
+    reason: ForwardCompatibleOptional(PullRequestOperationFailureReason),
     listResult: Schema.optional(PullRequestListResult),
     cause: Schema.optional(Schema.Defect()),
   },
@@ -856,8 +860,6 @@ export class PullRequestOperationError extends Schema.TaggedError<PullRequestOpe
   }
 
   override get message(): string {
-    // apps/web strips this English prefix in pullRequestDetail.logic.ts `OPERATION_PREFIX`;
-    // keeping it English lets the client show only `detail`. `detail` itself is translated.
     return `Pull request operation ${this.operation} failed: ${this.detail}`;
   }
 }

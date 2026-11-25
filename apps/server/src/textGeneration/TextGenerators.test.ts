@@ -76,6 +76,44 @@ it.effect.each([
       run!(request).pipe(Effect.provideService(FetchHttpClient.Fetch, upstream)),
     );
     expect(failure.detail).toMatch(/rejected the API key: Incorrect API key provided$/);
+    expect(failure.reason).toBe("unauthenticated");
+  }),
+);
+
+it.effect.each([
+  { status: 403, expectedReason: "unauthenticated" as const },
+  { status: 429, expectedReason: "rate_limited" as const },
+  { status: 503, expectedReason: "unavailable" as const },
+])("classifies HTTP $status errors with reason $expectedReason", ({ status, expectedReason }) =>
+  Effect.gen(function* () {
+    const upstream = vi.fn<typeof fetch>(async () =>
+      Response.json({ error: { message: "Upstream error" } }, { status }),
+    );
+    const generators = yield* TextGenerators.TextGenerators.pipe(
+      Effect.provide(layer({ kind: "openaiCompatible", apiKey: "secret" })),
+    );
+    const run = yield* generators.runner(ID);
+    const failure = yield* Effect.flip(
+      run!(request).pipe(Effect.provideService(FetchHttpClient.Fetch, upstream)),
+    );
+    expect(failure.reason).toBe(expectedReason);
+  }),
+);
+
+it.effect("classifies connection errors as network", () =>
+  Effect.gen(function* () {
+    const upstream = vi.fn<typeof fetch>(async () => {
+      throw new TypeError("fetch failed");
+    });
+    const generators = yield* TextGenerators.TextGenerators.pipe(
+      Effect.provide(layer({ kind: "openaiCompatible", apiKey: "secret" })),
+    );
+    const run = yield* generators.runner(ID);
+    const failure = yield* Effect.flip(
+      run!(request).pipe(Effect.provideService(FetchHttpClient.Fetch, upstream)),
+    );
+    expect(failure.reason).toBe("network");
+    expect(failure.detail).toContain("Couldn't reach");
   }),
 );
 
@@ -90,6 +128,7 @@ it.effect("a turned-off text generator fails instead of calling its API", () =>
       run!(request).pipe(Effect.provideService(FetchHttpClient.Fetch, upstream)),
     );
     expect(failure.detail).toBe("OpenRouter is off. Turn it on in Settings → Providers.");
+    expect(failure.reason).toBe("unavailable");
     expect(upstream).not.toHaveBeenCalled();
   }),
 );

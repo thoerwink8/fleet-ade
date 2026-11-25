@@ -9,6 +9,7 @@ import {
   ProjectFaviconPath,
   ReceivedProjectIcon,
   StoredProjectIcon,
+  ProjectCreateNewResult,
   ProjectReadFileError,
   ProjectReadFileInput,
   ProjectReadFileResult,
@@ -220,3 +221,33 @@ effectIt.effect("an icon kind from a newer server shows the default icon", () =>
     assert.strictEqual(broken._tag, "Failure");
   }),
 );
+
+const decodeProjectCreateNewResult = Schema.decodeUnknownSync(
+  Schema.toCodecJson(ProjectCreateNewResult),
+);
+
+describe("ProjectCreateNewResult", () => {
+  it("decodes legacy results without commitFailure and preserves commitFailure when present", () => {
+    const legacy = decodeProjectCreateNewResult({
+      projectId: "project-1",
+      workspaceRoot: "/workspace/new",
+      commitError: "Git has no name or email on this machine.",
+    });
+    expect(legacy.commitFailure).toBeUndefined();
+
+    const structured = decodeProjectCreateNewResult({
+      projectId: "project-1",
+      workspaceRoot: "/workspace/new",
+      commitError: "Git has no name or email on this machine.",
+      commitFailure: {
+        _tag: "GitCommandError",
+        operation: "ManagedProjectFolders.commit",
+        action: "commit",
+        reason: "author_identity_unknown",
+        detail: "Git has no name or email on this machine.",
+      },
+    });
+    expect(structured.commitFailure?.reason).toBe("author_identity_unknown");
+    expect(structured.commitFailure?.action).toBe("commit");
+  });
+});

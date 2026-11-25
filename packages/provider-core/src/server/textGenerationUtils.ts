@@ -1,4 +1,4 @@
-import { TextGenerationError } from "@t3tools/contracts";
+import { TextGenerationError, type TextGenerationFailureReason } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -90,6 +90,52 @@ function cliLabel(cliName: string): string {
   return `${capitalized} CLI (\`${cliName}\`)`;
 }
 
+export function classifyTextGenerationCliFailure(
+  text: string,
+): TextGenerationFailureReason | undefined {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return undefined;
+  if (
+    /\b(?:command not found|not available on path|enoent|executable not found|not installed)\b|未找到\s*reclaude|set up managed codex/i.test(
+      trimmed,
+    )
+  ) {
+    return "not_installed";
+  }
+  if (
+    /\b(?:not logged in|please log in|sign in|signed out|login required|authentication (?:failed|required|error)|unauthorized|invalid(?:_| )api(?:_| )key|api key (?:missing|invalid|required|not set)|401|403|forbidden|token expired|re-?authenticate)\b|请先.*登录|重新登录|未登录/i.test(
+      trimmed,
+    )
+  ) {
+    return "unauthenticated";
+  }
+  if (
+    /\b(?:rate[ -]?limit(?:ed)?|too many requests|quota exceeded|usage limit|credit balance is too low|overloaded_error|429)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return "rate_limited";
+  }
+  if (/\b(?:timed? ?out|etimedout|deadline exceeded|request timeout|504)\b/i.test(trimmed)) {
+    return "timeout";
+  }
+  if (
+    /\b(?:econnrefused|econnreset|enotfound|eai_again|ehostunreach|enetunreach|fetch failed|network error|connection (?:refused|reset|failed|closed)|could(?:n't| not) (?:reach|connect)|tls|certificate)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return "network";
+  }
+  if (
+    /\b(?:service unavailable|503|502|bad gateway|overloaded|temporarily unavailable)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return "unavailable";
+  }
+  return undefined;
+}
+
 export function normalizeCliError(
   cliName: string,
   operation: string,
@@ -109,12 +155,15 @@ export function normalizeCliError(
     ) {
       return new TextGenerationError({
         operation,
+        reason: "not_installed",
         detail: `${cliLabel(cliName)} is required but not available on PATH.`,
         cause: error,
       });
     }
+    const reason = classifyTextGenerationCliFailure(error.message);
     return new TextGenerationError({
       operation,
+      ...(reason ? { reason } : {}),
       detail: fallback,
       cause: error,
     });

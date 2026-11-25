@@ -1,5 +1,6 @@
 import type {
   ThreadId,
+  VcsSnapshotFailure,
   WorktreeSetupSnapshot,
   WorktreeSetupStage,
   WorktreeSetupStageId,
@@ -20,6 +21,8 @@ import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
+
+import { clampVcsSnapshotFailureDetail } from "../vcs/vcsSnapshotFailure.ts";
 
 export class WorktreeSetupTracker extends Context.Service<
   WorktreeSetupTracker,
@@ -55,6 +58,7 @@ export class WorktreeSetupTracker extends Context.Service<
       threadId: ThreadId,
       phase: "done" | "failed" | "cancelled",
       error?: string | null,
+      failure?: VcsSnapshotFailure | null,
     ) => Effect.Effect<WorktreeSetupSnapshot | null>;
     /** Call just before dispatch so late cancellation cannot roll back a started agent's thread. */
     readonly markUncancellable: (threadId: ThreadId) => Effect.Effect<void>;
@@ -233,29 +237,40 @@ export const make = Effect.gen(function* () {
 
   const finish: WorktreeSetupTracker["Service"]["finish"] = Effect.fn(
     "WorktreeSetupTracker.finish",
-  )(function* (threadId, phase, error) {
+  )(function* (threadId, phase, error, failure) {
     const endedAt = yield* nowIso;
-    const snapshot = yield* modify(threadId, (tracked) => ({
-      fiber: null,
-      snapshot: {
-        ...tracked.snapshot,
-        phase,
-        endedAt,
-        error:
-          error === undefined || error === null
-            ? null
-            : clampText(error, WORKTREE_SETUP_ERROR_MAX_LENGTH),
-        stages: tracked.snapshot.stages.map((entry) =>
-          entry.status === "running"
-            ? {
-                ...entry,
-                status: phase === "done" ? "done" : phase === "cancelled" ? "skipped" : "failed",
-                endedAt,
-              }
-            : entry,
-        ),
-      },
-    }));
+    const snapshot = yield* modify(threadId, (tracked) => {
+      const { failure: _prevFailure, ...restSnapshot } = tracked.snapshot;
+      const nextFailure =
+        phase === "failed" && failure !== undefined && failure !== null
+          ? {
+              ...failure,
+              detail: clampVcsSnapshotFailureDetail(failure.detail),
+            }
+          : undefined;
+      return {
+        fiber: null,
+        snapshot: {
+          ...restSnapshot,
+          phase,
+          endedAt,
+          error:
+            error === undefined || error === null
+              ? null
+              : clampText(error, WORKTREE_SETUP_ERROR_MAX_LENGTH),
+          ...(nextFailure === undefined ? {} : { failure: nextFailure }),
+          stages: tracked.snapshot.stages.map((entry) =>
+            entry.status === "running"
+              ? {
+                  ...entry,
+                  status: phase === "done" ? "done" : phase === "cancelled" ? "skipped" : "failed",
+                  endedAt,
+                }
+              : entry,
+          ),
+        },
+      };
+    });
     if (!snapshot) return null;
     yield* clearRetention(threadId);
     const fiber = yield* remove(threadId).pipe(

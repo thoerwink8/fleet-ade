@@ -83,6 +83,7 @@ describe("VcsProcess.run", () => {
       expect(error).toMatchObject({
         exitCode: 128,
         failureKind: "command-failed",
+        reason: "index_locked",
         detail: "Git's index is locked. Wait for other Git operations to finish, then try again.",
       });
       expect(error.message).not.toContain("index.lock");
@@ -100,34 +101,48 @@ describe("VcsProcess.run", () => {
       stderr: "fatal: Unable to create '/private/repo/index.lock': File exists",
       retryable: true,
       detail: "Git's index is locked. Wait for other Git operations to finish, then try again.",
+      reason: "index_locked" as const,
     },
     {
       stderr: "fatal: Unable to create 'C:\\private\\repo\\.git\\index.lock': File exists.",
       retryable: true,
       detail: "Git's index is locked. Wait for other Git operations to finish, then try again.",
+      reason: "index_locked" as const,
     },
     {
       stderr: "fatal: Unable to create '/private/repo/.git/config.lock': File exists.",
       retryable: true,
+      reason: undefined,
     },
     {
       stderr: "fatal: Unable to create '/private/repo/index.lock': Permission denied",
       retryable: false,
+      reason: undefined,
     },
-    { stderr: 'error: open("/private/repo/file"): No such file or directory', retryable: true },
+    {
+      stderr: 'error: open("/private/repo/file"): No such file or directory',
+      retryable: true,
+      reason: undefined,
+    },
     {
       stderr: "fatal: unable to stat '/private/repo/file': No such file or directory",
       retryable: true,
+      reason: undefined,
     },
-    { stderr: 'error: open("/private/repo/file"): Permission denied', retryable: false },
+    {
+      stderr: 'error: open("/private/repo/file"): Permission denied',
+      retryable: false,
+      reason: undefined,
+    },
     {
       stderr: "error: '/private/repo/child/' does not have a commit checked out",
       retryable: false,
+      reason: undefined,
     },
-    { stderr: "fatal: index file corrupt", retryable: false },
+    { stderr: "fatal: index file corrupt", retryable: false, reason: undefined },
   ])(
     "classifies Git exit retryability and safe detail without retaining stderr: $stderr",
-    ({ stderr, retryable, detail = "Process exited with a non-zero status." }) =>
+    ({ stderr, retryable, detail = "Process exited with a non-zero status.", reason }) =>
       Effect.gen(function* () {
         const error = yield* captureProcessResult(
           Effect.succeed({
@@ -144,6 +159,7 @@ describe("VcsProcess.run", () => {
         assert.instanceOf(error, VcsProcessExitError);
         expect(error.retryable === true).toBe(retryable);
         expect(error.detail).toBe(detail);
+        expect(error.reason).toBe(reason);
         const encoded = yield* encodeExitError(error);
         expect(encoded).not.toContain("private");
       }),
@@ -536,6 +552,7 @@ describe("VcsProcess.run", () => {
         operation: "test.spawn",
         command: "definitely-not-a-t3code-executable",
         argumentCount: 1,
+        reason: "executable_not_found",
       });
       expect(error).toHaveProperty("cause");
       expect(error.message).not.toContain(secretArgument);

@@ -7,9 +7,11 @@ import {
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
 import { ChildProcessSpawner } from "effect/process";
+import { classifyTextGenerationCliFailure } from "@t3tools/provider-core/server/textGenerationUtils";
 import { makeCodexTextGeneration } from "../../textGeneration/CodexTextGeneration.ts";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { chatGptModels } from "../CodexChatGptModels.ts";
@@ -31,6 +33,8 @@ import { codexContinuationIdentity } from "./CodexHomeLayout.ts";
 import { withInstanceIdentity } from "@t3tools/provider-core/server/instanceIdentity";
 import { HttpClient } from "effect/http";
 const DRIVER = ProviderDriverKind.make("codex");
+const isTextGenerationError = Schema.is(TextGenerationError);
+const isProviderSetupError = Schema.is(ProviderSetupError);
 
 export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(function* (
   input: ProviderDriverCreateInput<CodexSettings>,
@@ -266,13 +270,24 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
   const protect = <A>(operation: string, effect: Effect.Effect<A, TextGenerationError>) =>
     runtime.auth.controller.withAccess!(effect).pipe(
       Effect.scoped,
-      Effect.mapError(
-        (cause) =>
-          new TextGenerationError({
-            operation,
-            detail: "detail" in cause ? cause.detail : "Codex 文本生成失败。",
-          }),
-      ),
+      Effect.mapError((cause) => {
+        if (isTextGenerationError(cause)) {
+          return cause;
+        }
+        const detail = "detail" in cause ? cause.detail : "Codex 文本生成失败。";
+        const reason = isProviderSetupError(cause)
+          ? cause.operation === "install"
+            ? "not_installed"
+            : cause.operation === "runtime"
+              ? "unavailable"
+              : classifyTextGenerationCliFailure(detail)
+          : classifyTextGenerationCliFailure(detail);
+        return new TextGenerationError({
+          operation,
+          detail,
+          ...(reason ? { reason } : {}),
+        });
+      }),
     );
   const generatePlainText = nativeGeneration.generatePlainText;
   const textGeneration: ProviderInstance["textGeneration"] = {

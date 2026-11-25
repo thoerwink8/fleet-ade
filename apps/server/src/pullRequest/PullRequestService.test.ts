@@ -4308,3 +4308,35 @@ it.effect.each(["expiry", "commit expiry", "cache hit", "commit cache hit", "ref
       assert.strictEqual(diffReads, 2);
     }),
 );
+
+it.effect("preserves rate-limited reason on PullRequestOperationError across operations", () =>
+  Effect.gen(function* () {
+    const rateLimitDetail = "GitHub rate limit exceeded.";
+    const service = yield* makeService({
+      projects: [project({ id: "p1", title: "web", workspaceRoot: "/a", repository: "acme/web" })],
+      providers: [
+        fakePullRequestProvider(SourceControlProviderKind.make("github"), {
+          getDiff: () =>
+            Effect.fail(
+              new PullRequestProviderError({
+                provider: SourceControlProviderKind.make("github"),
+                operation: "getDiff",
+                reason: "rate-limited",
+                detail: rateLimitDetail,
+              }),
+            ),
+        }),
+      ],
+    });
+
+    const error = yield* Effect.flip(
+      service.diff({ projectId: "p1" as ProjectId, repository: "acme/web", number: 1 }),
+    );
+
+    assert.strictEqual(error._tag, "PullRequestOperationError");
+    if (error._tag === "PullRequestOperationError") {
+      assert.strictEqual(error.reason, "rate-limited");
+      assert.strictEqual(error.detail, rateLimitDetail);
+    }
+  }),
+);
