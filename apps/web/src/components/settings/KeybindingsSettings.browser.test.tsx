@@ -130,6 +130,10 @@ it("re-enables Save when a When editor closes on an expression it could not pars
       <KeybindingsSettingsPanel />
     </RegistryProvider>,
   );
+  const terminalRow = document.getElementById("keybinding-terminal.toggle")!;
+  terminalRow
+    .querySelector("button[aria-expanded]")!
+    .dispatchEvent(new MouseEvent("click", { bubbles: true }));
   const whenTrigger = screen.getByRole("button", { name: "编辑 终端：开关 的生效条件" });
   const expression = screen.getByRole("textbox", { name: "生效条件表达式" });
 

@@ -60,6 +60,8 @@ import {
   DEFAULT_WHEN_VARIABLE,
   isKnownWhenVariable,
   keybindingConflictLabels,
+  keybindingDraftDisplay,
+  keybindingInputValue,
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
   groupKeybindingRows,
@@ -74,6 +76,7 @@ import {
 } from "./KeybindingsSettings.logic";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { AdvancedSettings } from "./AdvancedSettings";
 import { keybindingSearchAnchorId, searchableSetting } from "./settingsSearch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -840,17 +843,18 @@ function KeybindingKeyControl({
         </button>
       ) : (
         <Input
-          data-keybinding-capture=""
           autoFocus={isRecording}
           aria-label={`${commandLabel(row.command)} 的快捷键`}
-          value={isRecording ? "" : keyDraft}
+          value={isRecording ? "" : keybindingDraftDisplay(keyDraft)}
           placeholder={isRecording ? "按下快捷键" : "未分配"}
           size="sm"
           font="mono"
           className="w-44"
           onFocus={() => setDraft({ isRecording: true })}
           onBlur={() => setDraft({ isRecording: false })}
-          onChange={(event) => setDraft({ keyDraft: event.currentTarget.value })}
+          onChange={(event) =>
+            setDraft({ keyDraft: keybindingInputValue(event.currentTarget.value) })
+          }
           onKeyDown={captureKeybinding}
         />
       )}
@@ -979,8 +983,7 @@ function KeybindingRowWhen({
   variables: ReadonlyArray<WhenVariableOption>;
 }) {
   return (
-    <span className="flex h-6 items-center gap-1.5">
-      <span className="text-xs leading-none text-muted-foreground/70">条件</span>
+    <AdvancedSettings targetIds={[]}>
       <WhenClauseControl
         label={commandLabel(row.command)}
         expression={editor.whenDraftExpression}
@@ -989,7 +992,7 @@ function KeybindingRowWhen({
         onChange={(whenDraft) => editor.setDraft({ whenDraft })}
         onValidityChange={(isWhenDraftValid) => editor.setDraft({ isWhenDraftValid })}
       />
-    </span>
+    </AdvancedSettings>
   );
 }
 
@@ -1015,7 +1018,6 @@ function KeybindingSettingsRow(props: KeybindingRowProps) {
       id={anchorId}
       className="group/row rounded-none"
       title={<KeybindingRowTitle row={row} />}
-      description={<KeybindingRowWhen row={row} editor={editor} variables={variables} />}
       control={
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <KeybindingConflictWarning labels={editor.conflictLabels} />
@@ -1033,7 +1035,9 @@ function KeybindingSettingsRow(props: KeybindingRowProps) {
           />
         </div>
       }
-    />
+    >
+      <KeybindingRowWhen row={row} editor={editor} variables={variables} />
+    </SettingsRow>
   );
 }
 
@@ -1156,14 +1160,16 @@ function NewKeybindingKeyInput({
       data-keybinding-capture=""
       autoFocus={autoFocus}
       aria-label={`${draft.commandLabelText} 的快捷键`}
-      value={draft.isRecording ? "" : draft.keyDraft}
+      value={draft.isRecording ? "" : keybindingDraftDisplay(draft.keyDraft)}
       placeholder={draft.isRecording ? "按下快捷键" : "未分配"}
       size="sm"
       font="mono"
       className={className}
       onFocus={() => draft.setDraft({ isRecording: true })}
       onBlur={() => draft.setDraft({ isRecording: false })}
-      onChange={(event) => draft.setDraft({ keyDraft: event.currentTarget.value })}
+      onChange={(event) =>
+        draft.setDraft({ keyDraft: keybindingInputValue(event.currentTarget.value) })
+      }
       onKeyDown={draft.captureKeybinding}
     />
   );
@@ -1225,12 +1231,6 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
     <SettingsRow
       className="bg-muted/15"
       title="新建快捷键"
-      description={
-        <span className="flex h-6 items-center gap-1.5">
-          <span className="text-xs leading-none text-muted-foreground/70">仅当</span>
-          <NewKeybindingWhen draft={draft} variables={variables} />
-        </span>
-      }
       control={
         <div className="flex flex-wrap items-center gap-2">
           <NewKeybindingCommandSelect
@@ -1246,7 +1246,11 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
           <NewKeybindingCancelIcon isSaving={isSaving} onCancel={onCancel} />
         </div>
       }
-    />
+    >
+      <AdvancedSettings targetIds={[]}>
+        <NewKeybindingWhen draft={draft} variables={variables} />
+      </AdvancedSettings>
+    </SettingsRow>
   );
 }
 
