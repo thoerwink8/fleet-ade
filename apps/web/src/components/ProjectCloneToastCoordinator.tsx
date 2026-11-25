@@ -27,6 +27,7 @@ import { useAtomCommand } from "../state/use-atom-command";
 import { type DraftId, useComposerDraftStore } from "../composerDraftStore";
 import { toastManager } from "./ui/toast";
 import { stackedThreadToast } from "./ui/toastHelpers";
+import { presentVersionControlError } from "./versionControlError.logic";
 
 export function ProjectCloneToastCoordinator() {
   const { environments } = useEnvironments();
@@ -49,17 +50,17 @@ function renderKey(clone: ProjectCloneSnapshot): string {
 }
 
 async function runCloneAction(
-  title: string,
-  action: () => Promise<AtomCommandResult<unknown, unknown>>,
+  action: string,
+  run: () => Promise<AtomCommandResult<unknown, unknown>>,
 ) {
-  const result = await action();
+  const result = await run();
   if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-    const error = squashAtomCommandFailure(result);
+    const presentation = presentVersionControlError(squashAtomCommandFailure(result), action);
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title,
-        description: error instanceof Error ? error.message : "发生错误。",
+        title: presentation.title,
+        description: presentation.description,
       }),
     );
   }
@@ -126,7 +127,7 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
           actionProps: {
             children: "取消",
             onClick: () => {
-              void runCloneAction("无法取消克隆", () =>
+              void runCloneAction("取消克隆", () =>
                 cancelClone({ environmentId, input: { projectId: clone.projectId } }),
               );
             },
@@ -177,7 +178,7 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
         actionProps: {
           children: "重试",
           onClick: () => {
-            void runCloneAction("无法重试克隆", () =>
+            void runCloneAction("重试克隆", () =>
               retryClone({ environmentId, input: { projectId: clone.projectId } }),
             );
           },

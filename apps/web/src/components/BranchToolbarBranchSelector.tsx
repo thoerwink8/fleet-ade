@@ -54,6 +54,7 @@ import {
   sanitizeNewRefName,
   shouldIncludeBranchPickerItem,
 } from "./BranchToolbar.logic";
+import { presentVersionControlError } from "./versionControlError.logic";
 import {
   ThreadPullRequestBadgeControl,
   resolveDisplayedThreadPr,
@@ -482,11 +483,15 @@ export function BranchToolbarBranchSelector({
       }
       setOptimisticBranch(previousBranch);
       if (!isAtomCommandInterrupted(checkoutResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(checkoutResult),
+          "切换分支",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法切换分支",
-            description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }
@@ -521,11 +526,15 @@ export function BranchToolbarBranchSelector({
       }
       setOptimisticBranch(previousBranch);
       if (!isAtomCommandInterrupted(createBranchResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(createBranchResult),
+          "创建并切换分支",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法创建并切换分支",
-            description: toBranchActionErrorMessage(squashAtomCommandFailure(createBranchResult)),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

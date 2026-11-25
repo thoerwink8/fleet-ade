@@ -1,4 +1,8 @@
-/** Diff failures currently include transport wrappers, so recognize the reason inside them. */
+/**
+ * Diff failures currently include transport wrappers, so recognize the reason inside them.
+ * This has to read the text: the server does not yet send a typed rate-limit reason, and the
+ * provider's `reason` is lost when the failure is encoded for HTTP.
+ */
 export function describePullRequestDiffError(error: string, providerName: string, term: string) {
   if (/\brate limit\b|\brate[-_]limited\b|\btoo many requests\b/i.test(error)) {
     return {

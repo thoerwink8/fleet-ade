@@ -68,10 +68,6 @@ function shortenTraceId(traceId: string): string {
   return `${traceId.slice(0, 18)}...${traceId.slice(-10)}`;
 }
 
-function isStaleProcessSignalMessage(message: string | undefined): boolean {
-  return message?.includes("not a live descendant") ?? false;
-}
-
 function StatBlock({
   label,
   value,
@@ -878,15 +874,6 @@ function DiagnosticsSettingsBody() {
     if (!result.value.signaled) {
       const message = Option.getOrUndefined(result.value.message);
       refreshProcesses();
-      if (isStaleProcessSignalMessage(message)) {
-        toastManager.add({
-          type: "info",
-          title: "进程已退出",
-          description: "此进程不是 Fleet ADE 服务器的子进程，可能已经退出。",
-        });
-        return;
-      }
-
       toastManager.add({
         type: "error",
         title: `无法发送 ${signal}`,

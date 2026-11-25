@@ -1,5 +1,6 @@
 import { normalizeProjectPathForComparison } from "@t3tools/shared/path";
 
+import { presentVersionControlError } from "./components/versionControlError.logic";
 import type { ThreadShell } from "./types";
 
 export function getOrphanedWorktreePathForThread(
@@ -39,4 +40,29 @@ export function formatWorktreePathForDisplay(worktreePath: string): string {
   const parts = normalized.split("/");
   const lastPart = parts[parts.length - 1]?.trim() ?? "";
   return lastPart.length > 0 ? lastPart : trimmed;
+}
+
+/**
+ * The toast after a thread is deleted but its worktree cleanup failed. When only the Git status
+ * refresh failed the worktree is already gone, so the title says that first.
+ */
+export function describeWorktreeCleanupFailure(input: {
+  readonly removalFailed: boolean;
+  readonly error: unknown;
+  readonly worktreePath?: string;
+}): { readonly title: string; readonly description: string } {
+  if (!input.removalFailed) {
+    return {
+      title: "工作树已删除，但无法刷新 Git 状态",
+      description: presentVersionControlError(input.error, "刷新 Git 状态").description,
+    };
+  }
+  const presentation = presentVersionControlError(input.error, "删除工作树");
+  return {
+    title: presentation.title,
+    description:
+      input.worktreePath === undefined
+        ? presentation.description
+        : `无法删除 ${input.worktreePath}。${presentation.description}`,
+  };
 }

@@ -50,7 +50,7 @@ export function BranchPicker({
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadNext: () => void;
-  statusText: string | null;
+  statusText: ReactNode;
   notice?: string | null | undefined;
   originControl?: { checked: boolean; onCheckedChange: (checked: boolean) => void } | undefined;
   popupProps: Omit<ComponentProps<typeof ComboboxPopup>, "children">;
