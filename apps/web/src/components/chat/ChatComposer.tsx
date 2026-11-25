@@ -468,6 +468,7 @@ export interface ChatComposerProps {
   supportsProviderSwitchingViaHandoff?: boolean;
   providerStatuses: ServerProvider[];
   providerCatalogKnown: boolean;
+  preferDevReplay?: boolean | undefined;
   activeProjectDefaultModelSelection: ModelSelection | null | undefined;
   activeThreadModelSelection: ModelSelection | null | undefined;
   reportedModelSelection?: ModelSelection | null;
@@ -591,6 +592,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     supportsProviderSwitchingViaHandoff = false,
     providerStatuses,
     providerCatalogKnown,
+    preferDevReplay = false,
     activeProjectDefaultModelSelection,
     activeThreadModelSelection,
     reportedModelSelection,
@@ -938,6 +940,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     lockedProvider,
     lockedInstanceId:
       activeThread?.runtime?.providerInstanceId ?? activeThreadModelSelection?.instanceId,
+    preferDevReplay,
   });
   const noProviderAvailable =
     selectedProviderEntry === undefined && multipleModelSelections === null;
