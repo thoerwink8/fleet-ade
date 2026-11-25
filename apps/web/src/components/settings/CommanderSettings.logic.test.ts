@@ -300,6 +300,29 @@ describe("CommanderSettings logic", () => {
       hasAnyCommanderSettingToReset({ isProjectScope: true, targets: [overriddenProjectTarget] }),
     ).toBe(true);
 
+    // Two projects where only one overrides the row: still resettable (mixed source).
+    const otherProjectId = ProjectId.make("proj-2");
+    const inheritedOtherTarget = {
+      environmentId: envId,
+      label: "Env 1",
+      projectId: otherProjectId,
+      ...resolveProjectSettings(modifiedEnvSettings, otherProjectId),
+    };
+    expect(
+      canResetCommanderSettingRow({
+        key: "dispatchCodeModelSelection",
+        isProjectScope: true,
+        targets: [overriddenProjectTarget, inheritedOtherTarget],
+        mixed: true,
+      }),
+    ).toBe(true);
+    expect(
+      hasAnyCommanderSettingToReset({
+        isProjectScope: true,
+        targets: [overriddenProjectTarget, inheritedOtherTarget],
+      }),
+    ).toBe(true);
+
     expect(commanderResetRowPatch("dispatchCodeModelSelection")).toEqual({
       dispatchCodeModelSelection: null,
     });
