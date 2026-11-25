@@ -966,7 +966,7 @@ function PullRequestCodeTab({
   if (diffQuery.error && loadedSlices.length === 0) {
     return withToolbar(
       <PullRequestDiffUnavailableState
-        error={diffQuery.error}
+        error={diffQuery.failure ?? diffQuery.error}
         provider={detail.provider}
         url={detail.url}
         onRetry={() => diffQuery.refresh()}

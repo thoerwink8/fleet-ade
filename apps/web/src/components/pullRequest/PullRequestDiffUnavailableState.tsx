@@ -6,7 +6,7 @@ import { getSourceControlPresentationForKind } from "~/sourceControlPresentation
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import { RefreshIcon } from "../ui/refresh-icon";
-import { describePullRequestDiffError } from "./pullRequestDiffError";
+import { describePullRequestDiffError, pullRequestDiffErrorDetail } from "./pullRequestDiffError";
 
 export function PullRequestDiffUnavailableState({
   error,
@@ -14,7 +14,7 @@ export function PullRequestDiffUnavailableState({
   url,
   onRetry,
 }: {
-  error: string;
+  error: unknown;
   provider: SourceControlProviderKind;
   url: string;
   onRetry: () => void;
@@ -53,7 +53,7 @@ export function PullRequestDiffUnavailableState({
           技术详情
         </summary>
         <pre className="scrollbar-gutter-both mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
-          {error}
+          {pullRequestDiffErrorDetail(error)}
         </pre>
       </details>
     </Empty>

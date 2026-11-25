@@ -24,6 +24,7 @@ import { observeVisibleAnimation } from "~/lib/visibleAnimation";
 import { cn } from "~/lib/utils";
 import { useNowSecond } from "~/hooks/useNowSecond";
 import { WorkLogRow } from "./WorkLog";
+import { worktreeSetupFailureDescription } from "../versionControlError.logic";
 
 interface WorktreeSetupCardProps {
   snapshot: WorktreeSetupSnapshot;
@@ -354,8 +355,11 @@ export function WorktreeSetupCard({
         </div>
       )}
 
-      {snapshot.phase === "failed" && snapshot.error ? (
-        <p className="mt-1 ml-8 text-xs text-muted-foreground">{snapshot.error}</p>
+      {snapshot.phase === "failed" &&
+      worktreeSetupFailureDescription(snapshot.failure, snapshot.error) ? (
+        <p className="mt-1 ml-8 break-words text-xs text-muted-foreground">
+          {worktreeSetupFailureDescription(snapshot.failure, snapshot.error)}
+        </p>
       ) : null}
 
       <div className="mt-0.5 ml-[calc(--spacing(6)+2px-(--spacing(2)-1px))] flex flex-wrap items-center gap-0.5">
