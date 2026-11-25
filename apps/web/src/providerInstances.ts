@@ -236,7 +236,9 @@ export function findUsableDevReplayEntry(
     (entry) =>
       entry.instanceId === DEV_REPLAY_INSTANCE_ID &&
       entry.driverKind === "acpRegistry" &&
-      isProviderInstanceUsableForDefault(entry),
+      // Not the real-agent readiness check: until its first probe finishes the snapshot reads
+      // "not installed" with a placeholder model, and Replay is free either way.
+      isSelectableProviderInstanceEntry(entry),
   );
 }
 

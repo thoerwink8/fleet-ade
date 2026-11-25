@@ -857,4 +857,52 @@ describe("resolveNewSessionDefaultModelSelection", () => {
       model: "gpt-5.4",
     });
   });
+
+  it("still picks Replay while its snapshot has not been probed yet", () => {
+    // The snapshot a dev server publishes before the first probe finishes: not installed,
+    // warning, and only the placeholder "Default" model.
+    const unprobedReplay = provider({
+      provider: ProviderDriverKind.make("acpRegistry"),
+      instanceId: "devReplay",
+      displayName: "Replay (dev)",
+      installed: false,
+      status: "warning",
+      auth: { status: "unknown" },
+      models: [model("default", false, true)],
+    });
+    const claude = provider({
+      provider: ProviderDriverKind.make("claudeAgent"),
+      instanceId: "claudeAgent",
+      status: "ready",
+      auth: { status: "authenticated" },
+      models: [model("claude-opus-4-6", false, true)],
+    });
+    const settings = {
+      providerInstances: {
+        [ProviderInstanceId.make("devReplay")]: {
+          driver: ProviderDriverKind.make("acpRegistry"),
+          displayName: "Replay (dev)",
+        },
+      },
+      projectSettingsOverrides: {},
+    };
+
+    expect(
+      resolveProjectDefaultProviderModelSelection([claude, unprobedReplay], settings, null, {
+        preferDevReplay: true,
+      }),
+    ).toEqual({ instanceId: ProviderInstanceId.make("devReplay"), model: "default" });
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: null,
+        providers: [claude, unprobedReplay],
+        settings,
+        projectId: null,
+        preferDevReplay: true,
+      }),
+    ).toEqual({ instanceId: ProviderInstanceId.make("devReplay"), model: "default" });
+    expect(
+      resolveProjectDefaultProviderModelSelection([claude, unprobedReplay], settings, null),
+    ).toEqual({ instanceId: ProviderInstanceId.make("claudeAgent"), model: "claude-opus-4-6" });
+  });
 });
