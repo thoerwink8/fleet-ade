@@ -5002,6 +5002,10 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
           mode: "local",
         }).pipe(Effect.flip);
 
+        expect(error._tag).toBe("GitManagerError");
+        if (error._tag === "GitManagerError") {
+          expect(error.reason).toBe("working_tree_dirty");
+        }
         expect(error.message).toContain("uncommitted changes");
         expect(NodeFS.readFileSync(NodePath.join(repoDir, "README.md"), "utf8")).toBe(
           "my unsaved edit\n",
