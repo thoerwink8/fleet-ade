@@ -460,4 +460,42 @@ describe("resolveInitialServerAuthGateState", () => {
       "连不上这台电脑。检查网络，或确认这台电脑上的服务还在运行，再重试。",
     );
   });
+
+  it("keeps a structured server error as the submit failure", async () => {
+    const { describePairingSubmitError, PrimaryEnvironmentRequestError } =
+      await import("./environments/primary");
+    const { EnvironmentInternalError } = await import("@t3tools/contracts");
+    const cause = new EnvironmentInternalError({
+      code: "internal_error",
+      reason: "browser_session_issuance_failed",
+      traceId: "trace-server-error",
+    });
+    const error = PrimaryEnvironmentRequestError.fromCause({
+      operation: "exchange-bootstrap-credential",
+      cause,
+    });
+    expect(describePairingSubmitError(error)).toBe(
+      "后台服务在 exchange-bootstrap-credential 期间请求失败（HTTP 500）。",
+    );
+  });
+
+  it("does not recover onto a valid session when the exchange fails without a rejection", async () => {
+    const cause = new EnvironmentAuthInvalidError({
+      code: "auth_invalid",
+      reason: "missing_credential",
+      traceId: "trace-missing-credential",
+    });
+    await installAuthApi({
+      session: () => authenticatedSession(LOOPBACK_AUTH),
+      browserSession: () => Effect.fail(cause),
+    });
+    installTestBrowser("http://localhost/pair#token=unreachable-token");
+    const { submitServerAuthCredential, takePairingRecoveryNotice, takePairingTokenFromUrl } =
+      await import("./environments/primary");
+
+    await expect(submitServerAuthCredential(takePairingTokenFromUrl()!)).rejects.toMatchObject({
+      _tag: "PrimaryEnvironmentRequestError",
+    });
+    expect(takePairingRecoveryNotice()).toBeNull();
+  });
 });

@@ -167,10 +167,28 @@ export function takePairingRecoveryNotice(): string | null {
     return null;
   }
 }
+const isPairingTransportFailure = (error: PrimaryEnvironmentRequestError): boolean => {
+  // Decoded typed errors mean the server answered, so connectivity is not the problem.
+  if (isEnvironmentHttpCommonError(error.cause)) {
+    return false;
+  }
+  if (!HttpClientError.isHttpClientError(error.cause) || error.cause.response === undefined) {
+    // Aborts and fetch-level failures never received a server response.
+    return true;
+  }
+  return TRANSIENT_BOOTSTRAP_STATUS_CODES.has(error.status);
+};
+
+export function isPairingSubmitTransportFailure(error: unknown): boolean {
+  return isPrimaryEnvironmentRequestError(error) && isPairingTransportFailure(error);
+}
 
 export function describePairingSubmitError(error: unknown): string {
   if (isPrimaryEnvironmentRequestError(error)) {
-    return pairingRequestFailureMessage("this");
+    if (isPairingTransportFailure(error)) {
+      return pairingRequestFailureMessage("this");
+    }
+    return error.message;
   }
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;

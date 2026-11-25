@@ -8,6 +8,7 @@ import {
   stripPairingTokenFromUrl,
   submitServerAuthCredential,
   describePairingSubmitError,
+  isPairingSubmitTransportFailure,
 } from "../../environments/primary";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -45,15 +46,17 @@ export function PairingRouteSurface({
 
     const submitError = await submitServerAuthCredential(nextCredential).then(
       () => null,
-      (error) => describePairingSubmitError(error),
+      (error: unknown) => error,
     );
 
     setIsSubmitting(false);
 
     if (submitError) {
-      // The old code is useless now; clearing it lets the user paste a fresh one.
-      setCredential("");
-      setErrorMessage(submitError);
+      if (!isPairingSubmitTransportFailure(submitError)) {
+        // The old code is useless now; clearing it lets the user paste a fresh one.
+        setCredential("");
+      }
+      setErrorMessage(describePairingSubmitError(submitError));
       return;
     }
 
