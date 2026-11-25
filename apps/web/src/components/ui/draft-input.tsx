@@ -1,5 +1,8 @@
+import type { ComponentProps } from "react";
+
 import { useCommitOnBlur, type CommitVerdict } from "~/hooks/useCommitOnBlur";
 import { Input, type InputProps } from "./input";
+import { Textarea } from "./textarea";
 
 export type DraftInputProps = Omit<InputProps, "value" | "onChange" | "defaultValue"> & {
   readonly value: string;
@@ -24,4 +27,26 @@ export function DraftInput({
     resetOnCommit,
   );
   return <Input {...rest} {...input} />;
+}
+
+export type DraftTextareaProps = Omit<
+  ComponentProps<typeof Textarea>,
+  "value" | "onChange" | "defaultValue"
+> &
+  Pick<DraftInputProps, "value" | "onCommit" | "normalizeDraft" | "resetOnCommit">;
+
+/** Blur commits like DraftInput, but Enter stays a newline in the multi-line draft. */
+export function DraftTextarea({
+  value,
+  onCommit,
+  normalizeDraft,
+  resetOnCommit = false,
+  ...rest
+}: DraftTextareaProps) {
+  const {
+    reset: _reset,
+    onKeyDown: _onKeyDown,
+    ...textarea
+  } = useCommitOnBlur<HTMLTextAreaElement>(value, onCommit, normalizeDraft, resetOnCommit);
+  return <Textarea {...rest} {...textarea} />;
 }

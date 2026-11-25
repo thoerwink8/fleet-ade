@@ -12,6 +12,8 @@ import { formatProviderDriverKindLabel } from "../../providerModels";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ErrorDetailsDisclosure } from "./ErrorDetailsDisclosure";
+import { useEnvironment } from "../../state/environments";
+import { providerSetupGuidance } from "../settings/providerSetupGuidance.logic";
 import { classifyProviderError, type AlternativeReadyAgent } from "./providerErrorClassification";
 
 function getIncompatibleVersion(status: ServerProvider) {
@@ -151,7 +153,12 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     label: "刷新智能体状态",
   });
+  const startProviderAuth = useAtomCommand(serverEnvironment.startProviderAuth, {
+    reportFailure: false,
+    reportDefect: false,
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const environmentLabel = useEnvironment(environmentId)?.label ?? "这台电脑";
 
   const refresh = async () => {
     if (!status || !canRefresh || isRefreshing) return;
@@ -173,6 +180,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   }
 
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
+  const guidance = providerSetupGuidance({ provider: status, environmentLabel });
   const incompatible = getIncompatibleVersion(status);
   const classified =
     incompatible === null
@@ -186,7 +194,9 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
 
   const title = incompatible
     ? `${providerName} ${status.version ?? ""} ${incompatible.status === "broken" ? "已知不兼容" : "版本不受支持"}`.trim()
-    : classified!.message;
+    : guidance.action
+      ? guidance.message
+      : classified!.message;
   const rawDetail = incompatible
     ? (incompatible.message ?? status.message ?? null)
     : classified!.rawDetail;
@@ -213,11 +223,23 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
       case "sign_in":
       case "install_help":
         return onOpenProviderSetup
-          ? {
-              label: action.label,
-              disabled: false,
-              onClick: () => onOpenProviderSetup(status.instanceId),
-            }
+          ? guidance.action?.kind === "authenticate"
+            ? {
+                // Starts the login on the server, then opens settings where its terminal is shown.
+                label: guidance.action.label,
+                disabled: false,
+                onClick: () => {
+                  void startProviderAuth({
+                    environmentId,
+                    input: { instanceId: status.instanceId },
+                  }).finally(() => onOpenProviderSetup(status.instanceId));
+                },
+              }
+            : {
+                label: action.label,
+                disabled: false,
+                onClick: () => onOpenProviderSetup(status.instanceId),
+              }
           : null;
       case "switch_agent":
         return onSwitchAgent
@@ -244,7 +266,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     >
       <InfoIcon />
       <AlertTitle>{title}</AlertTitle>
-      {rawDetail ? (
+      {rawDetail && rawDetail !== title ? (
         <AlertDescription>
           <ErrorDetailsDisclosure detail={rawDetail} />
         </AlertDescription>
