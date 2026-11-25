@@ -40,6 +40,14 @@ export type ResolvedSettingsScope = ScopeTargets &
       }
   );
 
+/**
+ * Identifies the picked scope, not which of its machines are connected, so a draft keyed by it
+ * survives a disconnect and reconnect.
+ */
+export function settingsScopeKey(search: SettingsScopeSearch): string {
+  return JSON.stringify([search.project ?? null, search.machine ?? null, search.checkout ?? null]);
+}
+
 /** Stale IDs remain visible to the resolver so a removed target reads as unavailable, not as "all". */
 export function validateSettingsScopeSearch(raw: Record<string, unknown>): SettingsScopeSearch {
   const stringValue = (value: unknown) =>

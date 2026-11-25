@@ -2,21 +2,33 @@ import { useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject 
 
 import { anchoredToastManager } from "../components/ui/toast";
 
-/** `false` rejects the commit and keeps the typed text; a promise reports an asynchronous save. */
-export type CommitVerdict = void | false | Promise<boolean>;
+/** `false` rejects the commit and keeps the typed text; a string does the same and names the reason; a promise reports an asynchronous save. */
+export type CommitVerdict = void | false | string | Promise<boolean>;
 
 const SAVED_TOAST_TIMEOUT_MS = 1500;
 const REJECTED_TOAST_TIMEOUT_MS = 2500;
 
+// Room a one-line tip needs beside the input; the settings rows stack the input below its title
+// on narrow screens, where the tip hangs above the input's left edge instead.
+const TIP_ROOM_BESIDE_PX = 272;
+
+/** The tip starts at the input's left edge or sits beside it, never over the next row. */
+function inputTipPlacement(anchor: HTMLElement) {
+  const roomBeside = anchor.getBoundingClientRect().left >= TIP_ROOM_BESIDE_PX;
+  return roomBeside
+    ? { anchor, side: "inline-start" as const, align: "center" as const }
+    : { anchor, side: "top" as const, align: "start" as const };
+}
+
 function showAnchoredInputToast(
-  ref: RefObject<HTMLInputElement | null>,
+  ref: RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
   options: { title: string; timeout: number; type?: "error" },
 ) {
   if (!ref.current) return;
   anchoredToastManager.add({
     ...(options.type ? { type: options.type } : {}),
     data: { tooltipStyle: true },
-    positionerProps: { anchor: ref.current },
+    positionerProps: inputTipPlacement(ref.current),
     timeout: options.timeout,
     title: options.title,
   });
@@ -26,38 +38,45 @@ function showAnchoredInputToast(
  * Commits drafts on blur or Enter. A verdict of `false` or a rejected asynchronous save keeps the
  * typed text instead of reverting to the stored value; a confirmed save flashes a brief toast.
  */
-export function useCommitOnBlur(
+export function useCommitOnBlur<
+  TElement extends HTMLInputElement | HTMLTextAreaElement = HTMLInputElement,
+>(
   value: string,
   onCommit: (next: string) => CommitVerdict,
   normalizeDraft?: (previous: string, next: string) => string,
   resetOnCommit = false,
 ): {
   value: string;
-  ref: RefObject<HTMLInputElement | null>;
+  ref: RefObject<TElement | null>;
   "aria-invalid"?: true;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onChange: (event: ChangeEvent<TElement>) => void;
   onFocus: () => void;
   onBlur: () => void;
-  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown: (event: KeyboardEvent<TElement>) => void;
   /** Clears the draft so the input shows the stored value again. */
   reset: () => void;
 } {
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<TElement | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  // A saved text keeps showing until the stored value moves on, so a slow snapshot cannot flash the old value back.
+  const [held, setHeld] = useState<{ text: string; base: string } | null>(null);
+  const shownValue = held !== null && held.base === value ? held.text : value;
   const [rejected, setRejected] = useState<{ text: string; kind: "invalid" | "failed" } | null>(
     null,
   );
   const valueOnFocus = useRef(value);
   const commitToken = useRef(0);
   const editEpoch = useRef(0);
+  const focusEpoch = useRef(0);
+  const lastCommit = useRef<{ focus: number; text: string; edits: number } | null>(null);
 
-  const reject = (text: string, kind: "invalid" | "failed") => {
+  const reject = (text: string, kind: "invalid" | "failed", reason?: string) => {
     setRejected({ text, kind });
     showAnchoredInputToast(inputRef, {
       type: "error",
       timeout: REJECTED_TOAST_TIMEOUT_MS,
-      title: kind === "invalid" ? "无效的值，未保存" : "保存失败，内容已保留",
+      title: reason ?? (kind === "invalid" ? "无效的值，未保存" : "保存失败，内容已保留"),
     });
   };
 
@@ -70,6 +89,7 @@ export function useCommitOnBlur(
         const untouched = editEpoch.current === epoch;
         if (saved) {
           setRejected(null);
+          if (!resetOnCommit && text !== value) setHeld({ text, base: value });
           setDraft((current) => (resetOnCommit || current === text ? null : current));
           if (untouched) {
             showAnchoredInputToast(inputRef, {
@@ -90,9 +110,10 @@ export function useCommitOnBlur(
   };
 
   const commit = (text: string) => {
+    lastCommit.current = { focus: focusEpoch.current, text, edits: editEpoch.current };
     const verdict = onCommit(text);
-    if (verdict === false) {
-      reject(text, "invalid");
+    if (verdict === false || typeof verdict === "string") {
+      reject(text, "invalid", typeof verdict === "string" ? verdict : undefined);
       return;
     }
     if (resetOnCommit) setDraft(null);
@@ -105,29 +126,42 @@ export function useCommitOnBlur(
   };
   const reset = () => {
     commitToken.current += 1;
+    lastCommit.current = null;
     setDraft(null);
     setPending(null);
+    setHeld(null);
     setRejected(null);
   };
 
   return {
     ref: inputRef,
-    value: draft ?? pending ?? value,
+    value: draft ?? pending ?? shownValue,
     ...(rejected !== null ? { "aria-invalid": true as const } : {}),
     reset,
-    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+    onChange: (event: ChangeEvent<TElement>) => {
       const next = event.target.value;
       editEpoch.current += 1;
       setRejected(null);
-      setDraft(normalizeDraft ? normalizeDraft(draft ?? pending ?? value, next) : next);
+      setDraft(normalizeDraft ? normalizeDraft(draft ?? pending ?? shownValue, next) : next);
     },
     onFocus: () => {
-      const shown = draft ?? pending ?? value;
+      focusEpoch.current += 1;
+      const shown = draft ?? pending ?? shownValue;
       valueOnFocus.current = shown;
       setDraft(shown);
     },
     onBlur: () => {
       const text = draft ?? value;
+      // Browsers can deliver a second blur for one edit (e.g. the input becomes disabled);
+      // only a refocus or a new edit may commit the same text again.
+      const last = lastCommit.current;
+      if (
+        last !== null &&
+        last.focus === focusEpoch.current &&
+        last.text === text &&
+        last.edits === editEpoch.current
+      )
+        return;
       if (text === valueOnFocus.current) {
         if (rejected === null) {
           // A draft still saving must survive so a failure can keep showing it.
@@ -143,11 +177,11 @@ export function useCommitOnBlur(
       }
       commit(text);
     },
-    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+    onKeyDown: (event: KeyboardEvent<TElement>) => {
       if (event.nativeEvent.isComposing || event.keyCode === 229) return;
       if (event.key === "Enter") {
         event.preventDefault();
-        (event.target as HTMLInputElement).blur();
+        (event.target as HTMLElement).blur();
       }
     },
   };

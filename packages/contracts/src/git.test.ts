@@ -129,6 +129,22 @@ describe("GitCommandError", () => {
     expect(decodedByLegacy.detail).toBe("git pull failed");
     expect((decodedByLegacy as { action?: unknown }).action).toBeUndefined();
   });
+
+  it("round-trips network_unreachable and reads as absent to a legacy decoder", () => {
+    const encoded = encodeGitCommandError(
+      new GitCommandError({
+        operation: "SourceControlRepositoryService.cloneRepository",
+        action: "clone",
+        command: "git",
+        cwd: "/repo",
+        reason: "network_unreachable",
+        detail: "git clone failed",
+      }),
+    );
+
+    expect(decodeGitCommandError(encoded).reason).toBe("network_unreachable");
+    expect(decodeLegacyGitCommandErrorJson(JSON.stringify(encoded)).reason).toBeUndefined();
+  });
 });
 
 describe("GitManagerError and TextGenerationError", () => {
