@@ -708,7 +708,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         (root) => Effect.sync(() => NodeFS.rmSync(root, { recursive: true, force: true })),
       );
 
-      const spawnedHome = (input: {
+      const spawnedEnv = (input: {
         readonly t3Home: string | undefined;
         readonly cwd: string;
         readonly ambientHome: string | undefined;
@@ -739,8 +739,29 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
             ),
           );
 
-          return captured?.T3CODE_HOME;
+          return captured;
         });
+
+      const spawnedHome = (input: Parameters<typeof spawnedEnv>[0]) =>
+        spawnedEnv(input).pipe(Effect.map((env) => env?.T3CODE_HOME));
+
+      it.effect("marks only an explicit --home-dir for the server child", () =>
+        Effect.gen(function* () {
+          const root = yield* makeWorktree;
+          const explicit = yield* spawnedEnv({
+            t3Home: "/tmp/explicit-home",
+            cwd: root,
+            ambientHome: "/home/user/.t3",
+          });
+          assert.equal(explicit?.T3CODE_HOME_EXPLICIT, "1");
+          const implicit = yield* spawnedEnv({
+            t3Home: undefined,
+            cwd: root,
+            ambientHome: "/home/user/.t3",
+          });
+          assert.equal(implicit?.T3CODE_HOME_EXPLICIT, undefined);
+        }).pipe(Effect.scoped),
+      );
 
       it.effect("prefers an explicit --home-dir over the worktree default", () =>
         Effect.gen(function* () {
