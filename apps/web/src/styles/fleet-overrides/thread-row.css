@@ -139,8 +139,10 @@
   display: inline-flex;
 }
 
+/* The "..." menu stays at every width: it holds every batch action, so spreading the bar out
+   only adds shortcuts and never removes a way to reach one. */
 .fa-batch .fa-batch__more {
-  display: none;
+  display: inline-flex;
 }
 
 /* The container query measures the bar's content box: the sidebar minus the bar wrapper's 8px
@@ -149,10 +151,6 @@
 @container batch (max-width: 286px) {
   .fa-batch .is-overflow {
     display: none;
-  }
-
-  .fa-batch .fa-batch__more {
-    display: inline-flex;
   }
 }
 
