@@ -37,6 +37,7 @@ import {
   buildMultiSelectThreadMenuItems,
   buildSidebarListItems,
   countArchivedThreadsInScope,
+  filterSidebarV2VisibleThreads,
   isThreadAttentionDismissible,
   isThreadAttentionRowDisabled,
   resolveSidebarDropVerb,
@@ -656,6 +657,7 @@ function makeThread(overrides: ThreadFixtureOverrides = {}): Thread {
     latestRun: null,
     branch: null,
     worktreePath: null,
+    turnCount: 1,
     ...overrides,
   });
 }
@@ -2464,5 +2466,46 @@ describe("countArchivedThreadsInScope", () => {
         scopedProjectKeys: new Set(["env-a:p1", "env-b:p1"]),
       }),
     ).toBe(2);
+  });
+});
+
+describe("filterSidebarV2VisibleThreads", () => {
+  it("hides never-messaged empty threads except the active route row, while keeping messaged siblings", () => {
+    const emptyHidden = makeThreadFixture({
+      id: ThreadId.make("empty-hidden"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "新会话",
+    });
+    const emptyRoute = makeThreadFixture({
+      id: ThreadId.make("empty-route"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "打开中的空会话",
+    });
+    const messagedA = makeThreadFixture({
+      id: ThreadId.make("messaged-a"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "同名会话",
+      turnCount: 1,
+    });
+    const messagedB = makeThreadFixture({
+      id: ThreadId.make("messaged-b"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "同名会话",
+      latestUserMessageAt: "2026-03-09T10:01:00.000Z",
+    });
+
+    const routeRowThreadKey = `${localEnvironmentId}:${emptyRoute.id}`;
+    const visible = filterSidebarV2VisibleThreads(
+      [emptyHidden, emptyRoute, messagedA, messagedB],
+      null,
+      new Set(),
+      routeRowThreadKey,
+    );
+
+    expect(visible.map((thread) => thread.id)).toEqual([emptyRoute.id, messagedA.id, messagedB.id]);
   });
 });

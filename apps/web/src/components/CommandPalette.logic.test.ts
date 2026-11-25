@@ -216,6 +216,7 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     latestRun: null,
     branch: null,
     worktreePath: null,
+    turnCount: 1,
     ...overrides,
   });
 }
@@ -239,6 +240,43 @@ describe("buildThreadActionItems", () => {
     const remoteItem = items.find((item) => item.description === "Remote project · 当前会话");
     await remoteItem?.run();
     expect(runThread).toHaveBeenCalledWith(remote);
+  });
+
+  it("hides never-messaged empty threads except the active thread while keeping messaged siblings", () => {
+    const emptyHidden = makeThread({
+      id: ThreadId.make("empty-hidden"),
+      title: "空会话",
+      turnCount: 0,
+    });
+    const emptyActive = makeThread({
+      id: ThreadId.make("empty-active"),
+      title: "当前空会话",
+      turnCount: 0,
+    });
+    const messagedA = makeThread({
+      id: ThreadId.make("messaged-a"),
+      title: "同名会话",
+      turnCount: 1,
+    });
+    const messagedB = makeThread({
+      id: ThreadId.make("messaged-b"),
+      title: "同名会话",
+      turnCount: 2,
+    });
+
+    const items = buildThreadActionItems({
+      threads: [emptyHidden, emptyActive, messagedA, messagedB],
+      activeThread: emptyActive,
+      projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "Project" }]]),
+      icon: null,
+      runThread: async () => undefined,
+    });
+
+    expect(items.map((item) => item.threadRef?.threadId)).toEqual([
+      emptyActive.id,
+      messagedA.id,
+      messagedB.id,
+    ]);
   });
 
   it("ranks thread title matches ahead of contextual project-name matches", () => {

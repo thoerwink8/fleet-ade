@@ -626,7 +626,12 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     lastVisitedAtById,
   } = input;
   const preciseNow = new Date().toISOString();
-  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
+  const visible = filterSidebarV2VisibleThreads(
+    threads,
+    scopedProjectKeys,
+    delegatedUnderParent,
+    routeRowThreadKey,
+  );
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
   const commander: EnvironmentThreadShell[] = [];
   const pinned: EnvironmentThreadShell[] = [];

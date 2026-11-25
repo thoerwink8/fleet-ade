@@ -145,6 +145,7 @@ function threadShell(projectId: ProjectId, index: number): EnvironmentThreadShel
     id: ThreadId.make(`thread-${index}`),
     projectId,
     title: `会话 ${index}`,
+    turnCount: 1,
   });
 }
 
@@ -299,6 +300,7 @@ describe("sidebar settled pagination", () => {
         title: `Settled thread ${index}`,
         settledOverride: "settled",
         settledAt: "2026-01-01T00:00:00.000Z",
+        turnCount: 1,
       }),
     );
     threads.unshift(threadShell(activeProject.id, 100));
@@ -596,12 +598,14 @@ describe("sidebar thread settle", () => {
       projectId: activeProject.id,
       id: ThreadId.make("thread-x"),
       title: "会话 X",
+      turnCount: 1,
     });
     const threadY = makeThreadFixture({
       environmentId: activeProject.environmentId,
       projectId: activeProject.id,
       id: ThreadId.make("thread-y"),
       title: "会话 Y",
+      turnCount: 1,
     });
     const threadXRef: ScopedThreadRef = {
       environmentId: activeProject.environmentId,
