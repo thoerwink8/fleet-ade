@@ -13,6 +13,11 @@ const isWindowsRenameLock = (error: PlatformError.PlatformError) => {
   return code === "EBUSY" || code === "EPERM" || code === "EACCES";
 };
 
+const isUnsupportedSync = (error: PlatformError.PlatformError) => {
+  const code = (error.reason.cause as NodeJS.ErrnoException | undefined)?.code;
+  return code === "EINVAL" || code === "ENOTSUP" || code === "ENOSYS";
+};
+
 // Bound denial delays to about two seconds because settings saves hold their write lock.
 const LOCKED_RENAME_RETRIES = 20;
 const LOCKED_RENAME_RETRY_DELAY = "100 millis";
@@ -32,25 +37,27 @@ export const writeFileStringAtomically = (input: {
       const targetDirectory = path.dirname(targetPath);
 
       yield* fs.makeDirectory(targetDirectory, { recursive: true });
-      // Cleanup failure must not fail a write that already landed.
+      // Cleanup failure must not fail a write that already landed. The prefix stays fixed:
+      // carrying the file name into it overflows the 255-byte entry limit for long names.
       const tempDirectory = yield* Effect.acquireRelease(
         fs.makeTempDirectory({
           directory: targetDirectory,
-          prefix: `${path.basename(targetPath)}.`,
+          prefix: "t3-write-",
         }),
         (directory) => fs.remove(directory, { recursive: true }).pipe(Effect.ignore({ log: true })),
       );
       const tempPath = path.join(tempDirectory, "contents.tmp");
 
-      const contents = input.contents;
-      if (typeof contents === "string") {
-        yield* fs.writeFileString(tempPath, contents);
-      } else {
-        // Closed before the rename, which Windows refuses for open files.
-        yield* Effect.scoped(
-          Effect.gen(function* () {
-            const file = yield* fs.open(tempPath, { flag: "w" });
-            const encoder = new TextEncoder();
+      // The sync before the rename keeps a crash right after it from leaving the target empty.
+      // Closed before the rename, which Windows refuses for open files.
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const file = yield* fs.open(tempPath, { flag: "w" });
+          const encoder = new TextEncoder();
+          const contents = input.contents;
+          if (typeof contents === "string") {
+            yield* file.writeAll(encoder.encode(contents));
+          } else {
             let batch: string[] = [];
             let batchLength = 0;
             for (const chunk of contents) {
@@ -62,10 +69,24 @@ export const writeFileStringAtomically = (input: {
               batchLength = 0;
             }
             if (batchLength > 0) yield* file.writeAll(encoder.encode(batch.join("")));
-          }),
+          }
+          yield* file.sync;
+        }),
+      );
+      if (platform !== "win32") {
+        yield* fs.rename(tempPath, targetPath);
+        // Persists the rename itself. Windows cannot open a directory to sync it, and a
+        // filesystem without directory sync answers ENOTSUP, EINVAL or ENOSYS: the rename
+        // already landed, so the save stands.
+        return yield* fs.open(targetDirectory, { flag: "r" }).pipe(
+          Effect.flatMap((directory) => directory.sync),
+          Effect.scoped,
+          Effect.catchIf(
+            (error) => error.reason._tag === "PermissionDenied" || isUnsupportedSync(error),
+            (error) => Effect.logWarning(error),
+          ),
         );
       }
-      if (platform !== "win32") return yield* fs.rename(tempPath, targetPath);
 
       // Stop retrying if another save changes the target; read-only targets also return permanent EPERM.
       const targetVersion = fs.stat(targetPath).pipe(
