@@ -1,4 +1,5 @@
 import type { SensorProps } from "@dnd-kit/core";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { fakeTimers } from "../../test/render";
 import { SidebarPointerSensor } from "./Sidebar.pointer";
@@ -100,5 +101,31 @@ describe("sidebar pointer lifecycle", () => {
     expect(drag.onCancel).toHaveBeenCalledOnce();
     expect(drag.onEnd).not.toHaveBeenCalled();
     expect(drag.onFinish).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("ignores touch activation inside mobile sidebar drawer while allowing mouse and desktop touch", () => {
+    using stack = new DisposableStack();
+    const mobileDrawer = document.createElement("div");
+    mobileDrawer.dataset.mobile = "true";
+    mobileDrawer.dataset.sidebar = "sidebar";
+    const insideButton = document.createElement("button");
+    mobileDrawer.append(insideButton);
+    const outsideButton = document.createElement("button");
+    document.body.append(mobileDrawer, outsideButton);
+    stack.defer(() => {
+      mobileDrawer.remove();
+      outsideButton.remove();
+    });
+
+    const activator = SidebarPointerSensor.activators[0]!;
+    const createSyntheticPointer = (target: Element, pointerType: "touch" | "mouse") => {
+      const event = pointer("pointerdown", { pointerType, isPrimary: true, button: 0 });
+      Object.defineProperty(event, "target", { value: target });
+      return { nativeEvent: event } as unknown as ReactPointerEvent;
+    };
+
+    expect(activator.handler(createSyntheticPointer(insideButton, "touch"))).toBe(false);
+    expect(activator.handler(createSyntheticPointer(insideButton, "mouse"))).toBe(true);
+    expect(activator.handler(createSyntheticPointer(outsideButton, "touch"))).toBe(true);
   });
 });

@@ -6,6 +6,7 @@ import {
   selectProjectAxis,
   settingsScopeCheckoutChoices,
   settingsScopeCheckoutLabel,
+  settingsScopeControlsVisible,
 } from "./settingsScopeAxis";
 
 const member = (environmentId: string, physicalProjectKey: string, workspaceRoot = "") =>
@@ -47,4 +48,17 @@ describe("settings scope axes", () => {
     expect(settingsScopeCheckoutLabel(second, [first, second, other])).toBe("C:\\work\\two\\app");
     expect(settingsScopeCheckoutLabel(other, [first, second, other])).toBe("tools");
   });
+
+  it.each([
+    [1, 0, false],
+    [1, 1, false],
+    [1, 2, true],
+    [2, 1, true],
+    [2, 2, true],
+  ])(
+    "shows scope controls only with more than one computer or project",
+    (computers, projects, visible) => {
+      expect(settingsScopeControlsVisible(computers, projects)).toBe(visible);
+    },
+  );
 });
