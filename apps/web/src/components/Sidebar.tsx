@@ -2802,7 +2802,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopeGroups.length > 1
       ? currentProjectRef !== null
         ? "选择其他项目新建：Shift+单击"
-        : `在当前项目中新建会话：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
+        : `跳过项目选择直接新建：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
       : null;
   return (
     <SidebarFolderDrop>
