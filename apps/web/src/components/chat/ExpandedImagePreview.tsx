@@ -8,7 +8,6 @@ import type {
 } from "@t3tools/contracts";
 import { videoMimeType } from "@t3tools/shared/video";
 import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { resolveAssetUrl } from "@t3tools/client-runtime/state/assets";
 import {
   squashAtomCommandFailure,
@@ -70,7 +69,7 @@ export async function resolveMarkdownMediaPreview(input: {
       environmentId: asset.environmentId,
       input: { resource: asset.resource },
     });
-    if (result._tag === "Failure") throw describeRequestFailure(squashAtomCommandFailure(result));
+    if (result._tag === "Failure") throw squashAtomCommandFailure(result);
     const assetUrl = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
     if (assetUrl === null) throw new Error("电脑返回了无效的媒体 URL。");
     src = assetUrl + media.srcFragment;

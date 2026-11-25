@@ -16,7 +16,7 @@ import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3t
 import { getProviderModelCapabilities } from "../providerModels";
 import { RewindFailureError } from "./chat/revertConfirm.logic";
 import { classifyRewindOutcome, hasActiveRun } from "./chat/stopAndRewind.logic";
-import { describeRequestFailure, sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
+import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
@@ -559,7 +559,7 @@ export async function resolveFileAttachmentUrl(input: {
       },
     },
   });
-  if (result._tag === "Failure") throw describeRequestFailure(squashAtomCommandFailure(result));
+  if (result._tag === "Failure") throw squashAtomCommandFailure(result);
   const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
   if (url === null) throw new Error("这台电脑返回了无效的附件 URL。");
   return url;
@@ -587,7 +587,7 @@ export async function prepareRevertedMessageAttachments(input: {
           },
         },
       });
-      if (result._tag === "Failure") throw describeRequestFailure(squashAtomCommandFailure(result));
+      if (result._tag === "Failure") throw squashAtomCommandFailure(result);
       const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
       if (url === null) throw new Error("这台电脑返回了无效的附件 URL。");
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });

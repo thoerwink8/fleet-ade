@@ -1,4 +1,3 @@
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { isClearComposerCommand, parseSideChatCommand } from "@t3tools/shared/composerTrigger";
 import { armFreshSession, disarmFreshSession, readFreshSessionArm } from "./freshSessionArms";
 import {
@@ -1397,7 +1396,7 @@ export function useComposerSend(input: ComposerSendInput) {
       const failureReason = isAtomCommandInterrupted(failure)
         ? "上一条消息的发送已中断。"
         : (() => {
-            const error = describeRequestFailure(squashAtomCommandFailure(failure));
+            const error = squashAtomCommandFailure(failure);
             return error instanceof Error ? error.message : "无法发送消息。";
           })();
       if (!isAtomCommandInterrupted(failure)) {

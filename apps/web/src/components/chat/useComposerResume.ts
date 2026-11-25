@@ -1,4 +1,3 @@
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   type EnvironmentId,
   type ProviderInteractionMode,
@@ -152,7 +151,7 @@ export function useComposerResume(input: ComposerResumeInput) {
       const reason = isAtomCommandInterrupted(result)
         ? "继续会话已中断。"
         : (() => {
-            const error = describeRequestFailure(squashAtomCommandFailure(result));
+            const error = squashAtomCommandFailure(result);
             return error instanceof Error ? error.message : "无法继续会话。";
           })();
       if (!isAtomCommandInterrupted(result)) {

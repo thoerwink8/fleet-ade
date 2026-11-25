@@ -3,7 +3,6 @@ import {
   type EditorId,
   type EnvironmentId,
 } from "@t3tools/contracts";
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 
 import { useOpenInPreferredEditor } from "../editorPreferences";
@@ -37,7 +36,7 @@ export function KeybindingsConfigWarning({
             if (!configPath) return;
             const result = await openInEditor(configPath);
             if (result._tag === "Success") return;
-            const error = describeRequestFailure(squashAtomCommandFailure(result));
+            const error = squashAtomCommandFailure(result);
             toastManager.add(
               stackedThreadToast({
                 type: "error",

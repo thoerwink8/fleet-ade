@@ -1,4 +1,3 @@
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import {
   findProjectByPath,
@@ -70,7 +69,7 @@ export function useOpenLocalWorkspace() {
           },
         });
         if (result._tag === "Failure") {
-          const error = describeRequestFailure(squashAtomCommandFailure(result));
+          const error = squashAtomCommandFailure(result);
           throw error instanceof Error ? error : new Error("Fleet ADE 无法添加该项目。");
         }
         return projectId;

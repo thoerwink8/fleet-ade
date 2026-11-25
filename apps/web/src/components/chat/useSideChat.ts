@@ -1,4 +1,3 @@
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import type { ModelSelection, RuntimeMode, ScopedThreadRef } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { deriveThreadTitleSeed } from "@t3tools/client-runtime/operations";
@@ -47,7 +46,7 @@ export function useSideChat(input: {
     fallback: string,
   ) => {
     if (isAtomCommandInterrupted(failure)) return;
-    const error = describeRequestFailure(squashAtomCommandFailure(failure));
+    const error = squashAtomCommandFailure(failure);
     input.onError(error instanceof Error ? error.message : fallback);
   };
   const start = async (threadRef: ScopedThreadRef, prompt: string | undefined) => {

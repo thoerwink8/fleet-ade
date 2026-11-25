@@ -141,7 +141,6 @@ import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection
 import { useStore } from "zustand";
 import { shallow } from "zustand/vanilla/shallow";
 import { useShallow } from "zustand/react/shallow";
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   mapAtomCommandResult,
@@ -1936,7 +1935,7 @@ export default function ChatView(props: ChatViewProps) {
       },
     });
     if (result._tag === "Failure") {
-      const error = describeRequestFailure(squashAtomCommandFailure(result));
+      const error = squashAtomCommandFailure(result);
       throw error instanceof Error ? error : new Error("无法发送应用的消息。");
     }
   };

@@ -7,7 +7,6 @@ import {
   makeRevisionedAssetUrlFamily,
   resolveAssetUrl,
 } from "@t3tools/client-runtime/state/assets";
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AssetResource, EnvironmentId } from "@t3tools/contracts";
 import { AsyncResult } from "effect/reactivity";
@@ -64,7 +63,7 @@ export function useAssetUrlRefresh(
   return async () => {
     if (environmentId === null || resource === null || httpBaseUrl === null) return null;
     const result = await refresh({ environmentId, input: { resource } });
-    if (result._tag === "Failure") throw describeRequestFailure(squashAtomCommandFailure(result));
+    if (result._tag === "Failure") throw squashAtomCommandFailure(result);
     return resolveAssetUrl(httpBaseUrl, result.value.relativeUrl);
   };
 }

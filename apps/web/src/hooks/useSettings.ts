@@ -19,7 +19,7 @@ import {
   type EnvironmentIdentificationMode,
   type UnifiedSettings,
 } from "@t3tools/contracts/settings";
-import { describeRequestFailure, safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
+import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   runAtomCommand,
@@ -602,7 +602,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       const label =
         environments.find((environment) => environment.environmentId === request.environmentId)
           ?.label ?? request.environmentId;
-      const error = describeRequestFailure(squashAtomCommandFailure(result));
+      const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
         title: "设置未保存",
@@ -712,7 +712,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
             }
             const failures = outcomes.flatMap(({ label, result }) => {
               if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return [];
-              const error = describeRequestFailure(squashAtomCommandFailure(result));
+              const error = squashAtomCommandFailure(result);
               return [
                 `无法在 ${label} 上保存：${error instanceof Error ? error.message : "保存失败，请重新连接后再保存。"}`,
               ];

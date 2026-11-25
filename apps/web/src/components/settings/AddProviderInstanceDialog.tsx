@@ -7,7 +7,6 @@ import {
   deriveAvailableInstanceId,
   deriveInstanceId,
 } from "@t3tools/client-runtime/provider-instance-ids";
-import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { ProviderClientDefinition } from "@t3tools/provider-core/client";
 import {
@@ -408,7 +407,7 @@ export function AddProviderInstanceDialog({
       instance: nextInstance,
     });
     if (result._tag === "Failure") {
-      const error = describeRequestFailure(squashAtomCommandFailure(result));
+      const error = squashAtomCommandFailure(result);
       setIsSaving(false);
       toastManager.add({
         type: "error",
