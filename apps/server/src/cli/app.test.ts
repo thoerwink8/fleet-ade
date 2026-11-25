@@ -52,8 +52,12 @@ const setProcessEnv = (name: string, value: string) => {
   };
 };
 
+// A linked worktree ignores T3CODE_HOME, so pin a cwd that is not one.
+const TEST_WORKING_DIRECTORY = NodeOS.tmpdir();
+
 const runCli = (args: ReadonlyArray<string>, env: Record<string, string> = {}) =>
   Command.runWith(makeCli(), { version: "0.0.0" })(args).pipe(
+    Effect.provideService(HostProcess.WorkingDirectory, TEST_WORKING_DIRECTORY),
     Effect.provide(
       Layer.mergeAll(
         NodeServices.layer,
@@ -292,7 +296,7 @@ describe("t3 app", () => {
         const baseDir = NodePath.join(root, "t3-home");
         const explicitPath = NodePath.join(root, "project");
         const platform = yield* HostProcess.Platform;
-        const workingDirectory = yield* HostProcess.WorkingDirectory;
+        const workingDirectory = TEST_WORKING_DIRECTORY;
         const desktop = yield* fakeDesktop({ baseDir });
 
         yield* runCli(["app"], { T3CODE_HOME: baseDir });
@@ -383,7 +387,7 @@ describe("t3 app", () => {
               _tag: "DesktopAppRequestFailedError",
               code: "project-create-failed",
               requestId: desktop.received[0]?.requestId,
-              workspaceRoot: yield* HostProcess.WorkingDirectory,
+              workspaceRoot: TEST_WORKING_DIRECTORY,
               message: expect.stringContaining("project-create-failed"),
               cause: {
                 ok: false,

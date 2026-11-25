@@ -30,6 +30,9 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { useScheduledTaskTitle } from "./TimelineUserMessageRow";
 import { queuedRunHeldLabel } from "./queuedRunHold.logic";
+import type { WithdrawQueuedRunRequest } from "./queuedRunWithdraw";
+
+export type { WithdrawQueuedRunRequest };
 
 export interface EditQueuedRunRequest {
   readonly runId: RunId;
@@ -83,6 +86,10 @@ export function QueuedRunsControl({
   readonly sendBlockedReason?: string | null;
   readonly onEditQueuedRun: (request: EditQueuedRunRequest) => void;
   readonly onCancelEdit: () => void;
+  readonly onQueuedRunWithdrawn?: (
+    request: WithdrawQueuedRunRequest,
+    origin: { readonly environmentId: EnvironmentId; readonly threadId: ThreadId },
+  ) => void;
   readonly timestampFormat: TimestampFormat;
   readonly onOpenThread: (threadId: ThreadId, environmentId?: EnvironmentId) => void;
 }) {
@@ -123,7 +130,7 @@ export function QueuedRunsControl({
     (message) => message.inputIntent === "queued_turn" && !acknowledgedMessageIds.has(message.id),
   );
   const items = [
-    ...queued.map(({ run, text, attachments, message }, serverIndex) => ({
+    ...queued.map(({ run, text, attachments, message, context }, serverIndex) => ({
       key: run.id,
       message,
       runId: run.id,
@@ -132,6 +139,7 @@ export function QueuedRunsControl({
       heldLabel: queuedRunHeldLabel(run),
       serverIndex,
       text,
+      context,
       editable: true,
       attachments,
       thumbnails: attachments
@@ -152,6 +160,7 @@ export function QueuedRunsControl({
       heldLabel: null,
       serverIndex: null,
       text: message.text,
+      context: undefined,
       editable: true,
       attachments: [] as ReadonlyArray<ContractChatAttachment>,
       thumbnails: (message.attachments ?? [])
@@ -224,13 +233,27 @@ export function QueuedRunsControl({
 
   if (items.length === 0) return null;
 
-  const remove = async (runId: RunId) => {
-    setBusyRunId(runId);
-    await cancel({
+  const withdraw = async (item: (typeof items)[number]) => {
+    if (item.runId === null) return;
+    setBusyRunId(item.runId);
+    const result = await cancel({
       environmentId: props.environmentId,
-      input: { threadId: props.threadId, runId },
+      input: { threadId: props.threadId, runId: item.runId },
     });
     setBusyRunId(null);
+    if (result._tag === "Success" && item.messageId !== null) {
+      props.onQueuedRunWithdrawn?.(
+        {
+          runId: item.runId,
+          messageId: item.messageId,
+          text: item.text,
+          attachments: item.attachments,
+          ...(item.context ? { context: item.context } : {}),
+        },
+        // Captured from the render that started the withdraw: the user may have switched threads meanwhile.
+        { environmentId: props.environmentId, threadId: props.threadId },
+      );
+    }
   };
 
   const collapsible = items.length > QUEUE_VISIBLE_ROWS;
@@ -359,18 +382,18 @@ export function QueuedRunsControl({
                         render={
                           <Button
                             size="xs"
-                            variant="ghost-destructive"
+                            variant="ghost-muted"
                             aria-label="撤回排队消息"
                             disabled={item.runId === null || busyRunId !== null}
                             onClick={() => {
-                              if (item.runId !== null) void remove(item.runId);
+                              if (item.runId !== null) void withdraw(item);
                             }}
                           />
                         }
                       >
                         撤回
                       </TooltipTrigger>
-                      <TooltipPopup>撤回排队消息</TooltipPopup>
+                      <TooltipPopup>撤回排队消息，放回输入框或暂存</TooltipPopup>
                     </Tooltip>
                   </>
                 )}
