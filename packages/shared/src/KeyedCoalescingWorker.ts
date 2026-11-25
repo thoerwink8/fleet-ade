@@ -1,3 +1,4 @@
+import * as Cause from "effect/Cause";
 import * as Scope from "effect/Scope";
 import * as Effect from "effect/Effect";
 import * as TxQueue from "effect/TxQueue";
@@ -70,9 +71,15 @@ export const makeKeyedCoalescingWorker = Effect.fn(
     Effect.flatMap((item) =>
       item === null
         ? Effect.void
-        : options
-            .process(item.key, item.value)
-            .pipe(Effect.ignoreCause, Effect.ensuring(completeKey(item.key))),
+        : Effect.suspend(() => options.process(item.key, item.value)).pipe(
+            // A throw while building the effect belongs to this item; the loop keeps the later keys.
+            Effect.catchCause((cause) =>
+              Cause.hasInterruptsOnly(cause)
+                ? Effect.void
+                : Effect.logError("KeyedCoalescingWorker item failed", cause),
+            ),
+            Effect.ensuring(completeKey(item.key)),
+          ),
     ),
     Effect.forever,
     Effect.forkScoped,
