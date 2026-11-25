@@ -735,9 +735,9 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
   });
 
   const hostEnvironment = yield* HostProcess.Environment;
-  // A dev server started inside a worktree defaults to that worktree's own
-  // (gitignored) `.t3` — see @t3tools/shared/devHome for why this must
-  // outrank an ambient T3CODE_HOME. `--home-dir` still wins.
+  // Kept here (the server applies the same rule itself) because the runner needs
+  // the directory before the server starts: seeding, logging, and the child's
+  // T3CODE_HOME. `--home-dir` still wins; see @t3tools/shared/devHome.
   const worktreeHome = yield* resolveWorktreeT3Home(yield* HostProcess.WorkingDirectory);
   // Trim before choosing: `--home-dir ""` is not a selection, and treating it
   // as one would skip the worktree default and land on the shared home —
@@ -759,6 +759,13 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     port: input.port,
     devUrl: input.devUrl,
   });
+  // The server resolves its own data directory and, inside a worktree, ignores an
+  // ambient T3CODE_HOME. This marks `--home-dir` as a deliberate choice it must honor.
+  if (input.t3Home?.trim()) {
+    env.T3CODE_HOME_EXPLICIT = "1";
+  } else {
+    delete env.T3CODE_HOME_EXPLICIT;
+  }
 
   const selectionSuffix =
     serverOffset !== offset || webOffset !== offset
