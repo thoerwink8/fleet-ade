@@ -11,6 +11,7 @@ import { MiddleTruncate } from "./ui/middle-truncate";
 import { Button } from "./ui/button";
 import { ComboboxTrigger } from "./ui/combobox";
 
+import { presentVersionControlError } from "./versionControlError.logic";
 export function WorktreeBaseBranchPicker({
   environmentId,
   cwd,
@@ -58,15 +59,24 @@ export function WorktreeBaseBranchPicker({
   const branchByName = new Map(branches.refs.map((branch) => [branch.name, branch]));
   const items = [...branchByName.keys()];
   const hasNextPage = branches.data?.nextCursor != null;
-  const statusText =
-    branches.error ??
-    (branches.isPending && branches.data === null
-      ? "正在加载分支…"
-      : branches.isFetchingNextPage
-        ? "正在加载更多分支…"
-        : hasNextPage
-          ? `显示 ${branches.refs.length} / ${branches.data?.totalCount} 个分支`
-          : null);
+  const errorPresentation = branches.failure
+    ? presentVersionControlError(branches.failure, "加载分支")
+    : null;
+  const statusText = errorPresentation ? (
+    <>
+      <span className="block">{errorPresentation.title}</span>
+      {errorPresentation.nextStep ? (
+        <span className="block">{errorPresentation.nextStep}</span>
+      ) : null}
+      <span className="block">{errorPresentation.detail}</span>
+    </>
+  ) : branches.isPending && branches.data === null ? (
+    "正在加载分支…"
+  ) : branches.isFetchingNextPage ? (
+    "正在加载更多分支…"
+  ) : hasNextPage ? (
+    `显示 ${branches.refs.length} / ${branches.data?.totalCount} 个分支`
+  ) : null;
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     if (!next) setQuery("");

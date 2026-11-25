@@ -126,6 +126,25 @@ import {
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { useOpenLink } from "~/lib/useOpenLink";
+import {
+  presentVersionControlError,
+  type VersionControlErrorToastPresentation,
+} from "./versionControlError.logic";
+
+function gitActionActionLabel(action: GitStackedAction): string {
+  switch (action) {
+    case "commit":
+      return "提交";
+    case "push":
+      return "推送";
+    case "create_pr":
+      return "创建 PR";
+    case "commit_push":
+      return "提交并推送";
+    case "commit_push_pr":
+      return "提交、推送并创建 PR";
+  }
+}
 
 interface GitActionsControlProps {
   gitCwd: string | null;
@@ -463,7 +482,9 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
   const [publishProtocol, setPublishProtocol] = useState<SourceControlCloneProtocol>("ssh");
   const [publishWizardStep, setPublishWizardStep] = useState(0);
   const [publishAdvancedOpen, setPublishAdvancedOpen] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<VersionControlErrorToastPresentation | null>(
+    null,
+  );
   const [publishResult, setPublishResult] = useState<SourceControlPublishRepositoryResult | null>(
     null,
   );
@@ -566,7 +587,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           const error = squashAtomCommandFailure(result);
-          setPublishError(error instanceof Error ? error.message : "发生错误。");
+          setPublishError(presentVersionControlError(error, "发布"));
         }
         return;
       }
@@ -852,8 +873,13 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 role="alert"
                 className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
               >
-                <p className="text-meta font-medium">无法发布</p>
-                <p className="mt-0.5 text-destructive/90">{publishError}</p>
+                <p className="text-meta font-medium">{publishError.title}</p>
+                {publishError.nextStep ? (
+                  <p className="mt-0.5 text-destructive/90">{publishError.nextStep}</p>
+                ) : null}
+                <p className="mt-0.5 whitespace-pre-wrap text-destructive/90">
+                  {publishError.detail}
+                </p>
               </div>
             ) : null}
           </div>
@@ -1063,7 +1089,10 @@ export default function GitActionsControl({
   const refreshVcsStatus = useAtomCommand(vcsEnvironment.refreshStatus, {
     reportFailure: false,
   });
-  const { data: gitStatus, error: gitStatusError } = gitStatusQuery;
+  const { data: gitStatus, error: gitStatusQueryError, failure: gitStatusFailure } = gitStatusQuery;
+  const gitStatusErrorPresentation = gitStatusQueryError
+    ? presentVersionControlError(gitStatusFailure ?? gitStatusQueryError, "读取 Git 状态")
+    : null;
   const sourceControlPresentation = getSourceControlPresentation(gitStatus?.sourceControlProvider);
   const changeRequestTerminology = sourceControlPresentation.terminology;
   const SourceControlIcon = sourceControlPresentation.Icon;
@@ -1190,7 +1219,7 @@ export default function GitActionsControl({
   const quietEmptyDraft =
     (draftId !== undefined || activeServerThreadShell?.latestRun === null) &&
     gitActionProgress === null &&
-    !gitStatusError &&
+    !gitStatusErrorPresentation &&
     quickAction.disabled &&
     !changesTotals.insertions &&
     !changesTotals.deletions;
@@ -1288,12 +1317,15 @@ export default function GitActionsControl({
       }
 
       const error = squashAtomCommandFailure(result);
+      const presentation = presentVersionControlError(error, gitActionActionLabel(action), {
+        composite: true,
+      });
       const errorToastTiming = resolveGitActionResultToastTiming("error");
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法执行操作",
-          description: error instanceof Error ? error.message : "发生错误。",
+          title: presentation.title,
+          description: presentation.description,
           timeout: errorToastTiming.timeout,
           ...(scopedToastData !== undefined ? { data: scopedToastData } : {}),
         }),
@@ -1369,12 +1401,13 @@ export default function GitActionsControl({
             return;
           }
           const error = squashAtomCommandFailure(result);
+          const presentation = presentVersionControlError(error, "拉取");
           const errorToastTiming = resolveGitActionResultToastTiming("error");
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "无法拉取",
-              description: error instanceof Error ? error.message : "发生错误。",
+              title: presentation.title,
+              description: presentation.description,
               timeout: errorToastTiming.timeout,
               ...(threadToastData !== undefined ? { data: threadToastData } : {}),
             }),
@@ -1480,7 +1513,7 @@ export default function GitActionsControl({
     menuItems: gitActionMenuItems,
     canWriteSourceControl,
     canPublishRepository,
-    hasNotice: isDetachedHead || isCleanAndBehind || Boolean(gitStatusError),
+    hasNotice: isDetachedHead || isCleanAndBehind || Boolean(gitStatusErrorPresentation),
   });
 
   // A disabled menu cannot refresh on open, and terminal edits or commits publish no status.
@@ -1494,11 +1527,12 @@ export default function GitActionsControl({
         return;
       }
       const error = squashAtomCommandFailure(result);
+      const presentation = presentVersionControlError(error, "初始化 Git");
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法初始化 Git",
-          description: error instanceof Error ? error.message : "发生错误。",
+          title: presentation.title,
+          description: presentation.description,
           ...(threadToastData !== undefined ? { data: threadToastData } : {}),
         }),
       );
@@ -1565,7 +1599,15 @@ export default function GitActionsControl({
       {isCleanAndBehind && (
         <p className="px-2 py-1.5 text-xs text-warning">落后于上游。请先拉取或变基。</p>
       )}
-      {gitStatusError && <p className="px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>}
+      {gitStatusErrorPresentation && (
+        <div className="space-y-0.5 px-2 py-1.5 text-xs text-destructive">
+          <p className="font-medium">{gitStatusErrorPresentation.title}</p>
+          {gitStatusErrorPresentation.nextStep ? (
+            <p>{gitStatusErrorPresentation.nextStep}</p>
+          ) : null}
+          <p>{gitStatusErrorPresentation.detail}</p>
+        </div>
+      )}
     </>
   );
 

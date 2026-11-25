@@ -18,17 +18,21 @@ import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button, InlineButton } from "../ui/button";
 import { Spinner } from "../ui/spinner";
+import { presentVersionControlError } from "../versionControlError.logic";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 
 type SignInState =
   | { readonly status: "idle" }
   | { readonly status: "starting" }
   | { readonly status: "waiting"; readonly prompt: SourceControlSignInPrompt }
-  | { readonly status: "failed"; readonly message: string };
+  | {
+      readonly status: "failed";
+      readonly failure: { readonly title: string; readonly description: string };
+    };
 
-const failureMessage = (cause: Cause.Cause<unknown>) => {
-  const error = Cause.squash(cause);
-  return error instanceof Error ? error.message : String(error);
+const failureOf = (cause: Cause.Cause<unknown>) => {
+  const presentation = presentVersionControlError(Cause.squash(cause), "登录");
+  return { title: presentation.title, description: presentation.description };
 };
 
 const expiryTime = (expiresAt: number) =>
@@ -122,7 +126,7 @@ export function SourceControlAppSignInSettings({
     const input = { provider: definition.kind, host };
     const started = await start({ environmentId, input });
     if (started._tag !== "Success") {
-      setState({ status: "failed", message: failureMessage(started.cause) });
+      setState({ status: "failed", failure: failureOf(started.cause) });
       return;
     }
     const prompt = started.value;
@@ -133,7 +137,7 @@ export function SourceControlAppSignInSettings({
       if (current.status !== "waiting" || current.prompt !== prompt) return current;
       return finished._tag === "Success"
         ? { status: "idle" }
-        : { status: "failed", message: failureMessage(finished.cause) };
+        : { status: "failed", failure: failureOf(finished.cause) };
     });
     if (finished._tag === "Success") onChanged();
   };
@@ -263,12 +267,13 @@ export function SourceControlAppSignInSettings({
       ) : null}
 
       {state.status === "failed" && !signedIn ? (
-        <p
+        <div
           role="alert"
-          className="border-t border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+          className="space-y-0.5 border-t border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"
         >
-          {state.message}
-        </p>
+          <p className="font-medium">{state.failure.title}</p>
+          <p>{state.failure.description}</p>
+        </div>
       ) : null}
     </div>
   );
