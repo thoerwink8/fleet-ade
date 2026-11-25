@@ -1894,6 +1894,42 @@ describe("deleted thread worktrees", () => {
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(kept !== null);
       }).pipe(Effect.provide(cleanupTestLayer)),
   );
+
+  // A missing project row must never widen what gets removed.
+  it.effect.each(["override turns cleanup off", "commits beyond the project branch"] as const)(
+    "keeps a worktree whose project is gone when %s",
+    (scenario) =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(NOW_MS);
+        const fixture = yield* cleanupFixture(
+          scenario === "override turns cleanup off"
+            ? undefined
+            : {
+                ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+                worktreeUnchanged: true,
+              },
+        );
+        fixture.setProjectRoots([]);
+        if (scenario === "override turns cleanup off")
+          fixture.setSettings({
+            projectSettingsOverrides: {
+              [ProjectId.make("project-1")]: { worktreeCleanup: { mode: "off" } },
+            },
+          });
+        else {
+          fixture.setThreads([
+            shell({ branch: "feature", worktreePath: fixture.worktree, archivedAt: at(-DAY_MS) }),
+          ]);
+          yield* fixture.fs.writeFileString(`${fixture.worktree}/tracked.txt`, "unmerged work\n");
+          yield* fixture.command(fixture.worktree, ["commit", "-am", "unmerged work"]);
+        }
+        const report = yield* fixture.service.runNow;
+        // With cleanup off the worktree is not even a candidate.
+        if (scenario === "override turns cleanup off") expect(report.entries).toEqual([]);
+        else expect(report.entries[0]).toMatchObject({ outcome: "kept" });
+        expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
+      }).pipe(Effect.provide(cleanupTestLayer)),
+  );
 });
 
 describe("orphan worktree reports", () => {

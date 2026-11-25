@@ -1196,10 +1196,9 @@ const make = Effect.gen(function* () {
       const project = deleted
         ? { workspaceRoot: thread.workspaceRoot }
         : snapshot.projects.find((entry) => entry.id === thread.projectId);
-      // A thread row can outlive its project row. Nothing project-specific
-      // survives that, so the global rules are the only ones that still apply.
-      const rulesProjectId = !deleted && project === undefined ? null : thread.projectId;
-      const settings = resolveWorktreeCleanup(serverSettings, rulesProjectId);
+      // A thread row can outlive its project row. Rules still resolve by project id:
+      // a surviving override keeps applying, and with none the global rules do.
+      const settings = resolveWorktreeCleanup(serverSettings, thread.projectId);
       if (!worktreeCleanupEnabled(settings)) continue;
       const worktreePath = path.resolve(thread.worktreePath!);
       const worktreeKey = yield* canonical(worktreePath);
@@ -1552,7 +1551,7 @@ const make = Effect.gen(function* () {
             const finalChanges = yield* localChangesReason(worktreePath, settings);
             if (finalChanges !== null) return keep(finalChanges);
             const currentSettings = yield* settingsService.getSettings;
-            const current = resolveWorktreeCleanup(currentSettings, rulesProjectId);
+            const current = resolveWorktreeCleanup(currentSettings, thread.projectId);
             if (
               currentSettings.autoResumeLimitedThreads !==
                 serverSettings.autoResumeLimitedThreads ||
