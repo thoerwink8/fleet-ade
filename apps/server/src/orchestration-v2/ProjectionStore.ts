@@ -571,6 +571,10 @@ export interface ProjectionStoreV2Shape {
     cascadeRootId: ThreadId,
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadTrash>, ProjectionStoreV2Error>;
   readonly isThreadInTrash: (threadId: ThreadId) => Effect.Effect<boolean, ProjectionStoreV2Error>;
+  /** Earliest-due-first, regardless of whether the window passed: the first row doubles as the wake hint. */
+  readonly listThreadTrashRootsByDueAt: (input: {
+    readonly limit: number;
+  }) => Effect.Effect<ReadonlyArray<ProjectionThreadTrash>, ProjectionStoreV2Error>;
   readonly getRecentlyDeleted: () => Effect.Effect<
     RecentlyDeletedProjection,
     ProjectionStoreV2Error
@@ -9132,6 +9136,18 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       return rows[0]?.present === 1;
     }, Effect.mapError(shellSnapshotReadError));
 
+    const listThreadTrashRootsByDueAt: ProjectionStoreV2Shape["listThreadTrashRootsByDueAt"] =
+      Effect.fn("ProjectionStore.listThreadTrashRootsByDueAt")(function* (input) {
+        const rows = yield* sql<ThreadTrashRow>`
+          SELECT thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+          FROM orchestration_v2_projection_thread_trash
+          WHERE thread_id = cascade_root_id
+          ORDER BY purge_due_at ASC, thread_id ASC
+          LIMIT ${input.limit}
+        `;
+        return rows.map(threadTrashFromRow);
+      }, Effect.mapError(shellSnapshotReadError));
+
     const getRecentlyDeleted: ProjectionStoreV2Shape["getRecentlyDeleted"] = Effect.fn(
       "ProjectionStore.getRecentlyDeleted",
     )(function* () {
@@ -9437,6 +9453,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getThreadTrash: readOnReader(getThreadTrash),
       getThreadTrashCascade: readOnReader(getThreadTrashCascade),
       isThreadInTrash: readOnReader(isThreadInTrash),
+      listThreadTrashRootsByDueAt: readOnReader(listThreadTrashRootsByDueAt),
       getRecentlyDeleted: readOnReader(getRecentlyDeleted),
       readShellSnapshot: readOnReader(readShellSnapshot),
       listOlderSettledThreads: readOnReader(listOlderSettledThreads),

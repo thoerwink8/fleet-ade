@@ -17,6 +17,13 @@ import { toastManager } from "../ui/toast";
 
 import { act, render } from "../../../test/render";
 import { useComposerDraftStore, useComposerThreadDraft } from "../../composerDraftStore";
+import { removeLocalStorageItem } from "../../hooks/useLocalStorage";
+import {
+  PROMPT_STASH_STORAGE_KEY,
+  usePromptStashStore,
+  writePromptStashStorageForTest,
+} from "../../promptStashStore";
+import { resetAutoStashDedupeForTest } from "./composerAutoStash";
 import { formatInlineContextReference } from "../../lib/composerContextReferences";
 import { INLINE_TERMINAL_CONTEXT_PLACEHOLDER } from "../../lib/terminalContext";
 import {
@@ -150,7 +157,11 @@ function view(
 
 function setup() {
   mocks.editQueuedRun.mockReset();
+  resetAutoStashDedupeForTest();
   useComposerDraftStore.setState({ draftsByThreadKey: {}, draftThreadsByThreadKey: {} });
+  usePromptStashStore.setState({ entries: [], stashSeq: 0 });
+  writePromptStashStorageForTest("");
+  removeLocalStorageItem(PROMPT_STASH_STORAGE_KEY);
   setRuns(THREAD_A, "queued");
   setRuns(THREAD_B, "queued");
   return { hook: { current: null as HookResult | null } };
@@ -369,7 +380,7 @@ describe("useQueuedRunEdit", () => {
     ).toBe("changed");
   });
 
-  it("moves a changed edit into the thread draft when its run starts while the user is away", async () => {
+  it("stashes a changed edit when its run starts while the user is away", async () => {
     const { hook } = setup();
     await using screen = await render(view(THREAD_A, "queued", hook));
     await beginChangedEdit(hook);
@@ -378,10 +389,13 @@ describe("useQueuedRunEdit", () => {
     expect(promptOf(THREAD_A)).toBe("");
     await act(() => setRuns(THREAD_A, "running"));
 
-    expect(promptOf(THREAD_A)).toBe("changed");
+    expect(promptOf(THREAD_A)).toBe("");
+    await vi.waitFor(() => {
+      expect(usePromptStashStore.getState().entries[0]?.prompt).toBe("changed");
+    });
   });
 
-  it("does not copy a saved edit into the thread draft when the run starts mid-save", async () => {
+  it("does not copy or stash a saved edit when the run starts mid-save", async () => {
     const { hook } = setup();
     let finishSave: (result: { readonly _tag: "Success" }) => void = () => {};
     mocks.editQueuedRun.mockReturnValue(
@@ -404,6 +418,7 @@ describe("useQueuedRunEdit", () => {
 
     expect(requireHook(hook).isEditing).toBe(false);
     expect(promptOf(THREAD_A)).toBe("");
+    expect(usePromptStashStore.getState().entries).toHaveLength(0);
   });
 
   it("leaves a newer edit alone when a save from before navigation finishes", async () => {

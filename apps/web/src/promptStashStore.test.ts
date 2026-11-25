@@ -302,3 +302,129 @@ describe("prompt stash context records", () => {
     expect(taken.entry?.records).toEqual(records);
   });
 });
+
+describe("promptStashStore overflow, quota fallback, and undo restore", () => {
+  beforeEach(() => {
+    usePromptStashStore.setState({ entries: [], stashSeq: 0 });
+    writePromptStashStorageForTest("");
+    removeLocalStorageItem(PROMPT_STASH_STORAGE_KEY);
+  });
+
+  afterEach(() => {
+    usePromptStashStore.setState({ entries: [], stashSeq: 0 });
+    writePromptStashStorageForTest("");
+    removeLocalStorageItem(PROMPT_STASH_STORAGE_KEY);
+  });
+
+  it("keeps existing entries instead of evicting the oldest when overflow is keep", () => {
+    const store = usePromptStashStore.getState();
+    for (let index = 0; index < MAX_STASH_ENTRIES; index += 1) {
+      store.stashEntry(makeEntry({ id: `entry-${index}` }));
+    }
+    const result = store.stashEntry(makeEntry({ id: "overflow-keep" }), { overflow: "keep" });
+    expect(result.written).toBe(true);
+    expect(result.evicted).toBeNull();
+    expect(result.overflowed).toBe(true);
+
+    const entries = usePromptStashStore.getState().entries;
+    expect(entries).toHaveLength(MAX_STASH_ENTRIES + 1);
+    expect(entries[0]?.id).toBe("overflow-keep");
+    expect(entries.at(-1)?.id).toBe("entry-0");
+  });
+
+  it("keeps the entry in memory when localStorage rejects writes and keepInMemoryOnWriteFailure is set", async () => {
+    const throwingStorage = {
+      get length() {
+        return 0;
+      },
+      clear: () => {},
+      key: () => null,
+      getItem: () => null,
+      removeItem: () => {},
+      setItem: () => {
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      },
+    };
+    vi.stubGlobal("localStorage", throwingStorage);
+    vi.resetModules();
+    try {
+      const mod = await import("./promptStashStore");
+      const store = mod.usePromptStashStore.getState();
+
+      const rejected = store.stashEntry(makeEntry({ id: "rejected" }));
+      expect(rejected.written).toBe(false);
+      expect(mod.usePromptStashStore.getState().entries).toEqual([]);
+
+      const kept = store.stashEntry(makeEntry({ id: "kept-in-memory" }), {
+        overflow: "keep",
+        keepInMemoryOnWriteFailure: true,
+      });
+      expect(kept.written).toBe(true);
+      expect(kept.durable).toBe(false);
+      expect(kept.evicted).toBeNull();
+      expect(mod.usePromptStashStore.getState().entries.map((entry) => entry.id)).toEqual([
+        "kept-in-memory",
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
+  it("restores deleted entries to their original position even across consecutive deletes", () => {
+    const store = usePromptStashStore.getState();
+    const entryC = makeEntry({ id: "entry-c" });
+    const entryB = makeEntry({ id: "entry-b" });
+    const entryA = makeEntry({ id: "entry-a" });
+    store.stashEntry(entryC);
+    store.stashEntry(entryB);
+    store.stashEntry(entryA);
+    expect(usePromptStashStore.getState().entries.map((e) => e.id)).toEqual([
+      "entry-a",
+      "entry-b",
+      "entry-c",
+    ]);
+
+    // Delete B then A, then undo A then B.
+    const takenB = store.takeEntry("entry-b");
+    const takenA = store.takeEntry("entry-a");
+    expect(takenB.entry?.id).toBe("entry-b");
+    expect(takenA.entry?.id).toBe("entry-a");
+    expect(usePromptStashStore.getState().entries.map((e) => e.id)).toEqual(["entry-c"]);
+
+    expect(store.insertEntry(takenA.entry!, takenA.anchor).inserted).toBe(true);
+    expect(store.insertEntry(takenB.entry!, takenB.anchor).inserted).toBe(true);
+    expect(usePromptStashStore.getState().entries.map((e) => e.id)).toEqual([
+      "entry-a",
+      "entry-b",
+      "entry-c",
+    ]);
+
+    // Duplicate insert of existing id is a no-op.
+    expect(store.insertEntry(takenB.entry!, takenB.anchor).inserted).toBe(false);
+
+    // Delete A then B, insert a newer entry at top, then undo B then A.
+    const takenA2 = store.takeEntry("entry-a");
+    const takenB2 = store.takeEntry("entry-b");
+    store.stashEntry(makeEntry({ id: "entry-new" }));
+    expect(store.insertEntry(takenB2.entry!, takenB2.anchor).inserted).toBe(true);
+    expect(store.insertEntry(takenA2.entry!, takenA2.anchor).inserted).toBe(true);
+    expect(usePromptStashStore.getState().entries.map((e) => e.id)).toEqual([
+      "entry-new",
+      "entry-a",
+      "entry-b",
+      "entry-c",
+    ]);
+  });
+
+  it("increments stashSeq only on stashEntry, not on takeEntry or insertEntry", () => {
+    const store = usePromptStashStore.getState();
+    const initialSeq = usePromptStashStore.getState().stashSeq;
+    store.stashEntry(makeEntry({ id: "seq-1" }));
+    expect(usePromptStashStore.getState().stashSeq).toBe(initialSeq + 1);
+    const taken = store.takeEntry("seq-1");
+    expect(usePromptStashStore.getState().stashSeq).toBe(initialSeq + 1);
+    store.insertEntry(taken.entry!, taken.anchor);
+    expect(usePromptStashStore.getState().stashSeq).toBe(initialSeq + 1);
+  });
+});
