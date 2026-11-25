@@ -1865,6 +1865,35 @@ describe("deleted thread worktrees", () => {
       expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
     }).pipe(Effect.provide(cleanupTestLayer)),
   );
+
+  // The thread row outlives its project: the project snapshot has no shell for
+  // project-1, so cleanup has only the global rules to go on.
+  it.effect.each(["global rules apply", "uncommitted changes", "open terminal"] as const)(
+    "cleans a worktree whose project is gone when %s",
+    (scenario) =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(NOW_MS);
+        const fixture = yield* cleanupFixture();
+        fixture.setProjectRoots([]);
+        if (scenario === "uncommitted changes")
+          yield* fixture.fs.writeFileString(`${fixture.worktree}/tracked.txt`, "local edit\n");
+        if (scenario === "open terminal")
+          yield* fixture.openTerminal({ cwd: fixture.worktree, worktreePath: fixture.worktree });
+        const report = yield* fixture.service.runNow;
+        const kept =
+          scenario === "uncommitted changes"
+            ? "Has uncommitted changes (1 file)"
+            : scenario === "open terminal"
+              ? "Open terminal"
+              : null;
+        expect(report.entries[0]).toMatchObject({
+          threadId: ThreadId.make("thread-1"),
+          outcome: kept === null ? "removed" : "kept",
+          reason: kept ?? "Inactive for 30 days",
+        });
+        expect(yield* fixture.fs.exists(fixture.worktree)).toBe(kept !== null);
+      }).pipe(Effect.provide(cleanupTestLayer)),
+  );
 });
 
 describe("orphan worktree reports", () => {

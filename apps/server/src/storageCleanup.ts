@@ -1072,6 +1072,29 @@ const make = Effect.gen(function* () {
         return "not a linked worktree";
       return null;
     });
+    // The project row normally names the main repository. Without it, the
+    // worktree's gitfile still does: `gitdir:` plus that directory's `commondir`.
+    const mainRepository = Effect.fn("StorageCleanup.mainRepository")(function* (
+      worktreePath: string,
+    ) {
+      const gitFile = path.join(worktreePath, ".git");
+      const gitdirLine = (yield* fs.readFileString(gitFile))
+        .split(/\r?\n/)
+        .find((line) => line.startsWith("gitdir:"));
+      if (gitdirLine === undefined) return yield* missingRepository(gitFile);
+      const gitdir = path.resolve(worktreePath, gitdirLine.slice("gitdir:".length).trim());
+      const commondir = (yield* fs.readFileString(path.join(gitdir, "commondir"))).trim();
+      const common = path.resolve(gitdir, commondir);
+      return path.basename(common) === ".git" ? path.dirname(common) : common;
+    });
+    const missingRepository = (gitFile: string) =>
+      new GitCommandError({
+        operation: "StorageCleanup.mainRepository",
+        action: "cleanup",
+        command: "git",
+        cwd: gitFile,
+        detail: "not a git repository",
+      });
     const deletedRows = yield* sql<{ payload_json: string; workspaceRoot: string }>`
           SELECT t.payload_json, p.workspace_root AS "workspaceRoot"
           FROM orchestration_v2_projection_threads t
@@ -1169,22 +1192,25 @@ const make = Effect.gen(function* () {
     ];
     const recentlyDeletedDeadline = now + 30_000;
     for (const thread of candidates) {
-      const settings = resolveWorktreeCleanup(serverSettings, thread.projectId);
+      const deleted = "workspaceRoot" in thread;
+      const project = deleted
+        ? { workspaceRoot: thread.workspaceRoot }
+        : snapshot.projects.find((entry) => entry.id === thread.projectId);
+      // A thread row can outlive its project row. Nothing project-specific
+      // survives that, so the global rules are the only ones that still apply.
+      const rulesProjectId = !deleted && project === undefined ? null : thread.projectId;
+      const settings = resolveWorktreeCleanup(serverSettings, rulesProjectId);
       if (!worktreeCleanupEnabled(settings)) continue;
       const worktreePath = path.resolve(thread.worktreePath!);
       const worktreeKey = yield* canonical(worktreePath);
       const worktreePaths = [worktreePath, worktreeKey];
       const group = groups.get(worktreeKey) ?? [];
       const activityAt = Math.max(...group.map(storageCleanupActivityAt));
-      const deleted = "workspaceRoot" in thread;
       const settlementChain = deleted
         ? []
         : worktreeSettlementChain(thread, threadsById, now, serverSettings);
       const settledThread = settlementChain.at(-1);
       const members = deleted ? [thread, ...group] : group;
-      const project = deleted
-        ? { workspaceRoot: thread.workspaceRoot }
-        : snapshot.projects.find((entry) => entry.id === thread.projectId);
       const entry: StorageCleanupReportEntry = {
         kind: "worktree",
         outcome: "kept",
@@ -1232,7 +1258,6 @@ const make = Effect.gen(function* () {
         if (deleted && !settings.worktreeOnDelete) return keep("没有适用的规则");
         if (members.length > 1 && worktreeOwner(members) === undefined)
           return keep(`shared by ${members.length} threads`);
-        if (project === undefined) return keep("project is unavailable");
         if (
           thread.branch === null ||
           !group.every((member) => storageCleanupThreadIdle(member, now, serverSettings))
@@ -1290,14 +1315,21 @@ const make = Effect.gen(function* () {
         if (!eligible && !unchangedApplies && !settings.worktreeOnMerge) return keep(notDueReason);
         const pathReason = yield* worktreePathReason(worktreePath);
         if (pathReason !== null) return keep(pathReason);
-        if (yield* containsProjectRoot(worktreePaths, [project, ...snapshot.projects]))
+        if (
+          yield* containsProjectRoot(
+            worktreePaths,
+            project === undefined ? snapshot.projects : [project, ...snapshot.projects],
+          )
+        )
           return keep("包含项目工作树");
         if (yield* branchChanged(worktreePath, thread.branch)) return keep("仓库或分支已更改");
         const changes = yield* localChangesReason(worktreePath, settings);
         if (changes !== null) return keep(changes);
         const head = yield* git.resolveCommit({ cwd: worktreePath, revision: "HEAD" });
         if (!eligible) {
-          const repositoryCwd = path.resolve(project.workspaceRoot);
+          const repositoryCwd = path.resolve(
+            project?.workspaceRoot ?? (yield* mainRepository(worktreePath)),
+          );
           const remotes = yield* git.execute({
             operation: "StorageCleanup.listRemotes",
             cwd: repositoryCwd,
@@ -1397,7 +1429,12 @@ const make = Effect.gen(function* () {
         // Re-read this path's threads and sessions so new activity cancels removal; full per-worktree snapshots take seconds.
         const blockedSinceCheck = Effect.fnUntraced(function* () {
           const latestProjects = yield* projectStore.listShells();
-          if (yield* containsProjectRoot(worktreePaths, [project, ...latestProjects]))
+          if (
+            yield* containsProjectRoot(
+              worktreePaths,
+              project === undefined ? latestProjects : [project, ...latestProjects],
+            )
+          )
             return "包含项目工作树";
           const bindings = yield* projections.getThreadWorktreePaths({ includeArchived: true });
           const bindingKeys = yield* Effect.forEach(bindings, (binding) =>
@@ -1515,7 +1552,7 @@ const make = Effect.gen(function* () {
             const finalChanges = yield* localChangesReason(worktreePath, settings);
             if (finalChanges !== null) return keep(finalChanges);
             const currentSettings = yield* settingsService.getSettings;
-            const current = resolveWorktreeCleanup(currentSettings, thread.projectId);
+            const current = resolveWorktreeCleanup(currentSettings, rulesProjectId);
             if (
               currentSettings.autoResumeLimitedThreads !==
                 serverSettings.autoResumeLimitedThreads ||
@@ -1535,17 +1572,18 @@ const make = Effect.gen(function* () {
               const changes = yield* localChangesReason(worktreePath, settings);
               if (changes !== null) return keep(changes);
             }
+            const repository = project?.workspaceRoot ?? (yield* mainRepository(worktreePath));
             yield* removeLinkedWorktree({
               operation: "StorageCleanup.cleanupGit",
-              cwd: project.workspaceRoot,
+              cwd: repository,
               worktreePath,
               // Git requires force for submodules; recursive checks above cannot make removal atomic.
               force: submodules.force,
               execute: git.execute,
-              run: (args) => cleanupGit(project.workspaceRoot, [...args], "git worktree remove"),
+              run: (args) => cleanupGit(repository, [...args], "git worktree remove"),
             });
             entries.push({ ...entry, outcome: "removed", reason: sentence(removalReason), bytes });
-            yield* gitManager.invalidateStatus(project.workspaceRoot);
+            yield* gitManager.invalidateStatus(repository);
             // Preserve branch/path so ProviderTurnStartService can recreate the checkout on resume.
             yield* Effect.logInfo("storage cleanup removed worktree", { threadId: thread.id });
           }),
