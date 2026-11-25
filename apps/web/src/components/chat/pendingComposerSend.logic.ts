@@ -57,7 +57,12 @@ export type PendingSendEvaluation =
   | { readonly status: "ready" }
   | {
       readonly status: "failed";
-      readonly kind: "preparing-images" | "loading-context" | "previous-send-busy" | "hard-blocked";
+      readonly kind:
+        | "preparing-images"
+        | "loading-context"
+        | "previous-send-busy"
+        | "hard-blocked"
+        | "target-changed";
       readonly title: string;
       readonly description: string;
       readonly canRetryDirect: boolean;
@@ -94,8 +99,22 @@ export function evaluatePendingComposerSend(input: {
   readonly blockers: ReadonlyArray<PendingSendBlocker>;
   readonly failures: PendingSendFailureSnapshot;
   readonly hardBlockedReason: string | null;
+  /** What a send would address right now: a question can arrive, or be closed, while waiting. */
+  readonly currentSubmissionTarget: PendingComposerSend["submissionTarget"];
+  /** Loading a queued message for editing replaces the draft, so the armed send no longer matches it. */
+  readonly editingQueuedMessage: boolean;
 }): PendingSendEvaluation {
   const { pending, blockers, failures, hardBlockedReason } = input;
+  if (pending.submissionTarget !== input.currentSubmissionTarget || input.editingQueuedMessage) {
+    return {
+      status: "failed",
+      kind: "target-changed",
+      title: "等待发送已取消",
+      description:
+        "会话状态变了（出现或结束了提问，或正在编辑排队消息），消息没有发出，内容还在输入框里。",
+      canRetryDirect: false,
+    };
+  }
   if (failures.imageFailure && failures.imageFailure.sequence > pending.baseline.imageFailureSeq) {
     return {
       status: "failed",

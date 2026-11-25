@@ -1902,6 +1902,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           previousSendFailure,
         },
         hardBlockedReason: hardBlockedReasonForPending,
+        currentSubmissionTarget: submissionTarget,
+        editingQueuedMessage: isEditingQueuedMessage,
       })
     : null;
   const pendingSendReason =
@@ -2527,6 +2529,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     importContextRecords,
     expandMobileComposer: expandMobileComposerStable,
   });
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the pending-send store outlives this component, so leaving a draft target must drop its armed send instead of auto-sending it whenever the user comes back
+  useEffect(
+    () => () => {
+      cancelPendingComposerSend(composerDraftTargetKey);
+    },
+    [composerDraftTargetKey],
+  );
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- listens for Escape while a pending send is waiting so clicking the waiting button or leaving the editor can still cancel it
   useEffect(() => {

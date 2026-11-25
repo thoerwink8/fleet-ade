@@ -119,6 +119,8 @@ describe("pendingComposerSend state machine", () => {
         blockers: bothActive,
         failures: noFailures,
         hardBlockedReason: null,
+        currentSubmissionTarget: "provider-turn",
+        editingQueuedMessage: false,
       }),
     ).toEqual({
       status: "waiting",
@@ -139,6 +141,8 @@ describe("pendingComposerSend state machine", () => {
         blockers: onlyReconnecting,
         failures: noFailures,
         hardBlockedReason: null,
+        currentSubmissionTarget: "provider-turn",
+        editingQueuedMessage: false,
       }),
     ).toEqual({
       status: "waiting",
@@ -154,6 +158,8 @@ describe("pendingComposerSend state machine", () => {
         blockers: [],
         failures: noFailures,
         hardBlockedReason: null,
+        currentSubmissionTarget: "provider-turn",
+        editingQueuedMessage: false,
       }),
     ).toEqual({ status: "ready" });
 
@@ -255,6 +261,8 @@ describe("pendingComposerSend state machine", () => {
           previousSendFailure: { sequence: 3, reason: "old send error" },
         },
         hardBlockedReason: null,
+        currentSubmissionTarget: "provider-turn",
+        editingQueuedMessage: false,
       }),
     ).toEqual({
       status: "waiting",
@@ -270,6 +278,8 @@ describe("pendingComposerSend state machine", () => {
         imageFailure: { sequence: 3, fileName: "huge.png", reason: "too-large" },
       },
       hardBlockedReason: null,
+      currentSubmissionTarget: "provider-turn",
+      editingQueuedMessage: false,
     });
     expect(imageFailed).toMatchObject({
       status: "failed",
@@ -290,6 +300,8 @@ describe("pendingComposerSend state machine", () => {
         contextFailure: { sequence: 2, reason: "从来源下载失败。" },
       },
       hardBlockedReason: null,
+      currentSubmissionTarget: "provider-turn",
+      editingQueuedMessage: false,
     });
     expect(contextFailed).toMatchObject({
       status: "failed",
@@ -309,6 +321,8 @@ describe("pendingComposerSend state machine", () => {
         previousSendFailure: { sequence: 4, reason: "网络超时" },
       },
       hardBlockedReason: null,
+      currentSubmissionTarget: "provider-turn",
+      editingQueuedMessage: false,
     });
     expect(previousFailed).toMatchObject({
       status: "failed",
@@ -322,6 +336,8 @@ describe("pendingComposerSend state machine", () => {
       blockers: [],
       failures: noFailures,
       hardBlockedReason: "这个后台服务目前不接受文件附件。请移除文件后再发送。",
+      currentSubmissionTarget: "provider-turn",
+      editingQueuedMessage: false,
     });
     expect(hardBlocked).toMatchObject({
       status: "failed",
@@ -350,12 +366,69 @@ describe("pendingComposerSend state machine", () => {
           previousSendFailure: { sequence: 1, reason: "unrelated failure" },
         },
         hardBlockedReason: null,
+        currentSubmissionTarget: "provider-turn",
+        editingQueuedMessage: false,
       }),
     ).toEqual({
       status: "waiting",
       primaryBlocker: "preparing-images",
       message: "正在压缩图片，好了自动发送",
     });
+  });
+});
+
+describe("evaluatePendingComposerSend when the composer changed under the armed send", () => {
+  const arm = (submissionTarget: "provider-turn" | "pending-user-input") =>
+    armPendingComposerSend({
+      targetKey: TARGET_A,
+      dispatchMode: "auto",
+      submissionIntent: "foreground",
+      submissionTarget,
+      waitedForPreviousSend: false,
+      baseline: zeroBaseline,
+    });
+
+  it("drops a message armed for a provider turn once a question takes over the composer", () => {
+    const pending = arm("provider-turn");
+    const result = evaluatePendingComposerSend({
+      pending,
+      blockers: [],
+      failures: noFailures,
+      hardBlockedReason: null,
+      currentSubmissionTarget: "pending-user-input",
+      editingQueuedMessage: false,
+    });
+    expect(result).toMatchObject({
+      status: "failed",
+      kind: "target-changed",
+      canRetryDirect: false,
+    });
+  });
+
+  it("drops a question answer armed earlier once the question is gone", () => {
+    const pending = arm("pending-user-input");
+    const result = evaluatePendingComposerSend({
+      pending,
+      blockers: ["reconnecting"],
+      failures: noFailures,
+      hardBlockedReason: null,
+      currentSubmissionTarget: "provider-turn",
+      editingQueuedMessage: false,
+    });
+    expect(result).toMatchObject({ status: "failed", kind: "target-changed" });
+  });
+
+  it("drops the armed send when a queued message is loaded for editing in its place", () => {
+    const pending = arm("provider-turn");
+    const result = evaluatePendingComposerSend({
+      pending,
+      blockers: ["previous-send-busy"],
+      failures: noFailures,
+      hardBlockedReason: null,
+      currentSubmissionTarget: "provider-turn",
+      editingQueuedMessage: true,
+    });
+    expect(result).toMatchObject({ status: "failed", kind: "target-changed" });
   });
 });
 
