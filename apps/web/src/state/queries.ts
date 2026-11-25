@@ -349,6 +349,41 @@ export function useComposerPathSearch(target: ComposerPathSearchTarget) {
   return useProjectPathSearch(target, COMPOSER_PATH_SEARCH_LIMIT);
 }
 
+export function useComposerRootEntries(target: {
+  readonly environmentId: EnvironmentId | null;
+  readonly cwd: string | null;
+  readonly enabled: boolean;
+}) {
+  const fileAccess = useFilesystemReadAccess(target.enabled ? target.environmentId : null);
+  const canReadFiles = fileAccess.canReadFiles;
+  const listTarget =
+    target.enabled && target.environmentId !== null && target.cwd !== null
+      ? {
+          environmentId: target.environmentId,
+          input: {
+            cwd: target.cwd,
+            directoryPath: "",
+          },
+        }
+      : null;
+  const result = useEnvironmentQuery(
+    canReadFiles && listTarget !== null ? projectEnvironment.listEntries(listTarget) : null,
+  );
+  const hasTarget = listTarget !== null;
+
+  return {
+    entries: canReadFiles ? (result.data?.entries ?? EMPTY_PROJECT_ENTRIES) : EMPTY_PROJECT_ENTRIES,
+    error:
+      !hasTarget || fileAccess.isPending
+        ? null
+        : canReadFiles
+          ? result.error
+          : (fileAccess.error ?? "此连接无法读取电脑文件。"),
+    isPending: hasTarget && (fileAccess.isPending || result.isPending),
+    refresh: result.refresh,
+  };
+}
+
 interface ProjectContentSearchTarget {
   readonly environmentId: EnvironmentId | null;
   readonly cwd: string | null;

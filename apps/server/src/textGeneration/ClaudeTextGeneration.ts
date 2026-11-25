@@ -10,6 +10,7 @@ import { resolveSpawnCommand } from "@t3tools/shared/shell";
 
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
 import {
+  classifyTextGenerationCliFailure,
   normalizeCliError,
   toJsonSchemaObject,
 } from "@t3tools/provider-core/server/textGenerationUtils";
@@ -206,6 +207,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
           (cause) =>
             new TextGenerationError({
               operation,
+              reason: "not_installed",
               detail: cause.message,
               cause,
             }),
@@ -282,9 +284,13 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
         const detail =
           claudeErrorResult(stdoutDetail) ??
           (stderrDetail.length > 0 ? stderrDetail : stdoutDetail);
+        const reason = classifyTextGenerationCliFailure(
+          detail.length > 0 ? detail : `${stderrDetail}\n${stdoutDetail}`,
+        );
         return Effect.fail(
           new TextGenerationError({
             operation,
+            ...(reason ? { reason } : {}),
             detail:
               detail.length > 0
                 ? `Claude CLI command failed: ${detail}`
@@ -298,7 +304,11 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
         Option.match({
           onNone: () =>
             Effect.fail(
-              new TextGenerationError({ operation, detail: "Claude CLI request timed out." }),
+              new TextGenerationError({
+                operation,
+                reason: "timeout",
+                detail: "Claude CLI request timed out.",
+              }),
             ),
           onSome: (value) => Effect.succeed(value),
         }),

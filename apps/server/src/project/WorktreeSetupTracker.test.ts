@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ThreadId } from "@t3tools/contracts";
+import { ThreadId, VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH } from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -138,6 +138,46 @@ describe("WorktreeSetupTracker", () => {
       expect(yield* tracker.cancel(threadId)).toBe(false);
       expect((yield* tracker.get(threadId))?.phase).toBe("running");
       yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("stores clamped structured failure on fail and omits it on subsequent begin", () =>
+    Effect.gen(function* () {
+      const tracker = yield* WorktreeSetupTracker.make;
+      yield* tracker.begin({
+        threadId,
+        branch: "feature",
+        baseRef: "main",
+        stages: ["checkout", "agent"],
+        fiber: null,
+      });
+
+      const tooLong = "x".repeat(VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH + 50);
+      yield* tracker.finish(threadId, "failed", "boom", {
+        _tag: "GitCommandError",
+        operation: "GitVcsDriver.worktreeAdd",
+        action: "create_branch",
+        reason: "working_tree_dirty",
+        detail: tooLong,
+      });
+
+      const failed = yield* tracker.get(threadId);
+      expect(failed?.failure).toEqual({
+        _tag: "GitCommandError",
+        operation: "GitVcsDriver.worktreeAdd",
+        action: "create_branch",
+        reason: "working_tree_dirty",
+        detail: `${"x".repeat(VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH - 1)}\u2026`,
+      });
+
+      yield* tracker.begin({
+        threadId,
+        branch: "feature",
+        baseRef: "main",
+        stages: ["checkout", "agent"],
+        fiber: null,
+      });
+      expect((yield* tracker.get(threadId))?.failure).toBeUndefined();
     }),
   );
 });

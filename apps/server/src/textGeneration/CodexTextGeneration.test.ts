@@ -23,7 +23,7 @@ import * as Scope from "effect/Scope";
 import { createModelSelection } from "@t3tools/shared/model";
 import { expect } from "vite-plus/test";
 
-import { CodexSettings, ProviderInstanceId } from "@t3tools/contracts";
+import { CodexSettings, ProviderInstanceId, ProviderSetupError } from "@t3tools/contracts";
 
 import * as ServerConfig from "../config.ts";
 import { makeProcessProbe, processProbeSource } from "../testUtils/processProbe.ts";
@@ -535,6 +535,80 @@ it.layer(layerCodexTextGenerationTest)("CodexTextGeneration", (it) => {
           expect(generated.branch).toBe("fix/ui-regression");
         }),
     ),
+  );
+
+  it.effect.each([
+    {
+      stderr: "401 Unauthorized: please log in again",
+      expectedReason: "unauthenticated" as const,
+    },
+    {
+      stderr: "429 Too Many Requests: rate limit exceeded",
+      expectedReason: "rate_limited" as const,
+    },
+    {
+      stderr: "fetch failed: connect ECONNREFUSED 127.0.0.1:443",
+      expectedReason: "network" as const,
+    },
+  ])("classifies Codex CLI exit failure $expectedReason", ({ stderr, expectedReason }) =>
+    withFakeCodexEnv({ output: "", stderr, exitCode: 1 }, (textGeneration) =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(
+          textGeneration.generateThreadTitle({
+            cwd: process.cwd(),
+            message: "Name this thread",
+            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+          }),
+        );
+        expect(error.reason).toBe(expectedReason);
+        expect(error.detail).toBe(`Codex CLI command failed: ${stderr}`);
+      }),
+    ),
+  );
+
+  it.effect.each([
+    {
+      operation: "install",
+      detail: "Set up managed Codex before starting a session.",
+      expectedReason: "not_installed" as const,
+    },
+    {
+      operation: "auth",
+      detail: "Sign in to Codex to continue.",
+      expectedReason: "unauthenticated" as const,
+    },
+    {
+      operation: "runtime",
+      detail: "Could not prepare the private managed Codex token listener.",
+      expectedReason: "unavailable" as const,
+    },
+  ])(
+    "classifies resolveRuntime setup failure $operation as $expectedReason",
+    ({ operation, detail, expectedReason }) =>
+      Effect.gen(function* () {
+        const config = decodeCodexSettings({ binaryPath: "/unused/codex" });
+        const textGeneration = yield* makeCodexTextGeneration(
+          config,
+          undefined,
+          Effect.succeed([]),
+          Effect.fail(
+            new ProviderSetupError({
+              instanceId: ProviderInstanceId.make("codex"),
+              operation,
+              detail,
+            }),
+          ),
+        );
+        const error = yield* Effect.flip(
+          textGeneration.generateThreadTitle({
+            cwd: process.cwd(),
+            message: "Name this thread",
+            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+          }),
+        );
+        expect(error.reason).toBe(expectedReason);
+        expect(error.detail).toBe(detail);
+      }),
   );
 });
 

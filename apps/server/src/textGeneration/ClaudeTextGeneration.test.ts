@@ -8,6 +8,9 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Sink from "effect/Sink";
+import * as Stream from "effect/Stream";
+import { ChildProcessSpawner } from "effect/process";
 import { expect } from "vite-plus/test";
 
 import * as ServerConfig from "../config.ts";
@@ -20,6 +23,7 @@ import {
 } from "../provider/ClaudeModelCatalog.testFixtures.ts";
 import * as TextGeneration from "./TextGeneration.ts";
 import { sanitizeThreadTitle } from "@t3tools/provider-core/server/textGenerationUtils";
+import { ClaudeExecutableFileCheck } from "../provider/Drivers/ClaudeExecutable.ts";
 import { makeClaudeTextGeneration } from "./ClaudeTextGeneration.ts";
 import { writeFakeCli } from "@t3tools/provider-testing/fakeCli";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
@@ -462,6 +466,86 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
 
           expect(error.detail).toBe(`Claude CLI command failed: ${structuredOutputError}`);
         }),
+    ),
+  );
+
+  it.effect("marks missing reclaude binary with reason not_installed", () =>
+    withFakeClaudeEnv(
+      { output: "", claudeConfig: { binaryPath: "/nonexistent/reclaude" } },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(
+            textGeneration.generateThreadTitle({
+              cwd: process.cwd(),
+              message: "Name this thread",
+              modelSelection: {
+                instanceId: ProviderInstanceId.make("claudeAgent"),
+                model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+              },
+            }),
+          );
+          expect(error.reason).toBe("not_installed");
+          expect(error.detail).toContain("reclaude");
+        }),
+    ),
+  );
+
+  it.effect.each([
+    {
+      output: JSON.stringify({ is_error: true, result: "Not logged in · Please log in" }),
+      reason: "unauthenticated" as const,
+    },
+    {
+      output: JSON.stringify({ is_error: true, result: "429 rate limit exceeded" }),
+      reason: "rate_limited" as const,
+    },
+    {
+      output: JSON.stringify({ is_error: true, result: "connect ECONNREFUSED 127.0.0.1:443" }),
+      reason: "network" as const,
+    },
+  ])("classifies Claude CLI exit failure $reason while keeping detail text", ({ output, reason }) =>
+    Effect.gen(function* () {
+      const config = decodeClaudeSettings({ binaryPath: "/fake/reclaude" });
+      const textGeneration = yield* makeClaudeTextGeneration(
+        config,
+        {},
+        Effect.succeed(SYNTHETIC_CLAUDE_MODEL_CATALOG),
+      );
+      const error = yield* Effect.flip(
+        textGeneration.generateThreadTitle({
+          cwd: process.cwd(),
+          message: "Name this thread",
+          modelSelection: {
+            instanceId: ProviderInstanceId.make("claudeAgent"),
+            model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+          },
+        }),
+      );
+      expect(error.reason).toBe(reason);
+      expect(error.detail).toMatch(/^Claude CLI command failed: /);
+    }).pipe(
+      Effect.provideService(ClaudeExecutableFileCheck, (filePath) => filePath === "/fake/reclaude"),
+      Effect.provideService(
+        ChildProcessSpawner.ChildProcessSpawner,
+        ChildProcessSpawner.make(() =>
+          Effect.succeed(
+            ChildProcessSpawner.makeHandle({
+              pid: ChildProcessSpawner.ProcessId(1),
+              exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(1)),
+              isRunning: Effect.succeed(false),
+              kill: () => Effect.void,
+              unref: Effect.succeed(Effect.void),
+              stdin: Sink.drain,
+              stdout: Stream.encodeText(Stream.make(output)),
+              stderr: Stream.empty,
+              all: Stream.empty,
+              getInputFd: () => Sink.drain,
+              getOutputFd: () => Stream.empty,
+            }),
+          ),
+        ),
+      ),
+      Effect.scoped,
     ),
   );
 });

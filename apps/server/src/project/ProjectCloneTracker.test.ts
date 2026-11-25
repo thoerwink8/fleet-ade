@@ -1,6 +1,7 @@
 import { SourceControlProviderKind } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import {
+  GitCommandError,
   OrchestrationDispatchCommandError,
   ProjectId,
   projectCloneProgressSummary,
@@ -159,6 +160,14 @@ describe("ProjectCloneTracker", () => {
                   operation: "cloneRepository",
                   provider: SourceControlProviderKind.make("unknown"),
                   detail: "fatal: repository not found",
+                  cause: new GitCommandError({
+                    operation: "SourceControlRepositoryService.cloneRepository",
+                    action: "clone",
+                    command: "git",
+                    cwd: input.destinationPath,
+                    reason: "not_a_repository",
+                    detail: "fatal: repository not found",
+                  }),
                 }),
               )
             : Effect.succeed({
@@ -173,12 +182,27 @@ describe("ProjectCloneTracker", () => {
       yield* tracker.start({ ...startInput, protocol: "ssh" }, harness.hooks);
       yield* Effect.yieldNow;
       const failed = yield* tracker.get(projectId);
-      expect(failed).toMatchObject({ phase: "failed", error: "fatal: repository not found" });
+      expect(failed).toMatchObject({
+        phase: "failed",
+        error: "fatal: repository not found",
+        failure: {
+          _tag: "GitCommandError",
+          operation: "SourceControlRepositoryService.cloneRepository",
+          action: "clone",
+          reason: "not_a_repository",
+          detail: "fatal: repository not found",
+        },
+      });
 
       expect(yield* tracker.retry(projectId)).toBe(true);
+      const retrying = yield* tracker.get(projectId);
+      expect(retrying?.phase).toBe("running");
+      expect(retrying?.failure).toBeUndefined();
       expect(harness.discarded).toEqual(["/workspace/t3code"]);
       yield* Effect.yieldNow;
-      expect((yield* tracker.get(projectId))?.phase).toBe("done");
+      const done = yield* tracker.get(projectId);
+      expect(done?.phase).toBe("done");
+      expect(done?.failure).toBeUndefined();
       expect(protocols).toEqual(["ssh", "ssh"]);
     }).pipe(Effect.provide(harness.layer));
   });
