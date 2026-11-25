@@ -3,9 +3,10 @@ import { userEvent } from "vite-plus/test/browser";
 
 import { resolvePastedPath } from "@t3tools/shared/path";
 
-import { render } from "../../test/render";
+import { act, render } from "../../test/render";
 import { parseSessionLimitDraft } from "../components/settings/SettingsPanels.logic";
-import { DraftInput } from "../components/ui/draft-input";
+import { DraftInput, DraftTextarea } from "../components/ui/draft-input";
+import { anchoredToastManager } from "../components/ui/toast";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -30,6 +31,29 @@ describe("settings draft commits", () => {
     await userEvent.tab();
 
     expect(saved).toBe("/projects");
+  });
+
+  it("shows a value another device saved in a field nobody is editing", async () => {
+    const commit = vi.fn();
+    await using screen = await render(<DraftInput value="t3" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await expect.element(input).toHaveValue("t3");
+
+    await screen.rerender(<DraftInput value="elsewhere/" onCommit={commit} />);
+
+    await expect.element(input).toHaveValue("elsewhere/");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("keeps the text being typed when another device saves a new value", async () => {
+    const commit = vi.fn();
+    await using screen = await render(<DraftInput value="t3" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await input.fill("typing/");
+
+    await screen.rerender(<DraftInput value="elsewhere/" onCommit={commit} />);
+
+    await expect.element(input).toHaveValue("typing/");
   });
 
   it("preserves a saved edit when refocused before its server snapshot arrives", async () => {
@@ -124,6 +148,28 @@ describe("settings draft commits", () => {
     expect(saved).toBe(4);
   });
 
+  it("keeps the draft marked invalid when the commit returns a reason", async () => {
+    const add = vi.spyOn(anchoredToastManager, "add");
+    const commit = vi.fn((next: string) =>
+      next.includes(":") ? undefined : "地址要写成 http://主机:端口",
+    );
+    await using screen = await render(<DraftInput type="text" value="" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await userEvent.type(input, "bad");
+    await userEvent.tab();
+    await expect.element(input).toHaveValue("bad");
+    await expect.element(input).toHaveAttribute("aria-invalid", "true");
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "地址要写成 http://主机:端口", type: "error" }),
+    );
+
+    await input.click();
+    await userEvent.type(input, ":1");
+    await userEvent.tab();
+    expect(commit).toHaveBeenLastCalledWith("bad:1");
+    await expect.element(input).not.toHaveAttribute("aria-invalid");
+  });
+
   it("keeps the typed text when the asynchronous save fails and clears it once it saves", async () => {
     const saves: string[] = [];
     let outcome = deferred<boolean>();
@@ -148,6 +194,66 @@ describe("settings draft commits", () => {
     outcome.resolve(true);
     await expect.element(input).not.toHaveAttribute("aria-invalid", "true");
     expect(saves).toEqual(["/projects", "/fixed"]);
+  });
+
+  it("keeps showing a saved text until the stored value catches up", async () => {
+    await using screen = await render(
+      <DraftInput value="old" onCommit={() => Promise.resolve(true)} />,
+    );
+    const input = screen.getByRole("textbox");
+    await input.fill("new");
+    await userEvent.tab();
+    // The stored value is still "old" here, as before a slow server snapshot arrives.
+    await expect.element(input).toHaveValue("new");
+    await expect.element(input).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("places the tip at the input's left edge on a narrow row and beside it with room", async () => {
+    const add = vi.spyOn(anchoredToastManager, "add");
+    await using screen = await render(
+      <div style={{ paddingLeft: 400 }}>
+        <DraftInput aria-label="wide" value="a" onCommit={() => false} />
+        <div style={{ marginLeft: -400 }}>
+          <DraftInput aria-label="narrow" value="a" onCommit={() => false} />
+        </div>
+      </div>,
+    );
+    await screen.getByRole("textbox", { name: "wide" }).fill("b");
+    await userEvent.tab();
+    await screen.getByRole("textbox", { name: "narrow" }).fill("b");
+    await userEvent.tab();
+    const placements = add.mock.calls.map(([options]) => options.positionerProps);
+    expect(placements[0]).toMatchObject({ side: "inline-start" });
+    expect(placements[1]).toMatchObject({ side: "top", align: "start" });
+  });
+
+  it("ignores duplicate blurs of one edit, retrying only after a refocus", async () => {
+    const outcome = deferred<boolean>();
+    const commit = vi.fn(() => outcome.promise);
+    await using screen = await render(<DraftInput value="~" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    const blurAgain = () =>
+      act(async () => {
+        screen.container
+          .querySelector("input")!
+          .dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      });
+    await input.fill("/projects");
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    // Disabling a focused input can deliver a second focusout for the same edit.
+    await blurAgain();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    outcome.resolve(false);
+    await expect.element(input).toHaveAttribute("aria-invalid", "true");
+    await blurAgain();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    await input.click();
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -196,5 +302,22 @@ describe("settings draft commits", () => {
     outcome.resolve(true);
     await expect.element(input).toHaveValue("/second");
     expect(saved).toBe("/second");
+  });
+
+  it("keeps Enter as a newline in a draft textarea and commits on blur, keeping text on failure", async () => {
+    const outcome = deferred<boolean>();
+    const commit = vi.fn(() => outcome.promise);
+    await using screen = await render(<DraftTextarea value="" onCommit={commit} />);
+    const textarea = screen.getByRole("textbox");
+    await textarea.click();
+    await userEvent.keyboard("first{Enter}second");
+    expect(commit).not.toHaveBeenCalled();
+    await expect.element(textarea).toHaveValue("first\nsecond");
+
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledExactlyOnceWith("first\nsecond");
+    outcome.resolve(false);
+    await expect.element(textarea).toHaveValue("first\nsecond");
+    await expect.element(textarea).toHaveAttribute("aria-invalid", "true");
   });
 });

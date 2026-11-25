@@ -2,13 +2,18 @@ import { type EnvironmentId, T3_PROJECT_FILE_NAME, type T3ProjectFile } from "@t
 import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
 import { getProjectFileQueryAtom, optimisticFileAtom } from "../files/projectFilesQueryState";
 import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
-import { resolveScopedSettingsTargets, selectScopedSettingsEnvironments } from "./scopedSettings";
-import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
+import {
+  nextHeldServerConfigs,
+  resolveScopedSettingsTargets,
+  selectScopedSettingsEnvironments,
+  withHeldServerConfigs,
+} from "./scopedSettings";
+import { resolveSettingsScope, settingsScopeKey, type SettingsScopeSearch } from "./settingsScope";
 import { selectSingleEnvironmentScope } from "./settingsScopeAxis";
 
 type ProjectFileMember = readonly [
@@ -74,12 +79,28 @@ function useResolvedSettingsScope(rawSearch: SettingsScopeSearch, singleEnvironm
     availableEnvironments,
     primaryEnvironmentId,
   );
-  const targets = resolveScopedSettingsTargets(scope, selected.connectedEnvironments, projectFiles);
+  // Targets only supply values to show; writes still go to connectedEnvironments.
+  const [held, setHeld] = useState<ReturnType<typeof nextHeldServerConfigs>>(new Map());
+  const nextHeld = nextHeldServerConfigs(selected.environments, held);
+  if (nextHeld !== held) setHeld(nextHeld);
+  const targets = resolveScopedSettingsTargets(
+    scope,
+    withHeldServerConfigs(selected.environments, nextHeld),
+    projectFiles,
+  );
   const target =
     targets.find((candidate) => candidate.environmentId === selected.environment?.environmentId) ??
     targets[0] ??
     null;
-  return { scope, groups, search, ...selected, targets, target };
+  return {
+    scope,
+    groups,
+    search,
+    scopeKey: settingsScopeKey(search),
+    ...selected,
+    targets,
+    target,
+  };
 }
 
 const SettingsScopeContext = createContext<
