@@ -41,6 +41,7 @@ import {
   NodeId,
   type OrchestrationV2AppThread,
   type OrchestrationV2PendingBackgroundTask,
+  OrchestrationV2ProviderTurnTokenUsage,
   OrchestrationV2ProviderThread,
   ProjectId,
   ProviderInstanceId,
@@ -743,6 +744,8 @@ describe("ClaudeAdapterV2 native protocol logging", () => {
   });
 });
 
+const decodeProviderTurnTokenUsage = Schema.decodeSync(OrchestrationV2ProviderTurnTokenUsage);
+
 describe("ClaudeAdapterV2 context usage", () => {
   it("dates cache expiry from the request start, not the response end", () => {
     const usage = ClaudeAdapterV2.claudeProviderTurnTokenUsage(
@@ -757,6 +760,28 @@ describe("ClaudeAdapterV2 context usage", () => {
       DateTime.makeUnsafe("2026-08-29T00:00:00.000Z"),
     );
     assert.strictEqual(usage.promptCacheExpiresAt, "2026-08-29T00:05:00.000Z");
+  });
+
+  it("counts missing, negative, or non-finite usage fields as zero", () => {
+    const partialUsage = ClaudeAdapterV2.claudeProviderTurnTokenUsage(
+      {
+        input_tokens: 1_200,
+        cache_creation_input_tokens: Number.NaN,
+        cache_read_input_tokens: -5,
+        output_tokens: undefined,
+      },
+      200_000,
+      "2026-08-29T00:03:00.000Z",
+    );
+    assert.deepEqual(decodeProviderTurnTokenUsage(partialUsage), {
+      usedTokens: 1_200,
+      maxTokens: 200_000,
+      inputTokens: 1_200,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      reasoningOutputTokens: 0,
+      updatedAt: "2026-08-29T00:03:00.000Z",
+    });
   });
 });
 
@@ -8627,6 +8652,95 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     ),
   );
 
+  it.effect("ignores empty stream usage frames and accepts partial usage deltas from proxies", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeWakeHarness;
+      yield* harness.runtime.startTurn(
+        makeClaudeTestTurnInput({
+          threadId: harness.threadId,
+          providerThread: harness.providerThread,
+          now: yield* DateTime.now,
+          attemptId: RunAttemptId.make("attempt-empty-start-usage"),
+          text: "Continue.",
+          attachments: [],
+        }),
+      );
+      // Some Anthropic-compatible proxies send an empty `usage: {}` object on
+      // message_start or omit fields from message_delta / assistant snapshots.
+      const frames = [
+        usageStreamFrame({
+          type: "message_start",
+          message: { id: "msg_empty_first", usage: {} },
+        }),
+        usageSnapshotFrame("msg_empty_first", "00000000-0000-4000-8000-000000000674", {}),
+        usageStreamFrame({
+          type: "message_delta",
+          delta: { stop_reason: "tool_use", stop_sequence: null },
+          usage: { input_tokens: 12_345 },
+        }),
+        usageStreamFrame({
+          type: "message_start",
+          message: { id: "msg_empty_second", usage: {} },
+        }),
+        usageSnapshotFrame("msg_empty_second", "00000000-0000-4000-8000-000000000675", {
+          input_tokens: 12_500,
+        }),
+        usageStreamFrame({
+          type: "message_delta",
+          delta: { stop_reason: "end_turn", stop_sequence: null },
+          usage: { output_tokens: 80 },
+        }),
+        usageStreamFrame({
+          type: "message_start",
+          message: { id: "msg_null_usage", usage: null },
+        }),
+        usageStreamFrame({
+          type: "message_delta",
+          delta: { stop_reason: "end_turn", stop_sequence: null },
+          usage: null,
+        }),
+        usageStreamFrame({
+          type: "message_delta",
+          delta: { stop_reason: "end_turn", stop_sequence: null },
+          usage: { input_tokens: 12_600, output_tokens: 40 },
+        }),
+        usageSnapshotFrame("msg_null_usage", "00000000-0000-4000-8000-000000000676", {}),
+        makeResultFrame({ uuid: "00000000-0000-4000-8000-000000000677", result: "Done." }),
+      ];
+      for (const frame of frames) yield* Queue.offer(harness.sdkMessages, frame);
+      const terminal = yield* Queue.take(harness.terminalReceipts);
+      assert.equal(terminal.status, "completed");
+      const tokenUsages = harness.events.flatMap((event) =>
+        event.type === "provider_turn.updated" && event.providerTurn.tokenUsage
+          ? [decodeProviderTurnTokenUsage(event.providerTurn.tokenUsage)]
+          : [],
+      );
+      assert.deepEqual(
+        tokenUsages.map((usage) => ({
+          usedTokens: usage.usedTokens,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cachedInputTokens: usage.cachedInputTokens,
+        })),
+        [
+          { usedTokens: 12_345, inputTokens: 12_345, outputTokens: 0, cachedInputTokens: 0 },
+          { usedTokens: 12_500, inputTokens: 12_500, outputTokens: 0, cachedInputTokens: 0 },
+          { usedTokens: 12_580, inputTokens: 12_500, outputTokens: 80, cachedInputTokens: 0 },
+          { usedTokens: 12_640, inputTokens: 12_600, outputTokens: 40, cachedInputTokens: 0 },
+        ],
+      );
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
+        ),
+      ),
+    ),
+  );
+
   it.effect("measures a model outside the catalog against the window Claude reports", () =>
     Effect.gen(function* () {
       const harness = yield* makeWakeHarness;
@@ -11116,6 +11230,37 @@ describe("ClaudeAdapterV2 background wake turns", () => {
               event.providerThread.pendingBackgroundTasks?.[0]?.parentTaskId === "agent-1" &&
               event.providerThread.pendingBackgroundTasks[1]?.nativeItemId === WAKE_TOOL_USE_ID &&
               event.providerThread.pendingBackgroundTasks[2]?.nativeItemId === "toolu_moved_shell",
+          ),
+        );
+
+        // A notification publishes the outcome in the roster before the entry leaves it.
+        yield* Queue.offer(
+          harness.sdkMessages,
+          claudeSdkFrame({
+            type: "system",
+            subtype: "task_notification",
+            task_id: "moved-shell",
+            tool_use_id: "toolu_moved_shell",
+            status: "failed",
+            output_file: "/tmp/claude-replay/tasks/moved-shell.output",
+            summary: "Foreground build failed (exit code 1)",
+            uuid: "00000000-0000-4000-8000-000000000205",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+        yield* harness.until(() =>
+          providerThreadRosterEvents(harness.events).some((event) =>
+            event.providerThread.pendingBackgroundTasks?.some(
+              (task) => task.taskId === "moved-shell" && task.status === "failed",
+            ),
+          ),
+        );
+        yield* harness.until(() =>
+          providerThreadRosterEvents(harness.events).some(
+            (event) =>
+              event.providerThread.pendingBackgroundTasks?.every(
+                (task) => task.taskId !== "moved-shell",
+              ) ?? false,
           ),
         );
 

@@ -68,6 +68,7 @@ it.effect(
                     reclaimableBytes: 1000,
                     incrementalVacuumEnabled: false,
                     legacyDatabaseBytes: 4000,
+                    legacyOnlyRecords: { projects: 0, threads: 0 },
                   }),
                 compact: () =>
                   startServer.pipe(
@@ -151,6 +152,7 @@ it.effect("warns how long reclaiming can take and reports each step with its ela
                 reclaimableBytes: 0,
                 incrementalVacuumEnabled: false,
                 legacyDatabaseBytes: null,
+                legacyOnlyRecords: null,
               }),
             compact: (_databasePath, onStep) =>
               Effect.gen(function* () {
@@ -194,4 +196,53 @@ it.effect("warns how long reclaiming can take and reports each step with its ela
       "each compaction step must print one line with the elapsed time as it starts",
     );
   }).pipe(Effect.provide(layerHost)),
+);
+
+it.effect(
+  "keeps the old database off the repair list and warns in Chinese while records are missing",
+  () =>
+    Effect.gen(function* () {
+      const output: string[] = [];
+      const stateDir = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped();
+      const path = yield* Path.Path;
+      yield* runDoctor(
+        {
+          dbPath: path.join(stateDir, "statev2.sqlite"),
+          serverRuntimeStatePath: path.join(stateDir, "server-runtime.json"),
+        },
+        { fix: true, dryRun: false, interactive: false },
+      ).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            Layer.mock(BootService.BootService)({
+              withStopped: (operation) => operation,
+            }),
+            Layer.succeed(DatabaseMaintenance, {
+              inspect: () =>
+                Effect.succeed({
+                  databaseBytes: 2000,
+                  reclaimableBytes: 0,
+                  incrementalVacuumEnabled: true,
+                  legacyDatabaseBytes: 4000,
+                  legacyOnlyRecords: { projects: 1, threads: 2 },
+                }),
+              compact: () => Effect.die(new Error("not reachable in this test")),
+              removeLegacyDatabase: () =>
+                Effect.die(new Error("the unverified database must not be removed")),
+            }),
+          ),
+        ),
+        Effect.provideService(Console.Console, {
+          ...globalThis.console,
+          log: (...args: ReadonlyArray<unknown>) => {
+            output.push(...args.join(" ").split("\n"));
+          },
+        }),
+      );
+
+      const text = output.join("\n");
+      assert.include(text, "1 个项目、2 个会话", "the warning must count the missing records");
+      assert.include(text, "请保留旧数据库", "the warning must keep the old database");
+      assert.notInclude(text, "Delete the database from before 0.1.0");
+    }).pipe(Effect.provide(layerHost)),
 );

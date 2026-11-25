@@ -90,7 +90,9 @@ import {
 import { createOrchestrationV2TurnItemVisibility } from "@t3tools/shared/orchestrationV2Timeline";
 import {
   deriveBlockedOnThreadWait,
+  deriveCompletedBackgroundWork,
   derivePendingBackgroundWork,
+  mergeBackgroundTaskLedger,
 } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -912,6 +914,24 @@ function isQueuedProviderThreadPlaceholder(providerThread: OrchestrationV2Provid
   );
 }
 
+function providerThreadWithBackgroundTaskLedger(
+  prior: OrchestrationV2ProviderThread | undefined,
+  payload: OrchestrationV2ProviderThread,
+  occurredAt: DateTime.Utc,
+): OrchestrationV2ProviderThread {
+  const ledger = mergeBackgroundTaskLedger({
+    pending: payload.pendingBackgroundTasks ?? [],
+    priorPending: prior?.pendingBackgroundTasks ?? [],
+    priorCompleted: prior?.completedBackgroundTasks ?? [],
+    occurredAt,
+  });
+  return {
+    ...payload,
+    pendingBackgroundTasks: [...ledger.pendingBackgroundTasks],
+    completedBackgroundTasks: [...ledger.completedBackgroundTasks],
+  };
+}
+
 export function applyToProjection(
   projection: OrchestrationV2ThreadProjection,
   event: OrchestrationV2DomainEvent,
@@ -1042,7 +1062,14 @@ export function applyToProjection(
                 activeProviderThreadId: event.payload.id,
               }
             : base.thread,
-        providerThreads: upsertById(base.providerThreads, event.payload),
+        providerThreads: upsertById(
+          base.providerThreads,
+          providerThreadWithBackgroundTaskLedger(
+            base.providerThreads.find((thread) => thread.id === event.payload.id),
+            event.payload,
+            event.occurredAt,
+          ),
+        ),
       };
     case "provider-turn.updated":
       return {
@@ -1880,6 +1907,10 @@ export function threadShellFromProjection(
       (plan) => plan.kind === "proposed_plan" && plan.status === "active",
     ),
     pendingBackgroundTasks: [...pendingBackgroundTasks],
+    completedBackgroundTasks: deriveCompletedBackgroundWork({
+      providerThreads: projection.providerThreads,
+      activeProviderThreadId: projection.thread.activeProviderThreadId,
+    }),
     providerInstanceHistory: providerInstanceHistoryForShell({
       threadId: projection.thread.id,
       providerThreads: projection.providerThreads,
@@ -2015,6 +2046,7 @@ type ShellThreadState = {
   readonly turnCount: number;
   readonly hasActionableProposedPlan: boolean;
   readonly pendingBackgroundTasks: OrchestrationV2ThreadShell["pendingBackgroundTasks"];
+  readonly completedBackgroundTasks: OrchestrationV2ThreadShell["completedBackgroundTasks"];
   readonly providerInstanceHistory: OrchestrationV2ThreadShell["providerInstanceHistory"];
   readonly goal: OrchestrationV2ThreadShell["goal"];
   readonly itemCount: number;
@@ -2191,6 +2223,7 @@ function shellFromState(input: {
     latestUserAuthoredMessageAt: input.state.latestUserAuthoredMessageAt,
     hasActionableProposedPlan: input.state.hasActionableProposedPlan,
     pendingBackgroundTasks: input.state.pendingBackgroundTasks,
+    completedBackgroundTasks: input.state.completedBackgroundTasks,
     providerInstanceHistory: input.state.providerInstanceHistory,
     goal: input.state.goal,
     itemCount: input.state.itemCount,
@@ -2793,7 +2826,22 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               break;
             }
             case "provider-thread.updated": {
-              const payloadJson = yield* encodeProviderThreadPayload(event.payload);
+              const priorRows = yield* sql<PayloadRow>`
+                SELECT payload_json
+                FROM orchestration_v2_projection_provider_threads
+                WHERE provider_thread_id = ${event.payload.id}
+                LIMIT 1
+              `;
+              const prior =
+                priorRows[0] === undefined
+                  ? undefined
+                  : yield* decodeProviderThreadPayload(priorRows[0].payload_json);
+              const merged = providerThreadWithBackgroundTaskLedger(
+                prior,
+                event.payload,
+                event.occurredAt,
+              );
+              const payloadJson = yield* encodeProviderThreadPayload(merged);
               const payload = parseEncodedPayload(payloadJson);
               yield* sql`
               INSERT INTO orchestration_v2_projection_provider_threads (
@@ -8700,6 +8748,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           turnCount: turnCountsByThreadId.get(thread.id) ?? 0,
           hasActionableProposedPlan: row.has_actionable_proposed_plan === 1,
           pendingBackgroundTasks,
+          completedBackgroundTasks: deriveCompletedBackgroundWork({
+            providerThreads: providerThreadsByThreadId.get(thread.id) ?? [],
+            activeProviderThreadId: thread.activeProviderThreadId,
+          }),
           providerInstanceHistory: providerInstanceHistoryForShell({
             threadId: thread.id,
             providerThreads: providerThreadsByThreadId.get(thread.id) ?? [],

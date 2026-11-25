@@ -866,6 +866,7 @@ describe("model selection patches at project scope", () => {
           defaultModelSelection: saved,
           sourceControlWriterModelSelection: saved,
           textGenerationModelSelection: saved,
+          dispatchCodeModelSelection: saved,
         },
       },
     },
@@ -877,11 +878,13 @@ describe("model selection patches at project scope", () => {
       defaultModelSelection: { instanceId: claude, model: "claude-opus-4-8" },
       sourceControlWriterModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
       textGenerationModelSelection: { instanceId: claude, model: "claude-sonnet-4-6" },
+      dispatchCodeModelSelection: { instanceId: claude, model: "claude-sonnet-4-6" },
     });
     expect(plan.serverWrites[0]?.patch.projectSettingsOverrides?.[projectId]).toEqual({
       defaultModelSelection: { instanceId: claude, model: "claude-opus-4-8" },
       sourceControlWriterModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
       textGenerationModelSelection: { instanceId: claude, model: "claude-sonnet-4-6" },
+      dispatchCodeModelSelection: { instanceId: claude, model: "claude-sonnet-4-6" },
     });
   });
 

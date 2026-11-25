@@ -1433,7 +1433,9 @@ describe("deriveThreadPendingBackgroundTasks", () => {
             ],
           }),
         ),
-      ).toEqual([{ taskId: "shell-1", description: "sleep 600", kind: "command" }]);
+      ).toEqual([
+        { taskId: "shell-1", description: "sleep 600", kind: "command", status: "running" },
+      ]);
     },
   );
 
