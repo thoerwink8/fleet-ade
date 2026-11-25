@@ -660,10 +660,10 @@ function ProjectDetail({
             }
             description={
               hasOtherMembers
-                ? "删除所选电脑上的项目目录条目及其会话。其他电脑和磁盘上的文件不受影响。"
+                ? "移除所选电脑上的项目目录条目，并永久删除其会话。其他电脑和磁盘上的文件不受影响。"
                 : group.memberProjects.length > 1
-                  ? `删除所有电脑上的全部 ${group.memberProjects.length} 个项目目录条目及其会话。磁盘上的文件不受影响。`
-                  : "删除项目条目及其会话。磁盘上的文件不受影响。"
+                  ? `移除所有电脑上的全部 ${group.memberProjects.length} 个项目目录条目，并永久删除其会话。磁盘上的文件不受影响。`
+                  : "移除项目条目，并永久删除其会话。磁盘上的文件不受影响。"
             }
             control={
               <Button
