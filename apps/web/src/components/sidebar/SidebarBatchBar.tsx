@@ -3,6 +3,7 @@ import {
   threadRuntimeCanArchive,
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/models";
+import { canSnooze, type SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { EllipsisIcon, XIcon } from "lucide-react";
 
@@ -10,7 +11,17 @@ import { readEnvironmentScope } from "~/state/session";
 import { useThreadSelectionStore } from "~/threadSelectionStore";
 import type { MultiSelectThreadMenuId } from "../Sidebar.logic";
 import { Button } from "../ui/button";
-import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
+import {
+  Menu,
+  MenuItem,
+  MenuItemDetail,
+  MenuPopup,
+  MenuSeparator,
+  MenuSub,
+  MenuSubPopup,
+  MenuSubTrigger,
+  MenuTrigger,
+} from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 function canOperateThreads(
@@ -26,6 +37,11 @@ export function SidebarBatchBar(props: {
   orderedThreadCount: number;
   serverConfigs: ReadonlyMap<string, EnvironmentServerConfig>;
   onAction: (action: MultiSelectThreadMenuId) => void;
+  /** Same presets the right-click menu shows, so the two entries offer the same choices. */
+  snoozePresets: ReadonlyArray<SnoozePreset>;
+  /** The moment the selection was made, so the snooze check does not read the clock while rendering. */
+  nowIso: string;
+  onCustomSnooze: () => void;
   onClearSelection: () => void;
 }) {
   const selectedThreadKeys = useThreadSelectionStore((state) => state.selectedThreadKeys);
@@ -52,7 +68,19 @@ export function SidebarBatchBar(props: {
   const canSettle = settlingThreads.length > 0 && canOperateThreads(settlingThreads);
   const canUnpin = pinnedSelectedThreads.length > 0 && canOperateThreads(pinnedSelectedThreads);
   const canDelete = canOperateThreads(selectedThreads);
-
+  const snoozeableThreads = selectedThreads.filter(
+    (thread) =>
+      props.serverConfigs.has(thread.environmentId) && canSnooze(thread, { now: props.nowIso }),
+  );
+  const canSnoozeSelected = snoozeableThreads.length > 0 && canOperateThreads(snoozeableThreads);
+  const titleRegenerationThreads = selectedThreads.filter((thread) =>
+    props.serverConfigs.has(thread.environmentId),
+  );
+  const regeneratableTitleThreads = titleRegenerationThreads.filter(
+    (thread) => thread.titleRegeneration == null,
+  );
+  const canRegenerateTitles =
+    regeneratableTitleThreads.length > 0 && canOperateThreads(regeneratableTitleThreads);
   return (
     <div className="px-2">
       <div
@@ -110,6 +138,35 @@ export function SidebarBatchBar(props: {
               {pinnedSelectedThreads.length > 0 ? (
                 <MenuItem disabled={!canUnpin} onClick={() => props.onAction("unpin")}>
                   取消置顶
+                </MenuItem>
+              ) : null}
+              {snoozeableThreads.length > 0 ? (
+                <MenuSub>
+                  <MenuSubTrigger disabled={!canSnoozeSelected}>暂缓</MenuSubTrigger>
+                  <MenuSubPopup>
+                    {props.snoozePresets.map((preset) => (
+                      <MenuItem
+                        key={preset.id}
+                        disabled={!canSnoozeSelected}
+                        onClick={() => props.onAction(`snooze:${preset.id}`)}
+                      >
+                        {preset.label}
+                        <MenuItemDetail>{preset.whenLabel}</MenuItemDetail>
+                      </MenuItem>
+                    ))}
+                    <MenuSeparator />
+                    <MenuItem disabled={!canSnoozeSelected} onClick={props.onCustomSnooze}>
+                      自定义…
+                    </MenuItem>
+                  </MenuSubPopup>
+                </MenuSub>
+              ) : null}
+              {titleRegenerationThreads.length > 0 ? (
+                <MenuItem
+                  disabled={!canRegenerateTitles}
+                  onClick={() => props.onAction("regenerate-title")}
+                >
+                  {regeneratableTitleThreads.length === 0 ? "正在重新生成…" : "重新生成标题"}
                 </MenuItem>
               ) : null}
               <MenuItem onClick={() => props.onAction("mark-unread")}>标为未读</MenuItem>

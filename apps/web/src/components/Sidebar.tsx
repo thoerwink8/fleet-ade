@@ -1039,6 +1039,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
   const toggleThreadSelection = useThreadSelectionStore((s) => s.toggleThread);
   const rangeSelectTo = useThreadSelectionStore((s) => s.rangeSelectTo);
+  const batchSelectionAt = useThreadSelectionStore((s) => s.selectedAt);
   const acknowledgeWoke = useAcknowledgeThreadWoke();
   // A Settings or Usage modal keeps the thread behind it current.
   const routeTarget = useShownThreadRouteTarget().shownTarget;
@@ -2461,6 +2462,26 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const handleBatchBarAction = useStableCallback((action: MultiSelectThreadMenuId) => {
     void executeMultiSelectAction(action);
   });
+  const handleBatchCustomSnooze = useStableCallback(() => {
+    void (async () => {
+      const choice = await requestCustomSnooze();
+      if (!choice) return;
+      const selected = [...useThreadSelectionStore.getState().selectedThreadKeys].flatMap(
+        (threadKey) => {
+          const thread = threadByKeyRef.current.get(threadKey);
+          return thread ? [thread] : [];
+        },
+      );
+      const snoozePresetThread = selected[0];
+      if (!snoozePresetThread) return;
+      await executeMultiSelectAction("snooze:custom", {
+        snoozePresets: [
+          { id: "custom", label: "自定义", whenLabel: "", snoozedUntil: choice.snoozedUntil },
+        ],
+        snoozePresetThread,
+      });
+    })();
+  });
   const handleMultiSelectContextMenu = useStableCallback(
     async (position: { x: number; y: number }) => {
       const api = readLocalApi();
@@ -3035,6 +3056,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 orderedThreadCount={orderedThreadKeys.length}
                 serverConfigs={serverConfigs}
                 onAction={handleBatchBarAction}
+                snoozePresets={
+                  primaryEnvironmentId === null || batchSelectionAt === null
+                    ? []
+                    : resolveSnoozePresets(
+                        new Date(batchSelectionAt),
+                        timestampFormat,
+                        primaryEnvironmentId,
+                      )
+                }
+                nowIso={batchSelectionAt ?? ""}
+                onCustomSnooze={handleBatchCustomSnooze}
                 onClearSelection={clearSelection}
               />
             ) : null}
