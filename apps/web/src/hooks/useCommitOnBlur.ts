@@ -8,6 +8,18 @@ export type CommitVerdict = void | false | string | Promise<boolean>;
 const SAVED_TOAST_TIMEOUT_MS = 1500;
 const REJECTED_TOAST_TIMEOUT_MS = 2500;
 
+// Room a one-line tip needs beside the input; the settings rows stack the input below its title
+// on narrow screens, where the tip hangs above the input's left edge instead.
+const TIP_ROOM_BESIDE_PX = 272;
+
+/** The tip starts at the input's left edge or sits beside it, never over the next row. */
+function inputTipPlacement(anchor: HTMLElement) {
+  const roomBeside = anchor.getBoundingClientRect().left >= TIP_ROOM_BESIDE_PX;
+  return roomBeside
+    ? { anchor, side: "inline-start" as const, align: "center" as const }
+    : { anchor, side: "top" as const, align: "start" as const };
+}
+
 function showAnchoredInputToast(
   ref: RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
   options: { title: string; timeout: number; type?: "error" },
@@ -16,7 +28,7 @@ function showAnchoredInputToast(
   anchoredToastManager.add({
     ...(options.type ? { type: options.type } : {}),
     data: { tooltipStyle: true },
-    positionerProps: { anchor: ref.current, side: "inline-start" },
+    positionerProps: inputTipPlacement(ref.current),
     timeout: options.timeout,
     title: options.title,
   });
@@ -47,6 +59,9 @@ export function useCommitOnBlur<
   const inputRef = useRef<TElement | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  // A saved text keeps showing until the stored value moves on, so a slow snapshot cannot flash the old value back.
+  const [held, setHeld] = useState<{ text: string; base: string } | null>(null);
+  const shownValue = held !== null && held.base === value ? held.text : value;
   const [rejected, setRejected] = useState<{ text: string; kind: "invalid" | "failed" } | null>(
     null,
   );
@@ -74,6 +89,7 @@ export function useCommitOnBlur<
         const untouched = editEpoch.current === epoch;
         if (saved) {
           setRejected(null);
+          if (!resetOnCommit && text !== value) setHeld({ text, base: value });
           setDraft((current) => (resetOnCommit || current === text ? null : current));
           if (untouched) {
             showAnchoredInputToast(inputRef, {
@@ -113,23 +129,24 @@ export function useCommitOnBlur<
     lastCommit.current = null;
     setDraft(null);
     setPending(null);
+    setHeld(null);
     setRejected(null);
   };
 
   return {
     ref: inputRef,
-    value: draft ?? pending ?? value,
+    value: draft ?? pending ?? shownValue,
     ...(rejected !== null ? { "aria-invalid": true as const } : {}),
     reset,
     onChange: (event: ChangeEvent<TElement>) => {
       const next = event.target.value;
       editEpoch.current += 1;
       setRejected(null);
-      setDraft(normalizeDraft ? normalizeDraft(draft ?? pending ?? value, next) : next);
+      setDraft(normalizeDraft ? normalizeDraft(draft ?? pending ?? shownValue, next) : next);
     },
     onFocus: () => {
       focusEpoch.current += 1;
-      const shown = draft ?? pending ?? value;
+      const shown = draft ?? pending ?? shownValue;
       valueOnFocus.current = shown;
       setDraft(shown);
     },

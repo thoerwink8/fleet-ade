@@ -173,6 +173,37 @@ describe("settings draft commits", () => {
     expect(saves).toEqual(["/projects", "/fixed"]);
   });
 
+  it("keeps showing a saved text until the stored value catches up", async () => {
+    await using screen = await render(
+      <DraftInput value="old" onCommit={() => Promise.resolve(true)} />,
+    );
+    const input = screen.getByRole("textbox");
+    await input.fill("new");
+    await userEvent.tab();
+    // The stored value is still "old" here, as before a slow server snapshot arrives.
+    await expect.element(input).toHaveValue("new");
+    await expect.element(input).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("places the tip at the input's left edge on a narrow row and beside it with room", async () => {
+    const add = vi.spyOn(anchoredToastManager, "add");
+    await using screen = await render(
+      <div style={{ paddingLeft: 400 }}>
+        <DraftInput aria-label="wide" value="a" onCommit={() => false} />
+        <div style={{ marginLeft: -400 }}>
+          <DraftInput aria-label="narrow" value="a" onCommit={() => false} />
+        </div>
+      </div>,
+    );
+    await screen.getByRole("textbox", { name: "wide" }).fill("b");
+    await userEvent.tab();
+    await screen.getByRole("textbox", { name: "narrow" }).fill("b");
+    await userEvent.tab();
+    const placements = add.mock.calls.map(([options]) => options.positionerProps);
+    expect(placements[0]).toMatchObject({ side: "inline-start" });
+    expect(placements[1]).toMatchObject({ side: "top", align: "start" });
+  });
+
   it("ignores duplicate blurs of one edit, retrying only after a refocus", async () => {
     const outcome = deferred<boolean>();
     const commit = vi.fn(() => outcome.promise);

@@ -8,7 +8,7 @@ import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environmen
 import { getProjectFileQueryAtom, optimisticFileAtom } from "../files/projectFilesQueryState";
 import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
 import { resolveScopedSettingsTargets, selectScopedSettingsEnvironments } from "./scopedSettings";
-import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
+import { resolveSettingsScope, settingsScopeKey, type SettingsScopeSearch } from "./settingsScope";
 import { selectSingleEnvironmentScope } from "./settingsScopeAxis";
 
 type ProjectFileMember = readonly [
@@ -79,7 +79,15 @@ function useResolvedSettingsScope(rawSearch: SettingsScopeSearch, singleEnvironm
     targets.find((candidate) => candidate.environmentId === selected.environment?.environmentId) ??
     targets[0] ??
     null;
-  return { scope, groups, search, ...selected, targets, target };
+  return {
+    scope,
+    groups,
+    search,
+    scopeKey: settingsScopeKey(search),
+    ...selected,
+    targets,
+    target,
+  };
 }
 
 const SettingsScopeContext = createContext<

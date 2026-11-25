@@ -639,14 +639,21 @@ export function SettingsEnvironmentScopeGate({ children }: { readonly children: 
   if (scope.scope.kind === "unavailable") {
     return <p className="text-sm text-muted-foreground">{scope.scope.message}</p>;
   }
-  if (scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        重新连接 {scope.scope.label}，才能改它的设置。
-      </p>
-    );
-  }
-  return children;
+  const disconnected =
+    scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0;
+  // The panels stay mounted while hidden, so a draft typed before the drop survives the reconnect.
+  return (
+    <>
+      {disconnected ? (
+        <p className="text-sm text-muted-foreground">
+          重新连接 {scope.scope.label}，才能改它的设置。
+        </p>
+      ) : null}
+      <div hidden={disconnected} className={disconnected ? undefined : "contents"}>
+        {children}
+      </div>
+    </>
+  );
 }
 
 export function scrollToSettingsTarget(

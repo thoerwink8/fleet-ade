@@ -19,8 +19,7 @@ const MODES = {
 
 export function BranchNamingSettings() {
   const settings = useScopedSettings();
-  const { targets } = useSettingsScope();
-  const scopeKey = targets.map((target) => `${target.environmentId}:${target.projectId}`).join(",");
+  const { scopeKey } = useSettingsScope();
   const updateSettings = useUpdateScopedSettings();
   const modeMixed = useScopedSettingsMixed(["branchNamingMode"]);
   const prefixMixed = useScopedSettingsMixed(["branchNamePrefix"]);

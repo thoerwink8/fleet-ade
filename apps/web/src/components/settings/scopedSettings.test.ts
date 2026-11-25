@@ -576,8 +576,9 @@ describe("scopedSettingsFailureMessage", () => {
   it.each([
     [new Error("Disconnected during save"), "Disconnected during save"],
     [new Error("ECONNRESET"), "ECONNRESET"],
-    ["plain text", "保存失败，请重新连接后再保存。"],
-    [undefined, "保存失败，请重新连接后再保存。"],
+    [{ _tag: "ServerRejected", message: "此连接无权修改这些设置。" }, "此连接无权修改这些设置。"],
+    ["plain text", "保存失败，请稍后再试。"],
+    [undefined, "保存失败，请稍后再试。"],
   ])("keeps an unrecognized error as is", (error, expected) => {
     expect(scopedSettingsFailureMessage(error)).toBe(expected);
   });
