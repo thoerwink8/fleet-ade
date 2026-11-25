@@ -3993,10 +3993,19 @@ export const OrchestrationV2RecentlyDeletedThread = Schema.Struct({
 });
 export type OrchestrationV2RecentlyDeletedThread = typeof OrchestrationV2RecentlyDeletedThread.Type;
 
+export const OrchestrationV2RecentlyDeletedTotals = Schema.Struct({
+  count: NonNegativeInt,
+  // null means unknown (a trashed thread holds sizeless tool outputs); never a stand-in 0.
+  attachmentBytes: Schema.NullOr(NonNegativeInt),
+  worktreeBytes: Schema.NullOr(NonNegativeInt),
+});
+export type OrchestrationV2RecentlyDeletedTotals = typeof OrchestrationV2RecentlyDeletedTotals.Type;
+
 export const OrchestrationV2RecentlyDeleted = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   now: Schema.DateTimeUtc,
   items: Schema.Array(OrchestrationV2RecentlyDeletedThread),
+  totals: Schema.optionalKey(OrchestrationV2RecentlyDeletedTotals),
 });
 export type OrchestrationV2RecentlyDeleted = typeof OrchestrationV2RecentlyDeleted.Type;
 

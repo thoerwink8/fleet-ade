@@ -600,7 +600,7 @@ export const make = Effect.gen(function* () {
         Effect.mapError(
           (cause) => new ProjectOperationError({ operation: "list-threads", projectId, cause }),
         ),
-      )).filter((item) => item.projectId === projectId);
+      )).items.filter((item) => item.projectId === projectId);
     yield* Effect.forEach(
       trashedRoots,
       (root) =>

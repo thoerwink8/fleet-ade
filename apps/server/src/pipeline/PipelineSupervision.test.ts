@@ -7,6 +7,7 @@ import {
   RunId,
   ThreadId,
   type OrchestrationV2Run,
+  type OrchestrationV2ServerCommand,
   type OrchestrationV2ThreadShell,
   type Project,
 } from "@t3tools/contracts";
@@ -161,9 +162,11 @@ const layer = (
   shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>,
   mergeCalls?: Ref.Ref<ReadonlyArray<number>>,
   removedWorktrees?: Ref.Ref<ReadonlyArray<RemovedWorktree>>,
+  dispatchedCommands?: Ref.Ref<ReadonlyArray<OrchestrationV2ServerCommand>>,
 ) => {
+  const liveShells = new Map(shells);
   const projectionThread = (threadId: ThreadId) => {
-    const current = shells.get(threadId) ?? shell(threadId);
+    const current = liveShells.get(threadId) ?? shell(threadId);
     const {
       status: _status,
       activeRunId: _activeRunId,
@@ -179,7 +182,28 @@ const layer = (
     return { ...thread6042, lastVisitedAt: lastVisitedAt ?? null };
   };
   const threads = Layer.mock(ThreadManagement.ThreadManagementService)({
-    getThreadShell: (threadId) => Effect.succeed(shells.get(threadId) ?? null),
+    getThreadShell: (threadId) => Effect.succeed(liveShells.get(threadId) ?? null),
+    listRecentlyDeleted: () =>
+      Effect.sync(() => {
+        const items = [...liveShells.values()].flatMap((thread) =>
+          thread === null || thread.deletedAt === null
+            ? []
+            : [
+                {
+                  threadId: thread.id,
+                  projectId: thread.projectId,
+                  projectTitle: project.title,
+                  title: thread.title,
+                  deletedAt: thread.deletedAt,
+                  purgeAt: thread.deletedAt,
+                  archived: thread.archivedAt !== null,
+                  sideChatCount: 0,
+                  worktreePath: thread.worktreePath,
+                },
+              ],
+        );
+        return { items, totals: { count: items.length, attachmentBytes: 0 } };
+      }),
     sendToThread: (input) =>
       Effect.succeed({
         dispatch: { sequence: 1, storedEvents: [] },
@@ -194,7 +218,17 @@ const layer = (
         turnItem: null,
         delivery: "queued",
       } satisfies ThreadManagement.ThreadManagementSendResult),
-    dispatch: () => Effect.succeed({ sequence: 1, storedEvents: [] }),
+    dispatch: (command) =>
+      Effect.gen(function* () {
+        if (dispatchedCommands !== undefined)
+          yield* Ref.update(dispatchedCommands, (current) => [...current, command]);
+        if (command.type === "thread.delete") {
+          const shell = liveShells.get(command.threadId);
+          if (shell !== undefined && shell !== null && shell.deletedAt === null)
+            liveShells.set(command.threadId, { ...shell, deletedAt: yield* DateTime.now });
+        }
+        return { sequence: 1, storedEvents: [] };
+      }),
   });
   const projects = Layer.mock(ProjectService.ProjectService)({
     getById: () => Effect.succeedSome(project),
@@ -240,7 +274,7 @@ const layer = (
   });
   if (mergeCalls === undefined) {
     return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(
-      Layer.provide(threads),
+      Layer.provideMerge(threads),
       Layer.provide(git),
       Layer.provide(projects),
       Layer.provide(budgetLayer),
@@ -293,7 +327,7 @@ const layer = (
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(
-    Layer.provide(threads),
+    Layer.provideMerge(threads),
     Layer.provide(git),
     Layer.provide(projects),
     Layer.provide(budgetLayer),
@@ -390,6 +424,7 @@ describe("PipelineSupervision", () => {
   it.effect("未合并时保留工人，合并后连工作树一起删", () =>
     Effect.gen(function* () {
       const removed = yield* Ref.make<ReadonlyArray<RemovedWorktree>>([]);
+      const commands = yield* Ref.make<ReadonlyArray<OrchestrationV2ServerCommand>>([]);
       yield* Effect.gen(function* () {
         const supervision = yield* PipelineSupervision;
         const started = yield* supervision.start(scope(controllerId), { issueNumber: 81 });
@@ -420,6 +455,17 @@ describe("PipelineSupervision", () => {
             force: true,
           },
         ]);
+        const threads = yield* ThreadManagement.ThreadManagementService;
+        const workerShell = yield* threads.getThreadShell(workerId);
+        assert.isNotNull(workerShell?.deletedAt);
+        assert.deepStrictEqual(
+          (yield* threads.listRecentlyDeleted()).items.map((item) => item.threadId),
+          [workerId],
+        );
+        assert.deepStrictEqual(
+          (yield* Ref.get(commands)).map((command) => command.type),
+          ["thread.delete"],
+        );
       }).pipe(
         Effect.provide(
           layer(
@@ -436,6 +482,7 @@ describe("PipelineSupervision", () => {
             ]),
             undefined,
             removed,
+            commands,
           ),
         ),
       );

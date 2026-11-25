@@ -1950,10 +1950,16 @@ export const layerWsRpc = (
           getOrchestrationV2ArchivedShellSnapshot,
         [ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted]: (_input) =>
           Effect.all({
-            items: threadManagement.listRecentlyDeleted(),
+            recentlyDeleted: storageCleanup.listRecentlyDeleted,
             snapshotSequence: applicationEvents.latestApplicationSequence,
             now: DateTime.now,
           }).pipe(
+            Effect.map(({ recentlyDeleted, snapshotSequence, now }) => ({
+              items: recentlyDeleted.items,
+              snapshotSequence,
+              now,
+              totals: recentlyDeleted.totals,
+            })),
             Effect.mapError(
               (cause) =>
                 new OrchestrationV2GetShellSnapshotError({

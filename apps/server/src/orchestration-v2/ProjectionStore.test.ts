@@ -5,6 +5,7 @@ import {
   EnvironmentId,
   EventId,
   CommandId,
+  ChatAttachmentId,
   CheckpointId,
   ContextTransferId,
   CheckpointRef,
@@ -47,6 +48,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as Statement from "effect/sql/Statement";
 import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
 
+import { createAttachmentId } from "../attachmentStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -2085,6 +2087,37 @@ const threadTrashLifecycle = Effect.gen(function* () {
       payload: { ...thread, updatedAt: at, deletedAt: at },
       ...(cascadeRootId === undefined ? {} : { cascadeRootId }),
     });
+  const addMessage = (
+    thread: OrchestrationV2AppThread,
+    name: string,
+    attachments: ReadonlyArray<{ readonly id: string; readonly sizeBytes: number }>,
+  ) =>
+    store.apply({
+      id: EventId.make(`event:trash:${name}:message`),
+      type: "message.updated",
+      threadId: thread.id,
+      occurredAt: createdAt,
+      payload: {
+        id: MessageId.make(`message:trash:${name}`),
+        threadId: thread.id,
+        runId: null,
+        nodeId: null,
+        role: "user",
+        text: name,
+        attachments: attachments.map(({ id, sizeBytes }) => ({
+          type: "file" as const,
+          id: ChatAttachmentId.make(id),
+          name: `${id}.txt`,
+          mimeType: "text/plain",
+          sizeBytes,
+        })),
+        streaming: false,
+        createdBy: "user",
+        creationSource: "web",
+        createdAt,
+        updatedAt: createdAt,
+      },
+    });
 
   yield* sql`
     INSERT INTO projection_projects
@@ -2105,6 +2138,18 @@ const threadTrashLifecycle = Effect.gen(function* () {
     (thread) => create(thread, thread.id),
     { concurrency: 1 },
   );
+  yield* addMessage(root, "root", [
+    { id: "trash-root", sizeBytes: 11 },
+    { id: "trash-shared", sizeBytes: 7 },
+  ]);
+  yield* addMessage(child, "child", [
+    { id: "trash-shared", sizeBytes: 7 },
+    { id: "trash-child", sizeBytes: 13 },
+  ]);
+  yield* addMessage(newer, "newer", [{ id: "trash-newer", sizeBytes: 17 }]);
+  yield* addMessage(restored, "restored", [{ id: "trash-restored", sizeBytes: 19 }]);
+  yield* addMessage(purged, "purged", [{ id: "trash-purged", sizeBytes: 23 }]);
+  yield* addMessage(legacy, "legacy", [{ id: "trash-legacy", sizeBytes: 29 }]);
   assert.isNull(yield* store.getThreadTrash(legacy.id));
 
   yield* remove(root, deletedAt, "root-deleted");
@@ -2133,6 +2178,35 @@ const threadTrashLifecycle = Effect.gen(function* () {
     payload: { ...restored, updatedAt: laterDeletedAt, deletedAt: null },
   });
   yield* remove(purged, deletedAt, "purged-deleted");
+  const { statements, tracer } = traceSqlStatements();
+  const beforeRestoreAndPurge = yield* store.getRecentlyDeleted().pipe(Effect.withTracer(tracer));
+  assert.equal(statements.length, 3);
+  assert.deepEqual(beforeRestoreAndPurge.totals, { count: 3, attachmentBytes: 71 });
+  // An HTML render keeps an attachment id but no size: the total becomes unknown, not a short number.
+  const renderId = createAttachmentId(newer.id, "html");
+  assert.isNotNull(renderId);
+  yield* sql`
+    INSERT INTO orchestration_v2_projection_turn_items
+      (turn_item_id, thread_id, ordinal, type, status, updated_at, payload_json)
+    VALUES (
+      ${"item:trash:render"}, ${newer.id}, 0, 'dynamic_tool', 'completed',
+      ${DateTime.formatIso(createdAt)},
+      ${JSON.stringify({
+        type: "dynamic_tool",
+        toolName: "mcp__t3-code__html_render",
+        output: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              htmlRender: { attachmentId: renderId, title: "x", height: 300 },
+            }),
+          },
+        ],
+      })}
+    )
+  `;
+  assert.isNull((yield* store.getRecentlyDeleted()).totals.attachmentBytes);
+  yield* sql`DELETE FROM orchestration_v2_projection_turn_items WHERE turn_item_id = ${"item:trash:render"}`;
   yield* store.apply({
     id: EventId.make("event:trash:purged"),
     type: "thread.purged",
@@ -2150,10 +2224,11 @@ const threadTrashLifecycle = Effect.gen(function* () {
   );
   const recentlyDeleted = yield* store.getRecentlyDeleted();
   assert.deepEqual(
-    recentlyDeleted.map((item) => item.threadId),
+    recentlyDeleted.items.map((item) => item.threadId),
     [newer.id, root.id],
   );
-  const rootItem = recentlyDeleted[1];
+  assert.deepEqual(recentlyDeleted.totals, { count: 2, attachmentBytes: 48 });
+  const rootItem = recentlyDeleted.items[1];
   assert.isDefined(rootItem);
   assert.deepEqual(
     {
