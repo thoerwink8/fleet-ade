@@ -16,8 +16,17 @@ export class SidebarPointerSensor {
   static activators = [
     {
       eventName: "onPointerDown" as const,
-      handler: ({ nativeEvent }: ReactPointerEvent) =>
-        nativeEvent.isPrimary && nativeEvent.button === 0,
+      handler: ({ nativeEvent }: ReactPointerEvent) => {
+        if (!nativeEvent.isPrimary || nativeEvent.button !== 0) return false;
+        if (
+          nativeEvent.pointerType === "touch" &&
+          nativeEvent.target instanceof Element &&
+          nativeEvent.target.closest('[data-mobile="true"][data-sidebar="sidebar"]') !== null
+        ) {
+          return false;
+        }
+        return true;
+      },
     },
   ];
   autoScrollEnabled = true;
