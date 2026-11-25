@@ -12,6 +12,8 @@ import { formatProviderDriverKindLabel } from "../../providerModels";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { ErrorDetailsDisclosure } from "./ErrorDetailsDisclosure";
+import { useEnvironment } from "../../state/environments";
+import { providerSetupGuidance } from "../settings/providerSetupGuidance.logic";
 import { classifyProviderError, type AlternativeReadyAgent } from "./providerErrorClassification";
 
 function getIncompatibleVersion(status: ServerProvider) {
@@ -152,6 +154,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     label: "刷新智能体状态",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const environmentLabel = useEnvironment(environmentId)?.label ?? "这台电脑";
 
   const refresh = async () => {
     if (!status || !canRefresh || isRefreshing) return;
@@ -173,6 +176,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   }
 
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
+  const guidance = providerSetupGuidance({ provider: status, environmentLabel });
   const incompatible = getIncompatibleVersion(status);
   const classified =
     incompatible === null
@@ -186,7 +190,9 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
 
   const title = incompatible
     ? `${providerName} ${status.version ?? ""} ${incompatible.status === "broken" ? "已知不兼容" : "版本不受支持"}`.trim()
-    : classified!.message;
+    : guidance.action
+      ? guidance.message
+      : classified!.message;
   const rawDetail = incompatible
     ? (incompatible.message ?? status.message ?? null)
     : classified!.rawDetail;
@@ -212,13 +218,19 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     switch (action.kind) {
       case "sign_in":
       case "install_help":
-        return onOpenProviderSetup
+        return guidance.action?.kind === "documentation"
           ? {
-              label: action.label,
+              label: guidance.action.label,
               disabled: false,
-              onClick: () => onOpenProviderSetup(status.instanceId),
+              href: guidance.action.url,
             }
-          : null;
+          : onOpenProviderSetup
+            ? {
+                label: action.label,
+                disabled: false,
+                onClick: () => onOpenProviderSetup(status.instanceId),
+              }
+            : null;
       case "switch_agent":
         return onSwitchAgent
           ? {
@@ -244,7 +256,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     >
       <InfoIcon />
       <AlertTitle>{title}</AlertTitle>
-      {rawDetail ? (
+      {rawDetail && rawDetail !== title ? (
         <AlertDescription>
           <ErrorDetailsDisclosure detail={rawDetail} />
         </AlertDescription>
@@ -253,9 +265,14 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         {primaryAction ? (
           <Button
             disabled={primaryAction.disabled}
-            onClick={primaryAction.onClick}
+            onClick={"onClick" in primaryAction ? primaryAction.onClick : undefined}
             size="sm"
             variant="secondary"
+            {...("href" in primaryAction
+              ? {
+                  render: <a href={primaryAction.href} target="_blank" rel="noreferrer" />,
+                }
+              : {})}
           >
             {primaryAction.label}
           </Button>

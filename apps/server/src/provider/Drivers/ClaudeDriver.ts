@@ -1,4 +1,4 @@
-import { ClaudeSettings, ProviderDriverKind } from "@t3tools/contracts";
+import { ClaudeSettings, ProviderDriverKind, ProviderSetupError } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
 import * as Duration from "effect/Duration";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -33,7 +33,11 @@ import {
   probeClaudeWorkspaceSnapshot,
   type ClaudeCapabilitiesProbe,
 } from "../ClaudeProvider.ts";
-import { isClaudeReclaudeNotFound, resolveClaudeSdkExecutablePath } from "./ClaudeExecutable.ts";
+import {
+  CLAUDE_RECLAUDE_MISSING_MESSAGE,
+  isClaudeReclaudeNotFound,
+  resolveClaudeSdkExecutablePath,
+} from "./ClaudeExecutable.ts";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
 import * as ModelCatalog from "@t3tools/provider-core/server/ModelCatalog";
 import { resolveClaudeModelCatalog } from "../ClaudeModelCatalog.ts";
@@ -56,6 +60,7 @@ import {
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { makeClaudeAuth } from "../ClaudeAuth.ts";
 import { makeClaudeMaintenanceResolution } from "./ClaudeMaintenance.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
@@ -303,6 +308,43 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           }),
       ),
     );
+    const auth = yield* makeClaudeAuth({
+      instanceId,
+      credentialKey: continuationGroupKey,
+      cwd: stateDir,
+      environment: processEnv,
+      resolveExecutable: resolveClaudeSdkExecutablePath(
+        effectiveConfig.binaryPath,
+        processEnv,
+      ).pipe(
+        Effect.mapError(
+          () =>
+            new ProviderSetupError({
+              instanceId,
+              operation: "start",
+              detail: CLAUDE_RECLAUDE_MISSING_MESSAGE,
+            }),
+        ),
+      ),
+      onChanged: (authenticated) =>
+        Cache.invalidateAll(capabilitiesProbeCache).pipe(
+          Effect.andThen(snapshot.refresh),
+          Effect.andThen(snapshot.getSnapshot),
+          Effect.flatMap((provider) =>
+            (provider.auth.status === "authenticated") === authenticated
+              ? Effect.void
+              : Effect.fail(
+                  new ProviderSetupError({
+                    instanceId,
+                    operation: authenticated ? "verify" : "logout",
+                    detail: authenticated
+                      ? "Claude 登录命令已结束，但这台电脑上的 Claude 仍未登录。"
+                      : "Claude 退出登录命令已结束，但这台电脑上的 Claude 仍保持登录。",
+                  }),
+                ),
+          ),
+        ),
+    });
 
     // Same rules as Codex: serialised on the config directory that holds the
     // login, one request id kept until Claude answers (a cooldown or rate
@@ -382,6 +424,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       accentColor,
       enabled,
       snapshot,
+      auth,
       invalidateCaches: Cache.invalidateAll(capabilitiesProbeCache),
       snapshotForCwd: (cwd: string) =>
         snapshot.getSnapshot.pipe(

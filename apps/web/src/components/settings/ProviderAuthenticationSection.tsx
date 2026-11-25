@@ -25,6 +25,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsRow } from "./settingsLayout";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
+import { providerSetupGuidance } from "./providerSetupGuidance.logic";
 
 const ProviderAuthTerminal = lazy(() => import("./ProviderAuthTerminal"));
 
@@ -58,6 +59,7 @@ export function ProviderAuthenticationSection({
   const terminalQueue = useRef<ProviderAuthRespondInput[]>([]);
   const terminalSending = useRef(false);
   const auth = query.data;
+  const guidance = providerSetupGuidance({ provider, environmentLabel });
   const interaction = auth?.interaction;
   const active =
     auth?.phase === "starting" || auth?.phase === "waiting" || auth?.phase === "verifying";
@@ -94,11 +96,13 @@ export function ProviderAuthenticationSection({
       ? "已登录"
       : isDiscovering
         ? "正在查找登录方式…"
-        : needsExternalSetup
-          ? "智能体未提供应用内登录。请按智能体文档完成设置。"
-          : usesCredentials
-            ? `在 ${environmentLabel} 上连接以加载模型。`
-            : `在 ${environmentLabel} 上登录。`;
+        : guidance.action
+          ? guidance.message
+          : needsExternalSetup
+            ? "智能体未提供应用内登录。请按智能体文档完成设置。"
+            : usesCredentials
+              ? `在 ${environmentLabel} 上连接以加载模型。`
+              : `在 ${environmentLabel} 上登录。`;
   const rawStatusMessage = auth?.phase === "failed" ? auth.message : null;
   const statusMessage =
     rawStatusMessage && !/\p{Script=Han}/u.test(rawStatusMessage)
@@ -268,7 +272,15 @@ export function ProviderAuthenticationSection({
             </>
           ) : null}
           <>
-            {needsExternalSetup && provider.setup?.documentationUrl ? (
+            {needsExternalSetup && guidance.action?.kind === "documentation" ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                render={<a href={guidance.action.url} target="_blank" rel="noreferrer" />}
+              >
+                {guidance.action.label}
+              </Button>
+            ) : needsExternalSetup && provider.setup?.documentationUrl ? (
               <Button
                 size="sm"
                 variant="secondary"

@@ -13,6 +13,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { ModelInfo } from "@anthropic-ai/claude-agent-sdk";
 import { describe, it, assert, expect } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
+import * as PlatformError from "effect/PlatformError";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -3494,6 +3495,63 @@ it.layer(
         );
         assert.strictEqual(status.status, "error");
         assert.strictEqual(status.auth.status, "unauthenticated");
+        assert.deepStrictEqual(status.setup, { canAuthenticate: true, canInstall: false });
+      }).pipe(
+        Effect.provide(
+          layerMockSpawner((args) => {
+            const joined = args.join(" ");
+            if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
+            throw new Error(`Unexpected args: ${joined}`);
+          }),
+        ),
+      ),
+    );
+
+    it.effect("offers documentation instead of in-app login when Claude is missing", () =>
+      Effect.gen(function* () {
+        const status = yield* checkClaudeProviderStatus(defaultClaudeSettings);
+        assert.strictEqual(status.installed, false);
+        assert.strictEqual(status.message, "还没装 Claude Code，装好后会自动识别。");
+        assert.deepStrictEqual(status.setup, {
+          canAuthenticate: false,
+          canInstall: false,
+          documentationUrl: "https://code.claude.com/docs/en/setup#install-claude-code",
+        });
+      }).pipe(
+        Effect.provide(
+          Layer.succeed(
+            ChildProcessSpawner.ChildProcessSpawner,
+            ChildProcessSpawner.make(() =>
+              Effect.fail(
+                new PlatformError.PlatformError(
+                  new PlatformError.SystemError({
+                    _tag: "NotFound",
+                    module: "ChildProcess",
+                    method: "spawn",
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    it.effect.each([
+      { name: "authenticated", capabilities: {} },
+      {
+        name: "custom endpoint",
+        capabilities: { tokenSource: "none", apiKeySource: "none", apiProvider: "firstParty" },
+        environment: { ANTHROPIC_BASE_URL: "https://proxy.example/api" },
+      },
+    ])("keeps in-app login closed when Claude is $name", ({ capabilities, environment }) =>
+      Effect.gen(function* () {
+        const status = yield* checkClaudeProviderStatus(
+          defaultClaudeSettings,
+          claudeCapabilities(capabilities),
+          environment ?? { ANTHROPIC_BASE_URL: "" },
+        );
+        assert.deepStrictEqual(status.setup, { canAuthenticate: false, canInstall: false });
       }).pipe(
         Effect.provide(
           layerMockSpawner((args) => {
@@ -3538,6 +3596,7 @@ it.layer(
             environment,
           );
           assert.strictEqual(status.auth.status, "unauthenticated");
+          assert.deepStrictEqual(status.setup, { canAuthenticate: true, canInstall: false });
           if (configDir === undefined) {
             assert.strictEqual(
               status.message,

@@ -6,6 +6,7 @@ import { EMPTY_SERVER_PROVIDERS, serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
 import { WizardFooter, WizardPanel } from "../ui/wizard";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
+import { providerSetupGuidance } from "./providerSetupGuidance.logic";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsRow } from "./settingsLayout";
 
@@ -34,6 +35,7 @@ export function ProviderWizardAuthenticationStep({
     (provider?.auth.status === "unknown" && auth?.phase === "succeeded");
   const isDiscovering = !signedIn && !query.error && auth?.methods === undefined;
   const canAuthenticate = (auth?.methods?.length ?? 0) > 0;
+  const guidance = provider ? providerSetupGuidance({ provider, environmentLabel }) : null;
 
   return (
     <>
@@ -68,6 +70,14 @@ export function ProviderWizardAuthenticationStep({
                 isDiscovering ? (
                   <Button disabled size="sm" variant="secondary">
                     登录
+                  </Button>
+                ) : guidance?.action?.kind === "documentation" ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    render={<a href={guidance.action.url} target="_blank" rel="noreferrer" />}
+                  >
+                    {guidance.action.label}
                   </Button>
                 ) : provider?.setup?.documentationUrl ? (
                   <Button

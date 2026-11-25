@@ -640,9 +640,27 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     modelCatalog.models.map((entry) => entry.model),
     claudeSettings.customModels,
   );
+  const buildClaudeSnapshot: typeof buildServerProvider = (input) => {
+    const draft = buildServerProvider(input);
+    const claudeMissing =
+      !draft.installed && draft.message === "还没装 Claude Code，装好后会自动识别。";
+    return {
+      ...draft,
+      setup: claudeMissing
+        ? {
+            canAuthenticate: false,
+            canInstall: false,
+            documentationUrl: "https://code.claude.com/docs/en/setup#install-claude-code",
+          }
+        : {
+            canAuthenticate: draft.installed && draft.auth.status === "unauthenticated",
+            canInstall: false,
+          },
+    };
+  };
 
   if (!claudeSettings.enabled) {
-    return buildServerProvider({
+    return buildClaudeSnapshot({
       presentation: CLAUDE_PRESENTATION,
       enabled: false,
       checkedAt,
@@ -672,7 +690,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   if (Result.isFailure(versionProbe)) {
     const error = versionProbe.failure;
     if (isClaudeReclaudeNotFound(error)) {
-      return buildServerProvider({
+      return buildClaudeSnapshot({
         presentation: CLAUDE_PRESENTATION,
         enabled: claudeSettings.enabled,
         checkedAt,
@@ -689,7 +707,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     yield* Effect.logWarning("Claude Agent CLI health check failed.", {
       errorTag: error._tag,
     });
-    return buildServerProvider({
+    return buildClaudeSnapshot({
       presentation: CLAUDE_PRESENTATION,
       enabled: claudeSettings.enabled,
       checkedAt,
@@ -700,14 +718,14 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
-          ? "在 PATH 上找不到 Claude Agent CLI（`claude`）。"
+          ? "还没装 Claude Code，装好后会自动识别。"
           : "执行 Claude Agent CLI 健康检查失败。",
       },
     });
   }
 
   if (Option.isNone(versionProbe.success)) {
-    return buildServerProvider({
+    return buildClaudeSnapshot({
       presentation: CLAUDE_PRESENTATION,
       enabled: claudeSettings.enabled,
       checkedAt,
@@ -730,7 +748,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
       stdoutLength: version.stdout.length,
       stderrLength: version.stderr.length,
     });
-    return buildServerProvider({
+    return buildClaudeSnapshot({
       presentation: CLAUDE_PRESENTATION,
       enabled: claudeSettings.enabled,
       checkedAt,
@@ -771,7 +789,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   const dedupedSlashCommands = dedupeSlashCommands(slashCommands);
 
   if (!capabilities) {
-    return buildServerProvider({
+    return buildClaudeSnapshot({
       presentation: CLAUDE_PRESENTATION,
       enabled: claudeSettings.enabled,
       checkedAt,
@@ -802,7 +820,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     const path = yield* Path.Path;
     const configDir = (yield* makeClaudeEnvironment(claudeSettings, resolvedEnvironment))
       .CLAUDE_CONFIG_DIR;
-    return buildServerProvider({
+    return buildClaudeSnapshot({
       presentation: CLAUDE_PRESENTATION,
       enabled: claudeSettings.enabled,
       checkedAt,
@@ -850,7 +868,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     parsedVersion
       ? yield* resolveResetCredits(parsedVersion)
       : undefined;
-  return buildServerProvider({
+  return buildClaudeSnapshot({
     presentation: CLAUDE_PRESENTATION,
     enabled: claudeSettings.enabled,
     checkedAt,
