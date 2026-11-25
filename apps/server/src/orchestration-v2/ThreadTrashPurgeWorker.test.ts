@@ -646,3 +646,62 @@ it.effect("purges a cascade group with its root and a lone side-chat row on its 
     }).pipe(Effect.provide(layerTest({ name: "cascade", queries })));
   }),
 );
+
+it.effect(
+  "purges only due trashed roots, including under a deleted project, and idles between",
+  () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-11-01T00:00:00.000Z"));
+      const queries = yield* Ref.make(0);
+      yield* Effect.gen(function* () {
+        const projects = yield* ProjectStore.ProjectStoreV2;
+        const projections = yield* ProjectionStore.ProjectionStoreV2;
+        const liveProject = yield* makeProject("purge-live-project");
+        const goneProject = yield* makeProject("purge-gone-project");
+        const live = yield* createThread("purge-live", liveProject);
+        const dueInGone = yield* createThread("purge-due-gone", goneProject);
+        const later = yield* createThread("purge-later", liveProject);
+        yield* deleteThread(dueInGone, "purge-due-gone");
+        yield* TestClock.adjust("1 day");
+        yield* deleteThread(later, "purge-later");
+        yield* projects.apply({
+          sequence: 0,
+          eventId: EventId.make("event:purge-gone-project-deleted"),
+          aggregateKind: "project",
+          aggregateId: goneProject,
+          occurredAt: IsoDateTime.make("2026-11-02T00:00:00.000Z"),
+          commandId: null,
+          causationEventId: null,
+          correlationId: null,
+          metadata: {},
+          type: "project.deleted",
+          payload: {
+            projectId: goneProject,
+            deletedAt: IsoDateTime.make("2026-11-02T00:00:00.000Z"),
+          },
+        });
+
+        // Far from any due time the hint keeps ticks off SQL: at most one fallback
+        // re-check per ten minutes, never one per five-second tick.
+        yield* TestClock.adjust("1 minute");
+        const before = yield* Ref.get(queries);
+        yield* TestClock.adjust("1 hour");
+        assert.isAtMost((yield* Ref.get(queries)) - before, 7);
+
+        const events = yield* watchPurged();
+        yield* TestClock.adjust("5 days");
+        yield* TestClock.adjust("23 hours");
+        yield* TestClock.adjust("10 minutes");
+        yield* takePurged(events, 1);
+        assert.isNull(yield* projections.getThreadTrash(dueInGone));
+        assert.isNotNull(yield* projections.getThreadTrash(later));
+        assert.equal(yield* countPurgedEvents([live, later]), 0);
+
+        yield* TestClock.adjust("1 day");
+        yield* takePurged(events, 1);
+        assert.isNull(yield* projections.getThreadTrash(later));
+        assert.equal(yield* countPurgedEvents([live]), 0);
+        assert.equal(yield* countPurgedEvents([dueInGone, later]), 2);
+      }).pipe(Effect.provide(layerTest({ name: "purge-scope", queries })));
+    }),
+);
