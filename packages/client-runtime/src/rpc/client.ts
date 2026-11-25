@@ -29,22 +29,6 @@ export class EnvironmentRpcUnavailableError extends Schema.TaggedError<Environme
   },
 ) {}
 
-export interface EnvironmentRpcRequestObservation {
-  readonly environmentId: string;
-  readonly environmentLabel: string;
-  readonly method: string;
-}
-
-export class EnvironmentRpcRequestObserver extends Context.Reference<{
-  readonly observe: (
-    request: EnvironmentRpcRequestObservation,
-  ) => Effect.Effect<Effect.Effect<void>>;
-}>("@t3tools/client-runtime/rpc/EnvironmentRpcRequestObserver", {
-  defaultValue: () => ({
-    observe: () => Effect.succeed(Effect.void),
-  }),
-}) {}
-
 export type EnvironmentRpcTag = keyof WsRpcProtocolClient & string;
 type RpcMethod<TTag extends EnvironmentRpcTag> = WsRpcProtocolClient[TTag];
 
@@ -224,16 +208,10 @@ export const requestInSession = Effect.fn("EnvironmentRpc.request")(function* <
     "rpc.method": tag,
   });
   yield* authorizeRequest(tag, input);
-  const observer = yield* EnvironmentRpcRequestObserver;
   const method = session.client[tag] as (
     input: EnvironmentRpcInput<TTag>,
   ) => Effect.Effect<EnvironmentRpcSuccess<TTag>, EnvironmentRpcFailure<TTag>>;
-  const completeObservation = yield* observer.observe({
-    environmentId: supervisor.target.environmentId,
-    environmentLabel: supervisor.target.label,
-    method: tag,
-  });
-  return yield* method(input).pipe(Effect.ensuring(completeObservation));
+  return yield* method(input);
 });
 
 // The session-bound request owns the existing EnvironmentRpc.request span.
