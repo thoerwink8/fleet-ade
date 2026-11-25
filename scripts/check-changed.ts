@@ -230,6 +230,9 @@ export const shouldRunDocsLinks = (files: ReadonlyArray<string>): boolean =>
       file.startsWith("scripts/docs-links"),
   );
 
+export const shouldRunCssFontWeightTest = (files: ReadonlyArray<string>): boolean =>
+  files.some((file) => file.startsWith("apps/web/src/") && file.endsWith(".css"));
+
 // A flag wins over its environment variable; either must be a positive integer.
 const override = Effect.fn("checkChanged.override")(function* (
   flagName: string,
@@ -366,6 +369,12 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   }
   // It reads files other than the ones beside it, so no changed file selects it.
   if (affected.includes("t3")) tests.add("apps/server/src/provider/AgentContextBudget.test.ts");
+  if (
+    shouldRunCssFontWeightTest(files) &&
+    (yield* fs.exists(inRoot("apps/web/src/cssFontWeight.test.ts")))
+  ) {
+    tests.add("apps/web/src/cssFontWeight.test.ts");
+  }
   const { vitestTests, nodeTests } = splitTests(tests);
 
   // React Compiler coverage compiles every client source file, so run only the

@@ -408,7 +408,6 @@ function DurationFields(props: { minutes: number; onChange: (minutes: number) =>
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <NumberField
-        size="sm"
         className="w-32"
         min={1}
         max={maxAmount}

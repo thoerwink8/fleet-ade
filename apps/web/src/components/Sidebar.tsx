@@ -3153,14 +3153,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               {projects.length === 0 ? (
                 <>
                   <span>暂无项目</span>
-                  <button
-                    type="button"
-                    onClick={openAddProjectCommandPalette}
-                    className="ade-touch-target ade-touch-target--bordered inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
-                    <PlusIcon className="-mx-0.5 size-3" />
+                  <Button type="button" variant="secondary" onClick={openAddProjectCommandPalette}>
+                    <PlusIcon />
                     添加项目
-                  </button>
+                  </Button>
                 </>
               ) : scopedProjectGroups.length > 0 ? (
                 <>
@@ -3171,25 +3167,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         : scopedProjectGroups[0]!.displayName
                     }中暂无${settledCount > 0 ? "进行中的会话" : "会话"}`}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setProjectScopeKeys([])}
-                    className="ade-touch-target ade-touch-target--bordered inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
+                  <Button type="button" variant="secondary" onClick={() => setProjectScopeKeys([])}>
                     显示所有项目
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <>
                   <span>暂无会话</span>
-                  <button
-                    type="button"
-                    onClick={handleNewThreadClick}
-                    className="ade-touch-target ade-touch-target--bordered inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
-                    <PlusIcon className="-mx-0.5 size-3" />
+                  <Button type="button" variant="secondary" onClick={handleNewThreadClick}>
+                    <PlusIcon />
                     开始新会话
-                  </button>
+                  </Button>
                 </>
               )}
             </div>

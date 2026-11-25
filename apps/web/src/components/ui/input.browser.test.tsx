@@ -368,18 +368,13 @@ describe("Input, Textarea, and InputGroup", () => {
     const composer = page.getByTestId("composer-editor");
     await expect.element(composer).toBeVisible();
     const composerInput = composer.element();
-    const uiProbe = document.createElement("span");
-    uiProbe.className = "text-ui";
-    document.body.append(uiProbe);
-    const sidebarDesktop = getComputedStyle(uiProbe).fontSize;
-    uiProbe.remove();
 
     const fields = [
       ["number", numberInput, DESKTOP_TYPE],
       ["combobox", comboboxInput, DESKTOP_TYPE],
       ["autocomplete", autocompleteInput, DESKTOP_TYPE],
       ["command", commandInput, DESKTOP_TYPE],
-      ["sidebar", sidebarInput, sidebarDesktop],
+      ["sidebar", sidebarInput, DESKTOP_TYPE],
       ["composer", composerInput, DESKTOP_TYPE],
     ] as const;
 

@@ -11,6 +11,23 @@ export interface CssFontWeightViolation {
 
 const HEAVY_VALUE = /^(?:bold|bolder|([1-9]\d{2,3}))$/iu;
 const ALLOW_COMMENT = /^font-weight-allow:\s*(.+)$/isu;
+const FONT_SHORTHAND_SIZE_TOKEN =
+  /^(?:(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|pt|ch|ex|vw|vh|vmin|vmax|cm|mm|in|pc|q|lh|rlh|dvh|svh|lvh|cqw|cqh|cqi|cqb)|(?:calc|clamp|min|max|var)\(|(?:xxx?-small|xxx?-large|xx?-small|xx?-large|small|medium|large|smaller|larger))(?:\/|$)/iu;
+
+function isHeavyWeightValue(rawValue: string): boolean {
+  const parsed = HEAVY_VALUE.exec(rawValue);
+  if (!parsed) return false;
+  return parsed[1] === undefined || Number(parsed[1]) > 500;
+}
+
+function hasHeavyFontShorthand(rawValue: string): boolean {
+  for (const token of rawValue.split(/\s+/u)) {
+    if (!token) continue;
+    if (FONT_SHORTHAND_SIZE_TOKEN.test(token)) break;
+    if (isHeavyWeightValue(token)) return true;
+  }
+  return false;
+}
 
 export function findHeavyCssFontWeights(css: string): ReadonlyArray<CssFontWeightViolation> {
   const commentSpans: Array<{ readonly start: number; readonly end: number }> = [];
@@ -54,16 +71,18 @@ export function findHeavyCssFontWeights(css: string): ReadonlyArray<CssFontWeigh
   masked += css.slice(cursor);
 
   const violations: CssFontWeightViolation[] = [];
-  const declarationPattern = /font-weight\s*:\s*([^;{}]+)/giu;
+  const declarationPattern = /(?<![-\w])font(-weight)?\s*:\s*([^;{}]+)/giu;
   for (
     let match = declarationPattern.exec(masked);
     match !== null;
     match = declarationPattern.exec(masked)
   ) {
-    const rawValue = match[1]?.replace(/!\s*important\b/iu, "").trim() ?? "";
-    const parsed = HEAVY_VALUE.exec(rawValue);
-    if (!parsed) continue;
-    if (parsed[1] !== undefined && Number(parsed[1]) <= 500) continue;
+    const isLonghandWeight = match[1] !== undefined;
+    const rawValue = match[2]?.replace(/!\s*important\b/iu, "").trim() ?? "";
+    const isHeavy = isLonghandWeight
+      ? isHeavyWeightValue(rawValue)
+      : hasHeavyFontShorthand(rawValue);
+    if (!isHeavy) continue;
 
     let declarationLine = 1;
     for (let pos = 0; pos < match.index; pos++) {
@@ -87,11 +106,14 @@ function collectCssFiles(dir: string, out: string[]) {
 }
 
 describe("CSS max font-weight guard", () => {
-  it("reports CSS font-weight values above 500 and bold keywords", () => {
+  it("reports CSS font-weight and font shorthand values above 500 and bold keywords", () => {
     const css = [
       ".ok { font-weight: 400; }",
       ".ok-medium { font-weight: 500; }",
       ".ok-normal { font-weight: normal; }",
+      ".ok-shorthand { font: 500 14px/20px var(--fa-font-sans); }",
+      ".ok-inherit { font: inherit; }",
+      '.ok-family-bold { font: 400 14px/20px "Inter Bold", sans-serif; }',
       // oxlint-disable-next-line t3code/max-font-weight -- Test fixture verifies CSS comments are ignored.
       "/* .ignored { font-weight: 700; } */",
       // oxlint-disable-next-line t3code/max-font-weight -- Test fixture verifies the CSS scanner flags heavy weights.
@@ -100,15 +122,23 @@ describe("CSS max font-weight guard", () => {
       ".bad-bold { font-weight: bold !important; }",
       // oxlint-disable-next-line t3code/max-font-weight -- Test fixture verifies the CSS scanner flags bolder keyword.
       ".bad-bolder { font-weight: bolder; }",
+      // oxlint-disable-next-line t3code/max-font-weight -- Test fixture verifies the CSS scanner flags heavy font shorthand weight.
+      ".bad-shorthand-600 { font: 600 14px/20px var(--fa-font-sans); }",
+      // oxlint-disable-next-line t3code/max-font-weight -- Test fixture verifies the CSS scanner flags bold keyword in font shorthand.
+      ".bad-shorthand-bold { font: italic bold 15px/24px sans-serif; }",
     ].join("\n");
 
     expect(findHeavyCssFontWeights(css)).toEqual([
       // oxlint-disable-next-line t3code/max-font-weight -- Expected output asserts CSS scanner catches 600.
-      { line: 5, declaration: "font-weight: 600" },
+      { line: 8, declaration: "font-weight: 600" },
       // oxlint-disable-next-line t3code/max-font-weight -- Expected output asserts CSS scanner catches bold.
-      { line: 6, declaration: "font-weight: bold !important" },
+      { line: 9, declaration: "font-weight: bold !important" },
       // oxlint-disable-next-line t3code/max-font-weight -- Expected output asserts CSS scanner catches bolder.
-      { line: 7, declaration: "font-weight: bolder" },
+      { line: 10, declaration: "font-weight: bolder" },
+      // oxlint-disable-next-line t3code/max-font-weight -- Expected output asserts CSS scanner catches 600 in font shorthand.
+      { line: 11, declaration: "font: 600 14px/20px var(--fa-font-sans)" },
+      // oxlint-disable-next-line t3code/max-font-weight -- Expected output asserts CSS scanner catches bold in font shorthand.
+      { line: 12, declaration: "font: italic bold 15px/24px sans-serif" },
     ]);
   });
 

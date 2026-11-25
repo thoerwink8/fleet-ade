@@ -171,7 +171,7 @@ const MODEL_LIST_ESTIMATED_ITEM_SIZE = 32;
 // Rendered heights in `--spacing` units. Chrome is the search box and list padding, plus a 1px border.
 const ROW_UNITS = 8;
 const ROW_SEPARATOR_UNITS = 0.5;
-const LIST_CHROME_UNITS = 15.5;
+const LIST_CHROME_UNITS = 16;
 
 function ModelListSeparator() {
   return <div className="h-0.5" />;

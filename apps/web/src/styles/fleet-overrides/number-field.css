@@ -7,6 +7,13 @@
   overflow: visible;
 }
 
+/* The steppers sit inside the frame, so the frame sets the height: 32, or 28 at sm. */
+@media (min-width: 640px) {
+  .ade-number-field-group {
+    min-height: var(--fa-ctrl);
+  }
+}
+
 [data-slot="number-field"][data-size="sm"] .ade-number-field-group {
   min-height: var(--fa-ctrl-sm);
 }
@@ -19,24 +26,16 @@
 
 .ade-number-field-step {
   position: relative;
-  align-self: stretch;
+  align-self: center;
   border: 0;
+  border-radius: var(--fa-radius-sm);
+  margin-inline: 1px;
   background: transparent;
   padding: 0 var(--fa-space-3);
   cursor: pointer;
   transition:
     color var(--fa-dur-fast) var(--fa-ease-out),
     background-image var(--fa-dur-fast) var(--fa-ease-out);
-}
-
-.ade-number-field-step:first-child {
-  border-radius: calc(var(--fa-radius-md) - var(--fa-bw-1)) 0 0
-    calc(var(--fa-radius-md) - var(--fa-bw-1));
-}
-
-.ade-number-field-step:last-child {
-  border-radius: 0 calc(var(--fa-radius-md) - var(--fa-bw-1))
-    calc(var(--fa-radius-md) - var(--fa-bw-1)) 0;
 }
 
 .ade-number-field-step:hover:not(:disabled):not([data-disabled]) {
@@ -68,15 +67,30 @@
   }
 }
 
-.ade-number-field-input {
+.fa-input--group .ade-number-field-input {
   min-width: 3ch;
+  align-self: center;
   text-align: center;
 }
 
+[data-slot="number-field"][data-size="sm"] .ade-number-field-step,
 [data-slot="number-field"][data-size="sm"] .ade-number-field-input {
-  min-height: calc(var(--fa-ctrl-sm) - 2 * var(--fa-bw-1));
+  height: var(--fa-ctrl-xs);
 }
 
+[data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-step,
 [data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-input {
-  min-height: calc(var(--fa-ctrl) - 2 * var(--fa-bw-1));
+  height: var(--fa-ctrl-sm);
+}
+
+@media (max-width: 639.98px) {
+  [data-slot="number-field"][data-size="sm"] .ade-number-field-step,
+  [data-slot="number-field"][data-size="sm"] .ade-number-field-input {
+    height: var(--fa-ctrl-sm);
+  }
+
+  [data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-step,
+  [data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-input {
+    height: calc(var(--fa-ctrl) - 2 * var(--fa-bw-1));
+  }
 }
