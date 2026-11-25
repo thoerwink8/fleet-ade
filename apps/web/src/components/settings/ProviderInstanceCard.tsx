@@ -275,7 +275,7 @@ function ProviderEnvironmentFieldRow(props: {
   readonly field: ProviderEnvironmentField;
   readonly variable: ProviderInstanceEnvironmentVariable | undefined;
   readonly idPrefix: string;
-  readonly onCommit: (field: ProviderEnvironmentField, value: string) => void;
+  readonly onCommit: (field: ProviderEnvironmentField, value: string) => Promise<boolean> | void;
   readonly onSecretChange: (
     field: ProviderEnvironmentField,
     secret: SecretReference | undefined,
@@ -340,7 +340,9 @@ function ProviderEnvironmentFieldRow(props: {
 
 export function ProviderEnvironmentSection(props: {
   readonly environment: ReadonlyArray<ProviderInstanceEnvironmentVariable>;
-  readonly onChange: (environment: ReadonlyArray<ProviderInstanceEnvironmentVariable>) => void;
+  readonly onChange: (
+    environment: ReadonlyArray<ProviderInstanceEnvironmentVariable>,
+  ) => Promise<boolean> | void;
   readonly secretSources?: ReadonlyArray<SecretSource>;
   readonly environmentId?: EnvironmentId | undefined;
 }) {
@@ -380,7 +382,7 @@ export function ProviderEnvironmentSection(props: {
           row.sensitive !== true ||
           row.valueRedacted !== undefined
         ) {
-          return;
+          return false;
         }
         continue;
       }
@@ -388,7 +390,7 @@ export function ProviderEnvironmentSection(props: {
       published.push({ ...rest, name });
     }
     setDraft({ rows: nextRows, seen: draft.seen, lastPublished: published });
-    props.onChange(published);
+    return props.onChange(published);
   };
 
   const updateVariable = (id: string, patch: Partial<Omit<EnvironmentDraftRow, "id">>) => {
@@ -402,7 +404,7 @@ export function ProviderEnvironmentSection(props: {
         : row,
     );
     setRows(nextRows);
-    publishRows(nextRows);
+    return publishRows(nextRows);
   };
 
   const setVariableSecret = (id: string, secret: SecretReference | undefined) => {
@@ -412,7 +414,7 @@ export function ProviderEnvironmentSection(props: {
       return { ...rest, value: secret ?? "" };
     });
     setRows(nextRows);
-    publishRows(nextRows);
+    return publishRows(nextRows);
   };
 
   const removeVariable = (id: string) => {
@@ -662,7 +664,7 @@ interface ProviderInstanceCardProps {
   readonly onSelect?: (() => void) | undefined;
   readonly readOnly?: boolean | undefined;
   readonly canWriteSettings?: boolean;
-  readonly onUpdate: (nextInstance: ProviderInstanceConfig) => void;
+  readonly onUpdate: (nextInstance: ProviderInstanceConfig) => Promise<boolean> | void;
   readonly onDelete?: (() => void) | undefined;
   readonly headerAction?: ReactNode | undefined;
   readonly setup?: ReactNode;
@@ -841,7 +843,7 @@ export function ProviderInstanceCard({
 
   const updateConfig = (nextConfig: Record<string, unknown> | undefined) => {
     const { config: _omit, ...rest } = instance;
-    onUpdate(
+    return onUpdate(
       nextConfig !== undefined
         ? ({ ...rest, config: nextConfig } as ProviderInstanceConfig)
         : (rest as ProviderInstanceConfig),
@@ -861,7 +863,7 @@ export function ProviderInstanceCard({
   const updateEnvironment = (environment: ReadonlyArray<ProviderInstanceEnvironmentVariable>) => {
     const cleaned = environment.filter((variable) => variable.name.trim().length > 0);
     const { environment: _omit, ...rest } = instance;
-    onUpdate(
+    return onUpdate(
       cleaned.length > 0
         ? ({ ...rest, environment: cleaned } as ProviderInstanceConfig)
         : (rest as ProviderInstanceConfig),
@@ -879,17 +881,15 @@ export function ProviderInstanceCard({
     const dedicatedEnvironment = (instance.environment ?? []).filter((variable) =>
       environmentFieldNames.has(variable.name),
     );
-    updateEnvironment([...dedicatedEnvironment, ...environment]);
+    return updateEnvironment([...dedicatedEnvironment, ...environment]);
   };
-  const updateEnvironmentField = (field: ProviderEnvironmentField, value: string) => {
+  const updateEnvironmentField = (field: ProviderEnvironmentField, value: string) =>
     updateEnvironment(nextProviderEnvironmentWithFieldValue(instance.environment, field, value));
-  };
   const updateEnvironmentFieldSecret = (
     field: ProviderEnvironmentField,
     secret: SecretReference | undefined,
-  ) => {
+  ) =>
     updateEnvironment(nextProviderEnvironmentWithFieldSecret(instance.environment, field, secret));
-  };
   const removeEnvironmentField = (field: ProviderEnvironmentField) => {
     updateEnvironment(providerEnvironmentWithoutNames(instance.environment, new Set([field.name])));
   };
