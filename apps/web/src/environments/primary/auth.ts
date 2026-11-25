@@ -6,7 +6,11 @@ import type {
   AuthSessionId,
   AuthSessionState,
 } from "@t3tools/contracts";
-import { EnvironmentHttpCommonError, PRIMARY_LOCAL_ENVIRONMENT_ID } from "@t3tools/contracts";
+import {
+  EnvironmentAuthCredentialFailureReason,
+  EnvironmentHttpCommonError,
+  PRIMARY_LOCAL_ENVIRONMENT_ID,
+} from "@t3tools/contracts";
 import type { EnvironmentHttpCommonError as EnvironmentHttpCommonErrorType } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -14,9 +18,11 @@ import { HttpClientError } from "effect/http";
 
 import {
   getPairingTokenFromUrl,
+  pairingRecoveryNotice,
+  pairingRejectionMessage,
+  pairingRequestFailureMessage,
   stripPairingTokenFromUrl as stripPairingTokenUrl,
 } from "@t3tools/shared/remote";
-
 import { PrimaryEnvironmentHttpClient } from "./httpClient";
 import { runPrimaryHttp } from "../../lib/runtime";
 
@@ -70,13 +76,15 @@ export class PrimaryEnvironmentPairingCredentialRejectedError extends Schema.Tag
   "PrimaryEnvironmentPairingCredentialRejectedError",
   {
     providedLength: Schema.Number,
+    credentialFailureReason: Schema.optionalKey(EnvironmentAuthCredentialFailureReason),
     cause: Schema.Defect(),
   },
 ) {
   override get message(): string {
-    return "配对码无效。请检查后重试。";
+    return pairingRejectionMessage(this.credentialFailureReason, "this");
   }
 }
+const isPairingCredentialRejected = Schema.is(PrimaryEnvironmentPairingCredentialRejectedError);
 
 export class PrimaryEnvironmentAuthSessionTimeoutError extends Schema.TaggedError<PrimaryEnvironmentAuthSessionTimeoutError>()(
   "PrimaryEnvironmentAuthSessionTimeoutError",
@@ -138,6 +146,58 @@ let resolvedAuthenticatedGateState: ServerAuthGateState | null = null;
 let explicitPairingRequested = false;
 const AUTH_SESSION_ESTABLISH_TIMEOUT_MS = 2_000;
 const AUTH_SESSION_ESTABLISH_STEP_MS = 100;
+const PAIRING_RECOVERY_NOTICE_KEY = "t3code:pairing-recovery-notice";
+
+export function rememberPairingRecoveryNotice() {
+  try {
+    window.sessionStorage.setItem(PAIRING_RECOVERY_NOTICE_KEY, pairingRecoveryNotice);
+  } catch {
+    // The notice is optional; some environments refuse session storage.
+  }
+}
+
+export function takePairingRecoveryNotice(): string | null {
+  try {
+    const notice = window.sessionStorage.getItem(PAIRING_RECOVERY_NOTICE_KEY);
+    if (notice) {
+      window.sessionStorage.removeItem(PAIRING_RECOVERY_NOTICE_KEY);
+    }
+    return notice;
+  } catch {
+    return null;
+  }
+}
+const isPairingTransportFailure = (error: PrimaryEnvironmentRequestError): boolean => {
+  // Decoded typed errors mean the server answered, so connectivity is not the problem.
+  if (isEnvironmentHttpCommonError(error.cause)) {
+    return false;
+  }
+  if (!HttpClientError.isHttpClientError(error.cause) || error.cause.response === undefined) {
+    // Aborts and fetch-level failures never received a server response.
+    return true;
+  }
+  return TRANSIENT_BOOTSTRAP_STATUS_CODES.has(error.status);
+};
+
+export function isPairingSubmitTransportFailure(error: unknown): boolean {
+  return isPrimaryEnvironmentRequestError(error) && isPairingTransportFailure(error);
+}
+
+export function describePairingSubmitError(error: unknown): string {
+  if (isPrimaryEnvironmentRequestError(error)) {
+    if (isPairingTransportFailure(error)) {
+      return pairingRequestFailureMessage("this");
+    }
+    return error.message;
+  }
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+  return "身份验证失败。";
+}
 
 export function peekPairingTokenFromUrl(): string | null {
   return getPairingTokenFromUrl(new URL(window.location.href));
@@ -228,6 +288,9 @@ async function exchangeBootstrapCredential(credential: string): Promise<AuthBrow
       ) {
         throw new PrimaryEnvironmentPairingCredentialRejectedError({
           providedLength: credential.length,
+          ...(error.credentialFailureReason === undefined
+            ? {}
+            : { credentialFailureReason: error.credentialFailureReason }),
           cause: error,
         });
       }
@@ -320,10 +383,14 @@ async function bootstrapServerAuth(urlCredential: string | null): Promise<Server
     await waitForAuthenticatedSessionAfterBootstrap();
     return { status: "authenticated" };
   } catch (error) {
+    if (currentSession.authenticated && isPairingCredentialRejected(error)) {
+      rememberPairingRecoveryNotice();
+      return { status: "authenticated" };
+    }
     return {
       status: "requires-auth",
       auth: currentSession.auth,
-      errorMessage: error instanceof Error ? error.message : "身份验证失败。",
+      errorMessage: describePairingSubmitError(error),
     };
   }
 }
@@ -337,7 +404,20 @@ export async function submitServerAuthCredential(credential: string): Promise<vo
   }
 
   resolvedAuthenticatedGateState = null;
-  await exchangeBootstrapCredential(trimmedCredential);
+  try {
+    await exchangeBootstrapCredential(trimmedCredential);
+  } catch (error) {
+    // An already-paired browser should not be trapped on /pair by a dead link.
+    const session = await fetchSessionState().catch(() => null);
+    if (isPairingCredentialRejected(error) && session?.authenticated) {
+      rememberPairingRecoveryNotice();
+      resolvedAuthenticatedGateState = { status: "authenticated" };
+      bootstrapPromise = null;
+      explicitPairingRequested = false;
+      return;
+    }
+    throw error;
+  }
   await waitForAuthenticatedSessionAfterBootstrap();
   resolvedAuthenticatedGateState = { status: "authenticated" };
   bootstrapPromise = null;
@@ -398,4 +478,7 @@ export function __resetServerAuthBootstrapForTests() {
   bootstrapPromise = null;
   resolvedAuthenticatedGateState = null;
   explicitPairingRequested = false;
+  try {
+    window.sessionStorage.removeItem(PAIRING_RECOVERY_NOTICE_KEY);
+  } catch {}
 }

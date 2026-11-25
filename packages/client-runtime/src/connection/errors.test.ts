@@ -19,7 +19,35 @@ describe("mapRemoteEnvironmentError", () => {
       traceId: "trace-1",
       hop: "server",
     });
+    expect(mapped.detail).toContain("配对码无效");
   });
+
+  it.each([
+    { credentialFailureReason: "consumed", detail: "这个配对码已经用过了。" },
+    { credentialFailureReason: "expired", detail: "这个配对码已过期。" },
+    { credentialFailureReason: "invalid", detail: "配对码无效。" },
+    { credentialFailureReason: undefined, detail: "配对码无效。" },
+  ] as const)(
+    "explains a $credentialFailureReason pairing rejection and where to get a new code",
+    ({ credentialFailureReason, detail }) => {
+      const mapped = mapRemoteEnvironmentError(
+        new EnvironmentAuthInvalidError({
+          code: "auth_invalid",
+          reason: "invalid_credential",
+          ...(credentialFailureReason === undefined ? {} : { credentialFailureReason }),
+          traceId: "trace-pairing",
+        }),
+      );
+      expect(mapped).toMatchObject({
+        _tag: "ConnectionBlockedError",
+        reason: "authentication",
+        hop: "server",
+      });
+      expect(mapped.detail).toContain(detail);
+      expect(mapped.detail).toContain("设置 → 连接");
+      expect(mapped.detail).toContain("t3 pair");
+    },
+  );
 
   it("blocks a scope refusal as a permission problem", () => {
     const mapped = mapRemoteEnvironmentError(
