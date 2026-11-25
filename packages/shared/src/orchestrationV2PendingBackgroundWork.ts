@@ -7,6 +7,7 @@ import type {
   ThreadId,
   ThreadPullRequestLink,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import { isOrchestrationV2WorkActive } from "@t3tools/contracts";
 import * as Predicate from "effect/Predicate";
 
@@ -128,6 +129,91 @@ export function monitorHoldsWakeCompletion(
   );
 }
 
+const TERMINAL_BACKGROUND_TASK_STATUSES: ReadonlySet<string> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
+
+function isTerminalBackgroundTaskStatus(status: PendingBackgroundWorkTask["status"]): boolean {
+  return status !== undefined && TERMINAL_BACKGROUND_TASK_STATUSES.has(status);
+}
+
+// Sessions do not outlive their threads; a generous cap only keeps a runaway roster from
+// growing provider-thread payloads without bound.
+const COMPLETED_BACKGROUND_TASK_CAP = 64;
+
+// Terminal entries leave the active roster for `completedBackgroundTasks`; active entries keep
+// their first `startedAt`. Entries dropped without an outcome file as interrupted unless they
+// reappear, which a process restart can do. `occurredAt` is the event's time, so replaying the
+// event log reproduces the same ledger. The emission's own `completedBackgroundTasks` is ignored.
+export function mergeBackgroundTaskLedger<
+  Task extends Pick<PendingBackgroundWorkTask, "taskId"> &
+    Partial<Pick<PendingBackgroundWorkTask, "status" | "startedAt" | "completedAt">>,
+>(input: {
+  readonly pending: ReadonlyArray<Task>;
+  readonly priorPending?: ReadonlyArray<Task> | undefined;
+  readonly priorCompleted?: ReadonlyArray<Task> | undefined;
+  readonly occurredAt: DateTime.Utc;
+}): {
+  readonly pendingBackgroundTasks: ReadonlyArray<Task>;
+  readonly completedBackgroundTasks: ReadonlyArray<Task>;
+} {
+  const priorPendingByTaskId = new Map(
+    (input.priorPending ?? []).map((task) => [task.taskId, task]),
+  );
+  const filedByTaskId = new Map<string, Task>();
+  const interruptedByTaskId = new Map<string, Task>();
+  for (const entry of input.priorCompleted ?? []) {
+    if (entry.status === "interrupted") interruptedByTaskId.set(entry.taskId, entry);
+  }
+
+  const pendingBackgroundTasks: Array<Task> = [];
+  const emittedActiveTaskIds = new Set<string>();
+  for (const task of input.pending) {
+    const prior = priorPendingByTaskId.get(task.taskId);
+    if (isTerminalBackgroundTaskStatus(task.status)) {
+      filedByTaskId.set(task.taskId, {
+        ...task,
+        startedAt: task.startedAt ?? prior?.startedAt ?? input.occurredAt,
+        completedAt: task.completedAt ?? input.occurredAt,
+      });
+      continue;
+    }
+    emittedActiveTaskIds.add(task.taskId);
+    // A task reappearing after its premature interrupted entry was never interrupted.
+    const interrupted = interruptedByTaskId.get(task.taskId);
+    pendingBackgroundTasks.push({
+      ...task,
+      startedAt: task.startedAt ?? prior?.startedAt ?? interrupted?.startedAt ?? input.occurredAt,
+      status: task.status ?? "running",
+    });
+  }
+
+  for (const prior of input.priorPending ?? []) {
+    if (emittedActiveTaskIds.has(prior.taskId) || filedByTaskId.has(prior.taskId)) continue;
+    if (isTerminalBackgroundTaskStatus(prior.status)) continue;
+    filedByTaskId.set(prior.taskId, {
+      ...prior,
+      status: "interrupted",
+      completedAt: input.occurredAt,
+    });
+  }
+
+  for (const entry of input.priorCompleted ?? []) {
+    if (interruptedByTaskId.has(entry.taskId) && emittedActiveTaskIds.has(entry.taskId)) continue;
+    if (!filedByTaskId.has(entry.taskId)) filedByTaskId.set(entry.taskId, entry);
+  }
+
+  const completedAtMs = (task: Task) =>
+    task.completedAt === undefined ? 0 : DateTime.toEpochMillis(task.completedAt);
+  const completedBackgroundTasks = Array.from(filedByTaskId.values())
+    .sort((left, right) => completedAtMs(right) - completedAtMs(left))
+    .slice(0, COMPLETED_BACKGROUND_TASK_CAP);
+  return { pendingBackgroundTasks, completedBackgroundTasks };
+}
+
 type PendingBackgroundWorkRun = Pick<OrchestrationV2Run, "id" | "ordinal" | "status">;
 
 type PendingBackgroundWorkPullRequest = Pick<
@@ -157,6 +243,8 @@ type PendingBackgroundWorkTurnItem = {
   readonly monitor?: boolean | undefined;
   readonly prompt?: string | undefined;
   readonly childThreadId?: ThreadId | null;
+  readonly startedAt?: OrchestrationV2TurnItem["startedAt"];
+  readonly completedAt?: OrchestrationV2TurnItem["completedAt"];
 };
 
 function isLatestRunSettledForBackgroundWait(
@@ -201,7 +289,18 @@ function pendingTaskFromTurnItem(
   item: PendingBackgroundWorkTurnItem,
 ): PendingBackgroundWorkTask {
   const description = descriptionFromTurnItem(item);
-  const named = { taskId, ...(description === undefined ? {} : { description }) };
+  const named = {
+    taskId,
+    ...(description === undefined ? {} : { description }),
+    // Turn items end while their thread keeps them, so their status and times are already exact.
+    status: item.status,
+    ...(item.startedAt === null || item.startedAt === undefined
+      ? {}
+      : { startedAt: item.startedAt }),
+    ...(item.completedAt === null || item.completedAt === undefined
+      ? {}
+      : { completedAt: item.completedAt }),
+  };
   switch (item.type) {
     case "subagent":
       return {
@@ -308,6 +407,42 @@ export function derivePendingBackgroundWork(input: {
   for (const task of pullRequestWatchTasks(input.pullRequests)) byTaskId.set(task.taskId, task);
 
   return Array.from(byTaskId.values());
+}
+
+/**
+ * The thread's ended roster tasks, newest first. Terminal turn items need no derivation: they
+ * stay in the transcript the client already reads. Roster tasks vanish on completion, so only
+ * the ledger remembers them.
+ */
+export function deriveCompletedBackgroundWork(input: {
+  readonly providerThreads: ReadonlyArray<
+    PendingBackgroundWorkProviderThread & {
+      readonly completedBackgroundTasks?: ReadonlyArray<PendingBackgroundWorkTask> | undefined;
+    }
+  >;
+  readonly activeProviderThreadId?: string | null;
+}): ReadonlyArray<PendingBackgroundWorkTask> {
+  const providerThreads =
+    input.activeProviderThreadId === undefined || input.activeProviderThreadId === null
+      ? input.providerThreads
+      : input.providerThreads.filter((thread) => thread.id === input.activeProviderThreadId);
+  const byTaskId = new Map<string, PendingBackgroundWorkTask>();
+  for (const providerThread of providerThreads) {
+    for (const task of providerThread.completedBackgroundTasks ?? []) {
+      if (task.taskId.length === 0 || byTaskId.has(task.taskId)) continue;
+      byTaskId.set(task.taskId, {
+        ...task,
+        ...(task.kind === "subagent"
+          ? { providerInstanceId: providerThread.providerInstanceId }
+          : {}),
+      });
+    }
+  }
+  return Array.from(byTaskId.values()).sort(
+    (left, right) =>
+      (right.completedAt === undefined ? 0 : DateTime.toEpochMillis(right.completedAt)) -
+      (left.completedAt === undefined ? 0 : DateTime.toEpochMillis(left.completedAt)),
+  );
 }
 
 function pullRequestWatchTasks(

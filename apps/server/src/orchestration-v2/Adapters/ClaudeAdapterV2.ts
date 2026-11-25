@@ -9510,6 +9510,13 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 : [],
             ),
           );
+          const outcomeByTaskId = new Map(
+            retired.flatMap((entry) =>
+              entry.type === "system" && entry.subtype === "task_notification"
+                ? [[entry.task_id, claudeTaskOutcome(entry.status)] as const]
+                : [],
+            ),
+          );
           const settledToolUseIds = claudeSettledSubagentToolUseIds(retired);
           const kept = [
             ...retired.filter(
@@ -9522,6 +9529,27 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...later,
           ];
           if (!(yield* replaceWakeBuffer(nativeThreadId, buffered, kept, retiredTaskIds))) return;
+          const roster = rosterForNativeThread(
+            yield* Ref.get(pendingBackgroundTasksByNativeThread),
+            nativeThreadId,
+          );
+          let stampedTerminal = false;
+          for (const taskId of retiredTaskIds) {
+            const entry = roster.get(taskId);
+            if (entry === undefined) continue;
+            yield* upsertPendingBackgroundTask(nativeThreadId, {
+              ...entry,
+              status: outcomeByTaskId.get(taskId) ?? "interrupted",
+            });
+            stampedTerminal = true;
+          }
+          if (stampedTerminal) {
+            const providerThread = (yield* Ref.get(lastProviderThreadByNativeThread)).get(
+              nativeThreadId,
+            );
+            if (providerThread !== undefined)
+              yield* emitProviderThreadRoster({ nativeThreadId, providerThread });
+          }
           for (const taskId of retiredTaskIds) {
             yield* clearPendingBackgroundTask(nativeThreadId, taskId);
             yield* clearTaskIdFromNativeThreadSet(
@@ -9671,6 +9699,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         }) {
           const message = input.message;
           let rosterChanged = false;
+          // Terminal entries publish in this change's roster emission, then leave the live
+          // roster: the projection's ledger keeps them, and staying listed would read as
+          // pending work to the adapter's own probes.
+          const silentTaskClears: Array<string> = [];
 
           if (isClaudeBackgroundTasksChangedMessage(message)) {
             const roster = Reflect.get(message, "tasks");
@@ -9771,16 +9803,26 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               updated.delete(message.task_id);
               return updated;
             });
-            const removed = yield* clearPendingBackgroundTask(
+            const roster = rosterForNativeThread(
+              yield* Ref.get(pendingBackgroundTasksByNativeThread),
               input.nativeThreadId,
-              message.task_id,
             );
+            const entry = roster.get(message.task_id);
+            if (entry === undefined) {
+              rosterChanged = false;
+            } else {
+              yield* upsertPendingBackgroundTask(input.nativeThreadId, {
+                ...entry,
+                status: claudeTaskOutcome(message.status),
+              });
+              silentTaskClears.push(message.task_id);
+              rosterChanged = true;
+            }
             yield* clearTaskIdFromNativeThreadSet(
               wakeEligibleBackgroundTasksByNativeThread,
               input.nativeThreadId,
               message.task_id,
             );
-            rosterChanged = removed;
           }
 
           if (!rosterChanged) {
@@ -9788,6 +9830,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
 
           yield* emitRosterUpdate(input.nativeThreadId, input.activeContext);
+          for (const taskId of silentTaskClears) {
+            yield* clearPendingBackgroundTask(input.nativeThreadId, taskId);
+          }
           return true;
         });
 
