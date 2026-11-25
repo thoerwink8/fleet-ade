@@ -117,7 +117,6 @@ vi.mock("./useSettings", () => ({
   useClientSettings: (select: (settings: unknown) => unknown) =>
     select({
       confirmThreadDelete: true,
-      confirmThreadArchive: true,
       timestampFormat: "12-hour",
     }),
 }));
@@ -132,7 +131,7 @@ vi.mock("./useThreadActions", () => ({
         "snoozeThread",
         "unsnoozeThread",
         "pinThread",
-        "confirmAndUnpinThread",
+        "unpinThread",
         "archiveThread",
         "deleteThread",
       ].map((action) => [
