@@ -41,11 +41,19 @@ import {
 } from "~/lib/composerContextRecords";
 import { randomUUID } from "~/lib/utils";
 import {
+  awaitAttachmentUploads,
   readAttachmentUpload,
   releaseAttachmentUpload,
   releasePersistedAttachmentUpload,
   verifyStashedAttachmentUpload,
 } from "../../lib/attachmentUploadQueue";
+import {
+  countPreparingComposerImages,
+  getPreparingComposerImageFailure,
+  whenPreparingComposerImagesIdle,
+} from "./preparingComposerImages";
+import { cancelPendingComposerSend, PENDING_SEND_STASH_NOTICE } from "./pendingComposerSend.logic";
+import { stashWaitReason, waitForStashReadiness } from "./composerStashReadiness.logic";
 import { remainingComposerAttachmentSlots } from "./composerThreadImport";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
 import { registerCommands } from "../../shortcuts/dispatcher";
@@ -147,6 +155,20 @@ export function useComposerStash(input: {
   // Each stash bumps the key; the badge replays its one-shot pulse animation per key.
   const [stashPulseKey, setStashPulseKey] = useState(0);
   const stashInFlightRef = useRef<Set<string>>(new Set());
+  const pendingStashAbortRef = useRef<{
+    readonly targetKey: string;
+    readonly controller: AbortController;
+  } | null>(null);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- aborts a pending stash wait if the composer switches drafts or unmounts
+  useEffect(() => {
+    return () => {
+      if (pendingStashAbortRef.current?.targetKey === attachmentTargetKey) {
+        pendingStashAbortRef.current.controller.abort();
+        pendingStashAbortRef.current = null;
+      }
+    };
+  }, [attachmentTargetKey]);
 
   const stashQueue = usePromptStashStore((state) => state.entries);
   const stashEntryToQueue = usePromptStashStore((state) => state.stashEntry);
@@ -167,6 +189,7 @@ export function useComposerStash(input: {
       });
       return;
     }
+    cancelPendingComposerSend(composerTargetKey(composerDraftTarget), PENDING_SEND_STASH_NOTICE);
     setIsStashMenuOpen(false);
 
     // An expired upload restores as a needs-reattach row instead of a reference
@@ -193,6 +216,7 @@ export function useComposerStash(input: {
     ) {
       return;
     }
+    cancelPendingComposerSend(composerTargetKey(composerDraftTarget), PENDING_SEND_STASH_NOTICE);
 
     const { entry, durable } = takeStashEntry(menuEntry.id);
     if (!entry) return;
@@ -456,17 +480,78 @@ export function useComposerStash(input: {
   const deleteStashEntryStable = useStableCallback(deleteStashEntry);
 
   const stashCurrentPrompt = async () => {
-    // Stashing clears the draft. A pasted attachment still downloading would then land in the
-    // emptied composer instead of travelling with the entry it belongs to.
-    if (pendingDraftWork.has(attachmentTargetKey)) {
-      toastManager.add({
-        type: "info",
-        title: "仍在把附加的上下文放入这条消息。",
-        description: "标签加载完成后请再次暂存。",
+    const stashTarget = composerDraftTarget;
+    cancelPendingComposerSend(composerTargetKey(stashTarget), PENDING_SEND_STASH_NOTICE);
+    if (pendingStashAbortRef.current?.targetKey === attachmentTargetKey) return;
+
+    const readUploadingFileIds = () =>
+      readAttachmentDraft()
+        .files.filter((file) => {
+          if (composerFileNeedsReattach(file)) return false;
+          const upload = readAttachmentUpload(file.id);
+          return (
+            upload === undefined ||
+            (upload.status === "uploading" && upload.environmentId === environmentId)
+          );
+        })
+        .map((file) => file.id);
+
+    const waitReason = stashWaitReason({
+      preparingImages: countPreparingComposerImages(attachmentTargetKey) > 0,
+      loadingContext: pendingDraftWork.has(attachmentTargetKey),
+      uploadingFiles: readUploadingFileIds().length > 0,
+    });
+    if (waitReason !== null) {
+      const contextFailureBaseline =
+        pendingDraftWork.lastFailure(attachmentTargetKey)?.sequence ?? 0;
+      const imageFailureBaseline =
+        getPreparingComposerImageFailure(attachmentTargetKey)?.sequence ?? 0;
+      const controller = new AbortController();
+      pendingStashAbortRef.current = { targetKey: attachmentTargetKey, controller };
+      const waitingToastId = toastManager.add({
+        type: "loading",
+        title: "正在准备暂存…",
+        description: waitReason,
+        timeout: 0,
+        data: { hideCopyButton: true },
+        actionProps: {
+          children: "取消",
+          onClick: () => controller.abort(),
+        },
       });
-      return;
+      const ready = await waitForStashReadiness({
+        isLoadingContext: () => pendingDraftWork.has(attachmentTargetKey),
+        waitForContextIdle: (signal) => pendingDraftWork.whenIdle(attachmentTargetKey, signal),
+        isPreparingImages: () => countPreparingComposerImages(attachmentTargetKey) > 0,
+        waitForImagesIdle: (signal) => whenPreparingComposerImagesIdle(attachmentTargetKey, signal),
+        readUploadingFileIds,
+        waitForFileUploads: (ids) => awaitAttachmentUploads(ids),
+        signal: controller.signal,
+      });
+      toastManager.close(waitingToastId);
+      if (pendingStashAbortRef.current?.controller === controller) {
+        pendingStashAbortRef.current = null;
+      }
+      if (!ready || !isComposerDraftTargetOpen(composerTargetKey(stashTarget))) {
+        return;
+      }
+      const nextContextFailure = pendingDraftWork.lastFailure(attachmentTargetKey);
+      const nextImageFailure = getPreparingComposerImageFailure(attachmentTargetKey);
+      if (
+        (nextContextFailure && nextContextFailure.sequence > contextFailureBaseline) ||
+        (nextImageFailure && nextImageFailure.sequence > imageFailureBaseline)
+      ) {
+        toastManager.add({
+          type: "error",
+          title: "附件未准备完成，未能暂存",
+          description: "内容还在输入框里，请处理失败的附件或上下文后重试。",
+        });
+        return;
+      }
     }
-    const replyTo = getComposerDraft(composerDraftTarget)?.replyTo;
+
+    const latestDraft = getComposerDraft(stashTarget);
+    const replyTo = latestDraft?.replyTo;
     const trimmedPrompt = promptRef.current.trim();
     // A trailing chip only parses with whitespace after it, so keep one space to restore it.
     const endsWithChip =
@@ -476,12 +561,15 @@ export function useComposerStash(input: {
     const attachmentDraft = readAttachmentDraft();
     const images = [...attachmentDraft.images];
     const files = [...attachmentDraft.files];
+    const latestThreadContexts = latestDraft?.threadContexts ?? composerThreadContexts;
+    const latestReviewComments = latestDraft?.reviewComments ?? composerReviewComments;
+    const latestPreviewAnnotations = latestDraft?.previewAnnotations ?? composerPreviewAnnotations;
     const stashedRecords: ComposerContextRecord[] = [
       ...(replyTo ? [replyTo] : []),
-      ...composerThreadContexts,
+      ...latestThreadContexts,
       ...readTerminalContexts().map(terminalContextRecord),
-      ...composerReviewComments.map(reviewCommentContextRecord),
-      ...composerPreviewAnnotations.map((annotation) =>
+      ...latestReviewComments.map(reviewCommentContextRecord),
+      ...latestPreviewAnnotations.map((annotation) =>
         previewAnnotationContextRecord(annotation, {
           screenshotContextId: images.some((image) => image.id === annotation.id)
             ? annotation.id
@@ -512,7 +600,8 @@ export function useComposerStash(input: {
       if (upload?.status !== "ready" || upload.environmentId !== environmentId) {
         toastManager.add({
           type: "error",
-          title: "请等文件上传完成后再暂存这条提示词",
+          title: "文件上传未完成，无法暂存",
+          description: "内容还在输入框里。请确认电脑已连接并重试上传，或移除该文件后再暂存。",
         });
         return;
       }
@@ -532,11 +621,10 @@ export function useComposerStash(input: {
       .map((image) => `image:${image.id}`)
       .concat(files.map((file) => `file:${file.id}`))
       .join(",");
-    const snapshotKey = [String(composerDraftTarget), prompt, attachmentKey].join("\n");
+    const snapshotKey = [String(stashTarget), prompt, attachmentKey].join("\n");
     if (stashInFlightRef.current.has(snapshotKey)) return;
     stashInFlightRef.current.add(snapshotKey);
 
-    const stashTarget = composerDraftTarget;
     const entryId = randomUUID();
     const stashAndEncode = async () => {
       // Ordering matters in both directions: writing before clearing means a
@@ -581,10 +669,10 @@ export function useComposerStash(input: {
       clearComposerDraftTerminalContexts(stashTarget);
       setComposerDraftThreadContexts(stashTarget, []);
       setComposerDraftReplyTo(stashTarget, null);
-      for (const comment of composerReviewComments) {
+      for (const comment of latestReviewComments) {
         removeComposerDraftReviewComment(stashTarget, comment.id);
       }
-      for (const annotation of composerPreviewAnnotations) {
+      for (const annotation of latestPreviewAnnotations) {
         releaseAttachmentUpload(annotation.id);
         removeComposerDraftPreviewAnnotation(stashTarget, annotation.id);
       }

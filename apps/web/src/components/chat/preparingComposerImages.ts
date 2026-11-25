@@ -9,7 +9,14 @@ export interface PreparingComposerImage {
   readonly hidden: boolean;
 }
 
+export interface PreparingComposerImageFailure {
+  readonly sequence: number;
+  readonly fileName: string;
+  readonly reason: "unreadable" | "too-large";
+}
+
 const NO_PREPARING_IMAGES: ReadonlyArray<PreparingComposerImage> = [];
+let nextImageFailureSequence = 0;
 
 /**
  * Images accepted into a draft but still being compressed, keyed by attachment target. Large
@@ -18,7 +25,8 @@ const NO_PREPARING_IMAGES: ReadonlyArray<PreparingComposerImage> = [];
  */
 const usePreparingComposerImageStore = create<{
   readonly byTargetKey: Readonly<Record<string, ReadonlyArray<PreparingComposerImage>>>;
-}>(() => ({ byTargetKey: {} }));
+  readonly lastFailureByTargetKey: Readonly<Record<string, PreparingComposerImageFailure>>;
+}>(() => ({ byTargetKey: {}, lastFailureByTargetKey: {} }));
 
 export function usePreparingComposerImages(targetKey: string) {
   return usePreparingComposerImageStore(
@@ -26,10 +34,22 @@ export function usePreparingComposerImages(targetKey: string) {
   );
 }
 
+export function usePreparingComposerImageFailure(
+  targetKey: string,
+): PreparingComposerImageFailure | null {
+  return usePreparingComposerImageStore((state) => state.lastFailureByTargetKey[targetKey] ?? null);
+}
+
 export function getPreparingComposerImages(
   targetKey: string,
 ): ReadonlyArray<PreparingComposerImage> {
   return usePreparingComposerImageStore.getState().byTargetKey[targetKey] ?? NO_PREPARING_IMAGES;
+}
+
+export function getPreparingComposerImageFailure(
+  targetKey: string,
+): PreparingComposerImageFailure | null {
+  return usePreparingComposerImageStore.getState().lastFailureByTargetKey[targetKey] ?? null;
 }
 
 export function countPreparingComposerImages(targetKey: string): number {
@@ -44,6 +64,26 @@ export function addPreparingComposerImages(
     byTargetKey: {
       ...state.byTargetKey,
       [targetKey]: [...(state.byTargetKey[targetKey] ?? NO_PREPARING_IMAGES), ...images],
+    },
+  }));
+}
+
+export function recordPreparingComposerImageFailure(
+  targetKey: string,
+  failure: {
+    readonly fileName: string;
+    readonly reason: "unreadable" | "too-large";
+  },
+): void {
+  const entry: PreparingComposerImageFailure = {
+    sequence: ++nextImageFailureSequence,
+    fileName: failure.fileName,
+    reason: failure.reason,
+  };
+  usePreparingComposerImageStore.setState((state) => ({
+    lastFailureByTargetKey: {
+      ...state.lastFailureByTargetKey,
+      [targetKey]: entry,
     },
   }));
 }
@@ -80,4 +120,37 @@ export function removePreparingComposerImages(
     return { byTargetKey };
   });
   return removed;
+}
+
+export function whenPreparingComposerImagesIdle(
+  targetKey: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  if (countPreparingComposerImages(targetKey) === 0) return Promise.resolve(true);
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const cleanup = () => {
+      unsubscribe();
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(false);
+    };
+    const unsubscribe = usePreparingComposerImageStore.subscribe(() => {
+      if (settled || countPreparingComposerImages(targetKey) > 0) return;
+      settled = true;
+      cleanup();
+      resolve(true);
+    });
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (countPreparingComposerImages(targetKey) === 0 && !settled) {
+      settled = true;
+      cleanup();
+      resolve(true);
+    }
+  });
 }

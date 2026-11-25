@@ -17,7 +17,7 @@ import { DEFAULT_INTERACTION_MODE } from "../../types";
 import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import type { makeThreadErrorSetter } from "../ChatView.logic";
-import { draftSendState } from "./chatViewSend";
+import { draftSendState, recordDraftSendFailure } from "./chatViewSend";
 import type { useTimelineFollow } from "./useTimelineFollow";
 import type { useUsageLimitsPanel } from "./useUsageLimitsPanel";
 
@@ -148,10 +148,16 @@ export function useComposerResume(input: ComposerResumeInput) {
     };
     const result = await resume();
     if (result._tag === "Failure") {
+      const reason = isAtomCommandInterrupted(result)
+        ? "继续会话已中断。"
+        : (() => {
+            const error = squashAtomCommandFailure(result);
+            return error instanceof Error ? error.message : "无法继续会话。";
+          })();
       if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        setThreadError(threadId, error instanceof Error ? error.message : "无法继续会话。");
+        setThreadError(threadId, reason);
       }
+      recordDraftSendFailure(routeThreadKey, reason);
     } else {
       clearUsageLimitsFor(routeThreadKey);
       if (currentRouteThreadKeyRef.current === routeThreadKey) scrollToEnd();

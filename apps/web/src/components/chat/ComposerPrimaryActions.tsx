@@ -9,6 +9,7 @@ import {
 import {
   CheckIcon,
   ChevronLeftIcon,
+  Clock3Icon,
   Minimize2Icon,
   PlayIcon,
   CornerUpRightIcon,
@@ -47,6 +48,8 @@ interface ComposerPrimaryActionsProps {
   canSteer?: boolean;
   alternateShortcutLabel?: string | null;
   isSendBusy: boolean;
+  pendingSendReason?: string | null | undefined;
+  pendingSendStatusId?: string | undefined;
   sendDisabledReason: string | null;
   sendBlockReasonId?: string | undefined;
   isEnvironmentUnavailable: boolean;
@@ -56,6 +59,7 @@ interface ComposerPrimaryActionsProps {
   preserveComposerFocusOnPointerDown?: boolean;
   isEditingQueuedMessage?: boolean;
   onSubmitMessage?: MouseEventHandler<HTMLButtonElement>;
+  onCancelPendingSend?: (() => void) | undefined;
   onResume?: () => void;
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
@@ -228,6 +232,8 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   canSteer = true,
   alternateShortcutLabel = null,
   isSendBusy,
+  pendingSendReason = null,
+  pendingSendStatusId,
   sendDisabledReason,
   sendBlockReasonId,
   isEnvironmentUnavailable,
@@ -237,6 +243,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   preserveComposerFocusOnPointerDown = false,
   isEditingQueuedMessage = false,
   onSubmitMessage,
+  onCancelPendingSend,
   onResume,
   onPreviousPendingQuestion,
   onInterrupt,
@@ -262,6 +269,31 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   const alternateAction = alternateComposerDispatchAction(followUpBehavior);
   const isSendDisabled = !canOperateThread || sendDisabledReason !== null;
   const stageBackdropVariant = useSidebarStageBackdropVariant(environmentIdentificationMode);
+
+  const renderWaitingSendButton = () => (
+    <Tooltip key="pending-send">
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            {...pointerFocusProps}
+            onClick={() => {
+              if (stopPhase === "landed") return;
+              onCancelPendingSend?.();
+            }}
+            aria-label={`${pendingSendReason}，点击取消`}
+            aria-describedby={pendingSendStatusId}
+          />
+        }
+      >
+        <Clock3Icon aria-hidden="true" />
+        等待中
+      </TooltipTrigger>
+      <TooltipPopup>{`${pendingSendReason}（点击或按 Esc 取消）`}</TooltipPopup>
+    </Tooltip>
+  );
 
   const renderStopGenerationButton = () => (
     <StopGenerationButton
@@ -314,33 +346,36 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             </Button>
           )
         ) : null}
-        <button
-          type="submit"
-          className={cn(
-            "ade-touch-target",
-            messageActionPillClassName,
-            "h-8 sm:h-7",
-            compact ? "px-3" : "px-4",
-          )}
-          {...pointerFocusProps}
-          onClick={(event) => {
-            if (stopPhase === "landed") event.preventDefault();
-          }}
-          disabled={
-            !canOperateThread ||
-            isEnvironmentUnavailable ||
-            isSendDisabled ||
-            pendingAction.isResponding ||
-            (pendingAction.isLastQuestion ? !pendingAction.isComplete : !pendingAction.canAdvance)
-          }
-        >
-          {formatPendingPrimaryActionLabel({
-            compact,
-            isLastQuestion: pendingAction.isLastQuestion,
-            isResponding: pendingAction.isResponding,
-            questionIndex: pendingAction.questionIndex,
-          })}
-        </button>
+        {pendingSendReason !== null ? (
+          renderWaitingSendButton()
+        ) : (
+          <button
+            type="submit"
+            className={cn(
+              "ade-touch-target",
+              messageActionPillClassName,
+              "h-8 sm:h-7",
+              compact ? "px-3" : "px-4",
+            )}
+            {...pointerFocusProps}
+            onClick={(event) => {
+              if (stopPhase === "landed") event.preventDefault();
+            }}
+            disabled={
+              !canOperateThread ||
+              isSendDisabled ||
+              pendingAction.isResponding ||
+              (pendingAction.isLastQuestion ? !pendingAction.isComplete : !pendingAction.canAdvance)
+            }
+          >
+            {formatPendingPrimaryActionLabel({
+              compact,
+              isLastQuestion: pendingAction.isLastQuestion,
+              isResponding: pendingAction.isResponding,
+              questionIndex: pendingAction.questionIndex,
+            })}
+          </button>
+        )}
         {canInterrupt || stopPhase === "pending" || stopPhase === "timedOut"
           ? renderStopGenerationButton()
           : null}
@@ -351,9 +386,14 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   if (
     (canInterrupt || stopPhase === "pending" || stopPhase === "timedOut") &&
     !hasSendableContent &&
-    !isEditingQueuedMessage
+    !isEditingQueuedMessage &&
+    pendingSendReason === null
   ) {
     return renderStopGenerationButton();
+  }
+
+  if (pendingSendReason !== null) {
+    return withStopButton(renderWaitingSendButton());
   }
 
   const showResume = canResume && !hasSendableContent && !isEditingQueuedMessage;
@@ -363,6 +403,21 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       ? formatContextWindowTokens(compactBeforeSendTokens)
       : null;
   const compactsBeforeSend = compactTokens !== null && !keepFullHistory;
+
+  const canQueueWhileUnavailable =
+    isEnvironmentUnavailable &&
+    hasSendableContent &&
+    !showResume &&
+    !isSendDisabled &&
+    canOperateThread &&
+    !isEditingQueuedMessage;
+  const canQueueBehindBusySend =
+    isSendBusy &&
+    hasSendableContent &&
+    !showResume &&
+    !isSendDisabled &&
+    canOperateThread &&
+    !isEditingQueuedMessage;
 
   const submitLabel = showResume
     ? "继续会话"
@@ -375,25 +430,32 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           : isRunning
             ? "立即发送"
             : "发送消息";
-  const submitStatus = isEnvironmentUnavailable
-    ? "电脑已断开"
-    : (sendDisabledReason ??
-      (isPreparingWorktree
-        ? "正在准备工作树"
-        : isSendBusy
-          ? isEditingQueuedMessage
-            ? "正在更新排队消息"
-            : "正在发送消息"
-          : null));
-  const submitTooltip =
-    submitStatus ??
-    (compactsBeforeSend
-      ? `先总结 ${compactTokens} token 的历史记录，再发送`
-      : isRunning && !isEditingQueuedMessage && canSteer && hideKeyboardHints
-        ? `点击：${describeActiveTurnAction(followUpBehavior)}`
-        : isRunning && !isEditingQueuedMessage && canSteer
-          ? `点击：${describeActiveTurnAction(followUpBehavior)}；${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}：${describeActiveTurnAction(alternateAction)}`
-          : submitLabel);
+  const submitStatus = canQueueWhileUnavailable
+    ? "正在重新连接，连上后自动发送"
+    : isEnvironmentUnavailable
+      ? "电脑已断开"
+      : (sendDisabledReason ??
+        (isPreparingWorktree
+          ? "正在准备工作树"
+          : canQueueBehindBusySend
+            ? "上一条还在发送，之后自动发送"
+            : isSendBusy
+              ? isEditingQueuedMessage
+                ? "正在更新排队消息"
+                : "正在发送消息"
+              : null));
+  const submitTooltip = canQueueWhileUnavailable
+    ? "电脑正在重新连接，点击后连上自动发送"
+    : canQueueBehindBusySend
+      ? "上一条还在发送，点击后自动接着发送"
+      : (submitStatus ??
+        (compactsBeforeSend
+          ? `先总结 ${compactTokens} token 的历史记录，再发送`
+          : isRunning && !isEditingQueuedMessage && canSteer && hideKeyboardHints
+            ? `点击：${describeActiveTurnAction(followUpBehavior)}`
+            : isRunning && !isEditingQueuedMessage && canSteer
+              ? `点击：${describeActiveTurnAction(followUpBehavior)}；${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}：${describeActiveTurnAction(alternateAction)}`
+              : submitLabel));
 
   const sendButton = (
     <button
@@ -414,9 +476,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         else onSubmitMessage?.(event);
       }}
       disabled={
-        isSendBusy ||
+        (isSendBusy && !canQueueBehindBusySend) ||
         isSendDisabled ||
-        isEnvironmentUnavailable ||
+        (isEnvironmentUnavailable && !canQueueWhileUnavailable) ||
         (!hasSendableContent && !showResume)
       }
       aria-describedby={sendBlockReasonId}
@@ -430,7 +492,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           <StageBackdropButtonArt variant={stageBackdropVariant} />
         </span>
       ) : null}
-      {isSendBusy ? (
+      {isSendBusy && !canQueueBehindBusySend ? (
         <Spinner size="sm" aria-hidden="true" />
       ) : showResume ? (
         <PlayIcon className="size-4 fill-current" aria-hidden="true" />
