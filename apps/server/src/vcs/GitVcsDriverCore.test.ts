@@ -1,5 +1,7 @@
-// @effect-diagnostics nodeBuiltinImport:off - realpathSync.native resolves Windows 8.3 short names, which the Effect realPath does not.
+// @effect-diagnostics nodeBuiltinImport:off -- realpathSync.native resolves Windows 8.3 short names; node:net/node:http host the loopback transport fixtures.
 import * as NodeFS from "node:fs";
+import * as NodeHttp from "node:http";
+import * as NodeNet from "node:net";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -51,6 +53,7 @@ import * as GitVcsDriver from "./GitVcsDriver.ts";
 import { gitConfigEnv } from "./VcsProcess.ts";
 
 const encodeGitCommandError = Schema.encodeEffect(Schema.fromJsonString(GitCommandError));
+const decodeGitCommandError = Schema.decodeUnknownSync(Schema.fromJsonString(GitCommandError));
 const decodeVcsRef = Schema.decodeUnknownSync(VcsRef);
 const decodeVcsListRefsResult = Schema.decodeUnknownSync(VcsListRefsResult);
 
@@ -8256,5 +8259,134 @@ it.layer(layerTest)("GitVcsDriverCore stable reason and action classification", 
         assert.equal(missingCwdError.action, "init");
         assert.isUndefined(missingCwdError.reason);
       }),
+  );
+
+  it.effect(
+    "classifies network_unreachable on refused clone, fetch, and push and keeps the reason through JSON",
+    () =>
+      Effect.gen(function* () {
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        // Bind then release a loopback port so the listener is gone when Git dials it.
+        const refusedPort = yield* Effect.callback<number>((resume) => {
+          const probe = NodeNet.createServer();
+          probe.once("error", () =>
+            resume(Effect.die(new Error("could not bind a loopback port"))),
+          );
+          probe.listen(0, "127.0.0.1", () => {
+            const address = probe.address();
+            const port = typeof address === "object" && address !== null ? address.port : 0;
+            probe.close(() => resume(Effect.succeed(port)));
+          });
+        });
+        const refusedUrl = `http://127.0.0.1:${refusedPort}/repo.git`;
+
+        const cloneParent = yield* makeTmpDir("git-network-clone-");
+        const cloneError = yield* driver
+          .execute({
+            operation: "SourceControlRepositoryService.cloneRepository",
+            cwd: cloneParent,
+            args: ["clone", refusedUrl, "repo"],
+          })
+          .pipe(Effect.flip);
+        assert.equal(cloneError._tag, "GitCommandError");
+        assert.equal(cloneError.action, "clone");
+        assert.equal(cloneError.reason, "network_unreachable");
+        assert.equal(
+          decodeGitCommandError(yield* encodeGitCommandError(cloneError)).reason,
+          "network_unreachable",
+        );
+
+        const cwd = yield* makeTmpDir("git-network-repo-");
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        yield* git(cwd, ["remote", "add", "origin", refusedUrl]);
+
+        const fetchError = yield* driver
+          .fetchRemote({ cwd, remoteName: "origin" })
+          .pipe(Effect.flip);
+        assert.equal(fetchError._tag, "GitCommandError");
+        assert.equal(fetchError.action, "fetch");
+        assert.equal(fetchError.reason, "network_unreachable");
+
+        const pushError = yield* driver
+          .pushCurrentBranch(cwd, initialBranch, { remoteName: "origin" })
+          .pipe(Effect.flip);
+        assert.equal(pushError._tag, "GitCommandError");
+        assert.equal(pushError.action, "push");
+        assert.equal(pushError.reason, "network_unreachable");
+      }),
+  );
+
+  it.effect("classifies network_unreachable when the remote hostname cannot be resolved", () =>
+    Effect.gen(function* () {
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+      const cloneParent = yield* makeTmpDir("git-network-dns-");
+      const error = yield* driver
+        .execute({
+          operation: "SourceControlRepositoryService.cloneRepository",
+          cwd: cloneParent,
+          args: ["clone", "https://no-such-host-fleettest.invalid/repo.git", "repo"],
+        })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "GitCommandError");
+      assert.equal(error.action, "clone");
+      assert.equal(error.reason, "network_unreachable");
+    }),
+  );
+
+  it.effect("classifies network_unreachable when the ssh connect to the remote times out", () =>
+    Effect.gen(function* () {
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+      const cloneParent = yield* makeTmpDir("git-network-timeout-");
+      // TEST-NET-1 never routes, so ssh itself reports the connect timeout.
+      const error = yield* driver
+        .execute({
+          operation: "SourceControlRepositoryService.cloneRepository",
+          cwd: cloneParent,
+          args: ["clone", "ssh://git@192.0.2.1/repo.git", "repo"],
+          env: { GIT_SSH_COMMAND: "ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no" },
+          timeoutMs: 30_000,
+        })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "GitCommandError");
+      assert.equal(error.action, "clone");
+      assert.equal(error.reason, "network_unreachable");
+    }),
+  );
+
+  it.effect("does not classify an HTTP 403 reply from the remote as network_unreachable", () =>
+    Effect.gen(function* () {
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+      const server = yield* Effect.acquireRelease(
+        Effect.callback<NodeHttp.Server>((resume) => {
+          const listening = NodeHttp.createServer((_request, response) => {
+            response.writeHead(403, { "Content-Type": "text/plain" });
+            response.end("Forbidden");
+          });
+          listening.once("error", () =>
+            resume(Effect.die(new Error("could not bind a loopback port"))),
+          );
+          listening.listen(0, "127.0.0.1", () => resume(Effect.succeed(listening)));
+        }),
+        (listening) =>
+          Effect.callback<void>((resume) => {
+            listening.closeAllConnections();
+            listening.close(() => resume(Effect.void));
+          }),
+      );
+      const address = server.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+
+      const cloneParent = yield* makeTmpDir("git-network-forbidden-");
+      const error = yield* driver
+        .execute({
+          operation: "SourceControlRepositoryService.cloneRepository",
+          cwd: cloneParent,
+          args: ["clone", `http://127.0.0.1:${port}/repo.git`, "repo"],
+        })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "GitCommandError");
+      assert.equal(error.action, "clone");
+      assert.notEqual(error.reason, "network_unreachable");
+    }),
   );
 });

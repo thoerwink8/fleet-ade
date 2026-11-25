@@ -496,7 +496,7 @@ const GIT_FAILURE_REASON_PATTERNS: ReadonlyArray<readonly [RegExp, GitCommandFai
   // Transport failures keep no `fatal:` detail of their own on SSH and git://, so these
   // must run before the generic remote-unreachable patterns below.
   [
-    /failed to connect|connect to host .+ port \d+|(?:connection|operation) timed out|operation too slow|could not resolve (?:host|proxy|hostname)|couldn't connect to|unable to connect (?:to\b|a socket)/i,
+    /failed(?: to)? connect|connect to host .+ port \d+|(?:connection|operation) timed out|operation too slow|could not resolve (?:host|proxy|hostname)|couldn't connect to|unable to connect (?:to\b|a socket)/i,
     "network_unreachable",
   ],
   [
