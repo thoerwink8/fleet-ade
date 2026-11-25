@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildThreadActionMenuItems, type ThreadActionMenuState } from "./threadActionMenu.logic";
+import {
+  buildThreadActionMenuItems,
+  hasCommanderDispatchConfig,
+  shouldShowCommanderMenuAction,
+  type ThreadActionMenuState,
+} from "./threadActionMenu.logic";
 
 const baseState: ThreadActionMenuState = {
+  surface: "sidebar",
   canOperate: true,
   branch: null,
   projectFilter: null,
@@ -65,14 +71,28 @@ describe("buildThreadActionMenuItems", () => {
     },
   );
 
-  it("disables archive and turning into a project while the thread is running", () => {
-    const items = buildThreadActionMenuItems({
+  it("disables archive and turning into a project while the thread is running, with an inline reason", () => {
+    const runningItems = buildThreadActionMenuItems({
       ...baseState,
       isRunning: true,
       canTurnIntoProject: true,
     });
-    expect(items.find((item) => item.id === "archive")?.disabled).toBe(true);
-    expect(items.find((item) => item.id === "turn-into-project")?.disabled).toBe(true);
+    expect(runningItems.find((item) => item.id === "archive")).toMatchObject({
+      disabled: true,
+      detail: "运行中，请先停止",
+    });
+    expect(runningItems.find((item) => item.id === "turn-into-project")).toMatchObject({
+      disabled: true,
+      detail: "运行中，请先停止",
+    });
+
+    const idleItems = buildThreadActionMenuItems({
+      ...baseState,
+      isRunning: false,
+      canTurnIntoProject: true,
+    });
+    expect(idleItems.find((item) => item.id === "archive")?.disabled).toBe(false);
+    expect(idleItems.find((item) => item.id === "archive")?.detail).toBeUndefined();
   });
 
   it("toggles mark-commander and unmark-commander independently of pin state", () => {
@@ -80,6 +100,7 @@ describe("buildThreadActionMenuItems", () => {
       ...baseState,
       isPinned: true,
       isCommander: false,
+      hasCommanderConfig: true,
       supports: { ...baseState.supports, commander: true },
     });
     expect(pinnedNotCommander.some((item) => item.id === "unpin")).toBe(true);
@@ -98,9 +119,101 @@ describe("buildThreadActionMenuItems", () => {
       ...baseState,
       canOperate: false,
       isCommander: false,
+      hasAnyCommanderThread: true,
       supports: { ...baseState.supports, commander: true },
     });
     expect(readOnly.find((item) => item.id === "mark-commander")?.disabled).toBe(true);
+  });
+
+  it("keeps common menu items identical across sidebar and chat-header while isolating declared surface items", () => {
+    const sharedInput: Omit<ThreadActionMenuState, "surface"> = {
+      ...baseState,
+      canFind: true,
+      canExport: true,
+      branch: "feature/b11",
+      projectFilter: { label: "Demo", isActive: false },
+      attentionDismissible: true,
+      canTurnIntoProject: true,
+      hasCommanderConfig: true,
+      supports: { ...baseState.supports, commander: true },
+    };
+
+    const sidebarItems = buildThreadActionMenuItems({ ...sharedInput, surface: "sidebar" });
+    const headerItems = buildThreadActionMenuItems({ ...sharedInput, surface: "chat-header" });
+
+    expect(sidebarItems.some((item) => item.id === "find")).toBe(false);
+    expect(headerItems.some((item) => item.id === "find")).toBe(true);
+    expect(sidebarItems.some((item) => item.id === "filter-by-project")).toBe(true);
+    expect(headerItems.some((item) => item.id === "filter-by-project")).toBe(false);
+
+    expect(sidebarItems.some((item) => item.id === "export-markdown")).toBe(true);
+    expect(headerItems.some((item) => item.id === "export-markdown")).toBe(true);
+    expect(sidebarItems.some((item) => item.id === "dismiss-attention")).toBe(true);
+    expect(headerItems.some((item) => item.id === "dismiss-attention")).toBe(true);
+
+    const commonFromSidebar = sidebarItems.filter((item) => item.id !== "filter-by-project");
+    const commonFromHeader = headerItems.filter((item) => item.id !== "find");
+    expect(commonFromSidebar).toEqual(commonFromHeader);
+  });
+
+  it("gates commander menu actions on commander usage or dispatch config", () => {
+    expect(hasCommanderDispatchConfig(undefined)).toBe(false);
+    expect(
+      hasCommanderDispatchConfig({
+        commanderInstructions: "   ",
+        dispatchCodeModelSelection: null,
+        dispatchReviewModelSelection: null,
+        dispatchReadonlyModelSelection: null,
+        dispatchPlanModelSelection: null,
+        dispatchCommanderModelSelection: null,
+        dispatchConcurrencyLimit: null,
+        dispatchTimeoutMs: null,
+        dispatchStopOnTimeout: false,
+      }),
+    ).toBe(false);
+    expect(hasCommanderDispatchConfig({ commanderInstructions: "先检查测试" })).toBe(true);
+    expect(
+      hasCommanderDispatchConfig({ dispatchCodeModelSelection: { instanceId: "x", model: "y" } }),
+    ).toBe(true);
+    expect(hasCommanderDispatchConfig({ dispatchConcurrencyLimit: 2 })).toBe(true);
+    expect(hasCommanderDispatchConfig({ dispatchStopOnTimeout: true })).toBe(true);
+
+    expect(
+      shouldShowCommanderMenuAction({
+        commanderSupported: true,
+        isCommander: false,
+        hasAnyCommanderThread: false,
+        hasCommanderConfig: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowCommanderMenuAction({
+        commanderSupported: false,
+        isCommander: true,
+        hasAnyCommanderThread: true,
+        hasCommanderConfig: true,
+      }),
+    ).toBe(false);
+
+    const hiddenItems = buildThreadActionMenuItems({
+      ...baseState,
+      isCommander: false,
+      hasAnyCommanderThread: false,
+      hasCommanderConfig: false,
+      supports: { ...baseState.supports, commander: true },
+    });
+    expect(
+      hiddenItems.some((item) => item.id === "mark-commander" || item.id === "unmark-commander"),
+    ).toBe(false);
+
+    const shownByThread = buildThreadActionMenuItems({
+      ...baseState,
+      isCommander: false,
+      hasAnyCommanderThread: true,
+      hasCommanderConfig: false,
+      supports: { ...baseState.supports, commander: true },
+    });
+    expect(shownByThread.some((item) => item.id === "mark-commander")).toBe(true);
   });
 
   it("keeps export-markdown enabled for read-only clients when canExport is true", () => {

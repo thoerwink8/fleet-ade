@@ -223,6 +223,7 @@ describe("sidebar thread row density", () => {
     });
     const unread = thread("unread", "有新回复", {
       lastVisitedAt: "2026-03-01T00:00:00.000Z",
+      runtime: null,
       latestRun: {
         runId: RunId.make("run-unread"),
         status: "completed",
@@ -252,6 +253,7 @@ describe("sidebar thread row density", () => {
           <SortableThreadRow
             {...rowProps("unread", "有新回复", {
               lastVisitedAt: unread.lastVisitedAt,
+              runtime: unread.runtime,
               latestRun: unread.latestRun,
             })}
           />

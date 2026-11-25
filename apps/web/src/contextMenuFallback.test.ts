@@ -245,4 +245,21 @@ describe("showContextMenuFallback", () => {
     expect(button?.textContent).toBe("In 1 hour3:00 PM");
     expect(button?.attributes.get("aria-label")).toBe("In 1 hour, 3:00 PM");
   });
+
+  it("keeps disabled reasons hoverable, exposes them via title and aria-label, and ignores clicks", async () => {
+    const menuPromise = showContextMenuFallback([
+      { id: "archive", label: "归档会话", detail: "运行中，请先停止", disabled: true },
+      { id: "rename", label: "重命名会话" },
+    ]);
+    const disabledButton = findButton("归档会话");
+    expect(disabledButton?.disabled).toBe(true);
+    expect(disabledButton?.attributes.get("aria-label")).toBe("归档会话, 运行中，请先停止");
+    expect(disabledButton?.attributes.get("title")).toBe("运行中，请先停止");
+    expect(disabledButton?.className).not.toContain("pointer-events-none");
+    expect(disabledButton?.style.pointerEvents).not.toBe("none");
+
+    disabledButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    findButton("重命名会话")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await expect(menuPromise).resolves.toBe("rename");
+  });
 });

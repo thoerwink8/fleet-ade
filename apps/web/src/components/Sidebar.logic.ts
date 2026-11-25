@@ -56,6 +56,10 @@ import { isModelPickerOpen, subscribeToModelPickerVisibility } from "../modelPic
 import { shortcutModifierStore } from "../shortcutModifierState";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useRightPanelStore } from "../rightPanelStore";
+import {
+  isEmptySidebarThread,
+  type SidebarEmptyThreadCandidate,
+} from "./sidebar/SidebarThreadRow.logic";
 
 export function shouldNavigateAfterThreadSnooze(input: {
   readonly threadKey: string;
@@ -242,6 +246,135 @@ export type SidebarListItem =
 
 export function sidebarListItemId(item: SidebarListItem): string {
   return item.kind === "thread" ? item.key : sidebarMarkerId(item.marker);
+}
+
+export function buildSidebarListItems(input: {
+  readonly commanderKeys: readonly string[];
+  readonly visibleAttentionKeys: readonly string[];
+  readonly attentionCount: number;
+  readonly hiddenAttentionCount: number;
+  readonly pinnedKeys: readonly string[];
+  readonly activeKeys: readonly string[];
+  readonly visibleWorkingKeys: readonly string[];
+  readonly workingCount: number;
+  readonly visibleSnoozedKeys: readonly string[];
+  readonly snoozedCount: number;
+  readonly renderedSettledKeys: readonly string[];
+  readonly settledCount: number;
+  readonly isDragging: boolean;
+}): SidebarListItem[] {
+  const {
+    commanderKeys,
+    visibleAttentionKeys,
+    attentionCount,
+    hiddenAttentionCount,
+    pinnedKeys,
+    activeKeys,
+    visibleWorkingKeys,
+    workingCount,
+    visibleSnoozedKeys,
+    snoozedCount,
+    renderedSettledKeys,
+    settledCount,
+    isDragging,
+  } = input;
+  if (
+    commanderKeys.length +
+      attentionCount +
+      pinnedKeys.length +
+      activeKeys.length +
+      workingCount +
+      snoozedCount +
+      settledCount ===
+    0
+  ) {
+    return [];
+  }
+  const rowsOf = (keys: readonly string[], section: SidebarSection): SidebarListItem[] =>
+    keys.map((key) => ({ kind: "thread", key, section }));
+
+  const items: SidebarListItem[] = rowsOf(commanderKeys, "commander");
+  if (attentionCount > 0) {
+    items.push({ kind: "marker", marker: "attention-header" });
+    items.push(...rowsOf(visibleAttentionKeys, "attention"));
+    if (hiddenAttentionCount > 0) items.push({ kind: "marker", marker: "attention-more" });
+  }
+  items.push({ kind: "marker", marker: "pinned-header" });
+  items.push(...rowsOf(pinnedKeys, "pinned"));
+  items.push({ kind: "marker", marker: "pinned-divider" });
+  items.push({ kind: "marker", marker: "active-placeholder" });
+  items.push(...rowsOf(activeKeys, "active"));
+  if (workingCount > 0) {
+    items.push({ kind: "marker", marker: "working-header" });
+    items.push(...rowsOf(visibleWorkingKeys, "working"));
+  }
+  if (snoozedCount > 0) {
+    items.push({ kind: "marker", marker: "snoozed-header" });
+    items.push(...rowsOf(visibleSnoozedKeys, "snoozed"));
+  }
+  if (settledCount > 0 || isDragging) {
+    items.push({ kind: "marker", marker: "settled-header" });
+    items.push({ kind: "marker", marker: "settled-placeholder" });
+    items.push(...rowsOf(renderedSettledKeys, "settled"));
+  }
+  return items;
+}
+
+export function shouldShowSidebarEmptyState(input: {
+  readonly isSearchingThreads: boolean;
+  readonly visibleDraftSessionCount: number;
+  readonly commanderCount: number;
+  readonly attentionCount: number;
+  readonly pinnedCount: number;
+  readonly activeCount: number;
+  readonly workingCount: number;
+  readonly snoozedCount: number;
+  readonly settledCount: number;
+  readonly hasProjectScope: boolean;
+  readonly settledShelfExpanded: boolean;
+}): boolean {
+  if (input.isSearchingThreads || input.visibleDraftSessionCount > 0) return false;
+  const nonSettledCount =
+    input.commanderCount +
+    input.attentionCount +
+    input.pinnedCount +
+    input.activeCount +
+    input.workingCount +
+    input.snoozedCount;
+  return (
+    nonSettledCount === 0 &&
+    (input.settledCount === 0 || (input.hasProjectScope && !input.settledShelfExpanded))
+  );
+}
+
+export function countArchivedThreadsInScope(input: {
+  readonly snapshots: ReadonlyArray<{
+    readonly environmentId: EnvironmentId;
+    readonly snapshot: {
+      readonly threads: ReadonlyArray<{
+        readonly id: string;
+        readonly projectId: string;
+        readonly archivedAt: unknown;
+        readonly deletedAt?: unknown;
+      }>;
+    };
+  }>;
+  readonly scopedProjectKeys: ReadonlySet<string> | null;
+}): number {
+  const seen = new Set<string>();
+  for (const { environmentId, snapshot } of input.snapshots) {
+    for (const thread of snapshot.threads) {
+      if (thread.archivedAt == null || thread.deletedAt != null) continue;
+      if (
+        input.scopedProjectKeys !== null &&
+        !input.scopedProjectKeys.has(`${environmentId}:${thread.projectId}`)
+      ) {
+        continue;
+      }
+      seen.add(`${environmentId}:${thread.id}`);
+    }
+  }
+  return seen.size;
 }
 
 function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number): SidebarSection {
@@ -718,13 +851,15 @@ export function resolveSidebarRowThreadId(
  * the sidebar lists, by thread key; they show under that thread, as subagents do.
  */
 export function filterSidebarV2VisibleThreads<
-  T extends Pick<SidebarThreadSummary, "archivedAt" | "environmentId" | "id" | "lineage"> & {
-    projectId: string;
-  },
+  T extends Pick<SidebarThreadSummary, "archivedAt" | "environmentId" | "id" | "lineage"> &
+    Partial<SidebarEmptyThreadCandidate> & {
+      projectId: string;
+    },
 >(
   threads: readonly T[],
   scopedProjectKeys: ReadonlySet<string> | null,
   delegatedUnderParent: ReadonlySet<string>,
+  routeRowThreadKey: string | null = null,
 ): T[] {
   return threads.filter(
     (thread) =>
@@ -734,34 +869,129 @@ export function filterSidebarV2VisibleThreads<
         thread.lineage,
         delegatedUnderParent,
       ) &&
+      (!isEmptySidebarThread(thread) ||
+        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === routeRowThreadKey) &&
       (scopedProjectKeys === null ||
         scopedProjectKeys.has(`${thread.environmentId}:${thread.projectId}`)),
   );
 }
 
-export function buildBulkTitleRegenerationContextMenuItem(input: {
-  supportedCount: number;
-  actionableCount: number;
-}): ContextMenuItem<"regenerate-title"> | null {
-  if (input.supportedCount === 0) return null;
-  if (input.actionableCount === 0) {
-    return {
-      id: "regenerate-title",
-      label: `正在重新生成…（${input.supportedCount}）`,
-      disabled: true,
-    };
-  }
-  return {
-    id: "regenerate-title",
-    label: `重新生成标题（${input.actionableCount}）`,
-  };
+export type MultiSelectThreadMenuId =
+  | "unpin"
+  | "settle"
+  | "snooze"
+  | `snooze:${string}`
+  | "regenerate-title"
+  | "archive"
+  | "select-all"
+  | "mark-unread"
+  | "delete";
+
+export interface MultiSelectThreadMenuInput {
+  readonly selectedCount: number;
+  readonly totalSelectableCount: number;
+  readonly pinnedCount: number;
+  readonly canOperatePinned: boolean;
+  readonly unsettledCount: number;
+  readonly canOperateUnsettled: boolean;
+  readonly snoozeableCount: number;
+  readonly canOperateSnoozeable: boolean;
+  readonly snoozePresets: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly whenLabel: string;
+  }>;
+  readonly titleRegenerationSupportedCount: number;
+  readonly titleRegenerationInFlightCount: number;
+  readonly canOperateRegeneratable: boolean;
+  readonly archiveableCount: number;
+  readonly canOperateArchiveable: boolean;
+  readonly canOperateAll: boolean;
 }
 
-export function buildBulkUnpinContextMenuItem(input: {
-  pinnedCount: number;
-}): ContextMenuItem<"unpin"> | null {
-  if (input.pinnedCount === 0) return null;
-  return { id: "unpin", label: `取消置顶（${input.pinnedCount}）` };
+export function buildMultiSelectThreadMenuItems(
+  input: MultiSelectThreadMenuInput,
+): ReadonlyArray<ContextMenuItem<MultiSelectThreadMenuId>> {
+  const regeneratableCount = Math.max(
+    0,
+    input.titleRegenerationSupportedCount - input.titleRegenerationInFlightCount,
+  );
+  return [
+    ...(input.pinnedCount > 0
+      ? [
+          {
+            id: "unpin" as const,
+            label: `取消置顶（${input.pinnedCount}）`,
+            disabled: !input.canOperatePinned,
+          },
+        ]
+      : []),
+    ...(input.unsettledCount > 0
+      ? [
+          {
+            id: "settle" as const,
+            label: `标为完成（${input.unsettledCount}）`,
+            disabled: !input.canOperateUnsettled,
+          },
+        ]
+      : []),
+    ...(input.snoozeableCount > 0
+      ? [
+          {
+            id: "snooze" as const,
+            label: `暂缓（${input.snoozeableCount}）`,
+            disabled: !input.canOperateSnoozeable,
+            children: [
+              ...input.snoozePresets.map((preset) => ({
+                id: `snooze:${preset.id}` as const,
+                label: preset.label,
+                detail: preset.whenLabel,
+                disabled: !input.canOperateSnoozeable,
+              })),
+              {
+                id: "snooze:custom" as const,
+                label: "自定义…",
+                separatorBefore: input.snoozePresets.length > 0,
+                disabled: !input.canOperateSnoozeable,
+              },
+            ],
+          },
+        ]
+      : []),
+    ...(input.titleRegenerationSupportedCount > 0
+      ? [
+          regeneratableCount === 0
+            ? {
+                id: "regenerate-title" as const,
+                label: `正在重新生成…（${input.titleRegenerationSupportedCount}）`,
+                disabled: true,
+              }
+            : {
+                id: "regenerate-title" as const,
+                label: `重新生成标题（${regeneratableCount}）`,
+                disabled: !input.canOperateRegeneratable,
+              },
+        ]
+      : []),
+    {
+      id: "archive",
+      label: `归档（${input.archiveableCount > 0 ? input.archiveableCount : input.selectedCount}）`,
+      ...(input.archiveableCount === 0
+        ? { disabled: true, detail: "运行中，请先停止" }
+        : { disabled: !input.canOperateArchiveable }),
+    },
+    ...(input.totalSelectableCount > input.selectedCount
+      ? [{ id: "select-all" as const, label: "全选当前列表" }]
+      : []),
+    { id: "mark-unread", label: `标为未读（${input.selectedCount}）` },
+    {
+      id: "delete",
+      label: `删除（${input.selectedCount}）`,
+      destructive: true,
+      separatorBefore: true,
+      disabled: !input.canOperateAll,
+    },
+  ];
 }
 
 export interface ThreadStatusPill {
@@ -972,13 +1202,68 @@ export type ThreadAttentionInput = ThreadStatusInput & {
     OrchestrationV2PendingRuntimeRequestSummary,
     "kind" | "blocking"
   > | null;
+  readonly source?: {
+    readonly pendingRuntimeRequest?: Pick<
+      OrchestrationV2PendingRuntimeRequestSummary,
+      "kind" | "blocking"
+    > | null;
+  };
 };
+
+function resolvePendingRuntimeRequest(
+  thread: Pick<ThreadAttentionInput, "pendingRuntimeRequest" | "source">,
+) {
+  return thread.pendingRuntimeRequest !== undefined
+    ? thread.pendingRuntimeRequest
+    : thread.source?.pendingRuntimeRequest;
+}
+
+function isLiveWorkingStatus(
+  status: SidebarThreadStatus,
+  thread: Pick<
+    SidebarThreadSummary,
+    "interactionMode" | "hasActionableProposedPlan" | "latestRun" | "runtime"
+  >,
+): boolean {
+  if (
+    status !== "preparing" &&
+    status !== "queued" &&
+    status !== "working" &&
+    status !== "waiting"
+  ) {
+    return false;
+  }
+  const run = thread.latestRun;
+  const runSettled =
+    run !== null &&
+    run.status !== "preparing" &&
+    run.status !== "queued" &&
+    run.status !== "starting" &&
+    run.status !== "running" &&
+    run.status !== "waiting" &&
+    thread.runtime?.activeRunId !== run.runId;
+  return !(
+    thread.interactionMode === "plan" &&
+    thread.hasActionableProposedPlan === true &&
+    runSettled
+  );
+}
+
+export function isSidebarLiveWorking(
+  thread: SidebarThreadStatusInput &
+    Pick<
+      SidebarThreadSummary,
+      "interactionMode" | "hasActionableProposedPlan" | "latestRun" | "runtime"
+    >,
+): boolean {
+  return isLiveWorkingStatus(resolveSidebarThreadStatus(thread), thread);
+}
 
 export function resolveThreadAttention(
   thread: ThreadAttentionInput,
   lastVisitedAt: string | null | undefined = thread.lastVisitedAt,
 ): ThreadAttention | null {
-  const request = thread.pendingRuntimeRequest;
+  const request = resolvePendingRuntimeRequest(thread);
   const statusThread = { ...thread, lastVisitedAt };
   if (
     (request !== null && request !== undefined
@@ -1000,6 +1285,15 @@ export function resolveThreadAttention(
     ...thread,
     blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
   });
+  // Active work or awaited background work supersedes any stale completion/failure from an earlier run.
+  if (
+    status === "preparing" ||
+    status === "queued" ||
+    status === "working" ||
+    status === "waiting"
+  ) {
+    return null;
+  }
   if (status === "failed" || status === "limited" || thread.latestRun?.status === "failed") {
     const category = status === "limited" ? "limited" : "failed";
     if (thread.latestRun?.status === "failed") {
@@ -1038,12 +1332,16 @@ export function isThreadAttentionDismissible(input: {
   );
 }
 
-function threadAttentionActionText(category: ThreadAttentionCategory): string {
-  switch (category) {
+export function threadAttentionSubtitleText(input: {
+  readonly attention: ThreadAttention;
+  readonly attentionOffline?: boolean | undefined;
+  readonly isRoute?: boolean | undefined;
+}): string {
+  switch (input.attention.category) {
     case "approval":
-      return "等你批准，点开处理";
+      return input.isRoute ? "等你批准" : "等你批准，点开处理";
     case "input":
-      return "等你回答，点开处理";
+      return input.isRoute ? "等你回答" : "等你回答，点开处理";
     case "failed":
       return "上一轮出错了，点开处理";
     case "limited":
@@ -1053,12 +1351,265 @@ function threadAttentionActionText(category: ThreadAttentionCategory): string {
   }
 }
 
-export function threadAttentionSubtitleText(input: {
-  readonly attention: ThreadAttention;
-  readonly attentionOffline: boolean | undefined;
-}): string {
-  if (isThreadAttentionRowDisabled(input)) return "电脑已断线，连上后处理";
-  return threadAttentionActionText(input.attention.category);
+export interface SidebarThreadRowMark {
+  readonly dot: string;
+  readonly label: string;
+}
+
+export interface SidebarThreadHoverDot {
+  readonly variant: "dot-attention" | "dot-active" | "dot-blocked" | "dot-waiting" | "dot-done";
+  readonly label: string;
+}
+
+export interface SidebarRowPresentation {
+  readonly status: SidebarThreadStatus;
+  readonly isUnread: boolean;
+  readonly subtitle: string | null;
+  readonly rowMark: SidebarThreadRowMark | null;
+  readonly statusLabel: string | null;
+  readonly hoverDot: SidebarThreadHoverDot;
+}
+
+export type SidebarRowPresentationThread = ThreadAttentionInput &
+  Pick<SidebarThreadSummary, "latestRun" | "runtime"> & {
+    readonly goal?: SidebarThreadSummary["goal"];
+    readonly turnCount?: number | undefined;
+    readonly visibleItemCount?: number | undefined;
+  };
+
+/** Derive row dot, unread highlight, subtitle, accessibility label, and hover status from one judgment. */
+export function resolveSidebarRowPresentation(input: {
+  readonly section: SidebarSection;
+  readonly thread: SidebarRowPresentationThread;
+  readonly attention: ThreadAttention | null;
+  readonly lastVisitedAt: string | null | undefined;
+  readonly isRoute: boolean;
+  readonly isWoke: boolean;
+}): SidebarRowPresentation {
+  const { section, thread, attention, lastVisitedAt, isRoute, isWoke } = input;
+  const rawStatus = resolveSidebarThreadStatus({
+    ...thread,
+    blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
+  });
+  let status: SidebarThreadStatus =
+    rawStatus === "ready" && thread.latestRun?.status === "failed" ? "failed" : rawStatus;
+  // Hold the row visually running during the inbox 2s exit grace so section and row never disagree.
+  if (section === "working" && status === "ready") {
+    status = "working";
+  }
+  if (section === "attention" && attention !== null) {
+    if (attention.category === "approval") status = "approval";
+    else if (attention.category === "input") status = "input";
+    else if (attention.category === "limited") status = "limited";
+    else if (attention.category === "failed") status = "failed";
+  }
+
+  const isUnread =
+    !isRoute &&
+    section !== "settled" &&
+    section !== "snoozed" &&
+    section !== "working" &&
+    status === "ready" &&
+    (attention?.category === "completed" || hasUnseenCompletion({ ...thread, lastVisitedAt }));
+
+  const subtitle =
+    section === "attention" &&
+    attention !== null &&
+    (!isRoute || attention.blocking) &&
+    !(isRoute && attention.category === "completed")
+      ? threadAttentionSubtitleText({ attention, isRoute })
+      : null;
+
+  const hasRun =
+    thread.latestRun != null || (thread.turnCount ?? 0) > 0 || (thread.visibleItemCount ?? 0) > 0;
+
+  let rowMark: SidebarThreadRowMark | null = null;
+  let statusLabel: string | null = null;
+  let hoverDot: SidebarThreadHoverDot;
+
+  switch (status) {
+    case "approval":
+      rowMark = { dot: "fa-dot--needs", label: "等你批准" };
+      statusLabel = "等你批准";
+      hoverDot = { variant: "dot-attention", label: "等你批准" };
+      break;
+    case "input":
+      rowMark = { dot: "fa-dot--needs", label: "等你回答" };
+      statusLabel = "等你回答";
+      hoverDot = { variant: "dot-attention", label: "等你回答" };
+      break;
+    case "preparing":
+      rowMark = { dot: "fa-dot--running", label: "正在设置" };
+      statusLabel = "正在设置";
+      hoverDot = { variant: "dot-active", label: "正在设置" };
+      break;
+    case "working": {
+      const label = thread.goal?.status === "active" ? "目标" : "运行中";
+      rowMark = { dot: "fa-dot--running", label: "运行中" };
+      statusLabel = label;
+      hoverDot = { variant: "dot-active", label: "运行中" };
+      break;
+    }
+    case "queued":
+      rowMark = { dot: "fa-dot--ring", label: "等空位" };
+      statusLabel = "等空位";
+      hoverDot = { variant: "dot-waiting", label: "等空位" };
+      break;
+    case "waiting":
+      rowMark =
+        section === "working" || (thread.runtime !== null && thread.runtime.status !== "idle")
+          ? { dot: "fa-dot--ring", label: "等待中" }
+          : null;
+      statusLabel = "等待中";
+      hoverDot = { variant: "dot-waiting", label: "等待中" };
+      break;
+    case "limited":
+      rowMark = { dot: "fa-dot--error", label: "用量受限" };
+      statusLabel = "用量受限";
+      hoverDot = { variant: "dot-blocked", label: "用量受限" };
+      break;
+    case "failed":
+      rowMark = { dot: "fa-dot--error", label: "出错了" };
+      statusLabel = "出错了";
+      hoverDot = { variant: "dot-blocked", label: "出错了" };
+      break;
+    case "ready":
+      if (isUnread) {
+        rowMark = { dot: "fa-dot--new", label: "有新结果" };
+        statusLabel = "有新结果";
+        hoverDot = { variant: "dot-done", label: "有新结果" };
+      } else if (isWoke) {
+        rowMark = null;
+        statusLabel = "暂缓结束";
+        hoverDot = { variant: "dot-done", label: "暂缓结束" };
+      } else {
+        rowMark = null;
+        statusLabel = null;
+        hoverDot = { variant: "dot-done", label: hasRun ? "空闲" : "新会话" };
+      }
+      break;
+  }
+
+  return { status, isUnread, subtitle, rowMark, statusLabel, hoverDot };
+}
+
+export interface SidebarResolvedThreadState extends SidebarRowPresentation {
+  readonly section: SidebarSection;
+  readonly attention: (ThreadAttention & { readonly demoted: boolean }) | null;
+}
+
+export type SidebarThreadStateInput = SidebarRowPresentationThread &
+  ThreadSnoozeShell &
+  Pick<SidebarThreadSummary, "commander" | "pinnedAt" | "settledOverride" | "settledAt">;
+
+/** Compute sidebar section, attention membership, and row presentation from a single judgment. */
+export function resolveSidebarThreadState(input: {
+  readonly thread: SidebarThreadStateInput;
+  readonly lastVisitedAt: string | null | undefined;
+  readonly isRoute: boolean;
+  readonly configLoaded: boolean;
+  readonly workingShelfEnabled: boolean;
+  readonly isWorkingGrace: boolean;
+  readonly now: string;
+  readonly isWoke?: boolean;
+}): SidebarResolvedThreadState {
+  const {
+    thread,
+    lastVisitedAt,
+    isRoute,
+    configLoaded,
+    workingShelfEnabled,
+    isWorkingGrace,
+    now,
+    isWoke = false,
+  } = input;
+  const snoozedNow = configLoaded && effectiveSnoozed(thread, { now });
+  const settledNow = configLoaded && thread.settledOverride === "settled";
+  const rawStatus = resolveSidebarThreadStatus({
+    ...thread,
+    blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
+  });
+
+  let section: SidebarSection;
+  let attention: (ThreadAttention & { readonly demoted: boolean }) | null = null;
+
+  if (thread.commander === true) {
+    section = "commander";
+  } else {
+    const rawAttention = resolveThreadAttention(thread, lastVisitedAt);
+    const holdInWorkingGrace =
+      workingShelfEnabled &&
+      isWorkingGrace &&
+      !snoozedNow &&
+      !settledNow &&
+      thread.pinnedAt == null &&
+      rawAttention?.blocking !== true;
+    // Open non-blocking threads drop back to their base section instead of lingering with click-to-open copy.
+    if (
+      !holdInWorkingGrace &&
+      rawAttention !== null &&
+      (rawAttention.blocking || (!snoozedNow && !settledNow && !isRoute && rawAttention.unseen))
+    ) {
+      section = "attention";
+      attention = { ...rawAttention, demoted: isRoute };
+    } else {
+      const baseSection = resolveSidebarThreadSection({
+        commander: false,
+        snoozed: snoozedNow,
+        settled: settledNow,
+        pinned: thread.pinnedAt != null,
+      });
+      if (baseSection !== "active") {
+        section = baseSection;
+      } else {
+        const liveWorking = isLiveWorkingStatus(rawStatus, thread);
+        section = workingShelfEnabled && (liveWorking || isWorkingGrace) ? "working" : "active";
+      }
+    }
+  }
+
+  const presentation = resolveSidebarRowPresentation({
+    section,
+    thread,
+    attention,
+    lastVisitedAt,
+    isRoute,
+    isWoke,
+  });
+
+  return { section, attention, ...presentation };
+}
+
+export function resolveSidebarOfflineBanner(input: {
+  readonly visibleThreads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId">>;
+  readonly connectedEnvironmentIds: ReadonlyArray<EnvironmentId>;
+  readonly environmentLabelById: ReadonlyMap<EnvironmentId, string>;
+}): {
+  readonly offlineEnvironmentIds: ReadonlyArray<EnvironmentId>;
+  readonly message: string;
+} | null {
+  const connected = new Set(input.connectedEnvironmentIds);
+  const offlineEnvironmentIds: EnvironmentId[] = [];
+  const seen = new Set<EnvironmentId>();
+  for (const thread of input.visibleThreads) {
+    if (connected.has(thread.environmentId) || seen.has(thread.environmentId)) continue;
+    seen.add(thread.environmentId);
+    offlineEnvironmentIds.push(thread.environmentId);
+  }
+  if (offlineEnvironmentIds.length === 0) return null;
+  if (offlineEnvironmentIds.length === 1) {
+    const onlyId = offlineEnvironmentIds[0]!;
+    const label = input.environmentLabelById.get(onlyId);
+    const message =
+      input.environmentLabelById.size > 1 && label
+        ? `${label} 已断线，连上后处理`
+        : "电脑已断线，连上后处理";
+    return { offlineEnvironmentIds, message };
+  }
+  return {
+    offlineEnvironmentIds,
+    message: `${offlineEnvironmentIds.length} 台电脑已断线，连上后处理`,
+  };
 }
 
 // Suppress trailing double-click navigation; keyboard and synthetic clicks use detail 0.
@@ -1200,10 +1751,16 @@ type SidebarThreadStatusInput = Pick<
     OrchestrationV2PendingRuntimeRequestSummary,
     "kind" | "blocking"
   > | null;
+  readonly source?: {
+    readonly pendingRuntimeRequest?: Pick<
+      OrchestrationV2PendingRuntimeRequestSummary,
+      "kind" | "blocking"
+    > | null;
+  };
 };
 
 export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
-  const request = thread.pendingRuntimeRequest;
+  const request = resolvePendingRuntimeRequest(thread);
   const hasApprovals =
     request !== null && request !== undefined
       ? isBlockingApproval(request.kind, request.blocking)

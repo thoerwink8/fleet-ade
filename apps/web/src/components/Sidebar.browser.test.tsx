@@ -145,6 +145,7 @@ function threadShell(projectId: ProjectId, index: number): EnvironmentThreadShel
     id: ThreadId.make(`thread-${index}`),
     projectId,
     title: `会话 ${index}`,
+    turnCount: 1,
   });
 }
 
@@ -299,6 +300,7 @@ describe("sidebar settled pagination", () => {
         title: `Settled thread ${index}`,
         settledOverride: "settled",
         settledAt: "2026-01-01T00:00:00.000Z",
+        turnCount: 1,
       }),
     );
     threads.unshift(threadShell(activeProject.id, 100));
@@ -375,6 +377,7 @@ describe("sidebar attention offline rows", () => {
       projectId: activeProject.id,
       id: ThreadId.make("failed-offline"),
       title: "Offline failed thread",
+      runtime: null,
       latestRun: {
         runId: RunId.make("run-failed"),
         status: "failed",
@@ -416,7 +419,11 @@ describe("sidebar attention offline rows", () => {
     expect(getComputedStyle(failedRow).opacity).toBe("1");
     expect(failedRow.className).toContain("cursor-default");
     expect(failedRow.getAttribute("aria-disabled")).toBe("true");
-    expect(failedRow.textContent).toContain("电脑已断线，连上后处理");
+    expect(failedRow.textContent).toContain("上一轮出错了，点开处理");
+    expect(failedRow.textContent).not.toContain("电脑已断线，连上后处理");
+    expect(screen.getByTestId("sidebar-offline-banner").element().textContent).toContain(
+      "电脑已断线，连上后处理",
+    );
     await userEvent.click(failedRow, { force: true });
     expect(screen.router?.state.location.pathname).toBe("/local/thread-1");
     failedRow.focus();
@@ -592,12 +599,14 @@ describe("sidebar thread settle", () => {
       projectId: activeProject.id,
       id: ThreadId.make("thread-x"),
       title: "会话 X",
+      turnCount: 1,
     });
     const threadY = makeThreadFixture({
       environmentId: activeProject.environmentId,
       projectId: activeProject.id,
       id: ThreadId.make("thread-y"),
       title: "会话 Y",
+      turnCount: 1,
     });
     const threadXRef: ScopedThreadRef = {
       environmentId: activeProject.environmentId,

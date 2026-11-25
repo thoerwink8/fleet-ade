@@ -81,7 +81,8 @@ export function resolveSidebarRouteReveal<T extends RevealableThread>(input: {
   const widensScope =
     thread !== undefined &&
     scopedProjectKeys !== null &&
-    filterSidebarV2VisibleThreads([thread], scopedProjectKeys, delegatedUnderParent).length === 0 &&
-    filterSidebarV2VisibleThreads([thread], null, delegatedUnderParent).length === 1;
+    filterSidebarV2VisibleThreads([thread], scopedProjectKeys, delegatedUnderParent, pendingKey)
+      .length === 0 &&
+    filterSidebarV2VisibleThreads([thread], null, delegatedUnderParent, pendingKey).length === 1;
   return { pendingKey, widensScope };
 }

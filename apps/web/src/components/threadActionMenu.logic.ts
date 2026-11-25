@@ -70,7 +70,51 @@ export function buildDraftActionMenuItems(options: {
   ];
 }
 
+export type ThreadActionMenuSurface = "sidebar" | "chat-header";
+
+export interface CommanderConfigSettings {
+  readonly commanderInstructions?: string | null | undefined;
+  readonly dispatchCommanderModelSelection?: unknown | null | undefined;
+  readonly dispatchCodeModelSelection?: unknown | null | undefined;
+  readonly dispatchReviewModelSelection?: unknown | null | undefined;
+  readonly dispatchReadonlyModelSelection?: unknown | null | undefined;
+  readonly dispatchPlanModelSelection?: unknown | null | undefined;
+  readonly dispatchConcurrencyLimit?: number | null | undefined;
+  readonly dispatchTimeoutMs?: number | null | undefined;
+  readonly dispatchStopOnTimeout?: boolean | null | undefined;
+}
+
+export function hasCommanderDispatchConfig(
+  settings: CommanderConfigSettings | null | undefined,
+): boolean {
+  if (!settings) return false;
+  return (
+    (settings.commanderInstructions?.trim().length ?? 0) > 0 ||
+    settings.dispatchCommanderModelSelection != null ||
+    settings.dispatchCodeModelSelection != null ||
+    settings.dispatchReviewModelSelection != null ||
+    settings.dispatchReadonlyModelSelection != null ||
+    settings.dispatchPlanModelSelection != null ||
+    settings.dispatchConcurrencyLimit != null ||
+    settings.dispatchTimeoutMs != null ||
+    settings.dispatchStopOnTimeout === true
+  );
+}
+
+export function shouldShowCommanderMenuAction(input: {
+  readonly commanderSupported: boolean;
+  readonly isCommander: boolean;
+  readonly hasAnyCommanderThread: boolean;
+  readonly hasCommanderConfig: boolean;
+}): boolean {
+  return (
+    input.commanderSupported &&
+    (input.isCommander || input.hasAnyCommanderThread || input.hasCommanderConfig)
+  );
+}
+
 export interface ThreadActionMenuState {
+  readonly surface: ThreadActionMenuSurface;
   readonly canOperate: boolean;
   readonly canFind?: boolean;
   readonly canExport?: boolean;
@@ -81,6 +125,8 @@ export interface ThreadActionMenuState {
   } | null;
   readonly isPinned: boolean;
   readonly isCommander?: boolean | undefined;
+  readonly hasAnyCommanderThread?: boolean | undefined;
+  readonly hasCommanderConfig?: boolean | undefined;
   readonly isSettled: boolean;
   readonly autoSettleEnabled: boolean;
   readonly isSnoozed: boolean;
@@ -123,8 +169,17 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
 export function buildThreadActionMenuItems(
   state: ThreadActionMenuState,
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
+  const showCommanderAction = shouldShowCommanderMenuAction({
+    commanderSupported: state.supports.commander === true,
+    isCommander: state.isCommander === true,
+    hasAnyCommanderThread: state.hasAnyCommanderThread === true,
+    hasCommanderConfig: state.hasCommanderConfig === true,
+  });
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
-    ...(state.canFind ? [{ id: "find" as const, label: "在会话中查找", icon: "text-search" }] : []),
+    // Chat-header only: opens in-conversation find bar for the active chat.
+    ...(state.surface === "chat-header" && state.canFind
+      ? [{ id: "find" as const, label: "在会话中查找", icon: "text-search" }]
+      : []),
     ...(state.branch
       ? [
           {
@@ -141,7 +196,7 @@ export function buildThreadActionMenuItems(
             : { id: "pin" as const, label: "置顶会话", icon: "pin" },
         ]
       : []),
-    ...(state.supports.commander
+    ...(showCommanderAction
       ? [
           state.isCommander
             ? { id: "unmark-commander" as const, label: "取消指挥", icon: "flag-off" }
@@ -194,7 +249,8 @@ export function buildThreadActionMenuItems(
     ...(state.attentionDismissible
       ? [{ id: "dismiss-attention" as const, label: "移出等你处理", icon: "bell-off" }]
       : []),
-    ...(state.projectFilter
+    // Sidebar only: scopes the sidebar thread list to the thread's project.
+    ...(state.surface === "sidebar" && state.projectFilter !== null
       ? [
           {
             id: "filter-by-project" as const,
@@ -212,6 +268,7 @@ export function buildThreadActionMenuItems(
             label: "转换为项目",
             icon: "folder-plus",
             disabled: state.isRunning,
+            ...(state.isRunning ? { detail: "运行中，请先停止" } : {}),
           },
         ]
       : []),
@@ -266,6 +323,7 @@ export function buildThreadActionMenuItems(
       label: "归档会话",
       icon: "archive",
       disabled: state.isRunning,
+      ...(state.isRunning ? { detail: "运行中，请先停止" } : {}),
       separatorBefore: true,
     },
     {

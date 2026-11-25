@@ -34,10 +34,18 @@ import {
   type SidebarListItem,
   type SidebarListMarker,
   type SidebarSection,
+  buildMultiSelectThreadMenuItems,
+  buildSidebarListItems,
+  countArchivedThreadsInScope,
+  filterSidebarV2VisibleThreads,
   isThreadAttentionDismissible,
   isThreadAttentionRowDisabled,
   resolveSidebarDropVerb,
+  resolveSidebarOfflineBanner,
+  resolveSidebarRowPresentation,
+  resolveSidebarThreadState,
   resolveThreadAttention,
+  shouldShowSidebarEmptyState,
   threadAttentionSubtitleText,
 } from "./Sidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -649,6 +657,7 @@ function makeThread(overrides: ThreadFixtureOverrides = {}): Thread {
     latestRun: null,
     branch: null,
     worktreePath: null,
+    turnCount: 1,
     ...overrides,
   });
 }
@@ -1838,10 +1847,13 @@ describe("resolveThreadAttention", () => {
     );
 
     expect(threadAttentionSubtitleText({ attention: blocking, attentionOffline: true })).toBe(
-      "电脑已断线，连上后处理",
+      "等你批准，点开处理",
     );
+    expect(
+      threadAttentionSubtitleText({ attention: blocking, attentionOffline: false, isRoute: true }),
+    ).toBe("等你批准");
     expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: true })).toBe(
-      "电脑已断线，连上后处理",
+      "上一轮出错了，点开处理",
     );
     expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: false })).toBe(
       "上一轮出错了，点开处理",
@@ -1852,5 +1864,681 @@ describe("resolveThreadAttention", () => {
     expect(isThreadAttentionDismissible({ attention: blocking, attentionOffline: false })).toBe(
       false,
     );
+  });
+});
+
+describe("resolveSidebarThreadState status × section consistency", () => {
+  const visitedAt = "2026-03-09T10:00:00.000Z";
+  const beforeVisit = "2026-03-09T09:00:00.000Z";
+  const afterVisit = "2026-03-09T11:00:00.000Z";
+  const runningRuntime = {
+    status: "running" as const,
+    activeRunId: RunId.make("run-live"),
+    providerInstanceId: ProviderInstanceId.make("codex"),
+    providerName: "Codex",
+    lastError: null,
+    updatedAt: afterVisit,
+  };
+  const completedRuntime = {
+    ...runningRuntime,
+    status: "completed" as const,
+    activeRunId: null,
+  };
+  const makeRun = (status: "completed" | "failed" | "running", completedAt: string | null) => ({
+    runId: RunId.make(`run-${status}`),
+    status,
+    requestedAt: beforeVisit,
+    startedAt: beforeVisit,
+    completedAt,
+    assistantMessageId: null,
+  });
+
+  const matrix = [
+    {
+      name: "open completed thread leaves attention and shows no unread prompt",
+      thread: makeThreadFixture({
+        latestRun: makeRun("completed", afterVisit),
+        runtime: completedRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: true,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "active",
+      expectedStatus: "ready",
+      expectedMarkLabel: null,
+      expectedHoverLabel: "空闲",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "open seen failed thread leaves attention without reopen prompt",
+      thread: makeThreadFixture({
+        latestRun: makeRun("failed", beforeVisit),
+        runtime: { ...runningRuntime, status: "failed", activeRunId: null, lastError: "boom" },
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: true,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "active",
+      expectedStatus: "failed",
+      expectedMarkLabel: "出错了",
+      expectedHoverLabel: "出错了",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "open thread with blocking approval stays in attention without click-to-open",
+      thread: makeThreadFixture({
+        hasPendingApprovals: true,
+        runtime: runningRuntime,
+      }),
+      isRoute: true,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "attention",
+      expectedStatus: "approval",
+      expectedMarkLabel: "等你批准",
+      expectedHoverLabel: "等你批准",
+      expectedSubtitle: "等你批准",
+      expectedUnread: false,
+    },
+    {
+      name: "working-exit 2s grace stays running visually while in working shelf",
+      thread: makeThreadFixture({
+        latestRun: makeRun("completed", afterVisit),
+        runtime: { ...runningRuntime, status: "completed", activeRunId: null },
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: true,
+      expectedSection: "working",
+      expectedStatus: "working",
+      expectedMarkLabel: "运行中",
+      expectedHoverLabel: "运行中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "idle runtime with awaited background work sits in working with waiting mark",
+      thread: makeThreadFixture({
+        latestRun: makeRun("completed", afterVisit),
+        runtime: { ...runningRuntime, status: "idle", activeRunId: null },
+        pendingBackgroundTasks: [{ taskId: "bg-1", kind: "command", awaited: true }],
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "working",
+      expectedStatus: "waiting",
+      expectedMarkLabel: "等待中",
+      expectedHoverLabel: "等待中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "blockedOnThreadWait with unseen prior run stays in working with waiting mark",
+      thread: makeThreadFixture({
+        blockedOnThreadWait: true,
+        latestRun: makeRun("completed", afterVisit),
+        runtime: runningRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "working",
+      expectedStatus: "waiting",
+      expectedMarkLabel: "等待中",
+      expectedHoverLabel: "等待中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "non-blocking user_input request while running stays in working",
+      thread: {
+        ...makeThreadFixture({
+          hasPendingUserInput: true,
+          runtime: runningRuntime,
+          lastVisitedAt: visitedAt,
+        }),
+        pendingRuntimeRequest: { kind: "user_input" as const, blocking: false },
+      },
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "working",
+      expectedStatus: "working",
+      expectedMarkLabel: "运行中",
+      expectedHoverLabel: "运行中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "running retry after prior failed run leaves attention and shows running",
+      thread: makeThreadFixture({
+        latestRun: makeRun("failed", beforeVisit),
+        runtime: runningRuntime,
+        lastVisitedAt: beforeVisit,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "working",
+      expectedStatus: "working",
+      expectedMarkLabel: "运行中",
+      expectedHoverLabel: "运行中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "running continuation after prior unseen completed run stays in working",
+      thread: makeThreadFixture({
+        latestRun: makeRun("completed", afterVisit),
+        runtime: runningRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "working",
+      expectedStatus: "working",
+      expectedMarkLabel: "运行中",
+      expectedHoverLabel: "运行中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "unseen failed run with cleared runtime stays consistent across attention, dot, and hover card",
+      thread: makeThreadFixture({
+        latestRun: makeRun("failed", afterVisit),
+        runtime: null,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "attention",
+      expectedStatus: "failed",
+      expectedMarkLabel: "出错了",
+      expectedHoverLabel: "出错了",
+      expectedSubtitle: "上一轮出错了，点开处理",
+      expectedUnread: false,
+    },
+    {
+      name: "settled thread with unseen completion stays in settled without unread mark",
+      thread: makeThreadFixture({
+        settledOverride: "settled",
+        settledAt: afterVisit,
+        latestRun: makeRun("completed", afterVisit),
+        runtime: completedRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "settled",
+      expectedStatus: "ready",
+      expectedMarkLabel: null,
+      expectedHoverLabel: "空闲",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "snoozed thread with unseen completion stays in snoozed without unread mark",
+      thread: makeThreadFixture({
+        snoozedUntil: "2099-01-01T00:00:00.000Z",
+        snoozedAt: afterVisit,
+        latestRun: makeRun("completed", afterVisit),
+        runtime: completedRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "snoozed",
+      expectedStatus: "ready",
+      expectedMarkLabel: null,
+      expectedHoverLabel: "空闲",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+    {
+      name: "settled thread with blocking approval moves to attention with approval state",
+      thread: makeThreadFixture({
+        settledOverride: "settled",
+        settledAt: afterVisit,
+        hasPendingApprovals: true,
+        runtime: runningRuntime,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "attention",
+      expectedStatus: "approval",
+      expectedMarkLabel: "等你批准",
+      expectedHoverLabel: "等你批准",
+      expectedSubtitle: "等你批准，点开处理",
+      expectedUnread: false,
+    },
+    {
+      name: "unseen completed non-route thread sits in attention with new-result mark and subtitle",
+      thread: makeThreadFixture({
+        latestRun: makeRun("completed", afterVisit),
+        runtime: completedRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "attention",
+      expectedStatus: "ready",
+      expectedMarkLabel: "有新结果",
+      expectedHoverLabel: "有新结果",
+      expectedSubtitle: "有新结果，点开查看",
+      expectedUnread: true,
+    },
+    {
+      name: "unopened thread asking for input sits in attention and says what it waits for",
+      thread: makeThreadFixture({ hasPendingUserInput: true, runtime: runningRuntime }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "attention",
+      expectedStatus: "input",
+      expectedMarkLabel: "等你回答",
+      expectedHoverLabel: "等你回答",
+      expectedSubtitle: "等你回答，点开处理",
+      expectedUnread: false,
+    },
+    {
+      name: "pinned thread that is running stays pinned and reads as running",
+      thread: makeThreadFixture({
+        pinnedAt: afterVisit,
+        latestRun: makeRun("running", null),
+        runtime: runningRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "pinned",
+      expectedStatus: "working",
+      expectedMarkLabel: "运行中",
+      expectedHoverLabel: "运行中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
+  ] as const;
+
+  it.each(matrix)("$name", (row) => {
+    const resolved = resolveSidebarThreadState({
+      thread: row.thread,
+      lastVisitedAt: row.thread.lastVisitedAt ?? undefined,
+      isRoute: row.isRoute,
+      configLoaded: true,
+      workingShelfEnabled: row.workingShelfEnabled,
+      isWorkingGrace: row.isWorkingGrace,
+      now: "2026-03-09T12:00:00.000Z",
+    });
+    expect(resolved.section).toBe(row.expectedSection);
+    expect(resolved.status).toBe(row.expectedStatus);
+    expect(resolved.rowMark?.label ?? null).toBe(row.expectedMarkLabel);
+    expect(resolved.hoverDot.label).toBe(row.expectedHoverLabel);
+    expect(resolved.subtitle).toBe(row.expectedSubtitle);
+    expect(resolved.isUnread).toBe(row.expectedUnread);
+    if (resolved.section === "attention") {
+      expect(resolved.subtitle).not.toBeNull();
+      expect(resolved.rowMark).not.toBeNull();
+    }
+
+    const rowPresentation = resolveSidebarRowPresentation({
+      section: resolved.section,
+      thread: row.thread,
+      attention: resolved.attention,
+      lastVisitedAt: row.thread.lastVisitedAt ?? undefined,
+      isRoute: row.isRoute,
+      isWoke: false,
+    });
+    expect(rowPresentation.status).toBe(resolved.status);
+    expect(rowPresentation.rowMark).toEqual(resolved.rowMark);
+    expect(rowPresentation.subtitle).toBe(resolved.subtitle);
+    expect(rowPresentation.isUnread).toBe(resolved.isUnread);
+  });
+});
+
+describe("resolveSidebarOfflineBanner", () => {
+  const localEnv = EnvironmentId.make("local");
+  const macEnv = EnvironmentId.make("mac");
+  const linuxEnv = EnvironmentId.make("linux");
+  const labelMap = new Map<EnvironmentId, string>([
+    [localEnv, "本机"],
+    [macEnv, "MacBook"],
+    [linuxEnv, "Linux 服务器"],
+  ]);
+
+  it("returns null when every visible thread environment is connected", () => {
+    expect(
+      resolveSidebarOfflineBanner({
+        visibleThreads: [{ environmentId: localEnv }],
+        connectedEnvironmentIds: [localEnv],
+        environmentLabelById: labelMap,
+      }),
+    ).toBeNull();
+  });
+
+  it("shows generic offline copy in single-environment setups and names the host when multiple exist", () => {
+    expect(
+      resolveSidebarOfflineBanner({
+        visibleThreads: [{ environmentId: localEnv }],
+        connectedEnvironmentIds: [],
+        environmentLabelById: new Map([[localEnv, "本机"]]),
+      }),
+    ).toEqual({
+      offlineEnvironmentIds: [localEnv],
+      message: "电脑已断线，连上后处理",
+    });
+
+    expect(
+      resolveSidebarOfflineBanner({
+        visibleThreads: [{ environmentId: localEnv }, { environmentId: macEnv }],
+        connectedEnvironmentIds: [localEnv],
+        environmentLabelById: labelMap,
+      }),
+    ).toEqual({
+      offlineEnvironmentIds: [macEnv],
+      message: "MacBook 已断线，连上后处理",
+    });
+
+    expect(
+      resolveSidebarOfflineBanner({
+        visibleThreads: [{ environmentId: macEnv }, { environmentId: linuxEnv }],
+        connectedEnvironmentIds: [localEnv],
+        environmentLabelById: labelMap,
+      }),
+    ).toEqual({
+      offlineEnvironmentIds: [macEnv, linuxEnv],
+      message: "2 台电脑已断线，连上后处理",
+    });
+  });
+});
+
+describe("buildSidebarListItems and shouldShowSidebarEmptyState", () => {
+  const baseListInput = {
+    commanderKeys: [] as const,
+    visibleAttentionKeys: [] as const,
+    attentionCount: 0,
+    hiddenAttentionCount: 0,
+    pinnedKeys: [] as const,
+    activeKeys: ["local:a1"] as const,
+    visibleWorkingKeys: [] as const,
+    workingCount: 0,
+    visibleSnoozedKeys: [] as const,
+    snoozedCount: 0,
+    renderedSettledKeys: [] as const,
+    settledCount: 0,
+    isDragging: false,
+  };
+
+  it("omits zero-count headers including settled when idle, and reveals settled drop zone while dragging", () => {
+    const idleItems = buildSidebarListItems(baseListInput);
+    expect(idleItems).toEqual([
+      { kind: "marker", marker: "pinned-header" },
+      { kind: "marker", marker: "pinned-divider" },
+      { kind: "marker", marker: "active-placeholder" },
+      { kind: "thread", key: "local:a1", section: "active" },
+    ]);
+
+    const draggingItems = buildSidebarListItems({ ...baseListInput, isDragging: true });
+    expect(
+      draggingItems.some((item) => item.kind === "marker" && item.marker === "settled-header"),
+    ).toBe(true);
+    expect(
+      draggingItems.some((item) => item.kind === "marker" && item.marker === "settled-placeholder"),
+    ).toBe(true);
+
+    const withSettled = buildSidebarListItems({
+      ...baseListInput,
+      settledCount: 1,
+      renderedSettledKeys: ["local:s1"],
+    });
+    expect(
+      withSettled.some((item) => item.kind === "marker" && item.marker === "settled-header"),
+    ).toBe(true);
+    expect(withSettled.some((item) => item.kind === "thread" && item.key === "local:s1")).toBe(
+      true,
+    );
+  });
+
+  it("never shows empty state when attention threads exist", () => {
+    expect(
+      shouldShowSidebarEmptyState({
+        isSearchingThreads: false,
+        visibleDraftSessionCount: 0,
+        commanderCount: 0,
+        attentionCount: 1,
+        pinnedCount: 0,
+        activeCount: 0,
+        workingCount: 0,
+        snoozedCount: 0,
+        settledCount: 0,
+        hasProjectScope: false,
+        settledShelfExpanded: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowSidebarEmptyState({
+        isSearchingThreads: false,
+        visibleDraftSessionCount: 0,
+        commanderCount: 0,
+        attentionCount: 0,
+        pinnedCount: 0,
+        activeCount: 0,
+        workingCount: 0,
+        snoozedCount: 0,
+        settledCount: 0,
+        hasProjectScope: false,
+        settledShelfExpanded: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowSidebarEmptyState({
+        isSearchingThreads: false,
+        visibleDraftSessionCount: 0,
+        commanderCount: 0,
+        attentionCount: 0,
+        pinnedCount: 0,
+        activeCount: 0,
+        workingCount: 0,
+        snoozedCount: 0,
+        settledCount: 2,
+        hasProjectScope: true,
+        settledShelfExpanded: false,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("buildMultiSelectThreadMenuItems", () => {
+  const presets = [
+    { id: "hour", label: "1 小时后", whenLabel: "15:00", snoozedUntil: "2026-08-07T15:00:00Z" },
+  ];
+  const baseInput = {
+    selectedCount: 3,
+    totalSelectableCount: 5,
+    pinnedCount: 0,
+    canOperatePinned: true,
+    unsettledCount: 2,
+    canOperateUnsettled: true,
+    snoozeableCount: 3,
+    canOperateSnoozeable: true,
+    snoozePresets: presets,
+    titleRegenerationSupportedCount: 3,
+    titleRegenerationInFlightCount: 0,
+    canOperateRegeneratable: true,
+    archiveableCount: 3,
+    canOperateArchiveable: true,
+    canOperateAll: true,
+  };
+
+  it("never emits unarchive and adjusts unpin across unpinned, partial, and all-pinned selections", () => {
+    const hasUnarchive = (items: ReadonlyArray<{ readonly id: string }>) =>
+      items.some((item) => item.id === "unarchive");
+    const allUnpinned = buildMultiSelectThreadMenuItems(baseInput);
+    expect(hasUnarchive(allUnpinned)).toBe(false);
+    expect(allUnpinned.some((item) => item.id === "unpin")).toBe(false);
+    expect(allUnpinned.find((item) => item.id === "select-all")?.label).toBe("全选当前列表");
+    expect(allUnpinned.find((item) => item.id === "delete")).toMatchObject({
+      label: "删除（3）",
+      destructive: true,
+      separatorBefore: true,
+    });
+
+    const partialPinned = buildMultiSelectThreadMenuItems({ ...baseInput, pinnedCount: 1 });
+    expect(hasUnarchive(partialPinned)).toBe(false);
+    expect(partialPinned.find((item) => item.id === "unpin")).toMatchObject({
+      id: "unpin",
+      label: "取消置顶（1）",
+      disabled: false,
+    });
+
+    const allPinned = buildMultiSelectThreadMenuItems({ ...baseInput, pinnedCount: 3 });
+    expect(hasUnarchive(allPinned)).toBe(false);
+    expect(allPinned.find((item) => item.id === "unpin")).toMatchObject({
+      id: "unpin",
+      label: "取消置顶（3）",
+      disabled: false,
+    });
+  });
+
+  it("hides inapplicable actions and explains disabled archive when all selected threads are running", () => {
+    const allSettled = buildMultiSelectThreadMenuItems({
+      ...baseInput,
+      totalSelectableCount: 3,
+      unsettledCount: 0,
+      snoozeableCount: 0,
+      titleRegenerationSupportedCount: 0,
+      archiveableCount: 0,
+    });
+    expect(allSettled.some((item) => item.id === "settle")).toBe(false);
+    expect(allSettled.some((item) => item.id === "snooze")).toBe(false);
+    expect(allSettled.some((item) => item.id === "regenerate-title")).toBe(false);
+    expect(allSettled.some((item) => item.id === "select-all")).toBe(false);
+    expect(allSettled.some((item) => String(item.id) === "unarchive")).toBe(false);
+    expect(allSettled.find((item) => item.id === "archive")).toMatchObject({
+      id: "archive",
+      label: "归档（3）",
+      disabled: true,
+      detail: "运行中，请先停止",
+    });
+
+    const partialRunning = buildMultiSelectThreadMenuItems({
+      ...baseInput,
+      archiveableCount: 2,
+    });
+    expect(partialRunning.find((item) => item.id === "archive")).toMatchObject({
+      id: "archive",
+      label: "归档（2）",
+      disabled: false,
+    });
+  });
+});
+
+describe("countArchivedThreadsInScope", () => {
+  const envA = EnvironmentId.make("env-a");
+  const envB = EnvironmentId.make("env-b");
+  const archivedAt = DateTime.makeUnsafe("2026-03-01T00:00:00.000Z");
+  const snap = (
+    environmentId: EnvironmentId,
+    threads: Array<{
+      id: string;
+      projectId: string;
+      archivedAt: DateTime.Utc | null;
+      deletedAt?: DateTime.Utc | null;
+    }>,
+  ) => ({
+    environmentId,
+    snapshot: {
+      projects: [],
+      threads: threads.map((t) => ({
+        ...makeThreadFixture({
+          environmentId,
+          id: ThreadId.make(t.id),
+          projectId: ProjectId.make(t.projectId),
+        }).source,
+        archivedAt: t.archivedAt,
+        deletedAt: t.deletedAt ?? null,
+      })),
+    },
+  });
+
+  it("counts unique archived non-deleted threads within optional project scope", () => {
+    const snapshots = [
+      snap(envA, [
+        { id: "arch-1", projectId: "p1", archivedAt },
+        { id: "arch-2", projectId: "p2", archivedAt },
+        { id: "active-1", projectId: "p1", archivedAt: null },
+        { id: "deleted-1", projectId: "p1", archivedAt, deletedAt: archivedAt },
+      ]),
+      snap(envB, [
+        { id: "arch-1", projectId: "p1", archivedAt },
+        { id: "arch-3", projectId: "p2", archivedAt },
+      ]),
+    ];
+
+    expect(countArchivedThreadsInScope({ snapshots: [], scopedProjectKeys: null })).toBe(0);
+    expect(countArchivedThreadsInScope({ snapshots, scopedProjectKeys: null })).toBe(4);
+    expect(
+      countArchivedThreadsInScope({
+        snapshots,
+        scopedProjectKeys: new Set(["env-a:p1", "env-b:p1"]),
+      }),
+    ).toBe(2);
+  });
+});
+
+describe("filterSidebarV2VisibleThreads", () => {
+  it("hides never-messaged empty threads except the active route row, while keeping messaged siblings", () => {
+    const emptyHidden = makeThreadFixture({
+      id: ThreadId.make("empty-hidden"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "新会话",
+    });
+    const emptyRoute = makeThreadFixture({
+      id: ThreadId.make("empty-route"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "打开中的空会话",
+    });
+    const messagedA = makeThreadFixture({
+      id: ThreadId.make("messaged-a"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "同名会话",
+      turnCount: 1,
+    });
+    const messagedB = makeThreadFixture({
+      id: ThreadId.make("messaged-b"),
+      environmentId: localEnvironmentId,
+      projectId: ProjectId.make("project-1"),
+      title: "同名会话",
+      latestUserMessageAt: "2026-03-09T10:01:00.000Z",
+    });
+
+    const routeRowThreadKey = `${localEnvironmentId}:${emptyRoute.id}`;
+    const visible = filterSidebarV2VisibleThreads(
+      [emptyHidden, emptyRoute, messagedA, messagedB],
+      null,
+      new Set(),
+      routeRowThreadKey,
+    );
+
+    expect(visible.map((thread) => thread.id)).toEqual([emptyRoute.id, messagedA.id, messagedB.id]);
   });
 });

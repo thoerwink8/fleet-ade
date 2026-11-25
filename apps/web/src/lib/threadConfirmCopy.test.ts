@@ -34,7 +34,7 @@ describe("thread confirmation copy", () => {
       name: "delete many",
       copy: batchDeleteConfirmCopy(2),
       title: "删除 2 个会话？",
-      confirmLabel: "删除",
+      confirmLabel: "删除 2 个会话",
       destructive: true,
     },
     {
