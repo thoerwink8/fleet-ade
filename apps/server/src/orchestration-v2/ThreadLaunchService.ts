@@ -1002,7 +1002,7 @@ const make = Effect.gen(function* () {
             runId,
             failure: makeProviderFailure({
               cause,
-              message: failureDetail(cause),
+              message: setupFailure(cause)?.detail ?? failureDetail(cause),
               class: "validation_error",
               retryable: false,
             }),

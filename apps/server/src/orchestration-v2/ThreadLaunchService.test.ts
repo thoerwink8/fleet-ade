@@ -1346,8 +1346,8 @@ it.effect("shows the fetch diagnosis when preparing a worktree from origin fails
       projection.turnItems.find((item) => item.type === "command_execution")?.status,
       "failed",
     );
-    assert.include(
-      projection.turnItems.find((item) => item.type === "error")?.failure.message ?? "",
+    assert.equal(
+      projection.turnItems.find((item) => item.type === "error")?.failure.message,
       detail,
     );
     assert.equal(harness.createWorktree.mock.calls.length, 0);

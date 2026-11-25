@@ -517,6 +517,30 @@ describe("describeVersionControlError", () => {
     ).toBe("请选择其他目录，或移走同名文件后重试。");
   });
 
+  it("shows only the Chinese next step for a reasoned failure and keeps the detail for the disclosure", () => {
+    const detail =
+      "Git could not reach the remote. Check the server's network connection and remote host, then retry.";
+    const presentation = presentVcsSnapshotFailure(
+      snapshotFailure({ action: "create_worktree", reason: "network_unreachable", detail }),
+      "准备工作树",
+    );
+
+    expect(presentation.description).toBe(
+      "请检查网络连接，确认能访问远端仓库所在的主机，然后重试。",
+    );
+    expect(presentation.description).not.toContain(detail);
+    expect(presentation.collapseDetail).toBe(true);
+    expect(presentation.detail).toBe(detail);
+  });
+
+  it("keeps the raw detail visible for a worktree failure without a reason code", () => {
+    const { reason: _reason, ...unreasoned } = snapshotFailure({ action: "create_worktree" });
+    const presentation = presentVcsSnapshotFailure(unreasoned, "准备工作树");
+
+    expect(presentation.collapseDetail).toBe(false);
+    expect(presentation.description).toContain(rawDetail);
+  });
+
   it("keeps the legacy worktree error when an older snapshot has no failure", () => {
     expect(worktreeSetupFailureDescription(undefined, "旧的英文错误")).toBe("旧的英文错误");
   });
