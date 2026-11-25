@@ -29,6 +29,19 @@ const StashEntrySchema = Schema.Struct({
 });
 export type PromptStashEntry = typeof StashEntrySchema.Type;
 
+export interface StashRestoreAnchor {
+  readonly index: number;
+  readonly beforeId: string | null;
+  readonly afterId: string | null;
+}
+
+export interface StashEntryOptions {
+  /** `"keep"` retains older entries past `MAX_STASH_ENTRIES` instead of silently dropping the oldest. */
+  readonly overflow?: "evict" | "keep";
+  /** Keeps the entry in memory if browser storage rejects the write, so user text is never dropped. */
+  readonly keepInMemoryOnWriteFailure?: boolean;
+}
+
 const PersistedPromptStashState = Schema.Struct({
   entries: Schema.Array(StashEntrySchema),
 });
@@ -130,17 +143,51 @@ function latestEntries(memory: ReadonlyArray<PromptStashEntry>): ReadonlyArray<P
   return stored.map((entry) => memoryById.get(entry.id) ?? entry);
 }
 
+function resolveAnchorInsertIndex(
+  entries: ReadonlyArray<PromptStashEntry>,
+  anchor: StashRestoreAnchor | null | undefined,
+): number {
+  if (!anchor) return 0;
+  if (anchor.beforeId !== null) {
+    const beforeIndex = entries.findIndex((candidate) => candidate.id === anchor.beforeId);
+    if (beforeIndex >= 0) return beforeIndex;
+  }
+  if (anchor.afterId !== null) {
+    const afterIndex = entries.findIndex((candidate) => candidate.id === anchor.afterId);
+    if (afterIndex >= 0) return afterIndex + 1;
+  }
+  return Math.min(Math.max(0, anchor.index), entries.length);
+}
+
 interface PromptStashStoreState {
   entries: ReadonlyArray<PromptStashEntry>;
-  stashEntry: (entry: PromptStashEntry) => {
+  /** Incremented only when a new entry is stashed, driving the badge pulse across manual and automatic stashes. */
+  stashSeq: number;
+  stashEntry: (
+    entry: PromptStashEntry,
+    options?: StashEntryOptions,
+  ) => {
     evicted: PromptStashEntry | null;
-    /** False when the write failed outright (e.g. quota); nothing was kept. */
+    overflowed: boolean;
+    /** False when the write failed outright (e.g. quota) and keepInMemoryOnWriteFailure was not requested. */
     written: boolean;
     /** False for failed writes or in-memory fallback; the entry will not survive reload. */
     durable: boolean;
   };
   /** durable=false means removal was not persisted and reload would restore the entry. */
-  takeEntry: (entryId: string) => { entry: PromptStashEntry | null; durable: boolean };
+  takeEntry: (entryId: string) => {
+    entry: PromptStashEntry | null;
+    durable: boolean;
+    anchor: StashRestoreAnchor | null;
+  };
+  insertEntry: (
+    entry: PromptStashEntry,
+    anchor?: StashRestoreAnchor | null,
+  ) => {
+    inserted: boolean;
+    written: boolean;
+    durable: boolean;
+  };
   /** attached=false means the entry disappeared while encoding, so images could not be saved. */
   finalizeEntryImages: (
     entryId: string,
@@ -154,25 +201,53 @@ interface PromptStashStoreState {
 
 export const usePromptStashStore = create<PromptStashStoreState>()((set, get) => ({
   entries: [],
-  stashEntry: (entry) => {
+  stashSeq: 0,
+  stashEntry: (entry, options) => {
+    const overflow = options?.overflow ?? "evict";
     const nextEntries = [entry, ...latestEntries(get().entries)];
-    const evicted = nextEntries.length > MAX_STASH_ENTRIES ? (nextEntries.pop() ?? null) : null;
+    const evicted =
+      overflow === "evict" && nextEntries.length > MAX_STASH_ENTRIES
+        ? (nextEntries.pop() ?? null)
+        : null;
+    const overflowed = nextEntries.length > MAX_STASH_ENTRIES;
     const { written, durable } = persistEntries(nextEntries);
-    // Failed writes must not duplicate the intact composer; eviction also commits only on success.
-    if (!written) {
-      return { evicted: null, written: false, durable: false };
+    // Manual stashes leave the composer intact when storage rejects writes; auto-stashes keep memory state.
+    if (!written && options?.keepInMemoryOnWriteFailure !== true) {
+      return { evicted: null, overflowed: false, written: false, durable: false };
     }
-    set(() => ({ entries: nextEntries }));
-    return { evicted, written: true, durable };
+    set((state) => ({ entries: nextEntries, stashSeq: state.stashSeq + 1 }));
+    return {
+      evicted,
+      overflowed,
+      written: true,
+      durable: written ? durable : false,
+    };
   },
   takeEntry: (entryId) => {
     const entries = latestEntries(get().entries);
-    const entry = entries.find((candidate) => candidate.id === entryId) ?? null;
-    if (!entry) return { entry: null, durable: true };
+    const index = entries.findIndex((candidate) => candidate.id === entryId);
+    const entry = index === -1 ? null : entries[index]!;
+    if (!entry) return { entry: null, durable: true, anchor: null };
+    const anchor: StashRestoreAnchor = {
+      index,
+      beforeId: entries[index + 1]?.id ?? null,
+      afterId: entries[index - 1]?.id ?? null,
+    };
     const nextEntries = entries.filter((candidate) => candidate.id !== entryId);
     const { durable } = persistEntries(nextEntries);
     set(() => ({ entries: nextEntries }));
-    return { entry, durable };
+    return { entry, durable, anchor };
+  },
+  insertEntry: (entry, anchor) => {
+    const entries = latestEntries(get().entries);
+    if (entries.some((candidate) => candidate.id === entry.id)) {
+      return { inserted: false, written: true, durable: storageIsDurable };
+    }
+    const targetIndex = resolveAnchorInsertIndex(entries, anchor);
+    const nextEntries = [...entries.slice(0, targetIndex), entry, ...entries.slice(targetIndex)];
+    const { written, durable } = persistEntries(nextEntries);
+    set(() => ({ entries: nextEntries }));
+    return { inserted: true, written, durable };
   },
   finalizeEntryImages: (entryId, images) => {
     const entries = latestEntries(get().entries);

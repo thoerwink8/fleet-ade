@@ -1,6 +1,7 @@
 import type { ChatComposerProps } from "./ChatComposer";
 import {
   type ComposerContextRecord,
+  type EnvironmentContextRecord,
   type EnvironmentId,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   type PreviewAnnotationPayload,
@@ -25,6 +26,7 @@ import {
   partitionStashAttachments,
   usePromptStashStore,
 } from "../../promptStashStore";
+import { deleteStashEntryWithUndo, registerEvictedStashUndo } from "./composerStashUndo";
 import { type PendingUserInput } from "../../session-logic";
 import { type ReviewCommentContext } from "../../reviewCommentContext";
 import { collapseExpandedComposerCursor } from "../../composer-logic";
@@ -93,6 +95,7 @@ export function useComposerStash(input: {
   readonly composerPreviewAnnotations: ReadonlyArray<PreviewAnnotationPayload>;
   readonly composerReviewComments: ReadonlyArray<ReviewCommentContext>;
   readonly composerThreadContexts: ReadonlyArray<ThreadContextRecord>;
+  readonly composerEnvironmentContexts: ReadonlyArray<EnvironmentContextRecord>;
   readonly attachmentTargetKey: string;
   readonly isComposerDraftTargetOpen: (targetKey: string) => boolean;
   readonly composerEditorRef: RefObject<ComposerPromptEditorHandle | null>;
@@ -123,6 +126,7 @@ export function useComposerStash(input: {
     composerPreviewAnnotations,
     composerReviewComments,
     composerThreadContexts,
+    composerEnvironmentContexts,
     attachmentTargetKey,
     isComposerDraftTargetOpen,
     composerEditorRef,
@@ -151,9 +155,10 @@ export function useComposerStash(input: {
     (store) => store.clearComposerPromptAndImages,
   );
   const setComposerDraftThreadContexts = useComposerDraftStore((store) => store.setThreadContexts);
+  const setComposerDraftEnvironmentContexts = useComposerDraftStore(
+    (store) => store.setEnvironmentContexts,
+  );
   const [isStashMenuOpen, setIsStashMenuOpen] = useState(false);
-  // Each stash bumps the key; the badge replays its one-shot pulse animation per key.
-  const [stashPulseKey, setStashPulseKey] = useState(0);
   const stashInFlightRef = useRef<Set<string>>(new Set());
   const pendingStashAbortRef = useRef<{
     readonly targetKey: string;
@@ -171,13 +176,13 @@ export function useComposerStash(input: {
   }, [attachmentTargetKey]);
 
   const stashQueue = usePromptStashStore((state) => state.entries);
+  const stashSeq = usePromptStashStore((state) => state.stashSeq);
+  // The sequence is global; counting from mount keeps a remounted composer from pulsing for old stashes.
+  const [initialStashSeq] = useState(stashSeq);
+  const stashPulseKey = stashSeq - initialStashSeq;
   const stashEntryToQueue = usePromptStashStore((state) => state.stashEntry);
   const takeStashEntry = usePromptStashStore((state) => state.takeEntry);
   const finalizeStashEntryImages = usePromptStashStore((state) => state.finalizeEntryImages);
-
-  const pulseStashBadge = () => {
-    setStashPulseKey((key) => key + 1);
-  };
 
   const restoreStashEntry = async (menuEntry: PromptStashEntry) => {
     const filesToVerify = menuEntry.files ?? [];
@@ -454,27 +459,27 @@ export function useComposerStash(input: {
   };
   const restoreStashEntryStable = useStableCallback(restoreStashEntry);
 
-  const deleteStashEntry = (entry: PromptStashEntry) => {
-    const { entry: removed, durable } = takeStashEntry(entry.id);
-    if (!stashQueue.some((candidate) => candidate.id !== entry.id)) {
-      setIsStashMenuOpen(false);
-    }
-    if (durable && removed) {
-      for (const file of removed.files ?? []) {
-        releasePersistedAttachmentUpload({
-          id: file.id,
-          environmentId: file.environmentId,
-          attachmentId: file.attachmentId,
-        });
-      }
-    }
-    if (!durable) {
+  const restoreStashEntryById = async (entryId: string) => {
+    const entry = usePromptStashStore
+      .getState()
+      .entries.find((candidate) => candidate.id === entryId);
+    if (!entry) {
       toastManager.add({
-        type: "warning",
-        title: "暂存条目可能会再次出现",
-        description: "浏览器存储拒绝了删除操作，所以刷新后这条提示词可能再次出现。",
+        type: "info",
+        title: "这条暂存已不在列表中",
+        description: "它可能已经被恢复或删除了。",
         data: { hideCopyButton: true },
       });
+      return;
+    }
+    await restoreStashEntry(entry);
+  };
+  const restoreStashEntryByIdStable = useStableCallback(restoreStashEntryById);
+
+  const deleteStashEntry = (entry: PromptStashEntry) => {
+    const { deleted, remainingCount } = deleteStashEntryWithUndo(entry);
+    if (deleted && remainingCount === 0) {
+      setIsStashMenuOpen(false);
     }
   };
   const deleteStashEntryStable = useStableCallback(deleteStashEntry);
@@ -562,11 +567,14 @@ export function useComposerStash(input: {
     const images = [...attachmentDraft.images];
     const files = [...attachmentDraft.files];
     const latestThreadContexts = latestDraft?.threadContexts ?? composerThreadContexts;
+    const latestEnvironmentContexts =
+      latestDraft?.environmentContexts ?? composerEnvironmentContexts;
     const latestReviewComments = latestDraft?.reviewComments ?? composerReviewComments;
     const latestPreviewAnnotations = latestDraft?.previewAnnotations ?? composerPreviewAnnotations;
     const stashedRecords: ComposerContextRecord[] = [
       ...(replyTo ? [replyTo] : []),
       ...latestThreadContexts,
+      ...latestEnvironmentContexts,
       ...readTerminalContexts().map(terminalContextRecord),
       ...latestReviewComments.map(reviewCommentContextRecord),
       ...latestPreviewAnnotations.map((annotation) =>
@@ -668,6 +676,7 @@ export function useComposerStash(input: {
       clearComposerDraftPromptAndImages(stashTarget);
       clearComposerDraftTerminalContexts(stashTarget);
       setComposerDraftThreadContexts(stashTarget, []);
+      setComposerDraftEnvironmentContexts(stashTarget, []);
       setComposerDraftReplyTo(stashTarget, null);
       for (const comment of latestReviewComments) {
         removeComposerDraftReviewComment(stashTarget, comment.id);
@@ -682,21 +691,13 @@ export function useComposerStash(input: {
       }
       setComposerCursor(0);
       setComposerTrigger(null);
-      pulseStashBadge();
 
       if (evicted) {
-        for (const file of evicted.files ?? []) {
-          releasePersistedAttachmentUpload({
-            id: file.id,
-            environmentId: file.environmentId,
-            attachmentId: file.attachmentId,
-          });
-        }
-        toastManager.add({
-          type: "warning",
-          title: "已丢弃最早的暂存提示词",
-          description: `暂存最多保留 ${MAX_STASH_ENTRIES} 条提示词，已删除最早的一条以腾出空间。`,
-          data: { hideCopyButton: true },
+        const lastRemaining = usePromptStashStore.getState().entries.at(-1);
+        registerEvictedStashUndo(evicted, {
+          index: MAX_STASH_ENTRIES,
+          beforeId: null,
+          afterId: lastRemaining?.id ?? null,
         });
       }
 
@@ -815,6 +816,7 @@ export function useComposerStash(input: {
     setIsStashMenuOpen,
     stashPulseKey,
     restoreStashEntryStable,
+    restoreStashEntryByIdStable,
     deleteStashEntryStable,
     toggleStashMenuStable,
   };
