@@ -73,7 +73,7 @@ The most common defect in this repo is a change that works on the path you teste
 
 ## Dev servers
 
-- Four commands run this checkout: `pnpm dev`, `pnpm start`, `pnpm stop`, and `pnpm check`. What each one does is in the README section 「本仓运行方式」. `pnpm check` is the Linux full run CI uses. On Windows, day-to-day checks stay `pnpm check:changed`.
+- Four commands run this checkout: `pnpm dev`, `pnpm start`, `pnpm stop`, and `pnpm check`. What each one does is in the README section 「本仓运行方式」. On Windows, day-to-day checks stay `pnpm check:changed`.
 - `vp i` installs. Worktrees get this from the t3.json setup script; if module resolution looks broken, it probably did not run.
 - Setup runs in the background. While `.t3/setup-running` names a live PID, wait for it and do not run `vp i`. It ends with `.t3/setup-done` or `.t3/setup-failed` (with the error tail). With no marker at all, setup never ran here, so run `vp i` yourself.
 - `pnpm dev` starts server and web through `scripts/dev-runner.ts` and records the child pid and ports in `_tmp/run/dev.json`. In a worktree, state defaults to that worktree's gitignored `.t3`, which outranks an ambient `T3CODE_HOME`; `--home-dir <path>` or `--base-dir` wins.
@@ -98,7 +98,7 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 - Before you push, run `pnpm check:changed`. It runs the fast checks for changed files: format, lint, knip, typecheck of affected packages and dependents, tests beside changes, and the cross-file checks those miss. CI runs `pnpm check` (lint, the interface English scan, doc links, typecheck, full Linux tests).
 - While you iterate, run `vp test run <files>`. For big files, add `-t "<name>"`.
-- Run commands with the Node pinned in `engines`; the repo refuses other versions. Never write "main is already red" without a root cause. Server suites that assume POSIX paths are skipped on Windows, and CI on Linux decides.
+- Run commands with the Node pinned in `engines`; the repo refuses other versions. Never write "main is already red" without a root cause.
 - Use `vp run typecheck`; it caches per package. Each package runs `effect-tsgo tsrs --noEmit`, the Rust TypeScript 7 checker with Effect's diagnostics built in. There is no `typescript` package to run.
 - Run `node -e` snippets from `apps/server` or the owning package. `effect` does not resolve from the repo root.
 - Test behavior that can break, such as orchestration and event-sourcing, provider protocol translation, auth and permission guards, persistence and migrations, external-format parsing, race fixes, and the logic a bug fix changed. Leave out tests for what types already guarantee, trivial logic, copy text, smoke runs, mock-call mirrors, callback wiring, and props rendered to static markup.
@@ -129,7 +129,7 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 - User-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web. The primary agent does this once after integrating. Subagents do not launch their own dev servers.
 
-- Real agent turns cost money. To watch a turn stream through the pipeline and UI, use the free `Replay (dev)` provider that `pnpm dev` registers; [test-t3-app](.agents/skills/test-t3-app/SKILL.md) shows how to start one. Use a real provider only when the change depends on that provider's behavior, and then pick its cheapest model, such as Haiku for Claude or Luna for Codex.
+- Real agent turns cost money. To watch a turn stream through the pipeline and UI, use the free `Replay (dev)` provider that `pnpm dev` registers ([test-t3-app](.agents/skills/test-t3-app/SKILL.md) shows how), and check the picker says it before the first message: a new thread can default to a real provider. Use a real one only when the change depends on it, with its cheapest model (Haiku for Claude, Luna for Codex).
 
 ## Evals
 
