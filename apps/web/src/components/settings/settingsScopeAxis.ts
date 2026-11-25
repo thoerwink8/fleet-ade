@@ -1,4 +1,6 @@
+import type { ConnectionTarget } from "@t3tools/client-runtime/connection";
 import { fileBasename } from "@t3tools/shared/path";
+import { isDesktopLocalConnectionTarget } from "../../connection/desktopLocal";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import type { EnvironmentPresentation } from "../../state/environments";
 import type { ResolvedSettingsScope, SettingsScopeSearch } from "./settingsScope";
@@ -169,7 +171,18 @@ export function settingsScopeControlsVisible(
   return environmentCount > 1 || projectCount > 1;
 }
 
-/** Fleet and connection entries compare computers; one computer has nothing to compare. */
-export function multiEnvironmentControlsVisible(environmentCount: number): boolean {
-  return environmentCount > 1;
+/**
+ * Fleet and connection entries compare and manage computers. They stay hidden only while the one
+ * computer is this machine; a lone remote computer still needs them to be managed or removed.
+ */
+export function multiEnvironmentControlsVisible(
+  environments: ReadonlyArray<{ readonly entry: { readonly target: ConnectionTarget } }>,
+): boolean {
+  if (environments.length > 1) return true;
+  const only = environments[0];
+  return (
+    only !== undefined &&
+    only.entry.target._tag !== "PrimaryConnectionTarget" &&
+    !isDesktopLocalConnectionTarget(only.entry.target)
+  );
 }

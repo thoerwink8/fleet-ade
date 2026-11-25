@@ -232,7 +232,7 @@ function SidebarUtilityItem({
 
 const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const { environments } = useEnvironments();
-  const showMultiEnvironment = multiEnvironmentControlsVisible(environments.length);
+  const showMultiEnvironment = multiEnvironmentControlsVisible(environments);
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
   const { isMobile, setOpenMobile } = useSidebar();

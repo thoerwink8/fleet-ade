@@ -135,9 +135,7 @@ export function SidebarHeaderActions({
                   type="button"
                   aria-label={`按项目筛选会话，当前是${projectScopeLabel}`}
                   onClick={onOpenProjectScope}
-                  // Hit testing must stay on the actual button; wrappers are not returned as buttons.
-                  // oxlint-disable-next-line shadcn/no-restyle
-                  className="ade-touch-target ade-touch-target--y max-w-40 min-w-0 shrink"
+                  size="scope"
                 />
               }
             >

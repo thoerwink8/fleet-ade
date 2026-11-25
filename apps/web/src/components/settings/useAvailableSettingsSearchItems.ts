@@ -49,6 +49,6 @@ export function useAvailableSettingsSearchItems() {
     hasThreadAutoSettlement,
     hasPeerLinkHost,
     hasPrimaryEnvironment: primaryEnvironmentId !== null,
-    hasMultipleEnvironments: multiEnvironmentControlsVisible(environments.length),
+    hasMultipleEnvironments: multiEnvironmentControlsVisible(environments),
   });
 }

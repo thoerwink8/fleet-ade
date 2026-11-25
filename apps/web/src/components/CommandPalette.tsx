@@ -1709,7 +1709,7 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
-  if (multiEnvironmentControlsVisible(environments.length)) {
+  if (multiEnvironmentControlsVisible(environments)) {
     actionItems.push({
       kind: "action",
       value: "action:fleet",

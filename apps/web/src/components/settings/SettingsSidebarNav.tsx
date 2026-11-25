@@ -93,7 +93,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { environments } = useEnvironments();
-  const showConnections = multiEnvironmentControlsVisible(environments.length);
+  const showConnections = multiEnvironmentControlsVisible(environments);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems();
