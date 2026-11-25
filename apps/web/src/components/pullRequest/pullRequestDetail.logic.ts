@@ -48,7 +48,7 @@ import {
   visibleThreadPullRequests,
 } from "@t3tools/client-runtime/thread-pull-requests";
 
-import { describeVersionControlError } from "../versionControlError.logic";
+import { describeVersionControlError, joinNextStepAndDetail } from "../versionControlError.logic";
 import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/reviewCommentContext";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
@@ -1380,11 +1380,7 @@ export function checkoutFailureDescription(failure: unknown): string {
   const detail = readableFailure(failure.detail, "");
   if (detail.length === 0) return hint;
   const { nextStep } = describeVersionControlError(failure);
-  return nextStep === undefined
-    ? detail
-    : `${nextStep}
-
-${detail}`;
+  return joinNextStepAndDetail(nextStep, detail);
 }
 
 export function resolveBaseFreshness(detail: {

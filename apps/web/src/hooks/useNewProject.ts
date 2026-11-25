@@ -54,7 +54,7 @@ export function useNewProject() {
           stackedThreadToast({
             type: "error",
             title: presentation.title,
-            description: `${presentation.description} 请使用 Git 菜单中的“发布仓库”重试。`,
+            description: `${presentation.description} 之后也可以在 Git 菜单中选择“发布仓库”。`,
           }),
         );
       }

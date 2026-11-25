@@ -977,16 +977,12 @@ describe("what to say when an action fails", () => {
       });
     expect(
       checkoutFailureDescription(diagnostic("git worktree add failed", "path_already_exists")),
-    ).toBe("请选择其他目录，或移走同名文件后重试。\n\ngit worktree add failed");
+    ).toBe("请选择其他目录，或移走同名文件后重试。详情：git worktree add failed");
     const reason = "The worktree directory already exists. Choose another directory.";
-    const nextStep = "请查看下方细节，处理后重试。";
-    expect(checkoutFailureDescription(diagnostic(reason))).toBe(`${nextStep}
-
-${reason}`);
+    const nextStep = "请根据详情中的原因处理，然后重试。";
+    expect(checkoutFailureDescription(diagnostic(reason))).toBe(`${nextStep}详情：${reason}`);
     expect(checkoutFailureDescription(diagnostic("x".repeat(900)))).toBe(
-      `${nextStep}
-
-${"x".repeat(319)}…`,
+      `${nextStep}详情：${"x".repeat(319)}…`,
     );
     for (const failure of [undefined, diagnostic(""), diagnostic("exited with code 1")]) {
       expect(checkoutFailureDescription(failure)).toBe(
