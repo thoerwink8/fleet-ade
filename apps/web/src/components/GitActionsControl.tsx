@@ -126,6 +126,7 @@ import {
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { useOpenLink } from "~/lib/useOpenLink";
+import { VersionControlErrorDetail } from "./VersionControlErrorDetail";
 import {
   presentVersionControlError,
   type VersionControlErrorToastPresentation,
@@ -877,9 +878,10 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 {publishError.nextStep ? (
                   <p className="mt-0.5 text-destructive/90">{publishError.nextStep}</p>
                 ) : null}
-                <p className="mt-0.5 whitespace-pre-wrap text-destructive/90">
-                  {publishError.detail}
-                </p>
+                <VersionControlErrorDetail
+                  error={publishError}
+                  className="mt-0.5 text-destructive/90"
+                />
               </div>
             ) : null}
           </div>
@@ -1605,7 +1607,7 @@ export default function GitActionsControl({
           {gitStatusErrorPresentation.nextStep ? (
             <p>{gitStatusErrorPresentation.nextStep}</p>
           ) : null}
-          <p>{gitStatusErrorPresentation.detail}</p>
+          <VersionControlErrorDetail error={gitStatusErrorPresentation} />
         </div>
       )}
     </>

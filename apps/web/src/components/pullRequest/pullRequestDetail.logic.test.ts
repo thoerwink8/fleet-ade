@@ -977,7 +977,7 @@ describe("what to say when an action fails", () => {
       });
     expect(
       checkoutFailureDescription(diagnostic("git worktree add failed", "path_already_exists")),
-    ).toBe("请选择其他目录，或移走同名文件后重试。详情：git worktree add failed");
+    ).toBe("请选择其他目录，或移走同名文件后重试。");
     const reason = "The worktree directory already exists. Choose another directory.";
     const nextStep = "请根据详情中的原因处理，然后重试。";
     expect(checkoutFailureDescription(diagnostic(reason))).toBe(`${nextStep}详情：${reason}`);
