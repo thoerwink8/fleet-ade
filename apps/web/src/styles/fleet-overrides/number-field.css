@@ -4,9 +4,14 @@
   gap: 0;
   padding: 0;
   height: auto;
-  /* The frame holds the step; the steppers and input sit inside it, so its height comes from here. */
-  min-height: var(--fa-ctrl);
   overflow: visible;
+}
+
+/* The steppers sit inside the frame, so the frame sets the height: 32, or 28 at sm. */
+@media (min-width: 640px) {
+  .ade-number-field-group {
+    min-height: var(--fa-ctrl);
+  }
 }
 
 [data-slot="number-field"][data-size="sm"] .ade-number-field-group {
