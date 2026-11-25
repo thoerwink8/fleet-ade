@@ -262,7 +262,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
             {isSearching && results.length === 0 ? (
               <p
                 role="status"
-                className="px-2 py-6 text-center text-ui text-sidebar-muted-foreground"
+                className="px-2 py-6 text-center text-meta text-sidebar-muted-foreground"
               >
                 未找到设置
               </p>

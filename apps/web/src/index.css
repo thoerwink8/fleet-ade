@@ -102,8 +102,8 @@
   /* Page header title, and dialog or sheet title. */
   --font-size-title: 0.9375rem;
   --line-height-title: 1.375rem;
-  --font-size-dialog-title: 1rem;
-  --line-height-dialog-title: 1.5rem;
+  --font-size-dialog-title: 1.125rem;
+  --line-height-dialog-title: 1.75rem;
   --thread-details-panel-width: 17.5rem;
   /* Below 640px the composer is at least 16px: iOS zooms on focus under that. */
   --font-size-prompt-touch: max(var(--font-size-prompt, 1rem), 16px);
