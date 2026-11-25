@@ -38,7 +38,7 @@ const contextChipVariants = cva(
       },
       shape: {
         inline: "",
-        bubble: "w-64 gap-2 rounded-2xl bg-message px-3 py-2 text-sm text-message-foreground",
+        bubble: "w-64 gap-2 rounded-xl bg-message px-3 py-2 text-sm text-message-foreground",
       },
       state: {
         unresolved: "data-[state=unresolved]:[--context-chip-accent:currentColor]",
