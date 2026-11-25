@@ -409,7 +409,7 @@ layer("ProviderEventIngestorV2", (it) => {
   const ingestRosterUpdate = (input: {
     readonly ingestor: ProviderEventIngestor.ProviderEventIngestorV2["Service"];
     readonly providerSessionId: ProviderSessionId;
-    readonly threadId: typeof ThreadId.Type;
+    readonly threadId: ThreadId;
     readonly providerThreadId: ProviderThreadId;
     readonly now: DateTime.Utc;
     readonly pendingBackgroundTasks: OrchestrationV2ProviderThread["pendingBackgroundTasks"];
@@ -580,7 +580,7 @@ layer("ProviderEventIngestorV2", (it) => {
     Effect.gen(function* () {
       const { ingestRoster, stored } = yield* setupRosterThread;
       yield* ingestRoster([{ taskId: "cmd-1", kind: "command", description: "build" }]);
-      const running = (yield* stored())?.pendingBackgroundTasks[0];
+      const running = (yield* stored())?.pendingBackgroundTasks?.[0];
       if (running === undefined) throw new Error("the first roster keeps the task running");
 
       yield* TestClock.adjust("1 minute");
