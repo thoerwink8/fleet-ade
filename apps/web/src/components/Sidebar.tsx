@@ -2465,20 +2465,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const handleBatchBarAction = useStableCallback((action: MultiSelectThreadMenuId) => {
     void executeMultiSelectAction(action);
   });
-  const handleBatchCustomSnooze = useStableCallback(() => {
-    void (async () => {
-      const choice = await requestCustomSnooze();
-      if (!choice) return;
-      const selected = [...useThreadSelectionStore.getState().selectedThreadKeys].flatMap(
-        (threadKey) => {
-          const thread = threadByKeyRef.current.get(threadKey);
-          return thread ? [thread] : [];
-        },
-      );
-      if (selected.length === 0) return;
-      await executeMultiSelectAction(`snooze:until:${choice.snoozedUntil}`);
-    })();
-  });
   const handleMultiSelectContextMenu = useStableCallback(
     async (position: { x: number; y: number }) => {
       const api = readLocalApi();
@@ -3063,7 +3049,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       )
                 }
                 nowIso={batchSelectionAt ?? ""}
-                onCustomSnooze={handleBatchCustomSnooze}
                 onClearSelection={clearSelection}
               />
             ) : null}

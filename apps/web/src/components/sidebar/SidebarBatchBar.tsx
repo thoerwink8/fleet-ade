@@ -41,7 +41,6 @@ export function SidebarBatchBar(props: {
   snoozePresets: ReadonlyArray<SnoozePreset>;
   /** The moment the selection was made, so the snooze check does not read the clock while rendering. */
   nowIso: string;
-  onCustomSnooze: () => void;
   onClearSelection: () => void;
 }) {
   const selectedThreadKeys = useThreadSelectionStore((state) => state.selectedThreadKeys);
@@ -155,7 +154,10 @@ export function SidebarBatchBar(props: {
                       </MenuItem>
                     ))}
                     <MenuSeparator />
-                    <MenuItem disabled={!canSnoozeSelected} onClick={props.onCustomSnooze}>
+                    <MenuItem
+                      disabled={!canSnoozeSelected}
+                      onClick={() => props.onAction("snooze:custom")}
+                    >
                       自定义…
                     </MenuItem>
                   </MenuSubPopup>

@@ -143,10 +143,10 @@
   display: none;
 }
 
-/* The batch bar sits inside the sidebar's 8px content inset, so the container query measures
-   the bar, not the sidebar. 303px of bar is 319px of sidebar, which is where the design's
-   320px break lands. */
-@container batch (max-width: 303px) {
+/* The container query measures the bar's content box: the sidebar minus the bar wrapper's 8px
+   inset on each side, the bar's own 12px and 4px padding, and the sidebar edge (about 33px in
+   all). 286px of content is a 319px sidebar, so a 320px sidebar spreads out. */
+@container batch (max-width: 286px) {
   .fa-batch .is-overflow {
     display: none;
   }
