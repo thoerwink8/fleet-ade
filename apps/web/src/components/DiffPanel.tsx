@@ -158,7 +158,8 @@ function DiffFileCollapseToggle({
       <TooltipTrigger
         render={
           <Button
-            size="icon-micro"
+            size="xs"
+            icon
             variant="ghost"
             className="-ms-0.5"
             aria-label={collapsed ? `展开 ${filePath}` : `收起 ${filePath}`}
@@ -1067,7 +1068,7 @@ export default function DiffPanel({
               }}
             >
               <ComboboxTrigger
-                render={<Button variant="ghost-muted" size="xs" />}
+                render={<Button variant="muted" size="xs" />}
                 className="min-w-9 max-w-48 shrink-0"
                 aria-label={`更改比较目标。当前为 ${comparisonBaseRef}。`}
               >
@@ -1170,7 +1171,8 @@ export default function DiffPanel({
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="sm"
+                  icon
                   variant="ghost"
                   aria-label={isRefreshingDiff ? "正在刷新差异" : "刷新差异"}
                   onClick={refreshDiffFromUserAction}
@@ -1190,7 +1192,8 @@ export default function DiffPanel({
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="sm"
+                  icon
                   variant="ghost"
                   aria-label={allDiffFilesCollapsed ? "展开所有文件" : "折叠所有文件"}
                   onClick={toggleDiffFileCollapse}

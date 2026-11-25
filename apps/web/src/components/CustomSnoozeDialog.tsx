@@ -127,7 +127,7 @@ function CustomSnoozeDialog() {
                           render={
                             <Button
                               id={`${id}-date`}
-                              variant="outline"
+                              variant="secondary"
                               className="w-full justify-between"
                             />
                           }
@@ -225,7 +225,7 @@ function CustomSnoozeDialog() {
           <DialogFooter>
             <Button
               type="button"
-              variant="ghost-muted"
+              variant="muted"
               className="sm:mr-auto"
               onClick={() => {
                 finish(null);
@@ -238,7 +238,7 @@ function CustomSnoozeDialog() {
               <Settings2Icon />
               编辑暂缓选项
             </Button>
-            <Button type="button" variant="outline" onClick={() => finish(null)}>
+            <Button type="button" variant="secondary" onClick={() => finish(null)}>
               取消
             </Button>
             <Button type="submit">暂缓</Button>

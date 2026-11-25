@@ -156,7 +156,7 @@ function PendingSecretRequestForm(props: {
       {link !== null ? (
         <div className="flex min-w-0 flex-col items-start gap-1.5">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             render={<a href={link.href} target="_blank" rel="noopener noreferrer" />}
           >
@@ -242,7 +242,7 @@ function PendingSecretRequestForm(props: {
         <Button
           type="button"
           size="xs"
-          variant="ghost-muted"
+          variant="muted"
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >

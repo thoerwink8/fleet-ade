@@ -295,9 +295,10 @@ function TimelineMinimapNavigationButton({
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          size="icon-micro"
+          size="xs"
+          icon
           type="button"
-          variant="ghost-muted"
+          variant="muted"
         >
           <Icon className="size-4 text-foreground/90" />
         </Button>

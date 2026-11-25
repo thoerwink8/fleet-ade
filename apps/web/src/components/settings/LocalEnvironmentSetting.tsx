@@ -75,11 +75,11 @@ export function LocalEnvironmentSetting() {
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
-            <AlertDialogClose disabled={isUpdating} render={<Button variant="outline" />}>
+            <AlertDialogClose disabled={isUpdating} render={<Button variant="secondary" />}>
               取消
             </AlertDialogClose>
             <Button
-              variant={enabled ? "destructive" : "default"}
+              variant={enabled ? "danger" : "primary"}
               disabled={isUpdating}
               onClick={() => void applyChange()}
             >

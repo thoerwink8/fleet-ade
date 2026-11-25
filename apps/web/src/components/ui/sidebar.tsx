@@ -618,7 +618,8 @@ function SidebarTrigger({
         }
         toggleSidebar();
       }}
-      size="icon"
+      size="md"
+      icon
       variant="ghost"
       {...props}
     >

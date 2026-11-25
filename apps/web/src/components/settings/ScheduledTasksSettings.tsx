@@ -221,7 +221,7 @@ function WebhookFiltersField({
         </div>
         <Button
           className="shrink-0"
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={filters.length >= MAX_WEBHOOK_FILTERS}
           onClick={() => onChange([...filters, emptyWebhookFilterDraft()])}
@@ -246,7 +246,8 @@ function WebhookFiltersField({
             </div>
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="sm"
+              icon
               aria-label={`移除筛选条件 ${index + 1}`}
               onClick={() => onChange(removeWebhookFilterDraft(filters, filter.id))}
             >
@@ -383,7 +384,7 @@ function ScheduledTaskTemplates({
         {SCHEDULED_TASK_TEMPLATES.map((template) => (
           <Button
             key={template.id}
-            variant="outline"
+            variant="secondary"
             size="sm"
             title={template.description}
             disabled={disabled}
@@ -475,7 +476,7 @@ export function ScheduledTasksSettings(target: {
         headerAction={
           <Button
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             disabled={!creationEnvironment}
             onClick={() =>
               creationEnvironment &&
@@ -871,7 +872,8 @@ function ScheduledTaskRow({
             <MenuTrigger
               render={
                 <Button
-                  size="icon-sm"
+                  size="sm"
+                  icon
                   variant="ghost"
                   disabled={busy || !canOperate}
                   aria-label={`${task.title} 的操作`}
@@ -1084,12 +1086,12 @@ function WebhookDeliveriesDialog({
         </DialogPanel>
         <DialogFooter>
           {selectedId !== null ? (
-            <Button variant="outline" size="sm" onClick={() => setSelectedId(null)}>
+            <Button variant="secondary" size="sm" onClick={() => setSelectedId(null)}>
               返回
             </Button>
           ) : (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={deliveriesQuery.isPending}
               onClick={deliveriesQuery.refresh}
@@ -1168,7 +1170,7 @@ function WebhookEndpointField({
         />
         <Button
           size="sm"
-          variant="outline"
+          variant="secondary"
           type="button"
           disabled={!copyable}
           onClick={() => copyToClipboard(url, undefined)}
@@ -1178,7 +1180,7 @@ function WebhookEndpointField({
         </Button>
         <Button
           size="sm"
-          variant="outline"
+          variant="secondary"
           type="button"
           disabled={rotating || !canRotate}
           onClick={() => void rotateUrl()}
@@ -1309,7 +1311,7 @@ function ScheduledTaskDestination({
             }
             aria-label={onThreadModeChange ? "目标会话" : undefined}
             disabled={disabled}
-            render={<Button variant="outline" size="sm" />}
+            render={<Button variant="secondary" size="sm" />}
             className="w-full justify-between"
           >
             <MessageSquareIcon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -1667,7 +1669,7 @@ function ScheduledTaskEditorDialog({
               <Button
                 type="button"
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 disabled={saving}
                 onClick={discardDraft}
               >
@@ -2226,7 +2228,7 @@ function ScheduledTaskEditorDialog({
         </DialogPanel>
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" size="sm" disabled={saving} />}>
+          <DialogClose render={<Button variant="secondary" size="sm" disabled={saving} />}>
             取消
           </DialogClose>
           <Button

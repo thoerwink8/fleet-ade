@@ -35,8 +35,9 @@ function BackButton({ onBack, focusable }: { onBack: () => void; focusable: bool
       <TooltipTrigger
         render={
           <Button
-            size="icon-micro"
-            variant="ghost-muted"
+            size="xs"
+            icon
+            variant="muted"
             {...(focusable ? {} : { tabIndex: -1 })}
             onClick={onBack}
             className="-ml-1.5"

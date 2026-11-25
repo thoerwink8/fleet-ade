@@ -218,9 +218,9 @@ export function ProjectScriptEditorDialog({
             <AlertDialogDescription>此操作无法撤销。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
             <Button
-              variant="destructive"
+              variant="danger"
               disabled={!canEditActions}
               onClick={() => {
                 if (!request?.scriptId) return;
@@ -417,8 +417,9 @@ function ProjectScriptEditorForm({
                     render={
                       <Button
                         type="button"
-                        variant="outline"
-                        size="icon"
+                        variant="secondary"
+                        size="md"
+                        icon
                         className="shrink-0"
                         aria-label="选择图标"
                       />
@@ -525,7 +526,7 @@ function ProjectScriptEditorForm({
         {isEditing && (
           <Button
             type="button"
-            variant="destructive-outline"
+            variant="danger-secondary"
             className="mr-auto"
             disabled={isSaving || !canEditActions}
             onClick={() => onRequestDelete(name)}
@@ -533,7 +534,7 @@ function ProjectScriptEditorForm({
             删除
           </Button>
         )}
-        <Button type="button" variant="outline" onClick={close}>
+        <Button type="button" variant="secondary" onClick={close}>
           取消
         </Button>
         <Button form={formId} type="submit" disabled={isSaving || !canEditActions}>

@@ -82,8 +82,9 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                 render={
                   <Button
                     type="button"
-                    size="icon-xs"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     aria-label={allDirectoriesExpanded ? "折叠全部文件夹" : "展开全部文件夹"}
                     data-scroll-anchor-ignore
                     onClick={() => {
@@ -110,7 +111,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                 <Button
                   type="button"
                   size="xs"
-                  variant="ghost-muted"
+                  variant="muted"
                   aria-label="打开差异"
                   onClick={() => onOpenTurnDiff(runId, files[0]?.path)}
                 />
@@ -137,7 +138,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
           <Button
             type="button"
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             onClick={() => onOpenTurnDiff(runId, files[0]?.path)}
           >
             完整 diff 中还有 {hiddenFileCount.toLocaleString("zh-CN")} 个文件

@@ -499,7 +499,7 @@ export function AddProviderInstanceDialog({
               {wizardStep === 0 ? (
                 <Collapsible open={showMoreProviders} onOpenChange={setShowMoreProviders}>
                   <div className="flex pt-2">
-                    <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
+                    <CollapsibleTrigger render={<Button variant="muted" size="xs" />}>
                       {showMoreProviders ? "收起" : "显示更多"}
                       <ChevronDownIcon
                         aria-hidden
@@ -718,7 +718,7 @@ export function AddProviderInstanceDialog({
 
             <WizardFooter>
               <Button
-                variant={wizardStep === 0 ? "ghost-muted" : "outline"}
+                variant={wizardStep === 0 ? "muted" : "secondary"}
                 size="sm"
                 disabled={isSaving || isPreparingRegistryAgent}
                 onClick={() => {
@@ -733,7 +733,7 @@ export function AddProviderInstanceDialog({
               </Button>
               {wizardStep === 0 && driver === "codex" ? (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => navigateToStep(1)}>
+                  <Button variant="secondary" size="sm" onClick={() => navigateToStep(1)}>
                     手动配置
                   </Button>
                   <ChatGptConnectionButton

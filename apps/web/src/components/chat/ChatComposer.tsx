@@ -4119,7 +4119,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     <Button
                       type="button"
                       size="xs"
-                      variant="outline"
+                      variant="secondary"
                       onClick={() =>
                         onOpenProviderSetup(composerReadiness.block?.instanceId ?? undefined)
                       }

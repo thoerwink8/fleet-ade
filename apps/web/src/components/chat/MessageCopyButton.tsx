@@ -14,16 +14,16 @@ export const MessageCopyButton = memo(function MessageCopyButton({
   label = "复制消息",
   icon: Icon = CopyIcon,
   extraFlavors,
-  size = "icon-sm",
-  variant = "outline",
+  size = "sm",
+  variant = "secondary",
   className,
 }: {
   text: string;
   label?: string;
   icon?: LucideIcon;
   extraFlavors?: Readonly<Record<string, string>>;
-  size?: "xs" | "icon-xs" | "icon-sm";
-  variant?: "outline" | "ghost";
+  size?: "xs" | "sm";
+  variant?: "secondary" | "ghost";
   className?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -45,7 +45,8 @@ export const MessageCopyButton = memo(function MessageCopyButton({
             ref={ref}
             type="button"
             size={size}
-            variant={variant === "ghost" ? "ghost-muted" : variant}
+            icon
+            variant={variant === "ghost" ? "muted" : variant}
             className={className}
           />
         }

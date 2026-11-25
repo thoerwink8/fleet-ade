@@ -58,8 +58,9 @@ export function ProjectActionsList({
             ) : null}
             <span className="flex shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
               <Button
-                size="icon-xs"
-                variant="ghost-muted"
+                size="xs"
+                icon
+                variant="muted"
                 aria-label={`编辑 ${script.name}`}
                 disabled={disabled}
                 onClick={() => onEdit(script)}

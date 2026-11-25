@@ -182,7 +182,7 @@ export function AcpRegistrySearchStep({
           onClick={onManualConfiguration}
           size="sm"
           type="button"
-          variant="ghost-muted"
+          variant="muted"
         >
           手动输入
         </Button>
@@ -192,7 +192,7 @@ export function AcpRegistrySearchStep({
             onClick={onLocalConfiguration}
             size="sm"
             type="button"
-            variant="outline"
+            variant="secondary"
           >
             本地 ACP 命令
           </Button>
@@ -245,7 +245,7 @@ export function AcpRegistrySearchStep({
               onClick={onOmpConfiguration}
               size="xs"
               type="button"
-              variant="outline"
+              variant="secondary"
             >
               {isConfiguredOmpAcp(providerInstances) ? "已添加" : "添加"}
             </Button>
@@ -322,8 +322,9 @@ function AcpRegistryAgentRow({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-xs"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     aria-label={`关于 ${agent.name}`}
                     render={<a href={aboutUrl} target="_blank" rel="noreferrer" />}
                   >
@@ -339,7 +340,7 @@ function AcpRegistryAgentRow({
             disabled={!canAdd || alreadyAdded}
             onClick={() => onAdd(agent)}
             size="xs"
-            variant={isPreparing ? "secondary" : "outline"}
+            variant="secondary"
           >
             {alreadyAdded ? "已添加" : isPreparing ? progressLabel : "添加"}
           </Button>

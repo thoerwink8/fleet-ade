@@ -51,25 +51,17 @@ export type ThreadToastData = {
   }>;
   secondaryActionProps?: ComponentPropsWithoutRef<"button">;
   secondaryActionVariant?:
-    | "default"
-    | "destructive"
-    | "destructive-outline"
+    | "primary"
+    | "danger"
+    | "danger-secondary"
     | "ghost"
     | "link"
-    | "outline"
     | "secondary";
   expandableContent?: ReactNode;
   expandableLabels?: { expand?: string; collapse?: string };
   expandableDescriptionTrigger?: boolean;
   actionLayout?: "inline" | "stacked-end";
-  actionVariant?:
-    | "default"
-    | "destructive"
-    | "destructive-outline"
-    | "ghost"
-    | "link"
-    | "outline"
-    | "secondary";
+  actionVariant?: "primary" | "danger" | "danger-secondary" | "ghost" | "link" | "secondary";
 };
 
 type BaseToastManager = ReturnType<typeof Toast.createToastManager<ThreadToastData>>;
@@ -245,8 +237,9 @@ function CopyErrorButton({ text }: { text: string }) {
       <TooltipTrigger
         render={
           <Button
-            size="icon-micro"
-            variant="ghost-muted"
+            size="xs"
+            icon
+            variant="muted"
             aria-label={label}
             className="[--control-icon-color:currentColor] rounded-md text-muted-foreground/80 hover:bg-transparent hover:text-muted-foreground"
             onClick={() => copyToClipboard(text)}
@@ -410,9 +403,9 @@ function deriveToastBodyDescriptor(toast: {
   const stackedActionLayout =
     hasVisibleToastAction(toast.actionProps) && toast.data?.actionLayout === "stacked-end";
   const actionVariant: NonNullable<ThreadToastData["actionVariant"]> =
-    toast.data?.actionVariant ?? "default";
+    toast.data?.actionVariant ?? "primary";
   const secondaryActionVariant: NonNullable<ThreadToastData["secondaryActionVariant"]> =
-    toast.data?.secondaryActionVariant ?? "outline";
+    toast.data?.secondaryActionVariant ?? "secondary";
   const copyErrorText =
     toast.type === "error" && typeof toast.description === "string" && !toast.data?.hideCopyButton
       ? toast.description

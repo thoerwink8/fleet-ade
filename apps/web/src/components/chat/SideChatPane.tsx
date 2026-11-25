@@ -146,14 +146,15 @@ export default function SideChatPane(props: {
         <span className="ade-touch-row ade-touch-row--gap-3 flex items-center gap-1 pointer-coarse:gap-3">
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="xs"
+            icon
             aria-label="删除侧聊"
             disabled={!canOperate || shell === null || deleting}
             onClick={() => void deleteSideChat()}
           >
             <Trash2Icon />
           </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="关闭侧聊" onClick={props.onClose}>
+          <Button variant="ghost" size="xs" icon aria-label="关闭侧聊" onClick={props.onClose}>
             <XIcon />
           </Button>
         </span>

@@ -139,7 +139,7 @@ export function SidebarUpdateCapsule({
           {settled && failed ? (
             <div className="mt-1 flex justify-end gap-1">
               {view.action === "retry" ? (
-                <Button size="xs" variant="outline" onClick={runAction}>
+                <Button size="xs" variant="secondary" onClick={runAction}>
                   重试
                 </Button>
               ) : null}

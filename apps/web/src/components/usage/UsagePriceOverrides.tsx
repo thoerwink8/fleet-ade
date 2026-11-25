@@ -292,7 +292,7 @@ export function UsagePriceOverrides({
               </Label>
               <Menu>
                 <MenuTrigger
-                  render={<Button variant="outline" size="sm" className="min-w-0" />}
+                  render={<Button variant="secondary" size="sm" className="min-w-0" />}
                   aria-labelledby="usage-prices-apply-label usage-prices-selection"
                   disabled={pending || hasChanges}
                 >
@@ -364,7 +364,8 @@ export function UsagePriceOverrides({
                       ))}
                       <TableHead>
                         <Button
-                          size="icon-xs"
+                          size="xs"
+                          icon
                           variant="ghost"
                           aria-label="添加模型价格"
                           disabled={locked}
@@ -498,7 +499,7 @@ export function UsagePriceOverrides({
                             <TableCell>
                               <Tooltip>
                                 <TooltipTrigger
-                                  render={<Button size="icon-xs" variant="ghost" />}
+                                  render={<Button size="xs" icon variant="ghost" />}
                                   disabled={locked}
                                   aria-label={
                                     row.removed

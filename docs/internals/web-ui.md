@@ -28,9 +28,11 @@ library's density table and type scale (`--fa-ctrl-*`, `--fa-row-*`, `.fa-captio
   12px is for times, hints, and labels you cannot click. Inputs, menu items, and other controls
   are 14px. 15px is body text and the composer field.
 - A fixed control is 24, 28, 32, or 40px tall (`--fa-ctrl-xs`, `--fa-ctrl-sm`, `--fa-ctrl`,
-  `--fa-ctrl-lg`), and that height does not change with viewport width. 20px (`--fa-ctrl-2xs`) is
-  a tag, not a click target. A standalone control is 32px. 28px and 24px sit only inside a bar or
-  row that is itself at least 32px. A checkbox or radio mark stays 16px inside that row.
+  `--fa-ctrl-lg`), and that height does not change with viewport width. `Button` names those four
+  heights `xs`, `sm`, `md`, and `lg`; `icon` makes the square icon-only form, and the local
+  `multiline` flag preserves wrapping without adding another size. 20px (`--fa-ctrl-2xs`) is a tag,
+  not a click target. A standalone control is 32px. 28px and 24px sit only inside a bar or row that
+  is itself at least 32px. A checkbox or radio mark stays 16px inside that row.
 - Under `pointer: coarse`, stretch the hit area to at least 44px with an `::after` and leave the
   painted height alone. The library does this for `.fa-btn`; controls it does not cover need it
   here, since growing the control to 44px would change the desktop metrics. Text inputs are the exception: below 640px the box is 36px, on the 4px

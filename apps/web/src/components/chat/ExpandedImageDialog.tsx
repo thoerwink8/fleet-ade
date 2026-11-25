@@ -173,7 +173,8 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         <Button
           type="button"
           ref={closeButtonRef}
-          size="icon-sm"
+          size="sm"
+          icon
           variant="media-close"
           className="absolute right-0 top-0 z-20"
           onClick={close}
@@ -184,7 +185,8 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         {preview.images.length > 1 && (
           <Button
             type="button"
-            size="icon"
+            size="md"
+            icon
             variant="media-navigation"
             className="left-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
             aria-label="上一个媒体"
@@ -225,7 +227,8 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         {preview.images.length > 1 && (
           <Button
             type="button"
-            size="icon"
+            size="md"
+            icon
             variant="media-navigation"
             className="right-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
             aria-label="下一个媒体"

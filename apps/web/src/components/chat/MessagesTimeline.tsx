@@ -2170,7 +2170,7 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
         >
           <span>{errorMessage}</span>
           {showManualRetry ? (
-            <Button type="button" variant="outline" size="xs" onClick={retry}>
+            <Button type="button" variant="secondary" size="xs" onClick={retry}>
               重试
             </Button>
           ) : null}
@@ -2214,7 +2214,7 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
         >
           <span>{errorMessage}</span>
           {showManualRetry ? (
-            <Button type="button" variant="outline" size="xs" onClick={retry}>
+            <Button type="button" variant="secondary" size="xs" onClick={retry}>
               重试
             </Button>
           ) : null}

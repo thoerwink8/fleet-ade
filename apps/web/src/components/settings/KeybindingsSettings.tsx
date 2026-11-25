@@ -326,7 +326,8 @@ function WhenExpressionRemoveButton({
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="sm"
+            icon
             className={cn("size-7", className)}
             aria-label={label}
             onClick={onRemove}
@@ -508,11 +509,11 @@ function WhenExpressionNodeEditor({
             <SelectItem value="or">或</SelectItem>
           </SelectContent>
         </Select>
-        <Button type="button" variant="outline" size="compact" onClick={addCondition}>
+        <Button type="button" variant="secondary" size="sm" onClick={addCondition}>
           <PlusIcon className="size-3.5" />
           条件
         </Button>
-        <Button type="button" variant="outline" size="compact" onClick={addGroup}>
+        <Button type="button" variant="secondary" size="sm" onClick={addGroup}>
           <PlusIcon className="size-3.5" />
           条件组
         </Button>
@@ -611,11 +612,11 @@ function WhenExpressionBuilder({
           <div className="text-row font-medium text-foreground">生效条件</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button type="button" variant="outline" size="compact" onClick={addRootCondition}>
+          <Button type="button" variant="secondary" size="sm" onClick={addRootCondition}>
             <PlusIcon className="size-3.5" />
             条件
           </Button>
-          <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
+          <Button type="button" variant="secondary" size="sm" onClick={addRootGroup}>
             <PlusIcon className="size-3.5" />
             条件组
           </Button>
@@ -658,11 +659,11 @@ function WhenExpressionBuilder({
         ) : (
           <div className="rounded-md border border-dashed border-border/80 bg-muted/15 p-3">
             <div className="flex flex-wrap gap-2">
-              <Button type="button" size="compact" onClick={addRootCondition}>
+              <Button type="button" size="sm" onClick={addRootCondition}>
                 <PlusIcon className="size-3.5" />
                 条件
               </Button>
-              <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
+              <Button type="button" variant="secondary" size="sm" onClick={addRootGroup}>
                 <PlusIcon className="size-3.5" />
                 条件组
               </Button>
@@ -881,11 +882,7 @@ function WhenClauseControl({
     <Popover onOpenChange={handleOpenChange}>
       <PopoverTrigger
         render={
-          <Button
-            variant={expression ? "ghost" : "ghost-muted"}
-            size="micro"
-            className="min-w-0 shrink"
-          />
+          <Button variant={expression ? "ghost" : "muted"} size="xs" className="min-w-0 shrink" />
         }
         aria-label={`编辑 ${label} 的生效条件`}
       >
@@ -925,8 +922,9 @@ function KeybindingRowMenu({
         render={
           <Button
             type="button"
-            variant="ghost-muted"
-            size="icon-sm"
+            variant="muted"
+            size="sm"
+            icon
             disabled={isSaving}
             aria-label={`${commandLabel(row.command)} 的操作`}
           />
@@ -1203,8 +1201,9 @@ function NewKeybindingCancelIcon({
         render={
           <Button
             type="button"
-            variant="ghost-muted"
-            size="icon-sm"
+            variant="muted"
+            size="sm"
+            icon
             disabled={isSaving}
             aria-label="取消新建快捷键"
             onClick={onCancel}
@@ -1281,7 +1280,7 @@ function BrowserKeybindingNotice() {
       <TooltipTrigger
         delay={200}
         render={
-          <Button size="icon-micro" variant="ghost-muted" aria-label={message}>
+          <Button size="xs" icon variant="muted" aria-label={message}>
             <TriangleAlertIcon className="size-3.5 text-warning" />
           </Button>
         }
@@ -1477,7 +1476,7 @@ export function KeybindingsSettingsPanel() {
           <KeybindingsSearchInput query={query} onChange={setQuery} inputRef={searchInputRef} />
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             disabled={isAddingBinding || !canWriteSettings}
             onClick={() => setIsAddingBinding(true)}
           >
@@ -1489,8 +1488,9 @@ export function KeybindingsSettingsPanel() {
               render={
                 <Button
                   type="button"
-                  variant="outline"
-                  size="icon"
+                  variant="secondary"
+                  size="md"
+                  icon
                   disabled={!keybindingsConfigPath || !canOpenKeybindingsFile}
                   onClick={openKeybindingsFile}
                   aria-label="打开 keybindings.json"

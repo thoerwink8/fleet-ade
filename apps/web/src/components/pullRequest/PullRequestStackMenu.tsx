@@ -212,7 +212,7 @@ export function PullRequestStackMenu({
             render={
               <span className="inline-flex">
                 <Button
-                  variant="default"
+                  variant="primary"
                   size="xs"
                   disabled={mergeDisabled && !stale}
                   aria-disabled={mergeDisabled || undefined}
@@ -264,7 +264,7 @@ export function PullRequestStackMenu({
             </ul>
           </DialogPanel>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmation(null)}>
+            <Button variant="secondary" onClick={() => setConfirmation(null)}>
               取消
             </Button>
             <Button onClick={() => void run()}>

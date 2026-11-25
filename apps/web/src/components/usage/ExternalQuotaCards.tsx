@@ -111,7 +111,7 @@ export function ExternalQuotaCards({
     <div className="flex flex-col gap-4 rounded-xl border p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-title font-medium">额度与今日用量</h2>
-        <Button size="sm" variant="outline" disabled={reading} onClick={retry}>
+        <Button size="sm" variant="secondary" disabled={reading} onClick={retry}>
           {reading ? "正在读取" : "刷新"}
         </Button>
       </div>
@@ -121,7 +121,7 @@ export function ExternalQuotaCards({
       {failure ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm text-muted-foreground">{failure}</p>
-          <Button size="sm" variant="outline" onClick={retry}>
+          <Button size="sm" variant="secondary" onClick={retry}>
             重试
           </Button>
         </div>

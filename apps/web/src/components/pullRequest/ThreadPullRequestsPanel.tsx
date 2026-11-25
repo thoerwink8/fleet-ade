@@ -307,7 +307,8 @@ function LinkRowImpl({
             render={
               <Button
                 variant="ghost"
-                size="icon-micro"
+                size="xs"
+                icon
                 aria-label={`#${link.number} 的操作`}
                 className="relative"
               >
@@ -432,7 +433,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         <p className="max-w-60 text-xs text-muted-foreground">
           智能体从本会话打开的 PR 会显示在这里。你也可以通过 URL 或编号自行关联。
         </p>
-        <Button size="sm" variant="outline" onClick={openLinkDialog}>
+        <Button size="sm" variant="secondary" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
           关联 PR
         </Button>

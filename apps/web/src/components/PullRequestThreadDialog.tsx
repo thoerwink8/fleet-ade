@@ -285,7 +285,7 @@ export function PullRequestThreadDialog({
         <DialogFooter>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => onOpenChange(false)}
             disabled={preparePullRequestThreadAction.isPending}
@@ -295,7 +295,7 @@ export function PullRequestThreadDialog({
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="secondary"
             onClick={() => handleConfirm("local")}
             disabled={
               !preparePullRequestThreadAction.isAllowed ||

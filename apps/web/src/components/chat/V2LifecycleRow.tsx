@@ -120,7 +120,7 @@ export function V2LifecycleRow(props: {
           </span>
           <Button
             size="xs"
-            variant="outline"
+            variant="secondary"
             aria-label={`打开 ${item.title ?? "已创建会话"}`}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >

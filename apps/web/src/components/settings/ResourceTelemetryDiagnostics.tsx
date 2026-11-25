@@ -468,8 +468,9 @@ function ProcessTreeName({
     >
       {hasChildren ? (
         <Button
-          size="icon-micro"
-          variant="ghost-muted"
+          size="xs"
+          icon
+          variant="muted"
           onClick={() => onToggle(process)}
           aria-label={collapsed ? `展开 ${name}` : `收起 ${name}`}
         >
@@ -984,7 +985,8 @@ function ResourceTelemetryDiagnosticsBody({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-micro"
+                    size="xs"
+                    icon
                     variant="ghost"
                     disabled={telemetry.isPending}
                     onClick={telemetry.refresh}
@@ -1097,7 +1099,7 @@ function ResourceTelemetryDiagnosticsBody({
         icon={<GaugeIcon className="size-4 text-muted-foreground" />}
         headerAction={
           collectorNeedsRetry ? (
-            <Button size="xs" variant="outline" disabled={isRetrying} onClick={retryCollector}>
+            <Button size="xs" variant="secondary" disabled={isRetrying} onClick={retryCollector}>
               <RefreshIcon size="xs" refreshing={isRetrying} />
               重试监测器
             </Button>
@@ -1225,7 +1227,8 @@ function ResourceTelemetryDiagnosticsBody({
           <div className="flex items-center gap-2">
             <HistoryWindowSelector selectedWindowMs={windowMs} onSelect={setWindowMs} />
             <Button
-              size="icon-micro"
+              size="xs"
+              icon
               variant="ghost"
               disabled={history.isPending}
               onClick={history.refresh}

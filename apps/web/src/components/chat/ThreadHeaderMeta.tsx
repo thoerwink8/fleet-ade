@@ -109,7 +109,7 @@ export function ThreadHeaderContext({
   const button = (
     <Button
       type="button"
-      variant="ghost-muted"
+      variant="muted"
       size="xs"
       data-thread-header-context
       aria-label={ariaLabel}

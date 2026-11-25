@@ -176,13 +176,13 @@ export function ConnectionDiagnosisPanel({
         ))}
       </dl>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+        <Button type="button" size="xs" variant="secondary" onClick={onRetry}>
           立即重试
         </Button>
         <Button
           type="button"
           size="xs"
-          variant="outline"
+          variant="secondary"
           onClick={() => {
             const text = connectionDiagnosisText(hostLabel, diagnosis);
             copyToClipboard(text, undefined);
@@ -191,7 +191,7 @@ export function ConnectionDiagnosisPanel({
           复制诊断信息
         </Button>
         {onAddRoute ? (
-          <Button type="button" size="xs" variant="outline" onClick={onAddRoute}>
+          <Button type="button" size="xs" variant="secondary" onClick={onAddRoute}>
             添加直连线路
           </Button>
         ) : null}

@@ -67,7 +67,8 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
           <Button
             type="button"
             variant="ghost"
-            size="icon-xs"
+            size="xs"
+            icon
             aria-label="刷新项目文件"
             onClick={props.onRefresh}
           />
@@ -541,7 +542,8 @@ export default function FileBrowserPanel({
               render={
                 <Button
                   type="button"
-                  size="icon-xs"
+                  size="xs"
+                  icon
                   variant="ghost"
                   aria-label={
                     expandAll || allDirectoriesExpanded ? "折叠全部文件夹" : "展开全部文件夹"
