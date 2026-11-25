@@ -392,10 +392,12 @@ function toPullRequestErrorWith(
         cause: error,
       });
     }
+    const reason =
+      error.reason === "not-found" || error.reason === "rate-limited" ? error.reason : undefined;
     return new PullRequestOperationError({
       operation,
       detail: error.detail,
-      ...(error.reason === "not-found" ? { reason: "not-found" as const } : {}),
+      ...(reason === undefined ? {} : { reason }),
       cause: error,
     });
   };
