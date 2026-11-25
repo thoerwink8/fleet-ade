@@ -34,6 +34,7 @@ import {
   type SidebarListItem,
   type SidebarListMarker,
   type SidebarSection,
+  buildMultiSelectThreadMenuItems,
   buildSidebarListItems,
   isThreadAttentionDismissible,
   isThreadAttentionRowDisabled,
@@ -2326,5 +2327,88 @@ describe("buildSidebarListItems and shouldShowSidebarEmptyState", () => {
         settledShelfExpanded: false,
       }),
     ).toBe(true);
+  });
+});
+
+describe("buildMultiSelectThreadMenuItems", () => {
+  const presets = [
+    { id: "hour", label: "1 小时后", whenLabel: "15:00", snoozedUntil: "2026-08-07T15:00:00Z" },
+  ];
+  const baseInput = {
+    selectedCount: 3,
+    totalSelectableCount: 5,
+    pinnedCount: 0,
+    canOperatePinned: true,
+    unsettledCount: 2,
+    canOperateUnsettled: true,
+    snoozeableCount: 3,
+    canOperateSnoozeable: true,
+    snoozePresets: presets,
+    titleRegenerationSupportedCount: 3,
+    titleRegenerationInFlightCount: 0,
+    canOperateRegeneratable: true,
+    archiveableCount: 3,
+    canOperateArchiveable: true,
+    canOperateAll: true,
+  };
+
+  it("never emits unarchive and adjusts unpin across unpinned, partial, and all-pinned selections", () => {
+    const allUnpinned = buildMultiSelectThreadMenuItems(baseInput);
+    expect(allUnpinned.some((item) => item.id === "unarchive")).toBe(false);
+    expect(allUnpinned.some((item) => item.id === "unpin")).toBe(false);
+    expect(allUnpinned.find((item) => item.id === "select-all")?.label).toBe("全选当前列表");
+    expect(allUnpinned.find((item) => item.id === "delete")).toMatchObject({
+      label: "删除（3）",
+      destructive: true,
+      separatorBefore: true,
+    });
+
+    const partialPinned = buildMultiSelectThreadMenuItems({ ...baseInput, pinnedCount: 1 });
+    expect(partialPinned.some((item) => item.id === "unarchive")).toBe(false);
+    expect(partialPinned.find((item) => item.id === "unpin")).toMatchObject({
+      id: "unpin",
+      label: "取消置顶（1）",
+      disabled: false,
+    });
+
+    const allPinned = buildMultiSelectThreadMenuItems({ ...baseInput, pinnedCount: 3 });
+    expect(allPinned.some((item) => item.id === "unarchive")).toBe(false);
+    expect(allPinned.find((item) => item.id === "unpin")).toMatchObject({
+      id: "unpin",
+      label: "取消置顶（3）",
+      disabled: false,
+    });
+  });
+
+  it("hides inapplicable actions and explains disabled archive when all selected threads are running", () => {
+    const allSettled = buildMultiSelectThreadMenuItems({
+      ...baseInput,
+      totalSelectableCount: 3,
+      unsettledCount: 0,
+      snoozeableCount: 0,
+      titleRegenerationSupportedCount: 0,
+      archiveableCount: 0,
+    });
+    expect(allSettled.some((item) => item.id === "settle")).toBe(false);
+    expect(allSettled.some((item) => item.id === "snooze")).toBe(false);
+    expect(allSettled.some((item) => item.id === "regenerate-title")).toBe(false);
+    expect(allSettled.some((item) => item.id === "select-all")).toBe(false);
+    expect(allSettled.some((item) => item.id === "unarchive")).toBe(false);
+    expect(allSettled.find((item) => item.id === "archive")).toMatchObject({
+      id: "archive",
+      label: "归档（3）",
+      disabled: true,
+      detail: "运行中，请先停止",
+    });
+
+    const partialRunning = buildMultiSelectThreadMenuItems({
+      ...baseInput,
+      archiveableCount: 2,
+    });
+    expect(partialRunning.find((item) => item.id === "archive")).toMatchObject({
+      id: "archive",
+      label: "归档（2）",
+      disabled: false,
+    });
   });
 });

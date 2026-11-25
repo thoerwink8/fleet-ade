@@ -163,11 +163,9 @@ import {
 } from "./threadActionMenu.logic";
 import {
   applySidebarThreadDrop,
+  buildMultiSelectThreadMenuItems,
   buildSidebarListItems,
   filterSidebarV2VisibleThreads,
-  buildBulkTitleRegenerationContextMenuItem,
-  buildBulkUnpinContextMenuItem,
-  applyThreadBatch,
   filterSidebarProjectScopeItems,
   firstValidTimestampMs,
   isSidebarNestedLinkClick,
@@ -1001,9 +999,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     reportFailure: false,
   });
   const regenerateThreadTitle = useOrchestrationCommand(threadEnvironment.regenerateTitle, {
-    reportFailure: false,
-  });
-  const batchThreads = useOrchestrationCommand(threadEnvironment.batch, {
     reportFailure: false,
   });
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
@@ -2321,9 +2316,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         return thread ? [thread] : [];
       });
       const settlingThreads = selectedThreads.filter(
-        (thread) => thread.settledOverride !== "settled",
+        (thread) => serverConfigs.has(thread.environmentId) && thread.settledOverride !== "settled",
       );
-      const canSnoozeSelection = selectedThreads.every(
+      const snoozeableThreads = selectedThreads.filter(
         (thread) =>
           serverConfigs.has(thread.environmentId) &&
           canSnooze(thread, { now: selectionNow.toISOString() }),
@@ -2334,86 +2329,40 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       const regeneratableTitleThreads = titleRegenerationThreads.filter(
         (thread) => thread.titleRegeneration == null,
       );
-      const titleRegenerationMenuItem = buildBulkTitleRegenerationContextMenuItem({
-        supportedCount: titleRegenerationThreads.length,
-        actionableCount: regeneratableTitleThreads.length,
-      });
       const pinnedSelectedThreads = selectedThreads.filter(
         (thread) => serverConfigs.has(thread.environmentId) && thread.pinnedAt != null,
       );
-      const unpinMenuItem = buildBulkUnpinContextMenuItem({
-        pinnedCount: pinnedSelectedThreads.length,
-      });
+      const archiveableThreads = selectedThreads.filter((thread) =>
+        threadRuntimeCanArchive(thread.runtime),
+      );
       // Presets sync across environments, so the first selected thread's stand for all.
       const menuOpenedAt = new Date();
+      const snoozePresetThread = snoozeableThreads[0] ?? selectedThreads[0]!;
       const snoozePresets = resolveSnoozePresets(
         menuOpenedAt,
         timestampFormat,
-        selectedThreads[0]!.environmentId,
+        snoozePresetThread.environmentId,
       );
       const clicked = await settlePromise(() =>
         api.contextMenu.show(
-          [
-            ...(unpinMenuItem
-              ? [{ ...unpinMenuItem, disabled: !canOperateThreads(pinnedSelectedThreads) }]
-              : []),
-            {
-              id: "settle",
-              label: `标为完成（${count}）`,
-              disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads),
-            },
-            ...(canSnoozeSelection
-              ? [
-                  {
-                    id: "snooze",
-                    label: `暂缓（${count}）`,
-                    disabled: !canOperateThreads(selectedThreads),
-                    children: [
-                      ...snoozePresets.map((preset) => ({
-                        id: `snooze:${preset.id}`,
-                        label: preset.label,
-                        detail: preset.whenLabel,
-                        disabled: !canOperateThreads(selectedThreads),
-                      })),
-                      {
-                        id: "snooze:custom",
-                        label: "自定义…",
-                        separatorBefore: snoozePresets.length > 0,
-                        disabled: !canOperateThreads(selectedThreads),
-                      },
-                    ],
-                  },
-                ]
-              : []),
-            ...(titleRegenerationMenuItem
-              ? [
-                  {
-                    ...titleRegenerationMenuItem,
-                    disabled:
-                      titleRegenerationMenuItem.disabled ||
-                      !canOperateThreads(regeneratableTitleThreads),
-                  },
-                ]
-              : []),
-            {
-              id: "archive",
-              label: `归档（${count}）`,
-              disabled: !canOperateThreads(selectedThreads),
-            },
-            {
-              id: "unarchive",
-              label: `取消归档（${count}）`,
-              disabled: !canOperateThreads(selectedThreads),
-            },
-            { id: "select-all", label: "全选当前列表" },
-            { id: "mark-unread", label: `标为未读（${count}）` },
-            {
-              id: "delete",
-              label: `删除（${count}）`,
-              destructive: true,
-              disabled: !canOperateThreads(selectedThreads),
-            },
-          ],
+          buildMultiSelectThreadMenuItems({
+            selectedCount: count,
+            totalSelectableCount: orderedThreadKeysRef.current.length,
+            pinnedCount: pinnedSelectedThreads.length,
+            canOperatePinned: canOperateThreads(pinnedSelectedThreads),
+            unsettledCount: settlingThreads.length,
+            canOperateUnsettled: canOperateThreads(settlingThreads),
+            snoozeableCount: snoozeableThreads.length,
+            canOperateSnoozeable: canOperateThreads(snoozeableThreads),
+            snoozePresets,
+            titleRegenerationSupportedCount: titleRegenerationThreads.length,
+            titleRegenerationInFlightCount:
+              titleRegenerationThreads.length - regeneratableTitleThreads.length,
+            canOperateRegeneratable: canOperateThreads(regeneratableTitleThreads),
+            archiveableCount: archiveableThreads.length,
+            canOperateArchiveable: canOperateThreads(archiveableThreads),
+            canOperateAll: canOperateThreads(selectedThreads),
+          }),
           position,
         ),
       );
@@ -2423,17 +2372,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ? pinnedSelectedThreads
           : clicked.value === "regenerate-title"
             ? regeneratableTitleThreads
-            : clicked.value === "settle"
-              ? settlingThreads.flatMap((thread) => {
-                  const current = threadByKeyRef.current.get(
-                    scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-                  );
-                  return current && current.settledOverride !== "settled" ? [current] : [];
-                })
-              : selectedThreads;
+            : clicked.value === "archive"
+              ? archiveableThreads
+              : clicked.value.startsWith("snooze:")
+                ? snoozeableThreads
+                : clicked.value === "settle"
+                  ? settlingThreads.flatMap((thread) => {
+                      const current = threadByKeyRef.current.get(
+                        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+                      );
+                      return current && current.settledOverride !== "settled" ? [current] : [];
+                    })
+                  : selectedThreads;
       if (clicked.value === "settle" && actionTargets.length === 0) return;
+      if (clicked.value === "archive" && actionTargets.length === 0) return;
       if (clicked.value !== "mark-unread" && !checkThreadOperations(actionTargets)) return;
       if (clicked.value?.startsWith("snooze:")) {
+        if (snoozeableThreads.length === 0) return;
         const preset =
           clicked.value === "snooze:custom"
             ? await requestCustomSnooze()
@@ -2441,13 +2396,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 snoozePresets,
                 clicked.value.slice("snooze:".length),
                 timestampFormat,
-                selectedThreads[0]!.environmentId,
+                snoozePresetThread.environmentId,
               );
         if (preset) {
-          const coSnoozingKeys = new Set(threadKeys);
+          const coSnoozingKeys = new Set(
+            snoozeableThreads.map((thread) =>
+              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+            ),
+          );
           clearSelection();
           const outcomes = await Promise.all(
-            selectedThreads.map(async (thread) => {
+            snoozeableThreads.map(async (thread) => {
               const threadRef = scopeThreadRef(thread.environmentId, thread.id);
               const outcome = await performSnooze(threadRef, preset, { coSnoozingKeys });
               return { outcome, threadRef };
@@ -2538,28 +2497,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         clearSelection();
         return;
       }
-      const finishBatch = async (operation: "unarchive") => {
-        const { prunedKeys, failures } = await applyThreadBatch({
-          threads: batchTargets,
-          dispatch: (group) =>
-            batchThreads({
-              environmentId: group.environmentId,
-              input: { operation, threadIds: group.threadIds },
-            }),
-        });
-        if (failures.length > 0) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "无法处理部分会话",
-              description: failures.join("\n"),
-            }),
-          );
-        }
-        removeFromSelection([...prunedKeys]);
-      };
       if (clicked.value === "archive") {
-        const { archivedKeys, prunedKeys, failures } = await archiveThreads(batchTargets);
+        const archiveTargets = actionTargets.map((thread) => ({
+          environmentId: thread.environmentId,
+          id: thread.id,
+          title: thread.title,
+          key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+        }));
+        const { archivedKeys, prunedKeys, failures } = await archiveThreads(archiveTargets);
         if (failures.length > 0) {
           toastManager.add(
             stackedThreadToast({
@@ -2570,10 +2515,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           );
         }
         removeFromSelection([...prunedKeys]);
-        return;
-      }
-      if (clicked.value === "unarchive") {
-        await finishBatch("unarchive");
         return;
       }
       if (clicked.value !== "delete") return;

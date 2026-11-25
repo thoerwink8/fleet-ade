@@ -838,29 +838,122 @@ export function filterSidebarV2VisibleThreads<
   );
 }
 
-export function buildBulkTitleRegenerationContextMenuItem(input: {
-  supportedCount: number;
-  actionableCount: number;
-}): ContextMenuItem<"regenerate-title"> | null {
-  if (input.supportedCount === 0) return null;
-  if (input.actionableCount === 0) {
-    return {
-      id: "regenerate-title",
-      label: `正在重新生成…（${input.supportedCount}）`,
-      disabled: true,
-    };
-  }
-  return {
-    id: "regenerate-title",
-    label: `重新生成标题（${input.actionableCount}）`,
-  };
+export type MultiSelectThreadMenuId =
+  | "unpin"
+  | "settle"
+  | "snooze"
+  | `snooze:${string}`
+  | "regenerate-title"
+  | "archive"
+  | "select-all"
+  | "mark-unread"
+  | "delete";
+
+export interface MultiSelectThreadMenuInput {
+  readonly selectedCount: number;
+  readonly totalSelectableCount: number;
+  readonly pinnedCount: number;
+  readonly canOperatePinned: boolean;
+  readonly unsettledCount: number;
+  readonly canOperateUnsettled: boolean;
+  readonly snoozeableCount: number;
+  readonly canOperateSnoozeable: boolean;
+  readonly snoozePresets: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly whenLabel: string;
+  }>;
+  readonly titleRegenerationSupportedCount: number;
+  readonly titleRegenerationInFlightCount: number;
+  readonly canOperateRegeneratable: boolean;
+  readonly archiveableCount: number;
+  readonly canOperateArchiveable: boolean;
+  readonly canOperateAll: boolean;
 }
 
-export function buildBulkUnpinContextMenuItem(input: {
-  pinnedCount: number;
-}): ContextMenuItem<"unpin"> | null {
-  if (input.pinnedCount === 0) return null;
-  return { id: "unpin", label: `取消置顶（${input.pinnedCount}）` };
+export function buildMultiSelectThreadMenuItems(
+  input: MultiSelectThreadMenuInput,
+): ReadonlyArray<ContextMenuItem<MultiSelectThreadMenuId>> {
+  const regeneratableCount = Math.max(
+    0,
+    input.titleRegenerationSupportedCount - input.titleRegenerationInFlightCount,
+  );
+  return [
+    ...(input.pinnedCount > 0
+      ? [
+          {
+            id: "unpin" as const,
+            label: `取消置顶（${input.pinnedCount}）`,
+            disabled: !input.canOperatePinned,
+          },
+        ]
+      : []),
+    ...(input.unsettledCount > 0
+      ? [
+          {
+            id: "settle" as const,
+            label: `标为完成（${input.unsettledCount}）`,
+            disabled: !input.canOperateUnsettled,
+          },
+        ]
+      : []),
+    ...(input.snoozeableCount > 0
+      ? [
+          {
+            id: "snooze" as const,
+            label: `暂缓（${input.snoozeableCount}）`,
+            disabled: !input.canOperateSnoozeable,
+            children: [
+              ...input.snoozePresets.map((preset) => ({
+                id: `snooze:${preset.id}` as const,
+                label: preset.label,
+                detail: preset.whenLabel,
+                disabled: !input.canOperateSnoozeable,
+              })),
+              {
+                id: "snooze:custom" as const,
+                label: "自定义…",
+                separatorBefore: input.snoozePresets.length > 0,
+                disabled: !input.canOperateSnoozeable,
+              },
+            ],
+          },
+        ]
+      : []),
+    ...(input.titleRegenerationSupportedCount > 0
+      ? [
+          regeneratableCount === 0
+            ? {
+                id: "regenerate-title" as const,
+                label: `正在重新生成…（${input.titleRegenerationSupportedCount}）`,
+                disabled: true,
+              }
+            : {
+                id: "regenerate-title" as const,
+                label: `重新生成标题（${regeneratableCount}）`,
+                disabled: !input.canOperateRegeneratable,
+              },
+        ]
+      : []),
+    {
+      id: "archive",
+      label: `归档（${input.archiveableCount > 0 ? input.archiveableCount : input.selectedCount}）`,
+      ...(input.archiveableCount === 0
+        ? { disabled: true, detail: "运行中，请先停止" }
+        : { disabled: !input.canOperateArchiveable }),
+    },
+    ...(input.totalSelectableCount > input.selectedCount
+      ? [{ id: "select-all" as const, label: "全选当前列表" }]
+      : []),
+    { id: "mark-unread", label: `标为未读（${input.selectedCount}）` },
+    {
+      id: "delete",
+      label: `删除（${input.selectedCount}）`,
+      destructive: true,
+      separatorBefore: true,
+      disabled: !input.canOperateAll,
+    },
+  ];
 }
 
 export interface ThreadStatusPill {
