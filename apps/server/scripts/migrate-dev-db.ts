@@ -497,6 +497,8 @@ export const runMigrateDevDb = Effect.fn("runMigrateDevDb")(function* (
     input.source ?? path.join(sharedHome, "userdata", "statev2.sqlite"),
   );
 
+  // Not the server's resolver: this script must refuse outside a worktree
+  // rather than fall back to a shared home.
   const baseDir =
     input.baseDir !== undefined
       ? path.resolve(input.baseDir)

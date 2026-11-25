@@ -431,6 +431,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
             NetService.layer,
           ),
         ),
+        // A linked worktree ignores T3CODE_HOME, so pin a cwd that is not one.
+        Effect.provideService(HostProcess.WorkingDirectory, NodeOS.tmpdir()),
       );
 
       expect(resolved).toEqual({
