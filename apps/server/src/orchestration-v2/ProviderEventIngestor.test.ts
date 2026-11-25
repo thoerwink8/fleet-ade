@@ -36,6 +36,7 @@ import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlError from "effect/sql/SqlError";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 
 import { toolOutputImages } from "@t3tools/shared/toolOutput";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -401,6 +402,171 @@ layer("ProviderEventIngestorV2", (it) => {
       );
       assert.equal(latestThreadSequence, 2);
     }),
+  );
+
+  const ingestRosterUpdate = (input: {
+    readonly ingestor: ProviderEventIngestor.ProviderEventIngestorV2["Service"];
+    readonly providerSessionId: ProviderSessionId;
+    readonly threadId: typeof ThreadId.Type;
+    readonly providerThreadId: ProviderThreadId;
+    readonly now: DateTime.Utc;
+    readonly pendingBackgroundTasks: OrchestrationV2ProviderThread["pendingBackgroundTasks"];
+  }) =>
+    input.ingestor.ingestNormalized({
+      providerSessionId: input.providerSessionId,
+      providerInstanceId: modelSelection.instanceId,
+      threadId: input.threadId,
+      event: {
+        type: "provider_thread.updated",
+        driver: CODEX_DRIVER,
+        providerThread: {
+          id: input.providerThreadId,
+          driver: CODEX_DRIVER,
+          providerInstanceId: modelSelection.instanceId,
+          providerSessionId: input.providerSessionId,
+          appThreadId: input.threadId,
+          ownerNodeId: null,
+          nativeThreadRef: {
+            driver: CODEX_DRIVER,
+            nativeId: "native-thread",
+            strength: "strong",
+          },
+          nativeConversationHeadRef: null,
+          status: "idle",
+          firstRunOrdinal: null,
+          lastRunOrdinal: null,
+          handoffIds: [],
+          forkedFrom: null,
+          createdAt: input.now,
+          updatedAt: input.now,
+          pendingBackgroundTasks: input.pendingBackgroundTasks,
+        },
+      },
+    });
+
+  const setupRosterThread = Effect.gen(function* () {
+    const eventSink = yield* EventSink.EventSinkV2;
+    const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+    const ingestor = yield* ProviderEventIngestor.ProviderEventIngestorV2;
+    const idAllocator = yield* IdAllocator.IdAllocatorV2;
+    const startedAt = yield* DateTime.now;
+    const threadEvent = yield* threadCreatedEvent(startedAt);
+    const threadId = threadEvent.threadId;
+    yield* eventSink.write({ events: [threadEvent] });
+    const providerSessionId = yield* idAllocator.allocate.providerSession({
+      providerInstanceId: modelSelection.instanceId,
+      threadId,
+    });
+    const providerThreadId = idAllocator.derive.providerThread({
+      driver: CODEX_DRIVER,
+      nativeThreadId: "native-thread",
+    });
+    const ingestRoster = (
+      pendingBackgroundTasks: OrchestrationV2ProviderThread["pendingBackgroundTasks"],
+    ) =>
+      ingestRosterUpdate({
+        ingestor,
+        providerSessionId,
+        threadId,
+        providerThreadId,
+        now: startedAt,
+        pendingBackgroundTasks,
+      });
+    const stored = () =>
+      projectionStore
+        .getThreadProjection(threadId)
+        .pipe(
+          Effect.map((projection) =>
+            projection.providerThreads.find((thread) => thread.id === providerThreadId),
+          ),
+        );
+    return { projectionStore, threadId, startedAt, ingestRoster, stored };
+  });
+
+  it.effect("records start, end, and status of background roster tasks in the projection", () =>
+    Effect.gen(function* () {
+      const { projectionStore, threadId, startedAt, ingestRoster, stored } =
+        yield* setupRosterThread;
+
+      yield* ingestRoster([{ taskId: "cmd-1", kind: "command", description: "npm test" }]);
+      assert.deepEqual((yield* stored())?.pendingBackgroundTasks, [
+        {
+          taskId: "cmd-1",
+          kind: "command",
+          description: "npm test",
+          status: "running",
+          startedAt,
+        },
+      ]);
+
+      yield* TestClock.adjust("1 minute");
+      const endedAt = yield* DateTime.now;
+      yield* ingestRoster([{ taskId: "cmd-1", kind: "command", status: "completed" }]);
+      const afterSuccess = yield* stored();
+      assert.deepEqual(afterSuccess?.pendingBackgroundTasks, []);
+      assert.deepEqual(afterSuccess?.completedBackgroundTasks, [
+        { taskId: "cmd-1", kind: "command", status: "completed", startedAt, completedAt: endedAt },
+      ]);
+
+      // The next emission no longer lists the task; the ledger keeps it.
+      yield* TestClock.adjust("1 minute");
+      yield* ingestRoster([]);
+      assert.deepEqual((yield* stored())?.completedBackgroundTasks, [
+        { taskId: "cmd-1", kind: "command", status: "completed", startedAt, completedAt: endedAt },
+      ]);
+
+      const shell = yield* projectionStore.getThreadShell(threadId);
+      assert.deepEqual(shell?.completedBackgroundTasks, [
+        { taskId: "cmd-1", kind: "command", status: "completed", startedAt, completedAt: endedAt },
+      ]);
+    }),
+  );
+
+  it.effect.each(["failed", "cancelled"] as const)(
+    "files a %s roster outcome with completedAt",
+    (status) =>
+      Effect.gen(function* () {
+        const { startedAt, ingestRoster, stored } = yield* setupRosterThread;
+
+        yield* ingestRoster([{ taskId: "cmd-1", kind: "command" }]);
+        yield* TestClock.adjust("1 minute");
+        const endedAt = yield* DateTime.now;
+        yield* ingestRoster([{ taskId: "cmd-1", kind: "command", status }]);
+
+        assert.deepEqual((yield* stored())?.completedBackgroundTasks, [
+          { taskId: "cmd-1", kind: "command", status, startedAt, completedAt: endedAt },
+        ]);
+      }),
+  );
+
+  it.effect(
+    "files a task the roster drops without an outcome as interrupted, until it reappears",
+    () =>
+      Effect.gen(function* () {
+        const { startedAt, ingestRoster, stored } = yield* setupRosterThread;
+
+        yield* ingestRoster([{ taskId: "cmd-1", kind: "command" }]);
+        yield* TestClock.adjust("1 minute");
+        const wipedAt = yield* DateTime.now;
+        yield* ingestRoster([]);
+        assert.deepEqual((yield* stored())?.completedBackgroundTasks, [
+          {
+            taskId: "cmd-1",
+            kind: "command",
+            status: "interrupted",
+            startedAt,
+            completedAt: wipedAt,
+          },
+        ]);
+
+        yield* TestClock.adjust("1 minute");
+        yield* ingestRoster([{ taskId: "cmd-1", kind: "command" }]);
+        const reappeared = yield* stored();
+        assert.deepEqual(reappeared?.pendingBackgroundTasks, [
+          { taskId: "cmd-1", kind: "command", status: "running", startedAt },
+        ]);
+        assert.deepEqual(reappeared?.completedBackgroundTasks, []);
+      }),
   );
 
   it.effect("skips a node update only when it matches the stored node", () =>

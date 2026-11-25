@@ -1158,6 +1158,36 @@ export const OrchestrationV2PendingBackgroundTask = kindUnionWithFallback(
 );
 export type OrchestrationV2PendingBackgroundTask = typeof OrchestrationV2PendingBackgroundTask.Type;
 
+// SQLite payloads and older-wire JSON carry times as strings; the runtime schema reads instances.
+const PendingBackgroundTaskJsonFields = {
+  ...PendingBackgroundTaskFields,
+  startedAt: Schema.optional(Schema.DateTimeUtcFromString),
+  completedAt: Schema.optional(Schema.DateTimeUtcFromString),
+};
+
+export const OrchestrationV2PendingBackgroundTaskJson = kindUnionWithFallback(
+  [
+    Schema.Struct({
+      ...PendingBackgroundTaskJsonFields,
+      kind: Schema.Literal("subagent"),
+      providerInstanceId: Schema.optional(ProviderInstanceId),
+      childThreadId: Schema.optional(ThreadId),
+    }),
+    Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind: Schema.Literal("command") }),
+    Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind: Schema.Literal("monitor") }),
+    Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind: Schema.Literal("background_task") }),
+  ],
+  (kind) => Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind }),
+  ({ taskId, description, parentTaskId }) => ({
+    taskId,
+    ...(description === undefined ? {} : { description }),
+    ...(parentTaskId === undefined ? {} : { parentTaskId }),
+    kind: "background_task",
+  }),
+);
+export type OrchestrationV2PendingBackgroundTaskJson =
+  typeof OrchestrationV2PendingBackgroundTaskJson.Type;
+
 export const OrchestrationV2ProviderThreadNativeMetadata = Schema.Struct({
   cursorStoreCwd: Schema.optional(TrimmedNonEmptyString),
   modelSelection: Schema.optional(ModelSelection),
