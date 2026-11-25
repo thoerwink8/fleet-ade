@@ -20,6 +20,8 @@ describe("t3code/max-font-weight", () => {
       );
       node.style.cssText = "font-weight: 500;";
       node.style.fontWeight = "500";
+      node.style.cssText = "font: 500 14px/20px sans-serif;";
+      node.style.cssText = "font: 400 14px/20px Bold, sans-serif;";
     `,
   );
 
@@ -78,6 +80,8 @@ describe("t3code/max-font-weight", () => {
       node.style.cssText = "font-weight: 600;";
       node.style.fontWeight = "bold";
       node.style.setProperty("font-weight", "700");
+      node.style.cssText = "font: 600 14px/20px sans-serif;";
+      node.style.cssText = "font: italic bold 15px/24px sans-serif;";
     `,
   );
 });

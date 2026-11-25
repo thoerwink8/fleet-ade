@@ -1,4 +1,4 @@
-import { InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
 import { useId, useState } from "react";
 
 import { cn } from "../../lib/utils";
@@ -32,15 +32,16 @@ export function ExpandableText({
         {expanded ? text : collapsedText}
       </div>
       {canExpand ? (
-        <InlineButton
+        <Button
           aria-expanded={expanded}
           aria-controls={textId}
-          tone="muted"
-          className="mt-1"
+          variant="muted"
+          size="xs"
+          className="-ms-2 mt-1"
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "收起" : expandLabel}
-        </InlineButton>
+        </Button>
       ) : null}
     </div>
   );
