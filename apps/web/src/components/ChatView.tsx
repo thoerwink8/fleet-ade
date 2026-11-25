@@ -3129,32 +3129,44 @@ export default function ChatView(props: ChatViewProps) {
       activeProviderStatus.compatibilityAdvisory.status === "unknown");
   const canResendEndedTurn =
     latestUserTurnMessageText !== null && providerSendBlockedReason === null;
-  const onQueuedRunWithdrawnStable = useStableCallback((request: WithdrawQueuedRunRequest) => {
-    if (!activeThread) return;
-    const routeKey = routeThreadKey;
-    const target = baseComposerDraftTarget;
-    void recoverWithdrawnQueuedRun({
-      environmentId: activeThread.environmentId,
-      threadId: activeThread.id,
-      threadDraftTarget: target,
-      isComposerOccupied: queuedRunEdit.editingRunId !== null || pendingUserInputs.length > 0,
-      request,
-      onRestoredToComposer: ({ prompt, images, files, terminalContexts }) => {
-        if (currentRouteThreadKeyRef.current === routeKey && queuedRunEdit.editingRunId === null) {
-          promptRef.current = prompt;
-          composerImagesRef.current = [...images];
-          composerFilesRef.current = [...files];
-          composerTerminalContextsRef.current = [...terminalContexts];
-          composerRef.current?.resetCursorState({
-            cursor: collapseExpandedComposerCursor(prompt, prompt.length),
-            prompt,
-            detectTrigger: true,
-          });
-        }
-      },
-      onRestoreStashEntry: (entryId) => composerRef.current?.restoreStashEntry(entryId),
-    });
-  });
+  const onQueuedRunWithdrawnStable = useStableCallback(
+    (
+      request: WithdrawQueuedRunRequest,
+      origin: { readonly environmentId: EnvironmentId; readonly threadId: ThreadId },
+    ) => {
+      if (!activeThread) return;
+      const routeKey = routeThreadKey;
+      // The cancel round trip can outlast a thread switch; then the text must not land in the new thread's composer.
+      const sameThread =
+        origin.environmentId === activeThread.environmentId && origin.threadId === activeThread.id;
+      void recoverWithdrawnQueuedRun({
+        environmentId: origin.environmentId,
+        threadId: origin.threadId,
+        threadDraftTarget: baseComposerDraftTarget,
+        isComposerOccupied:
+          !sameThread || queuedRunEdit.editingRunId !== null || pendingUserInputs.length > 0,
+        request,
+        onRestoredToComposer: ({ prompt, images, files, terminalContexts }) => {
+          if (
+            sameThread &&
+            currentRouteThreadKeyRef.current === routeKey &&
+            queuedRunEdit.editingRunId === null
+          ) {
+            promptRef.current = prompt;
+            composerImagesRef.current = [...images];
+            composerFilesRef.current = [...files];
+            composerTerminalContextsRef.current = [...terminalContexts];
+            composerRef.current?.resetCursorState({
+              cursor: collapseExpandedComposerCursor(prompt, prompt.length),
+              prompt,
+              detectTrigger: true,
+            });
+          }
+        },
+        onRestoreStashEntry: (entryId) => composerRef.current?.restoreStashEntry(entryId),
+      });
+    },
+  );
   const queuedRunsControl =
     isServerThread && activeThread ? (
       <>

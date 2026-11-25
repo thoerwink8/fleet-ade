@@ -86,7 +86,10 @@ export function QueuedRunsControl({
   readonly sendBlockedReason?: string | null;
   readonly onEditQueuedRun: (request: EditQueuedRunRequest) => void;
   readonly onCancelEdit: () => void;
-  readonly onQueuedRunWithdrawn?: (request: WithdrawQueuedRunRequest) => void;
+  readonly onQueuedRunWithdrawn?: (
+    request: WithdrawQueuedRunRequest,
+    origin: { readonly environmentId: EnvironmentId; readonly threadId: ThreadId },
+  ) => void;
   readonly timestampFormat: TimestampFormat;
   readonly onOpenThread: (threadId: ThreadId, environmentId?: EnvironmentId) => void;
 }) {
@@ -239,13 +242,17 @@ export function QueuedRunsControl({
     });
     setBusyRunId(null);
     if (result._tag === "Success" && item.messageId !== null) {
-      props.onQueuedRunWithdrawn?.({
-        runId: item.runId,
-        messageId: item.messageId,
-        text: item.text,
-        attachments: item.attachments,
-        ...(item.context ? { context: item.context } : {}),
-      });
+      props.onQueuedRunWithdrawn?.(
+        {
+          runId: item.runId,
+          messageId: item.messageId,
+          text: item.text,
+          attachments: item.attachments,
+          ...(item.context ? { context: item.context } : {}),
+        },
+        // Captured from the render that started the withdraw: the user may have switched threads meanwhile.
+        { environmentId: props.environmentId, threadId: props.threadId },
+      );
     }
   };
 

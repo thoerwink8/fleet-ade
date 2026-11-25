@@ -176,7 +176,10 @@ export function useComposerStash(input: {
   }, [attachmentTargetKey]);
 
   const stashQueue = usePromptStashStore((state) => state.entries);
-  const stashPulseKey = usePromptStashStore((state) => state.stashSeq);
+  const stashSeq = usePromptStashStore((state) => state.stashSeq);
+  // The sequence is global; counting from mount keeps a remounted composer from pulsing for old stashes.
+  const [initialStashSeq] = useState(stashSeq);
+  const stashPulseKey = stashSeq - initialStashSeq;
   const stashEntryToQueue = usePromptStashStore((state) => state.stashEntry);
   const takeStashEntry = usePromptStashStore((state) => state.takeEntry);
   const finalizeStashEntryImages = usePromptStashStore((state) => state.finalizeEntryImages);
