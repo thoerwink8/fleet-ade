@@ -442,8 +442,8 @@ export function spawnClaudeProcessGroup(
 /**
  * Windows has no process groups, and `taskkill` ends a tree only while its root is running, so
  * ending the CLI goes through taskkill instead of Node's leader-only kill. The SDK forwards its
- * abort signal after the graceful shutdown window; letting Node spawn consume it would end the
- * leader alone before taskkill could see the tree.
+ * abort signal after the graceful shutdown window; the adapter ends the tree itself when it
+ * fires, instead of handing the signal to `spawn`, which would also report an AbortError.
  */
 export const ClaudeWindowsProcessTreeTerminator = Context.Reference<(pid: number) => void>(
   "t3/claude-adapter-v2/ClaudeWindowsProcessTreeTerminator",
@@ -1461,7 +1461,7 @@ export const layerQueryRunner: Layer.Layer<
             if (platform === "win32") {
               patchClaudeWindowsKill(child, terminateWindowsProcessTree);
               // The forwarded signal aborts once the CLI's graceful window ends; kill() then ends
-              // the tree, where Node's own spawn abort handling would end the leader alone first.
+              // the tree through the patched kill.
               const endTree = () => child.kill("SIGKILL");
               spawnOptions.signal.addEventListener("abort", endTree, { once: true });
               child.once("exit", () => spawnOptions.signal.removeEventListener("abort", endTree));
