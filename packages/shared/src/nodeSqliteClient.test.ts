@@ -4,12 +4,16 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Path from "effect/Path";
+import * as Queue from "effect/Queue";
+import * as TestClock from "effect/testing/TestClock";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlError from "effect/sql/SqlError";
 import * as Statement from "effect/sql/Statement";
@@ -228,6 +232,25 @@ it.effect("waits for another process's lock while the database opens", () =>
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 );
 
+it.effect("commits on the worker writer after a returning write timed out on a lock", () =>
+  Effect.gen(function* () {
+    const { filename, other } = yield* makeTempDatabase;
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`PRAGMA busy_timeout = 0`;
+      yield* Effect.sync(() => other.exec("BEGIN IMMEDIATE"));
+      const error = yield* sql`UPDATE counters SET value = 1 WHERE id = 1 RETURNING value`.pipe(
+        Effect.flip,
+      );
+      assert.equal(error.reason._tag, "LockTimeoutError");
+      yield* Effect.sync(() => other.exec("COMMIT"));
+
+      yield* sql.withTransaction(sql`UPDATE counters SET value = 2 WHERE id = 1`);
+      assert.deepEqual(yield* sql`SELECT value FROM counters WHERE id = 1`.values, [[2]]);
+    }).pipe(Effect.provide(SqliteClient.layer({ filename, writerWorker: true })));
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
 it.effect("reports a transaction blocked by another writer as a lock timeout", () =>
   Effect.gen(function* () {
     const { filename, other } = yield* makeTempDatabase;
@@ -424,6 +447,86 @@ const withFileClient = <A, E>(
       return yield* setup(yield* SqlClient.SqlClient, filename);
     }).pipe(Effect.provide(SqliteClient.layer({ filename, readerWorker: true })));
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
+
+const readConnection = (sql: SqlClient.SqlClient) =>
+  Effect.gen(function* () {
+    const spans: Array<Tracer.Span> = [];
+    const observe: Statement.Transformer = (statement, _sql, _fiber, span) =>
+      Effect.sync(() => {
+        spans.push(span);
+        return statement;
+      });
+    const count = yield* countEntries(sql).pipe(
+      SqliteClient.readOnly,
+      Effect.provideService(Statement.CurrentTransformer, observe),
+      Effect.provideService(Statement.SpanPropagationEnabled, true),
+    );
+    return {
+      count,
+      connection: [...new Set(spans.map((span) => span.attributes.get("db.connection")))],
+    };
+  });
+
+it.effect("keeps readers off when the database is not in WAL mode", () =>
+  withFileClient((sql) =>
+    Effect.gen(function* () {
+      yield* sql`PRAGMA journal_mode = DELETE`;
+      yield* sql`CREATE TABLE entries(name TEXT NOT NULL)`;
+      yield* sql`INSERT INTO entries VALUES ('kept')`;
+      const startedBefore = startedWorkers.length;
+
+      assert.deepEqual(yield* readConnection(sql), { count: 1, connection: ["writer"] });
+      yield* TestClock.adjust(Duration.minutes(10));
+      assert.equal(startedWorkers.length, startedBefore + 1);
+      assert.deepEqual(yield* readConnection(sql), { count: 1, connection: ["writer"] });
+    }),
+  ),
+);
+
+const logText = (message: unknown) =>
+  (Array.isArray(message) ? message : [message])
+    .map((part) => (typeof part === "string" ? part : JSON.stringify(part)))
+    .join(" ");
+
+it.effect(
+  "reads on the writer after a reader fails to start, then uses the reader pool again",
+  () =>
+    Effect.gen(function* () {
+      const lines = yield* Queue.unbounded<string>();
+      const logger = Logger.make(({ logLevel, message }) => {
+        if (logLevel === "Info" || logLevel === "Warn") {
+          Queue.offerUnsafe(lines, logText(message));
+        }
+      });
+      yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          failingWorkers.message = "reader start failed";
+        }),
+        () =>
+          withReaderClient((sql) =>
+            Effect.gen(function* () {
+              const startedBefore = startedWorkers.length;
+              assert.deepEqual(yield* readConnection(sql), { count: 1, connection: ["writer"] });
+              assert.equal(startedWorkers.length, startedBefore + 1);
+              assert.include(yield* Queue.take(lines), "SQLite reader worker unavailable");
+              assert.deepEqual(yield* readConnection(sql), { count: 1, connection: ["writer"] });
+              assert.equal(startedWorkers.length, startedBefore + 1);
+
+              failingWorkers.message = undefined;
+              yield* TestClock.adjust(Duration.seconds(1));
+              assert.equal(startedWorkers.length, startedBefore + 2);
+              // The retried worker opens on the real event loop; the log is that open finishing.
+              assert.include(yield* Queue.take(lines), "SQLite reader worker available again");
+              assert.deepEqual(yield* readConnection(sql), { count: 1, connection: ["reader"] });
+            }),
+          ),
+        () =>
+          Effect.sync(() => {
+            failingWorkers.message = undefined;
+          }),
+      ).pipe(Effect.provide(Logger.layer([logger], { mergeWithExisting: false })));
+    }),
+);
 
 it.effect("uses the writer when the reader cannot open the database", () =>
   withFileClient((sql, filename) =>

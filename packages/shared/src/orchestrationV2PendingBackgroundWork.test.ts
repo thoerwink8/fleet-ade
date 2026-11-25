@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import { ProviderInstanceId, ProviderThreadId } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import {
   backgroundWorkHoldsCompletion,
+  deriveCompletedBackgroundWork,
   derivePendingBackgroundWork,
+  mergeBackgroundTaskLedger,
   monitorHoldsWakeCompletion,
 } from "./orchestrationV2PendingBackgroundWork.ts";
 
@@ -35,8 +38,8 @@ describe("derivePendingBackgroundWork", () => {
       ],
     });
     expect(tasks).toEqual([
-      { taskId: "owned-item", kind: "subagent", providerInstanceId: owner },
-      { taskId: "unknown-item", kind: "subagent" },
+      { taskId: "owned-item", kind: "subagent", status: "running", providerInstanceId: owner },
+      { taskId: "unknown-item", kind: "subagent", status: "running" },
     ]);
   });
 
@@ -110,7 +113,9 @@ describe("derivePendingBackgroundWork", () => {
         },
       ],
     });
-    expect(tasks).toEqual([{ taskId: "cmd-1", description: "npm test", kind: "command" }]);
+    expect(tasks).toEqual([
+      { taskId: "cmd-1", description: "npm test", kind: "command", status: "running" },
+    ]);
   });
 
   it("excludes rolled_back items when the latest run is waiting", () => {
@@ -147,6 +152,7 @@ describe("derivePendingBackgroundWork", () => {
         taskId: "cmd-new",
         description: "still pending",
         kind: "command",
+        status: "running",
       },
     ]);
   });
@@ -174,7 +180,9 @@ describe("derivePendingBackgroundWork", () => {
         },
       ],
     });
-    expect(tasks).toEqual([{ taskId: "cmd-1", description: "npm test", kind: "command" }]);
+    expect(tasks).toEqual([
+      { taskId: "cmd-1", description: "npm test", kind: "command", status: "running" },
+    ]);
   });
 
   it("dedupes roster entries against turn items by native task id", () => {
@@ -228,7 +236,12 @@ describe("derivePendingBackgroundWork", () => {
       ],
     });
     expect(tasks).toEqual([
-      { taskId: "mon-2", description: "finite monitor", kind: "background_task" },
+      {
+        taskId: "mon-2",
+        description: "finite monitor",
+        kind: "background_task",
+        status: "running",
+      },
     ]);
   });
 
@@ -307,6 +320,7 @@ describe("derivePendingBackgroundWork", () => {
         taskId: "cmd-null",
         description: "orphan item",
         kind: "command",
+        status: "running",
       },
     ]);
   });
@@ -355,9 +369,10 @@ describe("derivePendingBackgroundWork kinds", () => {
         taskId: "sub",
         description: "Review src/math.ts",
         kind: "subagent",
+        status: "running",
         childThreadId: "thread:child",
       },
-      { taskId: "cmd", description: "npm test", kind: "command" },
+      { taskId: "cmd", description: "npm test", kind: "command", status: "running" },
     ]);
   });
 
@@ -483,5 +498,203 @@ describe("derivePendingBackgroundWork kinds", () => {
         }),
       ).toEqual([]);
     });
+  });
+});
+
+describe("mergeBackgroundTaskLedger", () => {
+  const at = (iso: string) => DateTime.makeUnsafe(iso);
+  const started = at("2026-11-21T10:00:00.000Z");
+  const ended = at("2026-11-21T10:05:00.000Z");
+
+  it("stamps startedAt and running on a task's first emission", () => {
+    const ledger = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command" }],
+      occurredAt: started,
+    });
+    expect(ledger.pendingBackgroundTasks).toEqual([
+      { taskId: "cmd-1", kind: "command", status: "running", startedAt: started },
+    ]);
+    expect(ledger.completedBackgroundTasks).toEqual([]);
+  });
+
+  it("keeps the first startedAt across emissions", () => {
+    const first = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command" }],
+      occurredAt: started,
+    });
+    const second = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command", description: "npm test" }],
+      priorPending: first.pendingBackgroundTasks,
+      priorCompleted: first.completedBackgroundTasks,
+      occurredAt: ended,
+    });
+    expect(second.pendingBackgroundTasks).toEqual([
+      {
+        taskId: "cmd-1",
+        kind: "command",
+        description: "npm test",
+        status: "running",
+        startedAt: started,
+      },
+    ]);
+  });
+
+  it.each([["completed" as const], ["failed" as const], ["cancelled" as const]])(
+    "keeps a %s entry on the roster with completedAt, then files it once the roster drops it",
+    (status) => {
+      const first = mergeBackgroundTaskLedger({
+        pending: [{ taskId: "cmd-1", kind: "command" }],
+        occurredAt: started,
+      });
+      const second = mergeBackgroundTaskLedger({
+        pending: [{ taskId: "cmd-1", kind: "command", status }],
+        priorPending: first.pendingBackgroundTasks,
+        priorCompleted: first.completedBackgroundTasks,
+        occurredAt: ended,
+      });
+      const ended1 = {
+        taskId: "cmd-1",
+        kind: "command",
+        status,
+        startedAt: started,
+        completedAt: ended,
+      };
+      expect(second.pendingBackgroundTasks).toEqual([ended1]);
+      expect(second.completedBackgroundTasks).toEqual([]);
+      const third = mergeBackgroundTaskLedger({
+        pending: [],
+        priorPending: second.pendingBackgroundTasks,
+        priorCompleted: second.completedBackgroundTasks,
+        occurredAt: at("2026-11-21T10:06:00.000Z"),
+      });
+      expect(third.pendingBackgroundTasks).toEqual([]);
+      expect(third.completedBackgroundTasks).toEqual([ended1]);
+    },
+  );
+
+  it("carries completed entries forward through emissions that no longer list them", () => {
+    const first = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command", status: "completed" }],
+      occurredAt: ended,
+    });
+    const dropped = mergeBackgroundTaskLedger({
+      pending: [],
+      priorPending: first.pendingBackgroundTasks,
+      priorCompleted: first.completedBackgroundTasks,
+      occurredAt: at("2026-11-21T10:06:00.000Z"),
+    });
+    const second = mergeBackgroundTaskLedger({
+      pending: [],
+      priorPending: dropped.pendingBackgroundTasks,
+      priorCompleted: dropped.completedBackgroundTasks,
+      occurredAt: at("2026-11-21T10:07:00.000Z"),
+    });
+    expect(second.completedBackgroundTasks).toEqual([
+      {
+        taskId: "cmd-1",
+        kind: "command",
+        status: "completed",
+        startedAt: ended,
+        completedAt: ended,
+      },
+    ]);
+  });
+
+  it("files an entry the emission drops without an outcome as interrupted", () => {
+    const first = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command" }],
+      occurredAt: started,
+    });
+    const wiped = mergeBackgroundTaskLedger({
+      pending: [],
+      priorPending: first.pendingBackgroundTasks,
+      priorCompleted: first.completedBackgroundTasks,
+      occurredAt: ended,
+    });
+    expect(wiped.completedBackgroundTasks).toEqual([
+      {
+        taskId: "cmd-1",
+        kind: "command",
+        status: "interrupted",
+        startedAt: started,
+        completedAt: ended,
+      },
+    ]);
+  });
+
+  it("resurrects a reappearing interrupted task with its original startedAt", () => {
+    const first = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command" }],
+      occurredAt: started,
+    });
+    const wiped = mergeBackgroundTaskLedger({
+      pending: [],
+      priorPending: first.pendingBackgroundTasks,
+      priorCompleted: first.completedBackgroundTasks,
+      occurredAt: ended,
+    });
+    const reappeared = mergeBackgroundTaskLedger({
+      pending: [{ taskId: "cmd-1", kind: "command" }],
+      priorPending: wiped.pendingBackgroundTasks,
+      priorCompleted: wiped.completedBackgroundTasks,
+      occurredAt: at("2026-11-21T10:07:00.000Z"),
+    });
+    expect(reappeared.pendingBackgroundTasks).toEqual([
+      { taskId: "cmd-1", kind: "command", status: "running", startedAt: started },
+    ]);
+    expect(reappeared.completedBackgroundTasks).toEqual([]);
+  });
+});
+
+describe("deriveCompletedBackgroundWork", () => {
+  const at = (iso: string) => DateTime.makeUnsafe(iso);
+
+  it("collects terminal roster entries newest first across provider threads", () => {
+    const tasks = deriveCompletedBackgroundWork({
+      providerThreads: [
+        {
+          id: ProviderThreadId.make("pt-1"),
+          completedBackgroundTasks: [
+            {
+              taskId: "older",
+              kind: "command",
+              status: "completed",
+              completedAt: at("2026-11-21T10:01:00.000Z"),
+            },
+          ],
+        },
+        {
+          id: ProviderThreadId.make("pt-2"),
+          completedBackgroundTasks: [
+            {
+              taskId: "newer",
+              kind: "command",
+              status: "failed",
+              completedAt: at("2026-11-21T10:03:00.000Z"),
+            },
+          ],
+        },
+      ],
+    });
+    expect(tasks.map((task) => task.taskId)).toEqual(["newer", "older"]);
+  });
+
+  it("reads only the active provider thread when the thread has one", () => {
+    const threads = [
+      {
+        id: ProviderThreadId.make("pt-active"),
+        completedBackgroundTasks: [{ taskId: "kept", kind: "command" as const }],
+      },
+      {
+        id: ProviderThreadId.make("pt-other"),
+        completedBackgroundTasks: [{ taskId: "dropped", kind: "command" as const }],
+      },
+    ];
+    expect(
+      deriveCompletedBackgroundWork({
+        providerThreads: threads,
+        activeProviderThreadId: "pt-active",
+      }).map((task) => task.taskId),
+    ).toEqual(["kept"]);
   });
 });
