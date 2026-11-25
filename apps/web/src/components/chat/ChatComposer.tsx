@@ -3829,25 +3829,27 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   type="button"
                   data-chat-composer-transition-prompt="true"
                   className={cn(
-                    "ade-touch-target ade-touch-target--y min-w-0 flex-1 truncate bg-transparent p-0 text-left text-sm focus:outline-none",
+                    "ade-touch-target ade-touch-target--y min-w-0 flex-1 bg-transparent p-0 text-left text-sm focus:outline-none",
                     prompt.trim() ? "text-foreground" : "text-placeholder",
                   )}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={expandMobileComposerStable}
                   aria-label="展开输入框"
                 >
-                  {prompt.trim() ? (
-                    <CollapsedComposerPromptPreview
-                      prompt={prompt}
-                      skills={selectedProviderSkills}
-                      contextRecords={composerContextRecords}
-                      theme={resolvedTheme}
-                    />
-                  ) : showProviderUnavailable ? (
-                    "请在设置中启用一个智能体"
-                  ) : (
-                    "随便问点什么…"
-                  )}
+                  <span className="block truncate">
+                    {prompt.trim() ? (
+                      <CollapsedComposerPromptPreview
+                        prompt={prompt}
+                        skills={selectedProviderSkills}
+                        contextRecords={composerContextRecords}
+                        theme={resolvedTheme}
+                      />
+                    ) : showProviderUnavailable ? (
+                      "请在设置中启用一个智能体"
+                    ) : (
+                      "随便问点什么…"
+                    )}
+                  </span>
                 </button>
                 {collapsedComposerImagePreviews}
                 <CollapsedComposerStopAction
