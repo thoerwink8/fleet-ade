@@ -102,8 +102,8 @@ import { useThreadShell } from "../../state/entities";
 import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
 import { ThreadSearchMatchExcerpt } from "../ThreadSearchMatch";
 import { makeWorkspaceFileDropHandlers } from "../chat/workspaceFileDrop";
+import { resolveModelDisplayName } from "@t3tools/client-runtime/model-display";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { getTriggerDisplayModelName } from "../chat/providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { useThreadRunningTerminalIds } from "../../state/terminalSessions";
 import { Badge } from "../ui/badge";
@@ -393,12 +393,11 @@ function SidebarThreadDetails(props: {
   const showInstanceBadge =
     providerEntry !== null &&
     shouldShowInstanceBadge(providerEntry, props.providerEntryByInstanceId.values());
-  const selectedModel = providerEntry?.models.find(
-    (model) => model.slug === thread.modelSelection.model,
-  );
-  const modelLabel = selectedModel
-    ? getTriggerDisplayModelName(selectedModel, providerEntry?.driverKind)
-    : thread.modelSelection.model;
+  const modelLabel = resolveModelDisplayName({
+    driverKind: providerEntry?.driverKind,
+    model: thread.modelSelection.model,
+    models: providerEntry?.models,
+  });
   const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
   const modelWithEffort = reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel;
   const previousProviderNames = thread.providerInstanceHistory
@@ -1303,12 +1302,11 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
   const showInstanceBadge =
     providerEntry !== null &&
     shouldShowInstanceBadge(providerEntry, props.providerEntryByInstanceId.values());
-  const selectedModel = providerEntry?.models.find(
-    (model) => model.slug === thread.modelSelection.model,
-  );
-  const modelLabel = selectedModel
-    ? getTriggerDisplayModelName(selectedModel, providerEntry?.driverKind)
-    : thread.modelSelection.model;
+  const modelLabel = resolveModelDisplayName({
+    driverKind: providerEntry?.driverKind,
+    model: thread.modelSelection.model,
+    models: providerEntry?.models,
+  });
   const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
   const runningTerminalIds = useThreadRunningTerminalIds({
     environmentId: thread.environmentId,

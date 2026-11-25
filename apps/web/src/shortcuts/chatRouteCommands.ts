@@ -11,7 +11,11 @@ import {
 } from "../hooks/useHandleNewThread";
 import { createScratchProjectActions } from "../hooks/useScratchProject";
 import { getClientSettings } from "../hooks/useSettings";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import {
+  resolveCurrentProjectRef,
+  startNewThreadFromContext,
+  type CurrentProjectRouteContext,
+} from "../lib/chatThreadActions";
 import { selectProjectGroupingSettings } from "@t3tools/client-runtime/state/project-grouping";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
@@ -49,7 +53,7 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
     const target = readRouteTarget();
     return target?.kind === "server" ? target.threadRef : null;
   };
-  const readThreadContext = () => {
+  const readThreadContext = (groups?: ReturnType<typeof readProjectGroups>) => {
     const lastUsedProjectKey = readLastUsedProjectKey();
     const target = readRouteTarget();
     const drafts = useComposerDraftStore.getState();
@@ -59,7 +63,16 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
         ? drafts.getDraftThread(target.threadRef)
         : drafts.getDraftSession(target.draftId)
       : null;
+    const location = router.state.location;
+    const currentProjectRef = resolveCurrentProjectRef({
+      pathname: location?.pathname ?? "",
+      search: location?.search as CurrentProjectRouteContext["search"],
+      activeThread,
+      activeDraftThread,
+      ...(groups ? { projectGroups: groups } : {}),
+    });
     return {
+      currentProjectRef,
       activeDraftThread,
       activeThread: activeThread ?? undefined,
       defaultProjectRef: resolveDefaultProjectRef(
@@ -88,8 +101,9 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
 
   const startNewLocal: CommandHandler = (event) => {
     claim(event);
+    const context = readThreadContext(readProjectGroups());
     // With no current or open project, such as when every project is archived, pick one.
-    void startNewThreadFromContext(readThreadContext()).then((started) => {
+    void startNewThreadFromContext(context).then((started) => {
       if (!started) openCommandPalette({ open: "new-thread-in" });
     });
   };
@@ -108,18 +122,23 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
       },
       "chat.new": (event) => {
         const groups = readProjectGroups();
+        const context = readThreadContext(groups);
         if (
-          !shouldCreateNewThreadInCurrentProject(
-            false,
-            groups.filter((group) => !group.archived).length,
-            groups.length,
-          )
+          !shouldCreateNewThreadInCurrentProject({
+            shiftKey: false,
+            hasCurrentProject: context.currentProjectRef !== null,
+            openProjectGroupCount: groups.filter((group) => !group.archived).length,
+            projectGroupCount: groups.length,
+          })
         ) {
           claim(event);
           openCommandPalette({ open: "new-thread-in" });
           return;
         }
-        startNewLocal(event);
+        claim(event);
+        void startNewThreadFromContext(context).then((started) => {
+          if (!started) openCommandPalette({ open: "new-thread-in" });
+        });
       },
     },
     {

@@ -5,9 +5,8 @@ import type {
   OrchestrationProjectShell,
   ServerProvider,
 } from "@t3tools/contracts";
-import { formatModelSlugName, resolveSelectableModel } from "@t3tools/shared/model";
 import { fileBasename } from "@t3tools/shared/path";
-import { resolveModelShortName } from "../providerClients.ts";
+import { resolveCatalogModel, resolveModelDisplayName } from "../modelDisplay.ts";
 import { isTerminalSubagentStatus } from "./subagentRuntime.ts";
 
 export function subagentGroupSummary(
@@ -76,27 +75,18 @@ export function resolveSubagentMetadata(input: {
     | undefined;
 }) {
   const model = input.model?.trim() || input.modelSelection?.model.trim();
-  const slug = input.provider
-    ? resolveSelectableModel(input.provider.driver, model, input.provider.models)
-    : model;
-  const catalogModel = input.provider?.models.find((candidate) => candidate.slug === slug);
-  const reportedLabel = catalogModel
-    ? (resolveModelShortName(catalogModel, input.provider?.driver) ?? catalogModel.name)
-    : model
-      ? formatModelSlugName(model)
-      : "未报告";
-  const qualifier = catalogModel?.subProvider?.trim();
-  const modelLabel = qualifier
-    ? reportedLabel
-        .replace(
-          new RegExp(
-            `^${qualifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s*[.:/-]\\s*|\\s+)`,
-            "iu",
-          ),
-          "",
-        )
-        .trim() || reportedLabel
-    : reportedLabel;
+  const catalogModel = resolveCatalogModel({
+    driverKind: input.provider?.driver,
+    model,
+    models: input.provider?.models,
+  });
+  const slug = catalogModel?.slug ?? model;
+  const modelLabel =
+    resolveModelDisplayName({
+      driverKind: input.provider?.driver,
+      model,
+      models: input.provider?.models,
+    }) || "未报告";
   const parentWorkspace = input.parentThread?.worktreePath ?? input.parentProject?.workspaceRoot;
   const childWorkspace = input.childThread?.worktreePath ?? input.childProject?.workspaceRoot;
   const workspace = [
