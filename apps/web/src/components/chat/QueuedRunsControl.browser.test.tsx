@@ -7,7 +7,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import type { ComponentProps } from "react";
 import { expect, it, vi } from "vite-plus/test";
-import { page } from "vite-plus/test/browser";
+import { cdp, page } from "vite-plus/test/browser";
 
 const state = vi.hoisted(() => ({
   projection: null as unknown,
@@ -247,4 +247,209 @@ it("stays inside the timeline scroller instead of growing the chat column", asyn
   await expect.element(page.getByText("稍后", { exact: true })).toBeInTheDocument();
   const column = screen.getByTestId("column").element();
   expect(column.scrollHeight).toBe(column.clientHeight);
+});
+
+async function emulatePointer(options: {
+  width: number;
+  height: number;
+  pointer: "coarse" | "fine";
+}): Promise<AsyncDisposable> {
+  const previous = { width: window.innerWidth, height: window.innerHeight };
+  const session = cdp();
+  const isTouch = options.pointer === "coarse";
+  const cleanup = async () => {
+    await session.send("Emulation.setEmulatedMedia", { features: [] });
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await session.send("Emulation.clearDeviceMetricsOverride");
+    await page.viewport(prevWidthOrCurrent(previous.width), prevWidthOrCurrent(previous.height));
+  };
+  await page.viewport(options.width, options.height);
+  await session.send("Emulation.setDeviceMetricsOverride", {
+    width: options.width,
+    height: options.height,
+    deviceScaleFactor: isTouch ? 2 : 1,
+    mobile: isTouch,
+  });
+  await session.send("Emulation.setTouchEmulationEnabled", {
+    enabled: isTouch,
+    ...(isTouch ? { maxTouchPoints: 5 } : {}),
+  });
+  await session.send("Emulation.setEmulatedMedia", {
+    features: isTouch
+      ? [
+          { name: "pointer", value: "coarse" },
+          { name: "hover", value: "none" },
+        ]
+      : [
+          { name: "pointer", value: "fine" },
+          { name: "hover", value: "hover" },
+        ],
+  });
+  return { [Symbol.asyncDispose]: cleanup };
+}
+
+function prevWidthOrCurrent(value: number): number {
+  return value > 0 ? value : 1280;
+}
+
+it("expands queued message action hit areas to >= 44px via ::after on coarse 390x844 without growing painted buttons", async () => {
+  setup();
+  const message = (id: string, fields: Record<string, unknown>) => ({
+    id,
+    role: "user",
+    createdAt: DateTime.makeUnsafe("2026-10-27T12:00:00.000Z"),
+    ...fields,
+  });
+  state.projection = { projection: { messages: [] } };
+  state.workflow = {
+    activeRun: { id: "run:active" },
+    canPromoteToSteer: true,
+    queuedRuns: [
+      {
+        run: { id: "run:regular", userMessageId: "message:regular" },
+        text: "普通排队消息",
+        attachments: [],
+      },
+      {
+        run: { id: "run:editing", userMessageId: "message:editing" },
+        text: "正在编辑的排队消息",
+        attachments: [],
+      },
+      {
+        run: { id: "run:agent", userMessageId: "message:agent" },
+        text: "智能体排队消息",
+        attachments: [],
+        message: message("message:agent", {
+          text: "智能体排队消息",
+          createdBy: "agent",
+          creationSource: "provider",
+          senderThreadId: "thread:lead",
+        }),
+      },
+      {
+        run: { id: "run:automation", userMessageId: "message:automation" },
+        text: "自动化排队消息",
+        attachments: [],
+        message: message("message:automation", {
+          text: "自动化排队消息",
+          createdBy: "agent",
+          scheduledTaskId: "task:webhook",
+        }),
+      },
+    ],
+  };
+
+  await using _pointer = await emulatePointer({ width: 390, height: 844, pointer: "coarse" });
+  await using screen = await renderQueue({ editingRunId: "run:editing" as never });
+  await vi.waitFor(() => expect(window.matchMedia("(pointer: coarse)").matches).toBe(true));
+
+  const showAll = page.getByRole("button", { name: "显示全部 4 条排队消息" });
+  await showAll.click();
+  await expect.element(page.getByRole("link", { name: "打开自动化" })).toBeVisible();
+
+  const regularRow = screen.container.querySelectorAll("li")[0]!;
+  const regularButtons = [...regularRow.querySelectorAll<HTMLButtonElement>("button")];
+  const steerBtn = regularButtons.find((btn) => btn.textContent?.includes("立即发送"))!;
+  const editBtn = regularRow.querySelector<HTMLButtonElement>('button[aria-label="编辑排队消息"]')!;
+  const withdrawBtn = regularRow.querySelector<HTMLButtonElement>(
+    'button[aria-label="撤回排队消息"]',
+  )!;
+  const cancelEditBtn = screen.container.querySelector<HTMLButtonElement>(
+    'button[aria-label="取消编辑排队消息"]',
+  )!;
+  const openThreadBtn = screen.getByRole("button", { name: "打开会话" }).element() as HTMLElement;
+  const openAutomationLink = screen
+    .getByRole("link", { name: "打开自动化" })
+    .element() as HTMLElement;
+  const collapseBtn = screen.getByRole("button", { name: "收起" }).element() as HTMLElement;
+
+  for (const [label, el, maxPaintedHeight] of [
+    ["立即发送", steerBtn, 24],
+    ["编辑排队消息", editBtn, 24],
+    ["撤回排队消息", withdrawBtn, 24],
+    ["取消编辑排队消息", cancelEditBtn, 24],
+    ["打开会话", openThreadBtn, 20],
+    ["打开自动化", openAutomationLink, 20],
+    ["收起", collapseBtn, 20],
+  ] as const) {
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+    const rect = el.getBoundingClientRect();
+    const after = getComputedStyle(el, "::after");
+    expect(Math.round(rect.height), `${label} painted height`).toBeLessThanOrEqual(
+      maxPaintedHeight,
+    );
+    expect(Number.parseFloat(after.width), `${label} ::after width`).toBeGreaterThanOrEqual(44);
+    expect(Number.parseFloat(after.height), `${label} ::after height`).toBeGreaterThanOrEqual(44);
+    const cx = rect.left + rect.width / 2;
+    expect(document.elementFromPoint(cx, rect.top - 6), `${label} top extended hit`).toBe(el);
+    expect(document.elementFromPoint(cx, rect.bottom + 6), `${label} bottom extended hit`).toBe(el);
+  }
+
+  const editRect = editBtn.getBoundingClientRect();
+  const editCy = editRect.top + editRect.height / 2;
+  expect(document.elementFromPoint(editRect.left - 6, editCy), "edit left extended hit").toBe(
+    editBtn,
+  );
+  expect(document.elementFromPoint(editRect.right + 6, editCy), "edit right extended hit").toBe(
+    editBtn,
+  );
+
+  // Adjacent controls keep non-overlapping hit zones across the 20px coarse gap:
+  // 24px edit button extends 10px on each side (44px total) without crossing onto wide neighbors.
+  const steerRect = steerBtn.getBoundingClientRect();
+  const withdrawRect = withdrawBtn.getBoundingClientRect();
+  expect(document.elementFromPoint(steerRect.right - 2, editCy), "steer right edge").toBe(steerBtn);
+  expect(
+    document.elementFromPoint(steerRect.right + 2, editCy),
+    "steer side does not steal for edit",
+  ).not.toBe(editBtn);
+  expect(document.elementFromPoint(editRect.left - 9, editCy), "edit extended left edge").toBe(
+    editBtn,
+  );
+  expect(document.elementFromPoint(editRect.right + 9, editCy), "edit extended right edge").toBe(
+    editBtn,
+  );
+  expect(
+    document.elementFromPoint(withdrawRect.left - 2, editCy),
+    "withdraw side does not steal for edit",
+  ).not.toBe(editBtn);
+  expect(document.elementFromPoint(withdrawRect.left + 2, editCy), "withdraw left edge").toBe(
+    withdrawBtn,
+  );
+});
+
+it("keeps ::after inactive on desktop fine pointer for queued message controls", async () => {
+  setup();
+  state.projection = { projection: { messages: [] } };
+  state.workflow = {
+    activeRun: { id: "run:active" },
+    canPromoteToSteer: true,
+    queuedRuns: [
+      {
+        run: { id: "run:agent", userMessageId: "message:agent" },
+        text: "桌面测试",
+        attachments: [],
+        message: {
+          id: "message:agent",
+          role: "user",
+          createdAt: DateTime.makeUnsafe("2026-10-27T12:00:00.000Z"),
+          text: "桌面测试",
+          createdBy: "agent",
+          creationSource: "provider",
+          senderThreadId: "thread:lead",
+        },
+      },
+    ],
+  };
+
+  await using _pointer = await emulatePointer({ width: 1280, height: 800, pointer: "fine" });
+  await using screen = await renderQueue();
+  await vi.waitFor(() => expect(window.matchMedia("(pointer: coarse)").matches).toBe(false));
+
+  const editBtn = screen.getByRole("button", { name: "编辑排队消息" }).element();
+  const withdrawBtn = screen.getByRole("button", { name: "撤回排队消息" }).element();
+  const openThreadBtn = screen.getByRole("button", { name: "打开会话" }).element();
+  expect(getComputedStyle(editBtn, "::after").content).toBe("none");
+  expect(getComputedStyle(withdrawBtn, "::after").content).toBe("none");
+  expect(getComputedStyle(openThreadBtn, "::after").content).toBe("none");
 });
