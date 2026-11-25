@@ -70,7 +70,7 @@ const state = vi.hoisted(() => ({
   scopeKind: "environment" as "environment" | "project",
   rawSettings: {} as Record<string, unknown>,
   providers: [] as ReadonlyArray<ServerProvider>,
-  updateSettings: vi.fn<(patch: ScopedSettingsPatch) => void>(),
+  updateSettings: vi.fn<(patch: ScopedSettingsPatch) => Promise<boolean>>(),
   clearOverrides: vi.fn<(keys: readonly string[]) => void>(),
 }));
 
@@ -232,7 +232,7 @@ function setup(options?: {
   state.scopeKind = options?.scopeKind ?? "environment";
   state.providers = PROVIDERS;
   state.rawSettings = options?.rawSettings ?? { ...DEFAULT_UNIFIED_SETTINGS };
-  state.updateSettings.mockReset();
+  state.updateSettings.mockReset().mockResolvedValue(true);
   state.clearOverrides.mockReset();
 }
 

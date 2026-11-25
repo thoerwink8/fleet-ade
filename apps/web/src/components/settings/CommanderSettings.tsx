@@ -157,7 +157,7 @@ export function CommanderSettingsSection() {
             description={role.description}
             status={
               mixed
-                ? "各环境的配置不一样。请选择一个环境，或改成共用模型。"
+                ? "各电脑的配置不一样。请选择一台电脑，或改成各电脑共用的模型。"
                 : (presentation.providerNote ?? effortDisabledReason)
             }
             resetAction={
@@ -182,7 +182,7 @@ export function CommanderSettingsSection() {
                     triggerClassName={cn(SETTINGS_PICKER_TRIGGER_CLASSNAME, "max-w-full shrink")}
                     triggerAriaLabel={`${role.title}模型`}
                     {...(mixed
-                      ? { triggerLabel: "各不相同" }
+                      ? { triggerLabel: "多项不同" }
                       : presentation.usesDefault
                         ? { triggerLabel: "跟随默认模型" }
                         : {})}
@@ -223,7 +223,7 @@ export function CommanderSettingsSection() {
                 </div>
               ) : (
                 <span className="text-sm text-muted-foreground">
-                  {mixed ? "各不相同" : "没有可用的提供方"}
+                  {mixed ? "多项不同" : "没有可用的智能体"}
                 </span>
               )
             }
@@ -254,13 +254,12 @@ export function CommanderSettingsSection() {
               type="text"
               inputMode="numeric"
               value={mixedLimit ? "" : String(dispatchSettings.dispatchConcurrencyLimit ?? "")}
-              placeholder={mixedLimit ? "各不相同" : "不限制"}
+              placeholder={mixedLimit ? "多项不同" : "不限制"}
               aria-label="同时派出上限"
               onCommit={(value) => {
                 const parsed = parseDispatchConcurrencyLimitDraft(value);
-                if (parsed !== undefined) {
-                  updateSettings({ dispatchConcurrencyLimit: parsed });
-                }
+                if (parsed === undefined) return "无效的上限，请输入正整数或留空";
+                return updateSettings({ dispatchConcurrencyLimit: parsed });
               }}
             />
           </div>
@@ -270,13 +269,13 @@ export function CommanderSettingsSection() {
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
         <p className="min-w-0 text-ui text-muted-foreground">
           {isProjectScope
-            ? "将此项目的指挥设置恢复为环境默认。"
+            ? "将此项目的指挥设置恢复为电脑默认。"
             : "将以上全部指挥设置恢复为内置默认。"}
         </p>
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="secondary"
           disabled={!hasResettable || !canWriteSettings || unavailable}
           onClick={handleResetAll}
         >

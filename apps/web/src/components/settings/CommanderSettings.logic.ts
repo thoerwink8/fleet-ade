@@ -124,7 +124,7 @@ export interface CommanderRoleModelPresentation {
 }
 
 function providerNote(entry: ProviderInstanceEntry | undefined): string {
-  if (!entry) return "此环境上没有这个提供方。";
+  if (!entry) return "这台电脑上没有这个智能体。";
   if (!entry.enabled) return `${entry.displayName} 已关闭。`;
   return `${entry.displayName} 不可用。`;
 }

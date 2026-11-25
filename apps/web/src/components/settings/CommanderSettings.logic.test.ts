@@ -198,7 +198,7 @@ describe("CommanderSettings logic", () => {
     ).toEqual({
       saved: savedClaude,
       selection: savedClaude,
-      providerNote: "此环境上没有这个提供方。",
+      providerNote: "这台电脑上没有这个智能体。",
       usesDefault: false,
     });
   });
