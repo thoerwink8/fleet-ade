@@ -1374,13 +1374,17 @@ export function readableFailure(failure: unknown, hint: string): string {
 const isGitCommandError = Schema.is(GitCommandError);
 
 export function checkoutFailureDescription(failure: unknown): string {
-  const description = isGitCommandError(failure)
-    ? (() => {
-        const { nextStep, detail } = describeVersionControlError(failure);
-        return [nextStep, detail].filter(Boolean).join("\n\n");
-      })()
-    : failure;
-  return readableFailure(description, "请确认该分支仍然存在且未在其他位置检出，然后重试。");
+  const hint = "请确认该分支仍然存在且未在其他位置检出，然后重试。";
+  if (!isGitCommandError(failure)) return readableFailure(failure, hint);
+  // Filter and cut the diagnostic on its own; the next step must not make noise look like content.
+  const detail = readableFailure(failure.detail, "");
+  if (detail.length === 0) return hint;
+  const { nextStep } = describeVersionControlError(failure);
+  return nextStep === undefined
+    ? detail
+    : `${nextStep}
+
+${detail}`;
 }
 
 export function resolveBaseFreshness(detail: {
