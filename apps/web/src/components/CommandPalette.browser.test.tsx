@@ -35,7 +35,9 @@ describe("CommandPalette open intents", () => {
     const environmentId = EnvironmentId.make("remote");
     const threadId = ThreadId.make("dragged-thread");
     setup({
-      threads: [makeThreadFixture({ environmentId, id: threadId, title: "Drag this thread" })],
+      threads: [
+        makeThreadFixture({ environmentId, id: threadId, title: "Drag this thread", turnCount: 1 }),
+      ],
     });
     const onDrop = vi.fn();
     await using screen = await render(

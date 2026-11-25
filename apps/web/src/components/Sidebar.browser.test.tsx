@@ -377,6 +377,7 @@ describe("sidebar attention offline rows", () => {
       projectId: activeProject.id,
       id: ThreadId.make("failed-offline"),
       title: "Offline failed thread",
+      runtime: null,
       latestRun: {
         runId: RunId.make("run-failed"),
         status: "failed",

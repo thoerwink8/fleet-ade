@@ -2356,8 +2356,10 @@ describe("buildMultiSelectThreadMenuItems", () => {
   };
 
   it("never emits unarchive and adjusts unpin across unpinned, partial, and all-pinned selections", () => {
+    const hasUnarchive = (items: ReadonlyArray<{ readonly id: string }>) =>
+      items.some((item) => item.id === "unarchive");
     const allUnpinned = buildMultiSelectThreadMenuItems(baseInput);
-    expect(allUnpinned.some((item) => item.id === "unarchive")).toBe(false);
+    expect(hasUnarchive(allUnpinned)).toBe(false);
     expect(allUnpinned.some((item) => item.id === "unpin")).toBe(false);
     expect(allUnpinned.find((item) => item.id === "select-all")?.label).toBe("全选当前列表");
     expect(allUnpinned.find((item) => item.id === "delete")).toMatchObject({
@@ -2367,7 +2369,7 @@ describe("buildMultiSelectThreadMenuItems", () => {
     });
 
     const partialPinned = buildMultiSelectThreadMenuItems({ ...baseInput, pinnedCount: 1 });
-    expect(partialPinned.some((item) => item.id === "unarchive")).toBe(false);
+    expect(hasUnarchive(partialPinned)).toBe(false);
     expect(partialPinned.find((item) => item.id === "unpin")).toMatchObject({
       id: "unpin",
       label: "取消置顶（1）",
@@ -2375,7 +2377,7 @@ describe("buildMultiSelectThreadMenuItems", () => {
     });
 
     const allPinned = buildMultiSelectThreadMenuItems({ ...baseInput, pinnedCount: 3 });
-    expect(allPinned.some((item) => item.id === "unarchive")).toBe(false);
+    expect(hasUnarchive(allPinned)).toBe(false);
     expect(allPinned.find((item) => item.id === "unpin")).toMatchObject({
       id: "unpin",
       label: "取消置顶（3）",
@@ -2396,7 +2398,7 @@ describe("buildMultiSelectThreadMenuItems", () => {
     expect(allSettled.some((item) => item.id === "snooze")).toBe(false);
     expect(allSettled.some((item) => item.id === "regenerate-title")).toBe(false);
     expect(allSettled.some((item) => item.id === "select-all")).toBe(false);
-    expect(allSettled.some((item) => item.id === "unarchive")).toBe(false);
+    expect(allSettled.some((item) => String(item.id) === "unarchive")).toBe(false);
     expect(allSettled.find((item) => item.id === "archive")).toMatchObject({
       id: "archive",
       label: "归档（3）",

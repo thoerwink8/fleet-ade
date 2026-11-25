@@ -107,7 +107,9 @@ export function useThreadActionMenu(input: {
   readonly onFilterByProject?: ((threadRef: ScopedThreadRef) => void) | undefined;
   readonly onOpenProjectSettings?: ((threadRef: ScopedThreadRef) => void) | undefined;
   readonly onSettle?: ((threadRef: ScopedThreadRef) => void) | undefined;
-  readonly onSnooze?: ((threadRef: ScopedThreadRef, preset: SnoozePreset) => void) | undefined;
+  readonly onSnooze?:
+    | ((threadRef: ScopedThreadRef, preset: Pick<SnoozePreset, "snoozedUntil">) => void)
+    | undefined;
 }) {
   const {
     threadRef,
