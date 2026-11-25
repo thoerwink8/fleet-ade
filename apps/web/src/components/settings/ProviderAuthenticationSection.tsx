@@ -10,7 +10,7 @@ import type {
   ProviderInstanceId,
   ServerProvider,
 } from "@t3tools/contracts";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 import { CopyIcon } from "lucide-react";
 
 import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
@@ -27,7 +27,6 @@ import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 import { providerSetupGuidance } from "./providerSetupGuidance.logic";
 import { providerAuthAccountDescription } from "./providerAuthAccountDescription.logic";
-import { terminalSendFailureMessage } from "./providerAuthTerminalSend.logic";
 
 const ProviderAuthTerminal = lazy(() => import("./ProviderAuthTerminal"));
 
@@ -61,12 +60,6 @@ export function ProviderAuthenticationSection({
   const terminalQueue = useRef<ProviderAuthRespondInput[]>([]);
   const terminalSending = useRef(false);
   const auth = query.data;
-  // Late terminal input is judged against the newest state, not the render that sent it.
-  const latestAuth = useRef(auth);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- mirrors the newest auth state into a ref read by async terminal sends
-  useEffect(() => {
-    latestAuth.current = auth;
-  }, [auth]);
   const guidance = providerSetupGuidance({ provider, environmentLabel });
   const interaction = auth?.interaction;
   const active =
@@ -392,12 +385,8 @@ export function ProviderAuthenticationSection({
                         const result = await respond({ environmentId, input });
                         if (result._tag !== "Success") {
                           terminalQueue.current = [];
-                          const message = terminalSendFailureMessage({
-                            interrupted: isAtomCommandInterrupted(result),
-                            sent: { flowId: input.flowId, interactionId: input.interactionId },
-                            latest: latestAuth.current,
-                          });
-                          if (message) setError(message);
+                          if (!isAtomCommandInterrupted(result))
+                            setError("智能体登录终端已不可用。");
                           break;
                         }
                       }
