@@ -34,6 +34,7 @@ import {
   type SidebarListItem,
   type SidebarListMarker,
   type SidebarSection,
+  buildSidebarListItems,
   isThreadAttentionDismissible,
   isThreadAttentionRowDisabled,
   resolveSidebarDropVerb,
@@ -41,6 +42,7 @@ import {
   resolveSidebarRowPresentation,
   resolveSidebarThreadState,
   resolveThreadAttention,
+  shouldShowSidebarEmptyState,
   threadAttentionSubtitleText,
 } from "./Sidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -2226,5 +2228,103 @@ describe("resolveSidebarOfflineBanner", () => {
       offlineEnvironmentIds: [macEnv, linuxEnv],
       message: "2 台电脑已断线，连上后处理",
     });
+  });
+});
+
+describe("buildSidebarListItems and shouldShowSidebarEmptyState", () => {
+  const baseListInput = {
+    commanderKeys: [] as const,
+    visibleAttentionKeys: [] as const,
+    attentionCount: 0,
+    hiddenAttentionCount: 0,
+    pinnedKeys: [] as const,
+    activeKeys: ["local:a1"] as const,
+    visibleWorkingKeys: [] as const,
+    workingCount: 0,
+    visibleSnoozedKeys: [] as const,
+    snoozedCount: 0,
+    renderedSettledKeys: [] as const,
+    settledCount: 0,
+    isDragging: false,
+  };
+
+  it("omits zero-count headers including settled when idle, and reveals settled drop zone while dragging", () => {
+    const idleItems = buildSidebarListItems(baseListInput);
+    expect(idleItems).toEqual([
+      { kind: "marker", marker: "pinned-header" },
+      { kind: "marker", marker: "pinned-divider" },
+      { kind: "marker", marker: "active-placeholder" },
+      { kind: "thread", key: "local:a1", section: "active" },
+    ]);
+
+    const draggingItems = buildSidebarListItems({ ...baseListInput, isDragging: true });
+    expect(
+      draggingItems.some((item) => item.kind === "marker" && item.marker === "settled-header"),
+    ).toBe(true);
+    expect(
+      draggingItems.some((item) => item.kind === "marker" && item.marker === "settled-placeholder"),
+    ).toBe(true);
+
+    const withSettled = buildSidebarListItems({
+      ...baseListInput,
+      settledCount: 1,
+      renderedSettledKeys: ["local:s1"],
+    });
+    expect(
+      withSettled.some((item) => item.kind === "marker" && item.marker === "settled-header"),
+    ).toBe(true);
+    expect(withSettled.some((item) => item.kind === "thread" && item.key === "local:s1")).toBe(
+      true,
+    );
+  });
+
+  it("never shows empty state when attention threads exist", () => {
+    expect(
+      shouldShowSidebarEmptyState({
+        isSearchingThreads: false,
+        visibleDraftSessionCount: 0,
+        commanderCount: 0,
+        attentionCount: 1,
+        pinnedCount: 0,
+        activeCount: 0,
+        workingCount: 0,
+        snoozedCount: 0,
+        settledCount: 0,
+        hasProjectScope: false,
+        settledShelfExpanded: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowSidebarEmptyState({
+        isSearchingThreads: false,
+        visibleDraftSessionCount: 0,
+        commanderCount: 0,
+        attentionCount: 0,
+        pinnedCount: 0,
+        activeCount: 0,
+        workingCount: 0,
+        snoozedCount: 0,
+        settledCount: 0,
+        hasProjectScope: false,
+        settledShelfExpanded: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowSidebarEmptyState({
+        isSearchingThreads: false,
+        visibleDraftSessionCount: 0,
+        commanderCount: 0,
+        attentionCount: 0,
+        pinnedCount: 0,
+        activeCount: 0,
+        workingCount: 0,
+        snoozedCount: 0,
+        settledCount: 2,
+        hasProjectScope: true,
+        settledShelfExpanded: false,
+      }),
+    ).toBe(true);
   });
 });

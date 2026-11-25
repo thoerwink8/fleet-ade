@@ -244,6 +244,105 @@ export function sidebarListItemId(item: SidebarListItem): string {
   return item.kind === "thread" ? item.key : sidebarMarkerId(item.marker);
 }
 
+export function buildSidebarListItems(input: {
+  readonly commanderKeys: readonly string[];
+  readonly visibleAttentionKeys: readonly string[];
+  readonly attentionCount: number;
+  readonly hiddenAttentionCount: number;
+  readonly pinnedKeys: readonly string[];
+  readonly activeKeys: readonly string[];
+  readonly visibleWorkingKeys: readonly string[];
+  readonly workingCount: number;
+  readonly visibleSnoozedKeys: readonly string[];
+  readonly snoozedCount: number;
+  readonly renderedSettledKeys: readonly string[];
+  readonly settledCount: number;
+  readonly isDragging: boolean;
+}): SidebarListItem[] {
+  const {
+    commanderKeys,
+    visibleAttentionKeys,
+    attentionCount,
+    hiddenAttentionCount,
+    pinnedKeys,
+    activeKeys,
+    visibleWorkingKeys,
+    workingCount,
+    visibleSnoozedKeys,
+    snoozedCount,
+    renderedSettledKeys,
+    settledCount,
+    isDragging,
+  } = input;
+  if (
+    commanderKeys.length +
+      attentionCount +
+      pinnedKeys.length +
+      activeKeys.length +
+      workingCount +
+      snoozedCount +
+      settledCount ===
+    0
+  ) {
+    return [];
+  }
+  const rowsOf = (keys: readonly string[], section: SidebarSection): SidebarListItem[] =>
+    keys.map((key) => ({ kind: "thread", key, section }));
+
+  const items: SidebarListItem[] = rowsOf(commanderKeys, "commander");
+  if (attentionCount > 0) {
+    items.push({ kind: "marker", marker: "attention-header" });
+    items.push(...rowsOf(visibleAttentionKeys, "attention"));
+    if (hiddenAttentionCount > 0) items.push({ kind: "marker", marker: "attention-more" });
+  }
+  items.push({ kind: "marker", marker: "pinned-header" });
+  items.push(...rowsOf(pinnedKeys, "pinned"));
+  items.push({ kind: "marker", marker: "pinned-divider" });
+  items.push({ kind: "marker", marker: "active-placeholder" });
+  items.push(...rowsOf(activeKeys, "active"));
+  if (workingCount > 0) {
+    items.push({ kind: "marker", marker: "working-header" });
+    items.push(...rowsOf(visibleWorkingKeys, "working"));
+  }
+  if (snoozedCount > 0) {
+    items.push({ kind: "marker", marker: "snoozed-header" });
+    items.push(...rowsOf(visibleSnoozedKeys, "snoozed"));
+  }
+  if (settledCount > 0 || isDragging) {
+    items.push({ kind: "marker", marker: "settled-header" });
+    items.push({ kind: "marker", marker: "settled-placeholder" });
+    items.push(...rowsOf(renderedSettledKeys, "settled"));
+  }
+  return items;
+}
+
+export function shouldShowSidebarEmptyState(input: {
+  readonly isSearchingThreads: boolean;
+  readonly visibleDraftSessionCount: number;
+  readonly commanderCount: number;
+  readonly attentionCount: number;
+  readonly pinnedCount: number;
+  readonly activeCount: number;
+  readonly workingCount: number;
+  readonly snoozedCount: number;
+  readonly settledCount: number;
+  readonly hasProjectScope: boolean;
+  readonly settledShelfExpanded: boolean;
+}): boolean {
+  if (input.isSearchingThreads || input.visibleDraftSessionCount > 0) return false;
+  const nonSettledCount =
+    input.commanderCount +
+    input.attentionCount +
+    input.pinnedCount +
+    input.activeCount +
+    input.workingCount +
+    input.snoozedCount;
+  return (
+    nonSettledCount === 0 &&
+    (input.settledCount === 0 || (input.hasProjectScope && !input.settledShelfExpanded))
+  );
+}
+
 function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number): SidebarSection {
   let section: SidebarSection = "pinned";
   for (let i = 0; i < index && i < items.length; i += 1) {

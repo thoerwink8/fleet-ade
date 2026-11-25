@@ -163,6 +163,7 @@ import {
 } from "./threadActionMenu.logic";
 import {
   applySidebarThreadDrop,
+  buildSidebarListItems,
   filterSidebarV2VisibleThreads,
   buildBulkTitleRegenerationContextMenuItem,
   buildBulkUnpinContextMenuItem,
@@ -188,6 +189,7 @@ import {
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
   shouldNavigateAfterThreadSnooze,
+  shouldShowSidebarEmptyState,
   sidebarListItemId,
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
@@ -198,7 +200,6 @@ import {
   useSnoozeWakeClock,
   threadShortcutContext,
   useThreadJumpHintsVisible,
-  type SidebarListItem,
   type SidebarSection,
   resolveSidebarRowThreadId,
   attentionDismissVisitedAt,
@@ -2003,54 +2004,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         event.activatorEvent instanceof PointerEvent ? event.activatorEvent.clientY : null,
     });
   };
-  const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
-    const rowsOf = (
-      list: readonly EnvironmentThreadShell[],
-      section: SidebarSection,
-    ): SidebarListItem[] =>
-      list.map((thread) => {
-        const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-        return { kind: "thread", key, section };
-      });
-    if (
-      commanderThreads.length +
-        attentionThreads.length +
-        pinnedThreads.length +
-        activeThreads.length +
-        workingThreads.length +
-        snoozedThreads.length +
-        settledCount ===
-      0
-    ) {
-      return [];
-    }
-    const items: SidebarListItem[] = rowsOf(commanderThreads, "commander");
-    if (attentionThreads.length > 0) {
-      items.push({ kind: "marker", marker: "attention-header" });
-      items.push(...rowsOf(visibleAttentionThreads, "attention"));
-      if (hiddenAttentionCount > 0) items.push({ kind: "marker", marker: "attention-more" });
-    }
-    items.push({ kind: "marker", marker: "pinned-header" });
-    const pinnedRows = rowsOf(pinnedThreads, "pinned");
-    items.push(...pinnedRows);
-    items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(activeThreads, "active");
-    items.push({ kind: "marker", marker: "active-placeholder" });
-    items.push(...activeRows);
-    if (workingThreads.length > 0) {
-      items.push({ kind: "marker", marker: "working-header" });
-      items.push(...rowsOf(visibleWorkingThreads, "working"));
-    }
-    if (snoozedThreads.length > 0) {
-      items.push({ kind: "marker", marker: "snoozed-header" });
-      items.push(...rowsOf(visibleSnoozedThreads, "snoozed"));
-    }
-    items.push({ kind: "marker", marker: "settled-header" });
-    const settledRows = rowsOf(renderedSettledThreads, "settled");
-    items.push({ kind: "marker", marker: "settled-placeholder" });
-    items.push(...settledRows);
-    return items;
-  })();
+  const sidebarListItemsFresh = buildSidebarListItems({
+    commanderKeys: commanderThreads.map(threadShellKey),
+    visibleAttentionKeys: visibleAttentionThreads.map(threadShellKey),
+    attentionCount: attentionThreads.length,
+    hiddenAttentionCount,
+    pinnedKeys: pinnedThreads.map(threadShellKey),
+    activeKeys: activeThreads.map(threadShellKey),
+    visibleWorkingKeys: visibleWorkingThreads.map(threadShellKey),
+    workingCount: workingThreads.length,
+    visibleSnoozedKeys: visibleSnoozedThreads.map(threadShellKey),
+    snoozedCount: snoozedThreads.length,
+    renderedSettledKeys: renderedSettledThreads.map(threadShellKey),
+    settledCount,
+    isDragging: dragState !== null && !isContextDrag,
+  });
   // Preserve the list while streamed updates leave order unchanged to retain row memoization.
   const sidebarListItemsKey = sidebarListItemsFresh
     .map((item) => (item.kind === "thread" ? item.section + ":" + item.key : item.marker))
@@ -3400,15 +3368,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             )
           ) : null}
           {/* A scope can hide every active thread; say so even when its project still has settled ones. */}
-          {!isSearchingThreads &&
-          visibleDraftSessionCount === 0 &&
-          commanderThreads.length +
-            pinnedThreads.length +
-            activeThreads.length +
-            workingThreads.length +
-            snoozedThreads.length ===
-            0 &&
-          (settledCount === 0 || (scopedProjectGroups.length > 0 && !settledShelfExpanded)) ? (
+          {shouldShowSidebarEmptyState({
+            isSearchingThreads,
+            visibleDraftSessionCount,
+            commanderCount: commanderThreads.length,
+            attentionCount: attentionThreads.length,
+            pinnedCount: pinnedThreads.length,
+            activeCount: activeThreads.length,
+            workingCount: workingThreads.length,
+            snoozedCount: snoozedThreads.length,
+            settledCount,
+            hasProjectScope: scopedProjectGroups.length > 0,
+            settledShelfExpanded,
+          }) ? (
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
@@ -3440,7 +3412,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   </button>
                 </>
               ) : (
-                "暂无会话"
+                <>
+                  <span>暂无会话</span>
+                  <button
+                    type="button"
+                    onClick={handleNewThreadClick}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                  >
+                    <PlusIcon className="-mx-0.5 size-3" />
+                    开始新会话
+                  </button>
+                </>
               )}
             </div>
           ) : null}
@@ -3722,6 +3704,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="settled-shelf-header"
                                 marker="settled-header"
+                                className={cn(
+                                  workingThreads.length === 0 &&
+                                    snoozedThreads.length === 0 &&
+                                    "mt-auto",
+                                )}
                                 label="已完成"
                                 count={settledCount}
                                 dragging={from !== null}
