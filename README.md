@@ -80,7 +80,7 @@ A phone uses the web app. [Mobile setup](./docs/user/install.md#mobile-app) has 
 
 T3 Code needs one agent that is installed and signed in. For example, install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`, or install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`.
 
-[Provider setup](./docs/user/install.md#providers) has the steps for each agent. [Install T3 Code](./docs/user/install.md) covers nightly builds, AppImage, WSL, and NixOS.
+[Agent setup](./docs/user/install.md#agents) has the steps for each agent. [Install T3 Code](./docs/user/install.md) covers nightly builds, AppImage, WSL, and NixOS.
 
 ## "Wait, what are you selling me?"
 

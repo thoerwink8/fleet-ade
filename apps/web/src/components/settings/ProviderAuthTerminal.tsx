@@ -42,7 +42,7 @@ export default function ProviderAuthTerminal({
         if (/^https?:\/\//i.test(url))
           void ensureLocalApi()
             .shell.openExternal(url)
-            .catch(() => setError("无法打开提供方链接。"));
+            .catch(() => setError("无法打开智能体链接。"));
       },
     })
       .then((terminal) => {
@@ -65,7 +65,7 @@ export default function ProviderAuthTerminal({
     <>
       <div
         ref={mountSurface}
-        aria-label="提供方登录终端"
+        aria-label="智能体登录终端"
         className="relative h-64 overflow-hidden rounded-md border border-border"
       />
       {error ? (

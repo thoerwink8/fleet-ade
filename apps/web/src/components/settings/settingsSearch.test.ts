@@ -46,7 +46,7 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
   },
   {
     id: "providers",
-    title: "智能体提供方",
+    title: "智能体",
     to: "/settings/providers",
     searchTerms: ["claude codex agents"],
   },
@@ -172,7 +172,7 @@ describe("searchSettings", () => {
     };
     const results = (hasPeerLinkHost: boolean) =>
       searchSettings(
-        "关联环境",
+        "关联电脑",
         filterAvailableSettingsSearchItems({ ...availability, hasPeerLinkHost }),
       );
     expect(results(false).map((item) => item.id)).not.toContain("linked-environments");
@@ -209,7 +209,7 @@ describe("searchSettings", () => {
       ["工作树位置", "storage-worktrees-location"],
       ["产物与日志", "storage-artifacts"],
       ["立即删除", "storage-delete-now"],
-      ["智能体提供方", "providers"],
+      ["智能体", "providers"],
       ["运行中发送", "follow-up-behavior"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);
@@ -413,5 +413,37 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/projects", "project-defaults")).toBeNull();
     expect(movedSettingsPath("/settings/connections", "remote-environments")).toBeNull();
     expect(movedSettingsPath("/settings/appearance", "theme")).toBeNull();
+  });
+});
+
+describe("settings search keeps the names it used before the vocabulary change", () => {
+  const OLD_NAME_CASES: ReadonlyArray<readonly [query: string, id: string]> = [
+    ["聊天宽度", "chat-width"],
+    ["提供方", "providers"],
+    ["提供方实例", "providers"],
+    ["账号", "providers"],
+    ["用量数据提供方", "usage-providers"],
+    ["环境图标", "environment-icon"],
+    ["本地环境", "local-environment"],
+    ["关联环境", "linked-environments"],
+    ["环境", "remote-environments"],
+    ["机器", "remote-environments"],
+    ["主机", "remote-environments"],
+    ["服务器", "remote-environments"],
+    ["令牌", "connections-environment"],
+    ["引导凭据", "connections-environment"],
+    ["配对码", "connections-environment"],
+    ["已授权的客户端", "connections-environment"],
+    ["关联电脑", "remote-environments"],
+  ];
+
+  it.each(OLD_NAME_CASES)("finds the old name %s on %s", (query, id) => {
+    desktop.enabled = true;
+    try {
+      const ids = searchSettings(query, SETTINGS_SEARCH_ITEMS).map((item) => item.id);
+      expect(ids).toContain(id);
+    } finally {
+      desktop.enabled = false;
+    }
   });
 });

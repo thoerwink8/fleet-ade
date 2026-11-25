@@ -43,7 +43,7 @@ export const accessConfig: Record<
 };
 
 const ARM_DELAY_MS = 700;
-const UNSAFE_REDIRECT = "环境返回了一个此页面不会打开的地址。";
+const UNSAFE_REDIRECT = "电脑返回了一个此页面不会打开的地址。";
 
 function followRedirect(url: string): boolean {
   const safe = agentRedirectUrl(url);
@@ -60,7 +60,7 @@ type Loaded =
   | { readonly status: "invalid"; readonly message: string }
   | { readonly status: "ready"; readonly details: AuthMcpApprovalDetails };
 
-const UNREACHABLE = "无法访问此环境。请重试。";
+const UNREACHABLE = "无法访问这台电脑。请重试。";
 const isApprovalError = Schema.is(AuthMcpApprovalError);
 
 export type McpApprovalAnswer<A> =
@@ -219,7 +219,7 @@ function McpConsent({
       <StandalonePage>
         <ConnectAgentHeading
           title="正在检查登录请求"
-          description="请稍候，此环境正在验证智能体的请求。"
+          description="请稍候，这台电脑正在验证智能体的请求。"
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
       </StandalonePage>

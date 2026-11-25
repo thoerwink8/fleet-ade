@@ -21,6 +21,7 @@ vi.mock(import("../state/queries"), async (original) => ({
         : null,
       refs,
       error: null,
+      failure: null,
       isPending: !resolved,
       isFetchingNextPage: false,
       refresh: () => {},

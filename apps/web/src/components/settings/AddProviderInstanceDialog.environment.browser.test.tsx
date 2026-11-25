@@ -157,7 +157,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
     await using _screen = await render(dialog());
     await click("手动配置");
     await click("下一步");
-    await click("添加实例");
+    await click("添加智能体");
     expect(settingsHooks.mutate).toHaveBeenCalledWith({
       operation: "create",
       instanceId: "codex_3",
@@ -263,7 +263,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
     await type('input[aria-label="环境变量值 1"]', "work");
     await click("下一步");
     await type("#add-provider-label", "Deepseek Harness");
-    await click("添加实例");
+    await click("添加智能体");
 
     expect(settingsHooks.useMutation).toHaveBeenCalledWith(remoteEnvironmentId);
     expect(settingsHooks.mutate).toHaveBeenCalledWith({
@@ -286,7 +286,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
   it("rejects a queued save after the provider grant is revoked", async () => {
     setup();
     await using screen = await prepareCodexInstance();
-    const save = button("添加实例");
+    const save = button("添加智能体");
     actions.canManageProviders = false;
     // Click before React renders the revoked grant.
     await act(async () => save.click());
@@ -295,6 +295,6 @@ describe("AddProviderInstanceDialog environment routing", () => {
     expect(actions.toast).not.toHaveBeenCalled();
     expect(actions.onOpenChange).not.toHaveBeenCalled();
     await screen.rerender(dialog());
-    expect(button("添加实例").disabled).toBe(true);
+    expect(button("添加智能体").disabled).toBe(true);
   });
 });

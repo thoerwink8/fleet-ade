@@ -713,6 +713,7 @@ export default function ChatView(props: ChatViewProps) {
   const rollbackProgress = deriveRollbackProgress({
     pendingRollback: serverProjection?.thread.pendingRollback,
     rollbackFailure: serverProjection?.thread.rollbackFailure,
+    rollbackInProgressRequestId: serverProjection?.thread.rollbackInProgressRequestId,
     hasActiveRun: hasActiveRun(serverProjection?.runs ?? []),
     localRewinding: isLocallyRewinding,
   });
@@ -1353,6 +1354,8 @@ export default function ChatView(props: ChatViewProps) {
     activeProviderStatus;
   const supportsStopAndRollback =
     serverConfig?.environment.capabilities.threadStopAndRollback === true;
+  const supportsRollbackMarkers =
+    serverConfig?.environment.capabilities.threadRollbackMarkers === true;
   const supportsConversationRollback =
     canOperateThread &&
     conversationProviderStatus !== null &&
@@ -2887,6 +2890,7 @@ export default function ChatView(props: ChatViewProps) {
     isRevertingCheckpoint,
     supportsConversationRollback,
     supportsStopAndRollback,
+    supportsRollbackMarkers,
     hasPendingRollback,
     activeEnvironmentUnavailable,
     activeEnvironmentUnavailableLabel,

@@ -123,7 +123,7 @@ describe("model price writes", () => {
     });
     expect(onResult).toHaveBeenCalledWith("old", {
       status: "failed",
-      error: "更新服务器后才能映射模型",
+      error: "更新后台服务后才能映射模型",
     });
   });
 });

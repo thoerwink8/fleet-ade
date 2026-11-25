@@ -241,6 +241,8 @@ export async function rewindToMessage(input: {
     }) => Promise<AtomCommandResult<unknown, unknown>>;
     /** Aborted when the person cancels; the wait then ends without an error or a prompt. */
     readonly signal: AbortSignal;
+    /** The server advertises `threadRollbackMarkers`, so the thread says if the rewind was cancelled. */
+    readonly markers: boolean;
   };
   readonly revertThreadCheckpoint: (value: {
     environmentId: EnvironmentId;
@@ -299,6 +301,7 @@ export async function rewindToMessage(input: {
         },
         {
           signal: stopAndRollback.signal,
+          markers: stopAndRollback.markers,
           settleMs: input.restoreFiles ? REWIND_SETTLE_WITH_FILES_MS : REWIND_SETTLE_MS,
         },
       );

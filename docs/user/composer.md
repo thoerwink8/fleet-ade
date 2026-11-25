@@ -41,7 +41,7 @@ it. Very large code blocks are shown without syntax highlighting.
 
 Attach up to 100 files per message. Each image can be up to 10 MiB, with at most
 80 MiB of images in one message. Other files, including videos, can be up to
-50 MiB each, subject to the environment's upload support and limit. The agent
+50 MiB each, subject to the computer's upload support and limit. The agent
 receives them on that computer. Provider and model limits still
 apply, including images already in the conversation. A video attachment gives
 the agent a file path; only [Antigravity](./providers-antigravity.md#skills-and-attachments)
@@ -270,7 +270,7 @@ PR is older than the recent list. Type a single word after `#` to search PRs in
 the repository by text. Choose a result to insert it as a chip.
 
 Another thread can be context too. Type `@` followed by part of its title to pick one from
-the same computer, or from a linked computer while the Linked environments beta is on; those
+the same computer, or from a linked computer while Linked computers is available; those
 show the computer's name. On web and desktop you can also drag a thread out of the sidebar and
 drop it on the composer; a multi-selection drops together. On any client, **Copy thread** copies a
 link to the thread that pastes into a composer as its chip. The chip shows the thread's

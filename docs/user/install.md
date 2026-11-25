@@ -1,12 +1,12 @@
-# Install T3 Code
+# Install Fleet ADE
 
-T3 Code runs coding agents on your computer and lets you control them from its
-desktop or web app. Set up the machine where the agents will work first.
+Fleet ADE runs coding agents on your computer and lets you control them from its
+desktop or web app. Set up the computer where the agents will work first.
 
 ## Requirements
 
-You need an installed, authenticated provider before starting a thread. You can
-launch T3 Code and configure providers afterwards.
+You need an installed, authenticated agent before starting a thread. You can
+launch Fleet ADE and configure agents afterwards.
 
 ## Command line
 
@@ -28,25 +28,25 @@ installer or the desktop app did not create is already there, it leaves that
 one alone and stops. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
 `T3CODE_VERSION` to pin an exact version.
 
-| Task                                  | Command                                                                 |
-| ------------------------------------- | ----------------------------------------------------------------------- |
-| Start the server and open the web app | `t3`                                                                    |
-| Start the server without a browser    | `t3 serve`                                                              |
-| Use it from your other devices        | `t3 up` ([details](./remote-access.md))                                 |
-| Keep it running in the background     | `t3 service install` ([details](./background-service.md))               |
-| Move to another release               | install that release, then `t3 service install`                         |
-| Reclaim database space                | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
-| Remove it again                       | `t3 uninstall`                                                          |
+| Task                                              | Command                                                                 |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| Start the background service and open the web app | `t3`                                                                    |
+| Start the background service without a browser    | `t3 serve`                                                              |
+| Use it from your other devices                    | `t3 up` ([details](./remote-access.md))                                 |
+| Keep it running in the background                 | `t3 service install` ([details](./background-service.md))               |
+| Move to another release                           | install that release, then `t3 service install`                         |
+| Reclaim database space                            | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
+| Remove it again                                   | `t3 uninstall`                                                          |
 
 Run `t3 help` or `t3 --help` for the full reference. To start in a new working
 directory, use an explicit path such as `t3 ./my-project`. A bare directory name
 is accepted only if it already exists.
 
-If `t3` or `t3 start` reports an already running server, connect to that server
+If `t3` or `t3 start` reports an already running background service, connect to that service
 instead. Stop it before starting a replacement, or use a different `--base-dir`
-for an independent server.
+for an independent service.
 
-To try T3 Code once without installing it, run `npx t3@latest` instead (needs
+To try Fleet ADE once without installing it, run `npx t3@latest` instead (needs
 Node.js for `npx`). It offers to install the `t3` command first. If you say no,
 it asks again at the next minor release, and `npx t3 install` installs it later.
 `npx t3` always runs the version npm picked, even when a `t3` is installed. On
@@ -56,7 +56,7 @@ the nightly train, run your installed `t3` (for example `t3 serve`), not
 ### Intel Macs
 
 There is no `t3` executable for Intel Macs (the desktop app is available). To
-run a server there, build it from source with `vp`, which provides the Node version it needs
+run a background service there, build it from source with `vp`, which provides the Node version it needs
 ([Install vp](../operations/development.md#first-checkout)):
 
 ```bash
@@ -81,7 +81,7 @@ or use a package manager:
 
 ### Nix (nixpkgs)
 
-T3 Code is maintained in [nixpkgs](https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/by-name/t3/t3code).
+Fleet ADE is maintained in [nixpkgs](https://github.com/NixOS/nixpkgs/tree/nixos-unstable/pkgs/by-name/t3/t3code).
 The command above installs from `nixos-unstable` and requires Nix 2.30 or later with
 `nix-command` and `flakes` enabled. Launch the desktop app with `t3code-desktop`;
 the package also includes the `t3` command.
@@ -115,13 +115,13 @@ add it again. If you already have another `t3`, it stays as it is.
 ### Windows Subsystem for Linux
 
 Choose a WSL distro in **Settings → Connections** to run agents and projects
-there. Install the provider CLIs inside that distro. T3 Code installs its own
-server runtime there automatically; the first launch after an app update can
+there. Install the agent CLIs inside that distro. Fleet ADE installs its own
+background service runtime there automatically; the first launch after an app update can
 take longer.
 
 ### Open a project from a terminal
 
-With the desktop app already running on the same machine:
+With the desktop app already running on the same computer:
 
 ```bash
 t3 app
@@ -129,7 +129,7 @@ t3 app
 
 This opens a new thread for the current directory, adding the project if needed.
 Pass a path, such as `t3 app ../my-project`, to open another directory. It requires
-the desktop app, so a standalone server or an SSH session is not enough. If the
+the desktop app, so a standalone background service or an SSH session is not enough. If the
 command cannot reach the app, start or update the desktop app and try again.
 
 ### Drop a folder on the sidebar
@@ -141,85 +141,85 @@ folder paths, so in the web app use **Add project** instead.
 
 ## Mobile app
 
-Open the T3 Code web app in your phone's browser to connect to a server on
-another machine. Follow [remote access](./remote-access.md) to link it through
-Tailscale, a local network, or a pairing URL.
+Open the Fleet ADE web app in your phone's browser to connect to a background service on
+another computer. Follow [remote access](./remote-access.md) to link it through
+Tailscale, a local network, or a pairing link.
 
-## Providers
+## Agents
 
-Open **Settings → Providers** in the web or desktop app, select the environment,
-and enable the provider you want. Installation, login, and configuration belong
-to that environment's machine, even when you connect from a phone or another
+Open **Settings → Agents** in the web or desktop app, select the computer,
+and enable the agent you want. Installation, login, and configuration belong
+to that computer, even when you connect from a phone or another
 computer.
 
-| Provider    | Install and authenticate                                                                                                                                  |
+| Agent       | Install and authenticate                                                                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex       | [Connect with ChatGPT](./providers-codex.md#connect-with-chatgpt), or install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`. |
 | Claude      | Install [Claude Code](https://claude.com/product/claude-code), then run `claude auth login`.                                                              |
 | Grok Build  | Install [Grok Build CLI](https://x.ai/cli), then run `grok login`.                                                                                        |
-| Antigravity | Install and sign in with Google from T3 Code's provider settings.                                                                                         |
+| Antigravity | Install and sign in with Google from Fleet ADE's agent settings.                                                                                          |
 
-Provider CLIs must be on the server's `PATH`. If T3 Code cannot find one, set its
-**Binary path** in provider settings, especially when using a version manager.
+Agent CLIs must be on the background service's `PATH`. If Fleet ADE cannot find one, set its
+**Binary path** in agent settings, especially when using a version manager.
 Codex connected through ChatGPT and Antigravity can use their
 managed runtimes without a `PATH` entry.
 
-T3 Code warns when a provider version has known compatibility problems with your
-release. Check **Settings → Providers** on that environment for the recommended
+Fleet ADE warns when an agent version has known compatibility problems with your
+release. Check **Settings → Agents** on that computer for the recommended
 version or range. When its package manager supports installing a specific version,
-you can install the recommendation there. Otherwise use the provider's installer
-on the environment's machine. An unlisted version is unverified.
+you can install the recommendation there. Otherwise use the agent's installer
+on that computer. An unlisted version is unverified.
 
-When a provider CLI is behind its latest release, its provider card shows the
+When an agent CLI is behind its latest release, its agent card shows the
 available version. **Update now** runs the installer that owns the CLI
 (Homebrew, mise, or a global npm, pnpm, Yarn, Bun, Volta, or Vite+ install), or
-the CLI's own update command when T3 Code cannot tell. Claude and Codex installs
-T3 Code cannot identify stay manual: update them through the
-installer you used. T3 Code runs `mise upgrade`
-only for a tool your mise config requests as `latest` when the provider's binary
+the CLI's own update command when Fleet ADE cannot tell. Claude and Codex installs
+Fleet ADE cannot identify stay manual: update them through the
+installer you used. Fleet ADE runs `mise upgrade`
+only for a tool your mise config requests as `latest` when the agent's binary
 path is a mise shim or under the tool's `installs/<tool>/latest` link; update a
 pinned version, or a path into one version's directory, through mise yourself.
 Update a CLI installed with Nix through Nix.
-Antigravity updates with T3 Code. Homebrew and Chocolatey installs
+Antigravity updates with Fleet ADE. Homebrew and Chocolatey installs
 compare against the version their package manager offers, which can trail the
 npm release; update Claude installed with Chocolatey through Chocolatey.
 
 The managed runtimes for Antigravity and for Codex connected through ChatGPT
-first install the release T3 Code tested. When T3 Code finds a newer compatible
-release, their setup in **Settings → Providers** offers an update.
+first install the release Fleet ADE tested. When Fleet ADE finds a newer compatible
+release, their setup in **Settings → Agents** offers an update.
 
-Add another provider instance for a separate account or configuration. Each
-instance can have its own environment variables, such as API keys or a custom
-base URL. Mark secret values as sensitive; after saving, T3 Code does not display
+Add another agent account for a separate account or configuration. Each
+account can have its own environment variables, such as API keys or a custom
+base URL. Mark secret values as sensitive; after saving, Fleet ADE does not display
 their original values.
 
-For provider-specific setup and accounts, see [Codex](./providers-codex.md),
+For agent-specific setup and accounts, see [Codex](./providers-codex.md),
 [Claude](./providers-claude.md), and
 [Antigravity](./providers-antigravity.md).
 
-### Provider check timeouts
+### Agent check timeouts
 
-If a provider works in its CLI but T3 Code reports a timeout while checking it,
-allow more time in the T3 server's environment. For example, give Codex and
+If an agent works in its CLI but Fleet ADE reports a timeout while checking it,
+allow more time in the background service's environment. For example, give Codex and
 Claude readiness checks 60 seconds:
 
 ```bash
 T3CODE_CODEX_PROBE_TIMEOUT_MS=60000 T3CODE_CLAUDE_PROBE_TIMEOUT_MS=60000 t3 serve
 ```
 
-For a remote environment, set these on the machine running the T3 server.
+For a remote computer, set these on the computer running the background service.
 Keep them in your launcher or service configuration to retain them across
-updates, then restart the server. For systemd, add
+updates, then restart the service. For systemd, add
 `Environment=T3CODE_CODEX_PROBE_TIMEOUT_MS=60000` under `[Service]` in a service
-override, reload systemd, and restart the service. Provider instances can also
-set their own overrides in Settings → Providers.
+override, reload systemd, and restart the service. Agents can also
+set their own overrides in Settings → Agents.
 
-Each variable extends that provider's readiness-probe deadlines; a phase whose
-default is already longer keeps its default. Providers with several phases can
+Each variable extends that agent's readiness-probe deadlines; a phase whose
+default is already longer keeps its default. Agents with several phases can
 take longer than one deadline in total. Values must be whole milliseconds no
 greater than 2147483647; unset or invalid values keep the defaults.
 
-| Provider            | Environment variable                   |
+| Agent               | Environment variable                   |
 | ------------------- | -------------------------------------- |
 | Codex               | `T3CODE_CODEX_PROBE_TIMEOUT_MS`        |
 | Claude              | `T3CODE_CLAUDE_PROBE_TIMEOUT_MS`       |
@@ -237,5 +237,5 @@ installation, update checks, and shutdown limits keep their existing behavior.
 - [Working with threads](./thread-sidebar.md): start tasks and organize parallel work.
 - [Permission modes](./permission-modes.md): choose when agents ask before acting.
 - [Remote access](./remote-access.md): connect from another device.
-- [Running in the background](./background-service.md): keep a host available.
-- [Updating T3 Code](./updating.md): update the app and connected servers.
+- [Running in the background](./background-service.md): keep a computer available.
+- [Updating Fleet ADE](./updating.md): update the app and connected background services.

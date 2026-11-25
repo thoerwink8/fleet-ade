@@ -143,6 +143,8 @@ describe("WebSocket RPC contracts", () => {
     });
     expect(thread.pendingRollback).toBeUndefined();
     expect(thread.rollbackCompletedRequestId).toBeUndefined();
+    expect(thread.rollbackInProgressRequestId).toBeUndefined();
+    expect(thread.rollbackCancelledRequestId).toBeUndefined();
     expect(thread.rollbackFailure?.code).toBeUndefined();
     // Codes written before stop-and-rewind still decode beside the new ones.
     for (const code of ["git-index-locked", "rollback-failed", "target-invalid"]) {
@@ -159,6 +161,14 @@ describe("WebSocket RPC contracts", () => {
     });
     expect(capabilities.threadStopAndRollback).toBeUndefined();
     expect(capabilities.threadTrash).toBeUndefined();
+    expect(capabilities.threadRollbackMarkers).toBeUndefined();
+    const marked = decodeThread({
+      ...JSON.parse(JSON.stringify(thread)),
+      rollbackInProgressRequestId: "rollback-2",
+      rollbackCancelledRequestId: null,
+    });
+    expect(marked.rollbackInProgressRequestId).toBe("rollback-2");
+    expect(marked.rollbackCancelledRequestId).toBeNull();
   });
 
   it("registers the recently deleted read RPC", () => {

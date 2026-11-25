@@ -286,7 +286,7 @@ export function SettingInheritance({
                         layer.effective ? "font-medium text-foreground" : "text-muted-foreground",
                       )}
                     >
-                      {layer.key === "environment" ? "环境" : layer.label}
+                      {layer.key === "environment" ? "电脑" : layer.label}
                     </span>
                     <span
                       className={cn(
@@ -338,7 +338,7 @@ export function SettingInheritance({
                             {winningLayer?.value}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {winningLayer?.key === "environment" ? "环境" : winningLayer?.label}
+                            {winningLayer?.key === "environment" ? "电脑" : winningLayer?.label}
                           </span>
                           <ChevronRightIcon
                             aria-hidden
@@ -371,7 +371,7 @@ export function SettingInheritance({
                     {chain}
                     {hasMultipleEnvironments ? (
                       <p className="px-2 pt-1.5 text-xs text-muted-foreground">
-                        所有机器上的设置相同
+                        所有电脑上的设置相同
                       </p>
                     ) : null}
                   </>

@@ -51,6 +51,8 @@ interface TimelineRewindInput {
   readonly supportsConversationRollback: boolean;
   /** The server stops a running thread and rewinds it in one command. */
   readonly supportsStopAndRollback: boolean;
+  /** The server marks cancelled and in-progress rewinds on the thread. */
+  readonly supportsRollbackMarkers: boolean;
   /** A rewind is waiting on this thread for its run to stop. */
   readonly hasPendingRollback: boolean;
   readonly activeEnvironmentUnavailable: boolean;
@@ -79,6 +81,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     isRevertingCheckpoint,
     supportsConversationRollback,
     supportsStopAndRollback,
+    supportsRollbackMarkers,
     hasPendingRollback,
     activeEnvironmentUnavailable,
     activeEnvironmentUnavailableLabel,
@@ -214,7 +217,13 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       createAssetUrl: createAttachmentAssetUrl,
       ...(abort === null
         ? {}
-        : { stopAndRollback: { send: stopAndRollbackThread, signal: abort.signal } }),
+        : {
+            stopAndRollback: {
+              send: stopAndRollbackThread,
+              signal: abort.signal,
+              markers: supportsRollbackMarkers,
+            },
+          }),
       revertThreadCheckpoint,
     });
     if (rewindAbortRef.current === abort) {

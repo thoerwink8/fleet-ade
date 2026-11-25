@@ -188,9 +188,7 @@ export function PullRequestChecksPopover({
         <p className="mb-2 text-row font-medium">{presentation.label}</p>
         {summary === null ? null : <p className="mb-2 text-muted-foreground text-xs">{summary}</p>}
         {stale ? (
-          <p className="text-muted-foreground text-xs">
-            检查详情已过期。刷新 pull request 以更新。
-          </p>
+          <p className="text-muted-foreground text-xs">检查详情已过期。刷新 PR 以更新。</p>
         ) : checks !== undefined ? (
           <ChecksBody checks={checks} />
         ) : environmentId !== undefined && reference !== undefined ? (

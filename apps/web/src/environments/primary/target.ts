@@ -64,7 +64,7 @@ export class PrimaryEnvironmentDisabledError extends Schema.TaggedError<PrimaryE
   {},
 ) {
   override get message(): string {
-    return "本地环境已禁用。";
+    return "本机后台服务已停用。";
   }
 }
 

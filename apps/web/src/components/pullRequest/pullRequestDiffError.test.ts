@@ -1,3 +1,5 @@
+import { PullRequestOperationError } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
 import { describePullRequestDiffError } from "./pullRequestDiffError";
@@ -33,5 +35,31 @@ describe("describePullRequestDiffError", () => {
     expect(result.description).toContain("重试");
     expect(result.description).not.toContain("localhost");
     expect(result.description).not.toContain("limit");
+  });
+
+  // Why the check above reads text: a typed `reason` on the provider failure does not survive
+  // the JSON transport, so there is nothing typed left to read on the client.
+  it("loses the provider's typed reason when the failure is encoded for transport", () => {
+    class ProviderFailure extends Schema.TaggedError<ProviderFailure>()(
+      "PullRequestProviderError",
+      { reason: Schema.String, detail: Schema.String },
+    ) {
+      override get message() {
+        return `github failed in diff: ${this.detail}`;
+      }
+    }
+    const codec = Schema.toCodecJson(PullRequestOperationError);
+    const sent = Schema.encodeSync(codec)(
+      new PullRequestOperationError({
+        operation: "diff",
+        detail: "github requests are paused until the rate limit resets.",
+        cause: new ProviderFailure({ reason: "rate-limited", detail: "429" }),
+      }),
+    );
+    const received = Schema.decodeUnknownSync(codec)(JSON.parse(JSON.stringify(sent)));
+
+    expect(received.cause).not.toHaveProperty("reason");
+    expect(received.cause).not.toHaveProperty("_tag");
+    expect(received.detail).toContain("rate limit");
   });
 });

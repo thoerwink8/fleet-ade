@@ -79,14 +79,54 @@ describe("ui-no-old-terms", () => {
       "forget",
       "检查点",
     ]);
+
+    // Excerpt 5: Waiting for approval is allowed while bare 待批准 is flagged
+    const approvalExcerpt = `
+      const labels = {
+        allowed: "等待批准",
+        banned: "待批准",
+      };
+    `;
+    const approvalHits = scanSourceTextForOldTerms("ApprovalStatus.tsx", approvalExcerpt);
+    expect(approvalHits.map((hit) => `${hit.term}:${hit.text}`)).toEqual(["待批准:待批准"]);
+
+    // Excerpt 6: switch case statements and nested toast builder calls are scanned, while case tags, Set.add, and logs stay ignored
+    const switchAndToastExcerpt = `
+      switch (kind) {
+        case "工作区":
+          return "请求的路径不在工作区内。";
+      }
+      seen.add("工作区");
+      console.warn({ title: "工作区" });
+      toastManager.add(stackedThreadToast({ type: "error", title: "无法更新会话的 pull request" }));
+    `;
+    const switchAndToastHits = scanSourceTextForOldTerms(
+      "filePreviewMode.ts",
+      switchAndToastExcerpt,
+    );
+    expect(switchAndToastHits.map((hit) => `${hit.term}:${hit.text}`)).toEqual([
+      "工作区:请求的路径不在工作区内。",
+      "pull request:无法更新会话的 pull request",
+    ]);
   });
 
-  it("scans cleaned paths while exempting only the listed sentences", () => {
+  it("scans all client/shared source dirs while exempting only the listed sentences", () => {
     const tempRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-old-terms-"));
     try {
       const cleanedFile = NodePath.join(tempRoot, "apps/web/src/components/chat/SampleBanner.tsx");
       NodeFS.mkdirSync(NodePath.dirname(cleanedFile), { recursive: true });
       NodeFS.writeFileSync(cleanedFile, "export const Sample = () => <span>旧工作区</span>;\n");
+
+      const settingsFile = NodePath.join(
+        tempRoot,
+        "apps/web/src/components/settings/SampleSettings.tsx",
+      );
+      NodeFS.mkdirSync(NodePath.dirname(settingsFile), { recursive: true });
+      NodeFS.writeFileSync(settingsFile, "export const Label = () => <span>旧工作副本</span>;\n");
+
+      const sharedFile = NodePath.join(tempRoot, "packages/shared/src/authScopeOptions.ts");
+      NodeFS.mkdirSync(NodePath.dirname(sharedFile), { recursive: true });
+      NodeFS.writeFileSync(sharedFile, 'export const desc = "管理提供方";\n');
 
       const excludedFile = NodePath.join(
         tempRoot,
@@ -107,10 +147,22 @@ describe("ui-no-old-terms", () => {
           text: "旧工作区",
         },
         {
+          file: "apps/web/src/components/settings/SampleSettings.tsx",
+          line: 1,
+          term: "工作副本",
+          text: "旧工作副本",
+        },
+        {
           file: "packages/client-runtime/src/state/turnItemPresentation.ts",
           line: 2,
           term: "工作区",
           text: "新的工作区入口",
+        },
+        {
+          file: "packages/shared/src/authScopeOptions.ts",
+          line: 1,
+          term: "提供方",
+          text: "管理提供方",
         },
       ]);
     } finally {

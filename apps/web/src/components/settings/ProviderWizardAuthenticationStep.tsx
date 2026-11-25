@@ -62,7 +62,7 @@ export function ProviderWizardAuthenticationStep({
                   ? "正在查找登录方式…"
                   : (query.error ??
                     auth?.message ??
-                    "提供方未提供应用内登录。请按提供方文档完成设置。")
+                    "智能体未提供应用内登录。请按智能体文档完成设置。")
               }
               control={
                 isDiscovering ? (

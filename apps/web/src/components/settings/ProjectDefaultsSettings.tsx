@@ -139,7 +139,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
       status={
         mixedModel
-          ? `${automaticModel ? "各环境的自动默认值不一样。" : "各环境的默认值不一样。"}请选择一个环境，或改成各环境共用的模型，再编辑力度。`
+          ? `${automaticModel ? "各电脑的自动默认值不一样。" : "各电脑的默认值不一样。"}请选择一台电脑，或改成各电脑共用的模型，再编辑力度。`
           : (presentation.providerNote ?? effortDisabledReason)
       }
       resetAction={
@@ -159,7 +159,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               modelOptionsByInstance={modelOptions}
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
               {...(mixedModel
-                ? { triggerLabel: automaticModel ? "自动（各不相同）" : "各不相同" }
+                ? { triggerLabel: automaticModel ? "自动（多项不同）" : "多项不同" }
                 : {})}
               getModelDisabledReason={modelDisabledReason}
               onOpenProviderSetup={(instanceId) => {
@@ -189,7 +189,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
           </div>
         ) : (
           <span className="text-sm text-muted-foreground">
-            {mixedModel ? "各不相同" : "没有可用的提供方"}
+            {mixedModel ? "多项不同" : "没有可用的智能体"}
           </span>
         )
       }
@@ -201,16 +201,16 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultThreadEnvMode"]}
       mixed={mixedWorkspace}
       id={searchableSetting("new-threads").id}
-      title="工作区"
+      title="目录模式"
       description={
         isProjectScope
-          ? "此项目新会话的起始工作区。"
-          : "新会话的起始工作区。项目及其 t3.json 可以覆盖此设置。"
+          ? "此项目新会话默认使用的目录模式。"
+          : "新会话默认使用的目录模式。项目及其 t3.json 可以覆盖此设置。"
       }
       resetAction={
         !isProjectScope && settings.defaultThreadEnvMode !== null ? (
           <SettingResetButton
-            label="默认工作区"
+            label="默认目录模式"
             onClick={() => updateSettings({ defaultThreadEnvMode: null })}
           />
         ) : null
@@ -223,14 +223,14 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               updateSettings({ defaultThreadEnvMode: value });
           }}
         >
-          <SelectTrigger size="sm" aria-label="默认工作区">
+          <SelectTrigger size="sm" aria-label="默认目录模式">
             <SelectValue>
               {(value: string | null) =>
                 value === "local" || value === "worktree"
                   ? resolveEnvModeLabel(value)
                   : unavailable
                     ? "不可用"
-                    : "混合"
+                    : "多项不同"
               }
             </SelectValue>
           </SelectTrigger>
@@ -249,7 +249,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["fallbackModelSelection"]}
       mixed={mixedFallback}
       {...searchableSetting("fallback-model")}
-      description="默认模型的提供方额度耗尽时，新会话使用此模型。"
+      description="默认模型的智能体额度耗尽时，新会话使用此模型。"
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
@@ -271,7 +271,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
               triggerAriaLabel="备用模型"
               {...(mixedFallback
-                ? { triggerLabel: "各不相同" }
+                ? { triggerLabel: "多项不同" }
                 : settings.fallbackModelSelection === null
                   ? { triggerLabel: "无" }
                   : {})}
@@ -310,7 +310,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             ) : null}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">没有可用的提供方</span>
+          <span className="text-sm text-muted-foreground">没有可用的智能体</span>
         )
       }
     />
@@ -364,7 +364,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                   )}
                   <SelectValue>
                     {mixedPermissions
-                      ? "各不相同"
+                      ? "多项不同"
                       : runtimeModeConfig[settings.defaultRuntimeMode].label}
                   </SelectValue>
                 </SelectTrigger>
@@ -402,8 +402,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             title="自动拉取"
             description={
               isProjectScope
-                ? "工作副本没有本地改动或未推送的提交时，自动更新此项目的默认分支。"
-                : "工作副本没有本地改动或未推送的提交时，自动更新默认分支。项目可以覆盖此设置。"
+                ? "项目目录没有本地改动或未推送的提交时，自动更新此项目的默认分支。"
+                : "项目目录没有本地改动或未推送的提交时，自动更新默认分支。项目可以覆盖此设置。"
             }
             resetAction={
               settings.defaultAutoPull ? (
@@ -456,8 +456,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("pull-request-merge-method")}
             description={
               isProjectScope
-                ? "此项目的 pull request 默认使用此合并方式。"
-                : "Pull request 默认使用此合并方式。“上次选择”会沿用你在此设备上最近选择的方式。"
+                ? "此项目的 PR 默认使用此合并方式。"
+                : "PR 默认使用此合并方式。“上次选择”会沿用你在此设备上最近选择的方式。"
             }
             resetAction={
               settings.pullRequestMergeMethod !== null ? (
@@ -484,7 +484,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                         ? PULL_REQUEST_MERGE_METHOD_LABELS[value]
                         : value === "last"
                           ? "上次选择"
-                          : "混合"
+                          : "多项不同"
                     }
                   </SelectValue>
                 </SelectTrigger>
@@ -547,7 +547,7 @@ export function WorktreeSubmodulesRow() {
                   ? WORKTREE_SUBMODULES_LABELS[value]
                   : unavailable
                     ? "不可用"
-                    : "混合"
+                    : "多项不同"
               }
             </SelectValue>
           </SelectTrigger>

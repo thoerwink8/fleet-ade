@@ -37,7 +37,7 @@ function StackBody({
     <>
       <PullRequestStackHeader number={stackNumber} />
       <MenuGroupLabel>
-        {query.error ?? (query.isPending ? "正在加载堆叠…" : "此 pull request 已不在堆叠中。")}
+        {query.error ?? (query.isPending ? "正在加载堆叠…" : "此 PR 已不在堆叠中。")}
       </MenuGroupLabel>
     </>
   );

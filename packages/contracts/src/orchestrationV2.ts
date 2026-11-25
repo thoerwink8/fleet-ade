@@ -589,6 +589,17 @@ export const OrchestrationV2AppThread = Schema.Struct({
   pendingRollback: Schema.optional(Schema.NullOr(OrchestrationV2PendingRollback)),
   /** The rollback effect's command id, set in the same transaction that marks runs rolled back. */
   rollbackCompletedRequestId: Schema.optional(CommandId),
+  /**
+   * The rewind whose request was queued and has not finished. Set in the commit that clears
+   * `pendingRollback` (or that queues an idle rewind); cleared with the completion or failure.
+   * Absent on servers without `threadRollbackMarkers`.
+   */
+  rollbackInProgressRequestId: Schema.optional(Schema.NullOr(CommandId)),
+  /**
+   * The rewind a cancel removed from `pendingRollback`, under the id its requester sent, not the
+   * cancel command's id. Cleared when the next rewind is requested.
+   */
+  rollbackCancelledRequestId: Schema.optional(Schema.NullOr(CommandId)),
   deletedAt: Schema.NullOr(Schema.DateTimeUtc),
 });
 export type OrchestrationV2AppThread = typeof OrchestrationV2AppThread.Type;

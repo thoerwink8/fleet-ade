@@ -200,7 +200,7 @@ function WorkspaceImagePreview(props: {
     return (
       <MediaActions source={actionsSource}>
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-          无法加载工作区图片。
+          无法加载项目图片。
         </div>
       </MediaActions>
     );
@@ -1328,7 +1328,7 @@ export default function FilePreviewPanel({
     }
     return (
       <div className="p-4 text-sm text-muted-foreground">
-        {fileAccess.error ?? "此连接无法读取主机文件。"}
+        {fileAccess.error ?? "此连接无法读取电脑文件。"}
       </div>
     );
   }
@@ -1557,7 +1557,7 @@ export default function FilePreviewPanel({
                 ) : null}
                 {!isHostFile ? (
                   <p className="text-muted-foreground">
-                    工作区文件夹：{" "}
+                    项目文件夹：{" "}
                     <code className="break-all font-mono select-all">
                       {file.readError?.cwd ?? cwd}
                     </code>
@@ -1744,7 +1744,7 @@ export function WorkspaceLargeTextPreview(props: {
             setSaving(true);
             void (async () => {
               const url = await refreshAssetUrl();
-              if (!url) throw new Error("请重新连接环境后重试。");
+              if (!url) throw new Error("请重新连接电脑后重试。");
               const response = await fetch(url);
               if (!response.ok) throw new Error("无法加载文件，请重试。");
               const downloadUrl = URL.createObjectURL(await response.blob());

@@ -450,6 +450,9 @@ export const layer: Layer.Layer<
                   pendingRollback: null,
                   rollbackFailure: null,
                   rollbackCompletedRequestId: input.commandId,
+                  ...(current.rollbackInProgressRequestId === input.commandId
+                    ? { rollbackInProgressRequestId: null }
+                    : {}),
                   updatedAt: now,
                 },
               }),

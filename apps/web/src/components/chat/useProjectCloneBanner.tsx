@@ -6,6 +6,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { DownloadIcon } from "lucide-react";
 import { stackedThreadToast, toastManager } from "../ui/toast";
+import { presentVersionControlError } from "../versionControlError.logic";
 import { useRemoveClonedProject } from "../../hooks/useRemoveClonedProject";
 import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useProjectClone } from "../../state/projectClones";
@@ -32,17 +33,17 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
   });
   const removeClonedProject = useRemoveClonedProject();
   const runProjectCloneAction = async (
-    title: string,
-    action: () => Promise<AtomCommandResult<unknown, unknown>>,
+    action: string,
+    run: () => Promise<AtomCommandResult<unknown, unknown>>,
   ): Promise<void> => {
-    const result = await action();
+    const result = await run();
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      const error = squashAtomCommandFailure(result);
+      const presentation = presentVersionControlError(squashAtomCommandFailure(result), action);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title,
-          description: error instanceof Error ? error.message : "发生错误。",
+          title: presentation.title,
+          description: presentation.description,
         }),
       );
     }
@@ -85,7 +86,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
             size="sm"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneActionStable("无法取消克隆", () =>
+              void runProjectCloneActionStable("取消克隆", () =>
                 cancelProjectClone({ environmentId, input: { projectId } }),
               )
             }
@@ -115,7 +116,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
             size="sm"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneActionStable("无法重试克隆", () =>
+              void runProjectCloneActionStable("重试克隆", () =>
                 retryProjectClone({ environmentId, input: { projectId } }),
               )
             }

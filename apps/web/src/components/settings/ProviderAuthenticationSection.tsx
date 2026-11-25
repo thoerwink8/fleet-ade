@@ -95,7 +95,7 @@ export function ProviderAuthenticationSection({
       : isDiscovering
         ? "正在查找登录方式…"
         : needsExternalSetup
-          ? "提供方未提供应用内登录。请按提供方文档完成设置。"
+          ? "智能体未提供应用内登录。请按智能体文档完成设置。"
           : usesCredentials
             ? `在 ${environmentLabel} 上连接以加载模型。`
             : `在 ${environmentLabel} 上登录。`;
@@ -216,11 +216,11 @@ export function ProviderAuthenticationSection({
             >
               <SelectTrigger size="sm" aria-label="登录方式" className="w-44">
                 <SelectValue>
-                  {auth?.methods?.find((method) => method.id === methodId)?.name ?? "提供方默认"}
+                  {auth?.methods?.find((method) => method.id === methodId)?.name ?? "智能体默认"}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup>
-                <SelectItem value="">提供方默认</SelectItem>
+                <SelectItem value="">智能体默认</SelectItem>
                 {auth?.methods?.map((method) => (
                   <SelectItem key={method.id} value={method.id}>
                     {method.name}
@@ -250,7 +250,7 @@ export function ProviderAuthenticationSection({
                       onClick={() => {
                         // Copy during the click to retain clipboard activation; consent must still be
                         // recorded before use.
-                        const copied = writeTextToClipboard(url, "提供方登录链接");
+                        const copied = writeTextToClipboard(url, "智能体登录链接");
                         void (async () => {
                           await copied;
                           if (interaction?.type === "browser" && interaction.requiresConsent)

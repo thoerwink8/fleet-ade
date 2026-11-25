@@ -400,6 +400,7 @@ export function usePullRequestResolutionState(target: PullRequestResolutionTarge
   return {
     data: query.data ?? cached,
     error: query.error,
+    failure: query.failure,
     isPending: query.isPending && cached === null,
     isFetching: query.isPending,
     refresh: query.refresh,

@@ -91,7 +91,7 @@ describe("groupPipelineRuns", () => {
       "验收中",
       "可合并",
       "已合并",
-      "卡住",
+      "出错了",
     ]);
     expect(PIPELINE_RUN_STATUSES.map((status) => PIPELINE_STATUS_BADGE[status])).toEqual([
       "secondary",

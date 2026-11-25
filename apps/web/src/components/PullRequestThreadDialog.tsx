@@ -8,6 +8,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { useDebouncedValue } from "@tanstack/react-pacer";
+import { presentVersionControlError } from "./versionControlError.logic";
 import { useRef, useState } from "react";
 
 import {
@@ -62,6 +63,16 @@ function pullRequestStatusTone(state: string | undefined): string {
       return "text-muted-foreground";
   }
 }
+interface DialogError {
+  readonly title?: string;
+  readonly nextStep?: string;
+  readonly detail: string;
+}
+
+function dialogError(error: unknown, fallbackAction: string): DialogError {
+  const { title, nextStep, detail } = presentVersionControlError(error, fallbackAction);
+  return { title, ...(nextStep === undefined ? {} : { nextStep }), detail };
+}
 
 export function PullRequestThreadDialog({
   open,
@@ -76,7 +87,7 @@ export function PullRequestThreadDialog({
   const [reference, setReference] = useState(initialReference ?? "");
   const [referenceDirty, setReferenceDirty] = useState(false);
   const [preparingMode, setPreparingMode] = useState<"local" | "worktree" | null>(null);
-  const [prepareErrorMessage, setPrepareErrorMessage] = useState<string | null>(null);
+  const [prepareErrorMessage, setPrepareErrorMessage] = useState<DialogError | null>(null);
   const [debouncedReference, referenceDebouncer] = useDebouncedValue(
     reference,
     { wait: 450 },
@@ -153,9 +164,7 @@ export function PullRequestThreadDialog({
         preparePullRequestThreadAction.resetError();
       } else {
         const error = squashAtomCommandFailure(result);
-        setPrepareErrorMessage(
-          error instanceof Error ? error.message : `无法准备 ${terminology.singular} 会话。`,
-        );
+        setPrepareErrorMessage(dialogError(error, "准备 PR 会话"));
       }
       return;
     }
@@ -177,16 +186,14 @@ export function PullRequestThreadDialog({
       : parsedReference === null
         ? `请使用 ${terminology.singular} URL、检出命令、123 或 #123。`
         : null;
-  const errorMessage =
-    validationMessage ??
+  const errorMessage: DialogError | null =
+    (validationMessage === null ? null : { detail: validationMessage }) ??
     prepareErrorMessage ??
     (resolvedPullRequest === null && pullRequestResolution.error
-      ? pullRequestResolution.error
-      : preparePullRequestThreadAction.error instanceof Error
-        ? preparePullRequestThreadAction.error.message
-        : preparePullRequestThreadAction.error
-          ? `无法准备 ${terminology.singular} 会话。`
-          : null);
+      ? dialogError(pullRequestResolution.failure ?? pullRequestResolution.error, "加载 PR")
+      : preparePullRequestThreadAction.error
+        ? dialogError(preparePullRequestThreadAction.error, "准备 PR 会话")
+        : null);
 
   return (
     <Dialog
@@ -267,7 +274,13 @@ export function PullRequestThreadDialog({
             </div>
           ) : null}
 
-          {errorMessage ? <p className="text-destructive text-xs">{errorMessage}</p> : null}
+          {errorMessage ? (
+            <div className="space-y-0.5 text-destructive text-xs">
+              {errorMessage.title ? <p className="font-medium">{errorMessage.title}</p> : null}
+              {errorMessage.nextStep ? <p>{errorMessage.nextStep}</p> : null}
+              <p className="whitespace-pre-wrap">{errorMessage.detail}</p>
+            </div>
+          ) : null}
         </DialogPanel>
         <DialogFooter>
           <Button

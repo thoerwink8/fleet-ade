@@ -35,8 +35,8 @@ export function DesktopWebLinkCoordinator() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "无法添加后端",
-        description: error instanceof Error ? error.message : "无法添加后端。",
+        title: "无法添加电脑",
+        description: error instanceof Error ? error.message : "无法添加电脑。",
       }),
     );
 
@@ -54,7 +54,7 @@ export function DesktopWebLinkCoordinator() {
     }
     const confirmed =
       (await requestConfirmDialog("添加后会在这台设备上保存配对信息，可以随时在设置里移除。", {
-        title: `添加位于 ${origin} 的后端？`,
+        title: `添加位于 ${origin} 的电脑？`,
         confirmLabel: "添加",
       })) ?? false;
     if (!confirmed) return;
@@ -66,8 +66,8 @@ export function DesktopWebLinkCoordinator() {
     pairedUrlsRef.current.add(pairingUrl);
     toastManager.add({
       type: "success",
-      title: "已添加后端",
-      description: "已保存环境，应用启动时会自动重新连接。",
+      title: "已添加电脑",
+      description: "已保存电脑，应用启动时会自动重新连接。",
     });
   };
 
