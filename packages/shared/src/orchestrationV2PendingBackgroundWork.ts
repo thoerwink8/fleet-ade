@@ -129,6 +129,14 @@ export function monitorHoldsWakeCompletion(
   );
 }
 
+// Wake reports keep the outcome the provider announced; "updated" is not an ending.
+export function backgroundTaskStatusFromOutcome(
+  outcome: string | undefined,
+): PendingBackgroundWorkTask["status"] | undefined {
+  return outcome === "completed" || outcome === "failed" || outcome === "cancelled"
+    ? outcome
+    : undefined;
+}
 const TERMINAL_BACKGROUND_TASK_STATUSES: ReadonlySet<string> = new Set([
   "completed",
   "failed",
@@ -148,28 +156,25 @@ const COMPLETED_BACKGROUND_TASK_CAP = 64;
 // their first `startedAt`. Entries dropped without an outcome file as interrupted unless they
 // reappear, which a process restart can do. `occurredAt` is the event's time, so replaying the
 // event log reproduces the same ledger. The emission's own `completedBackgroundTasks` is ignored.
-export function mergeBackgroundTaskLedger<
-  Task extends Pick<PendingBackgroundWorkTask, "taskId"> &
-    Partial<Pick<PendingBackgroundWorkTask, "status" | "startedAt" | "completedAt">>,
->(input: {
-  readonly pending: ReadonlyArray<Task>;
-  readonly priorPending?: ReadonlyArray<Task> | undefined;
-  readonly priorCompleted?: ReadonlyArray<Task> | undefined;
+export function mergeBackgroundTaskLedger(input: {
+  readonly pending: ReadonlyArray<PendingBackgroundWorkTask>;
+  readonly priorPending?: ReadonlyArray<PendingBackgroundWorkTask> | undefined;
+  readonly priorCompleted?: ReadonlyArray<PendingBackgroundWorkTask> | undefined;
   readonly occurredAt: DateTime.Utc;
 }): {
-  readonly pendingBackgroundTasks: ReadonlyArray<Task>;
-  readonly completedBackgroundTasks: ReadonlyArray<Task>;
+  readonly pendingBackgroundTasks: ReadonlyArray<PendingBackgroundWorkTask>;
+  readonly completedBackgroundTasks: ReadonlyArray<PendingBackgroundWorkTask>;
 } {
   const priorPendingByTaskId = new Map(
     (input.priorPending ?? []).map((task) => [task.taskId, task]),
   );
-  const filedByTaskId = new Map<string, Task>();
-  const interruptedByTaskId = new Map<string, Task>();
+  const filedByTaskId = new Map<string, PendingBackgroundWorkTask>();
+  const interruptedByTaskId = new Map<string, PendingBackgroundWorkTask>();
   for (const entry of input.priorCompleted ?? []) {
     if (entry.status === "interrupted") interruptedByTaskId.set(entry.taskId, entry);
   }
 
-  const pendingBackgroundTasks: Array<Task> = [];
+  const pendingBackgroundTasks: Array<PendingBackgroundWorkTask> = [];
   const emittedActiveTaskIds = new Set<string>();
   for (const task of input.pending) {
     const prior = priorPendingByTaskId.get(task.taskId);
@@ -206,7 +211,7 @@ export function mergeBackgroundTaskLedger<
     if (!filedByTaskId.has(entry.taskId)) filedByTaskId.set(entry.taskId, entry);
   }
 
-  const completedAtMs = (task: Task) =>
+  const completedAtMs = (task: PendingBackgroundWorkTask) =>
     task.completedAt === undefined ? 0 : DateTime.toEpochMillis(task.completedAt);
   const completedBackgroundTasks = Array.from(filedByTaskId.values())
     .sort((left, right) => completedAtMs(right) - completedAtMs(left))

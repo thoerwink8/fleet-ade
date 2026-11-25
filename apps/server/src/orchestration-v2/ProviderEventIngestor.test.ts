@@ -18,11 +18,13 @@ import {
   type OrchestrationV2TurnItem,
   ProviderDriverKind,
   ProviderInstanceId,
+  ProviderSessionId,
   ProviderThreadId,
   ProviderTurnId,
   RunAttemptId,
   RunId,
   RuntimeRequestId,
+  ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -519,6 +521,11 @@ layer("ProviderEventIngestorV2", (it) => {
       assert.deepEqual(shell?.completedBackgroundTasks, [
         { taskId: "cmd-1", kind: "command", status: "completed", startedAt, completedAt: endedAt },
       ]);
+      assert.deepEqual(
+        (yield* projectionStore.getShellSnapshot()).threads.find((thread) => thread.id === threadId)
+          ?.completedBackgroundTasks,
+        shell?.completedBackgroundTasks,
+      );
     }),
   );
 
@@ -567,6 +574,41 @@ layer("ProviderEventIngestorV2", (it) => {
         ]);
         assert.deepEqual(reappeared?.completedBackgroundTasks, []);
       }),
+  );
+
+  it.effect("files the outcome an owed wake carries once the wake consumes it", () =>
+    Effect.gen(function* () {
+      const { ingestRoster, stored } = yield* setupRosterThread;
+      yield* ingestRoster([{ taskId: "cmd-1", kind: "command", description: "build" }]);
+      const running = (yield* stored())?.pendingBackgroundTasks[0];
+      if (running === undefined) throw new Error("the first roster keeps the task running");
+
+      yield* TestClock.adjust("1 minute");
+      const endedAt = yield* DateTime.now;
+      // The provider keeps an ended task on the roster until its wake consumes it, and stamps
+      // the outcome on that copy.
+      yield* ingestRoster([
+        { taskId: "cmd-1", kind: "command", description: "build", status: "failed" },
+      ]);
+      const owed = yield* stored();
+      assert.deepEqual(owed?.pendingBackgroundTasks, []);
+      assert.deepEqual(owed?.completedBackgroundTasks, [
+        {
+          taskId: "cmd-1",
+          kind: "command",
+          description: "build",
+          status: "failed",
+          startedAt: running?.startedAt,
+          completedAt: endedAt,
+        },
+      ]);
+
+      // The wake consumes the copy and the roster drops it; the outcome stays filed.
+      yield* ingestRoster([]);
+      const consumed = yield* stored();
+      assert.deepEqual(consumed?.pendingBackgroundTasks, []);
+      assert.deepEqual(consumed?.completedBackgroundTasks, owed?.completedBackgroundTasks);
+    }),
   );
 
   it.effect("skips a node update only when it matches the stored node", () =>

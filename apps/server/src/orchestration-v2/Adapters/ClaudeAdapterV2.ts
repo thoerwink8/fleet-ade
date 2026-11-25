@@ -85,6 +85,7 @@ import {
   mcpAppToolResourceUri,
 } from "@t3tools/shared/mcpApp";
 import { AgentScope } from "@t3tools/shared/AgentScope";
+import { backgroundTaskStatusFromOutcome } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import * as ProviderProcesses from "../../process/providerProcesses.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { applyClaudePromptEffortPrefix } from "@t3tools/shared/model";
@@ -6223,6 +6224,22 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           );
 
         // Untraced with roster emission: this runs for each streamed roster update.
+        // Ended tasks stay on the roster until their wake consumes them, so their outcome rides
+        // the owed-wake copies; the projection files them from that status.
+        const stampOwedWakeOutcomes = Effect.fnUntraced(function* (
+          nativeThreadId: string,
+          tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>,
+        ) {
+          const reports = (yield* Ref.get(wakeReportsByNativeThread)).reports.get(nativeThreadId);
+          if (reports === undefined) return tasks;
+          return tasks.map((task) => {
+            const status = backgroundTaskStatusFromOutcome(
+              reports.get(task.taskId)?.report.outcome,
+            );
+            return status === undefined || task.status !== undefined ? task : { ...task, status };
+          });
+        });
+
         const owedWakeTasksForNativeThread = Effect.fnUntraced(function* (nativeThreadId: string) {
           const previous = (yield* Ref.get(lastProviderThreadByNativeThread)).get(nativeThreadId);
           const roster = rosterForNativeThread(
@@ -6253,7 +6270,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             yield* Ref.get(awaitedBackgroundTasksByNativeThread),
             input.nativeThreadId,
           );
-          const owedWakeTasks = yield* owedWakeTasksForNativeThread(input.nativeThreadId);
+          const owedWakeTasks = yield* stampOwedWakeOutcomes(
+            input.nativeThreadId,
+            yield* owedWakeTasksForNativeThread(input.nativeThreadId),
+          );
           const now = yield* DateTime.now;
           const providerThread: OrchestrationV2ProviderThread = {
             ...input.providerThread,
@@ -9023,7 +9043,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   lastRunOrdinal: input.context.input.runOrdinal,
                   pendingBackgroundTasks: [
                     ...publishedPendingBackgroundTasks(nativeThreadId, roster, awaitedTaskIds),
-                    ...owedWakeTasks,
+                    ...(nativeThreadId === null
+                      ? []
+                      : yield* stampOwedWakeOutcomes(nativeThreadId, owedWakeTasks)),
                   ],
                   status: input.status === "completed" ? "active" : "idle",
                   updatedAt: input.completedAt,
@@ -9699,10 +9721,6 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
         }) {
           const message = input.message;
           let rosterChanged = false;
-          // Terminal entries publish in this change's roster emission, then leave the live
-          // roster: the projection's ledger keeps them, and staying listed would read as
-          // pending work to the adapter's own probes.
-          const silentTaskClears: Array<string> = [];
 
           if (isClaudeBackgroundTasksChangedMessage(message)) {
             const roster = Reflect.get(message, "tasks");
@@ -9803,21 +9821,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               updated.delete(message.task_id);
               return updated;
             });
-            const roster = rosterForNativeThread(
-              yield* Ref.get(pendingBackgroundTasksByNativeThread),
+            const removed = yield* clearPendingBackgroundTask(
               input.nativeThreadId,
+              message.task_id,
             );
-            const entry = roster.get(message.task_id);
-            if (entry === undefined) {
-              rosterChanged = false;
-            } else {
-              yield* upsertPendingBackgroundTask(input.nativeThreadId, {
-                ...entry,
-                status: claudeTaskOutcome(message.status),
-              });
-              silentTaskClears.push(message.task_id);
-              rosterChanged = true;
-            }
+            rosterChanged = removed;
             yield* clearTaskIdFromNativeThreadSet(
               wakeEligibleBackgroundTasksByNativeThread,
               input.nativeThreadId,
@@ -9830,9 +9838,6 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
 
           yield* emitRosterUpdate(input.nativeThreadId, input.activeContext);
-          for (const taskId of silentTaskClears) {
-            yield* clearPendingBackgroundTask(input.nativeThreadId, taskId);
-          }
           return true;
         });
 
@@ -12498,12 +12503,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     ...turnInput.providerThread,
                     pendingBackgroundTasks: [
                       ...(turnInput.providerThread.pendingBackgroundTasks ?? []),
-                      ...owedWakeTasks.filter(
-                        (task) =>
-                          !(turnInput.providerThread.pendingBackgroundTasks ?? []).some(
-                            (current) => current.taskId === task.taskId,
-                          ),
-                      ),
+                      ...(yield* stampOwedWakeOutcomes(
+                        nativeThreadId,
+                        owedWakeTasks.filter(
+                          (task) =>
+                            !(turnInput.providerThread.pendingBackgroundTasks ?? []).some(
+                              (current) => current.taskId === task.taskId,
+                            ),
+                        ),
+                      )),
                     ],
                   },
             );
