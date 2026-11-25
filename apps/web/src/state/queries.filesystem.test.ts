@@ -9,6 +9,8 @@ const state = vi.hoisted(() => ({
   sessionAtom: {},
   searchAtom: {},
   searchRequests: vi.fn(),
+  listAtom: {},
+  listRequests: vi.fn(),
   contentAtom: {},
   contentRequests: vi.fn(),
   contentError: null as string | null,
@@ -40,6 +42,10 @@ vi.mock("./projects", () => ({
       state.searchRequests(target);
       return state.searchAtom;
     },
+    listEntries: (target: unknown) => {
+      state.listRequests(target);
+      return state.listAtom;
+    },
   },
   projectContentSearch: (target: unknown) => {
     state.contentRequests(target);
@@ -57,9 +63,11 @@ vi.mock("./query", () => ({
         ? state.session
         : atom === state.searchAtom
           ? { entries: [{ path: "src/index.ts", kind: "file" }] }
-          : atom === state.contentAtom
-            ? state.contentData
-            : null,
+          : atom === state.listAtom
+            ? { entries: [{ path: "README.md", kind: "file" }], truncated: false }
+            : atom === state.contentAtom
+              ? state.contentData
+              : null,
     error:
       atom === state.sessionAtom
         ? state.sessionError
@@ -73,7 +81,7 @@ vi.mock("./query", () => ({
   }),
 }));
 
-import { useComposerPathSearch, useProjectContentSearch } from "./queries";
+import { useComposerPathSearch, useComposerRootEntries, useProjectContentSearch } from "./queries";
 
 const target = {
   environmentId: EnvironmentId.make("test-environment"),
@@ -87,6 +95,7 @@ beforeEach(() => {
   state.sessionWaiting = false;
   state.phase = "connected";
   state.searchRequests.mockClear();
+  state.listRequests.mockClear();
   state.contentRequests.mockClear();
   state.contentError = null;
 });
@@ -184,4 +193,37 @@ it("fails closed after a session check fails, even with a cached grant and match
     isPending: false,
   });
   expect(state.contentRequests).not.toHaveBeenCalled();
+});
+
+it("lists project root entries for bare @ when enabled and permitted, and skips otherwise", () => {
+  state.session = { authenticated: true, scopes: [AuthFilesystemReadScope] };
+  const enabledResult = useComposerRootEntries({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    enabled: true,
+  });
+  expect(state.listRequests).toHaveBeenCalledExactlyOnceWith({
+    environmentId: target.environmentId,
+    input: { cwd: target.cwd, directoryPath: "" },
+  });
+  expect(enabledResult.entries).toEqual([{ path: "README.md", kind: "file" }]);
+  expect(enabledResult.isPending).toBe(false);
+
+  state.listRequests.mockClear();
+  const disabledResult = useComposerRootEntries({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    enabled: false,
+  });
+  expect(state.listRequests).not.toHaveBeenCalled();
+  expect(disabledResult.entries).toEqual([]);
+
+  state.session = { authenticated: true, scopes: [] };
+  const deniedResult = useComposerRootEntries({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    enabled: true,
+  });
+  expect(state.listRequests).not.toHaveBeenCalled();
+  expect(deniedResult.entries).toEqual([]);
 });
