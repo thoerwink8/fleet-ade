@@ -19,6 +19,7 @@ import {
   MessageId,
   EnvironmentId,
   NodeId,
+  ForwardCompatibleOptional,
   ForwardCompatibleUnion,
   ForwardCompatibleUnionArray,
   hasUnknownUnionTag,
@@ -965,6 +966,18 @@ export const OrchestrationV2RemoteTaskChild = Schema.Struct({
 });
 export type OrchestrationV2RemoteTaskChild = typeof OrchestrationV2RemoteTaskChild.Type;
 
+export const OrchestrationV2SubagentStatus = Schema.Literals([
+  "idle",
+  "pending",
+  "running",
+  "waiting",
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
+export type OrchestrationV2SubagentStatus = typeof OrchestrationV2SubagentStatus.Type;
+
 export const OrchestrationV2Subagent = Schema.Struct({
   id: NodeId,
   threadId: ThreadId,
@@ -994,16 +1007,7 @@ export const OrchestrationV2Subagent = Schema.Struct({
   completionDelivery: Schema.optional(OrchestrationV2DelegatedCompletionTaskDelivery),
   // The run whose unfinished task was cancelled, committed with its Stop.
   cancelledRunId: Schema.optional(RunId),
-  status: Schema.Literals([
-    "idle",
-    "pending",
-    "running",
-    "waiting",
-    "completed",
-    "failed",
-    "cancelled",
-    "interrupted",
-  ]),
+  status: OrchestrationV2SubagentStatus,
   progress: Schema.optional(Schema.String),
   workflow: Schema.optional(OrchestrationV2SubagentWorkflow),
   result: Schema.NullOr(Schema.String),
@@ -1119,6 +1123,17 @@ const PendingBackgroundTaskFields = {
    * subagent. Only the agent knows whether a command is a wait or a dev server it left running.
    */
   awaited: Schema.optional(Schema.Literal(true)),
+  /**
+   * Same values as the subagent status. Absent on entries written before the ledger was kept;
+   * those are active work. An ended entry keeps its place here, stamped with its outcome, until the
+   * roster drops it (the provider holds it until its wake consumes it); then it moves to
+   * `completedBackgroundTasks`.
+   */
+  status: ForwardCompatibleOptional(OrchestrationV2SubagentStatus),
+  /** Written when the work starts and unchanged after. Absent on entries written before it was kept. */
+  startedAt: Schema.optional(Schema.DateTimeUtc),
+  /** Written when the work ends, however it ends. Absent while it runs and on older entries. */
+  completedAt: Schema.optional(Schema.DateTimeUtc),
 };
 
 export const OrchestrationV2PendingBackgroundTask = kindUnionWithFallback(
@@ -1143,6 +1158,36 @@ export const OrchestrationV2PendingBackgroundTask = kindUnionWithFallback(
   }),
 );
 export type OrchestrationV2PendingBackgroundTask = typeof OrchestrationV2PendingBackgroundTask.Type;
+
+// SQLite payloads and older-wire JSON carry times as strings; the runtime schema reads instances.
+const PendingBackgroundTaskJsonFields = {
+  ...PendingBackgroundTaskFields,
+  startedAt: Schema.optional(Schema.DateTimeUtcFromString),
+  completedAt: Schema.optional(Schema.DateTimeUtcFromString),
+};
+
+export const OrchestrationV2PendingBackgroundTaskJson = kindUnionWithFallback(
+  [
+    Schema.Struct({
+      ...PendingBackgroundTaskJsonFields,
+      kind: Schema.Literal("subagent"),
+      providerInstanceId: Schema.optional(ProviderInstanceId),
+      childThreadId: Schema.optional(ThreadId),
+    }),
+    Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind: Schema.Literal("command") }),
+    Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind: Schema.Literal("monitor") }),
+    Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind: Schema.Literal("background_task") }),
+  ],
+  (kind) => Schema.Struct({ ...PendingBackgroundTaskJsonFields, kind }),
+  ({ taskId, description, parentTaskId }) => ({
+    taskId,
+    ...(description === undefined ? {} : { description }),
+    ...(parentTaskId === undefined ? {} : { parentTaskId }),
+    kind: "background_task",
+  }),
+);
+export type OrchestrationV2PendingBackgroundTaskJson =
+  typeof OrchestrationV2PendingBackgroundTaskJson.Type;
 
 export const OrchestrationV2ProviderThreadNativeMetadata = Schema.Struct({
   cursorStoreCwd: Schema.optional(TrimmedNonEmptyString),
@@ -1202,6 +1247,12 @@ export const OrchestrationV2ProviderThread = Schema.Struct({
   pendingBackgroundTasks: Schema.optional(Schema.Array(OrchestrationV2PendingBackgroundTask)).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  /**
+   * Roster entries whose work ended and left `pendingBackgroundTasks`, newest first, bounded.
+   */
+  completedBackgroundTasks: Schema.optional(
+    Schema.Array(OrchestrationV2PendingBackgroundTask),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   contextUsage: Schema.optional(Schema.NullOr(ThreadTokenUsageSnapshot)).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
@@ -2311,6 +2362,10 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   pendingBackgroundTasks: Schema.optional(Schema.Array(OrchestrationV2PendingBackgroundTask)).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  /** Terminal roster entries of the thread's provider threads, newest first, for the overview's completed count. */
+  completedBackgroundTasks: Schema.optional(
+    Schema.Array(OrchestrationV2PendingBackgroundTask),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   providerInstanceHistory: Schema.optional(Schema.Array(ProviderInstanceId)).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
@@ -2598,6 +2653,12 @@ export const OrchestrationV2ProviderThreadJson = OrchestrationV2ProviderThread.m
     ...fields,
     createdAt: Schema.DateTimeUtcFromString,
     updatedAt: Schema.DateTimeUtcFromString,
+    pendingBackgroundTasks: Schema.optional(
+      Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+    ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+    completedBackgroundTasks: Schema.optional(
+      Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+    ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   }),
 );
 export type OrchestrationV2ProviderThreadJson = typeof OrchestrationV2ProviderThreadJson.Type;
@@ -2979,6 +3040,12 @@ export const OrchestrationV2ThreadShellJson = OrchestrationV2ThreadShell.mapFiel
     ),
   ),
   deletedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  pendingBackgroundTasks: Schema.optional(
+    Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  completedBackgroundTasks: Schema.optional(
+    Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
 }));
 export type OrchestrationV2ThreadShellJson = typeof OrchestrationV2ThreadShellJson.Type;
 

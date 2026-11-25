@@ -873,7 +873,13 @@ const stopEarlierBackgroundWork = ({
           (thread) => thread.id === codexProviderThread.id,
         )!;
         assert.equal(beforeStop.lastRunOrdinal, 5);
-        assert.deepEqual(beforeStop.pendingBackgroundTasks, backgroundTasks);
+        assert.deepEqual(beforeStop.pendingBackgroundTasks, [
+          {
+            ...backgroundTasks[0]!,
+            status: "running",
+            startedAt: now,
+          },
+        ]);
       }
 
       if (stopWithQueue !== undefined) {
@@ -1010,12 +1016,14 @@ const stopEarlierBackgroundWork = ({
         assert.deepEqual(
           after.providerThreads.find((candidate) => candidate.id === codexProviderThread.id)
             ?.pendingBackgroundTasks,
-          backgroundWorkAfterStop === undefined ? [] : backgroundTasks,
+          backgroundWorkAfterStop === undefined
+            ? []
+            : backgroundTasks.map((task) => ({ ...task, status: "running", startedAt: now })),
         );
         assert.deepEqual(
           after.providerThreads.find((candidate) => candidate.id === otherProviderThreadId)
             ?.pendingBackgroundTasks,
-          otherBackgroundTasks,
+          otherBackgroundTasks.map((task) => ({ ...task, status: "running", startedAt: now })),
         );
       }
     }).pipe(
