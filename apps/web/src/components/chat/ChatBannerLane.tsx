@@ -212,7 +212,7 @@ export function ChatBannerLane(props: {
       {ordered.length > 1 ? (
         <button
           type="button"
-          className="fa-strip__sum"
+          className="fa-strip__sum ade-touch-target ade-touch-target--y"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
