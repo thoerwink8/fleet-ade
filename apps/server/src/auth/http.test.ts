@@ -4,6 +4,7 @@ import {
   AuthTokenExchangeGrantType,
   AuthEnvironmentBootstrapTokenType,
   AuthAccessTokenType,
+  EnvironmentAuthInvalidError,
   EnvironmentHttpApi,
 } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
@@ -11,6 +12,9 @@ import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Duration from "effect/Duration";
+import * as TestClock from "effect/testing/TestClock";
+import * as Clock from "effect/Clock";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Etag from "effect/http/Etag";
@@ -216,4 +220,141 @@ it.effect("does not route a retired guest redeem", () =>
       (environment) => Effect.promise(() => environment.dispose()),
     );
   }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);
+
+const decodeAuthInvalid = Schema.decodeSync(Schema.fromJsonString(EnvironmentAuthInvalidError));
+
+const postTokenExchange = (subjectToken: string) =>
+  new Request("http://127.0.0.1/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: AuthTokenExchangeGrantType,
+      subject_token: subjectToken,
+      subject_token_type: AuthEnvironmentBootstrapTokenType,
+      requested_token_type: AuthAccessTokenType,
+    }),
+  });
+
+it.effect.each([{ endpoint: "browser-session" }, { endpoint: "oauth-token" }])(
+  "reports pairing credential failure reasons on the $endpoint route",
+  ({ endpoint }) =>
+    Effect.gen(function* () {
+      const random = yield* SecureRandom.SecureRandom;
+      const unusedSecretStore = ServerSecretStore.ServerSecretStore.of({
+        get: () => Effect.succeedNone,
+        set: () => Effect.void,
+        create: () => Effect.void,
+        getOrCreateRandom: () => Effect.die("Not used by these routes."),
+        remove: () => Effect.void,
+      });
+      const requestContext = Context.make(SecureRandom.SecureRandom, random).pipe(
+        Context.add(ServerSecretStore.ServerSecretStore, unusedSecretStore),
+      );
+      return yield* Effect.acquireUseRelease(
+        Effect.gen(function* () {
+          let service: EnvironmentAuth.EnvironmentAuth["Service"] | undefined;
+          const testClockContext = yield* Layer.build(TestClock.layer());
+          const testClock = Context.get(testClockContext, Clock.Clock) as TestClock.TestClock;
+          const routes = Layer.mergeAll(
+            Layer.effectDiscard(
+              EnvironmentAuth.EnvironmentAuth.pipe(
+                Effect.tap((auth) => Effect.sync(() => (service = auth))),
+              ),
+            ),
+            HttpApiBuilder.layer(AuthTestApi).pipe(
+              Layer.provide(AuthHttp.layer),
+              Layer.provide(AuthHttp.layerAuthenticatedAuth),
+            ),
+          ).pipe(
+            Layer.provideMerge(layerEnvironmentAuth),
+            Layer.provide(layerConfig),
+            Layer.provideMerge(
+              HttpPlatform.layer.pipe(
+                Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+                Layer.provideMerge(Etag.layerWeak),
+              ),
+            ),
+            Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+            Layer.provide(Layer.succeedContext(testClockContext)),
+          );
+          const web = HttpRouter.toWebHandler(routes, { disableLogger: true });
+          return { web, auth: () => service!, testClock };
+        }),
+        ({ web, auth, testClock }) =>
+          Effect.gen(function* () {
+            const exchange = (credential: string) =>
+              endpoint === "browser-session"
+                ? Effect.promise(() =>
+                    web.handler(
+                      postJson("/api/auth/browser-session", { credential }),
+                      requestContext,
+                    ),
+                  )
+                : Effect.promise(() => web.handler(postTokenExchange(credential), requestContext));
+            // Routes build lazily; one request materializes the captured auth service.
+            yield* Effect.promise(() =>
+              web.handler(new Request("http://127.0.0.1/api/auth/session"), requestContext),
+            );
+            const validCredential = yield* auth().issuePairingCredential();
+            const valid = yield* exchange(validCredential.credential);
+            expect(valid.status).toBe(200);
+            const body = yield* Effect.promise(() => valid.json());
+            if (endpoint === "browser-session") {
+              expect(body).toMatchObject({ authenticated: true });
+            } else {
+              expect(body).toMatchObject({
+                access_token: expect.any(String),
+                issued_token_type: AuthAccessTokenType,
+              });
+            }
+
+            // Missing and revoked stay indistinguishable: both report "invalid".
+            const missing = yield* exchange("C8VNM2KLPW3R");
+            expect(missing.status).toBe(401);
+            expect(decodeAuthInvalid(yield* Effect.promise(() => missing.text()))).toMatchObject({
+              reason: "invalid_credential",
+              credentialFailureReason: "invalid",
+            });
+
+            const revoked = yield* Effect.gen(function* () {
+              const issued = yield* auth().issuePairingCredential();
+              yield* auth().revokePairingLink(issued.id);
+              return yield* exchange(issued.credential);
+            });
+            expect(revoked.status).toBe(401);
+            expect(decodeAuthInvalid(yield* Effect.promise(() => revoked.text()))).toMatchObject({
+              reason: "invalid_credential",
+              credentialFailureReason: "invalid",
+            });
+
+            const consumed = yield* Effect.gen(function* () {
+              const issued = yield* auth().issuePairingCredential();
+              yield* auth().exchangeBootstrapCredentialForAccessToken(
+                issued.credential,
+                undefined,
+                { deviceType: "bot" },
+              );
+              return yield* exchange(issued.credential);
+            });
+            expect(consumed.status).toBe(401);
+            expect(decodeAuthInvalid(yield* Effect.promise(() => consumed.text()))).toMatchObject({
+              reason: "invalid_credential",
+              credentialFailureReason: "consumed",
+            });
+
+            const expired = yield* Effect.gen(function* () {
+              const issued = yield* auth().issuePairingCredential();
+              yield* testClock.adjust(Duration.minutes(6));
+              return yield* exchange(issued.credential);
+            });
+            expect(expired.status).toBe(401);
+            expect(decodeAuthInvalid(yield* Effect.promise(() => expired.text()))).toMatchObject({
+              reason: "invalid_credential",
+              credentialFailureReason: "expired",
+            });
+          }),
+        ({ web }) => Effect.promise(() => web.dispose()),
+      );
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );

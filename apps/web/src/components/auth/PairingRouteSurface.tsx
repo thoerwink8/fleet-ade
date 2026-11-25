@@ -1,11 +1,13 @@
 import { Alert, AlertDescription } from "../ui/alert";
 import type { AuthSessionState } from "@t3tools/contracts";
 import React, { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
+import { pairingRejectionHint } from "@t3tools/shared/remote";
 
 import {
   peekPairingTokenFromUrl,
   stripPairingTokenFromUrl,
   submitServerAuthCredential,
+  describePairingSubmitError,
 } from "../../environments/primary";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -43,12 +45,14 @@ export function PairingRouteSurface({
 
     const submitError = await submitServerAuthCredential(nextCredential).then(
       () => null,
-      (error) => errorMessageFromUnknown(error),
+      (error) => describePairingSubmitError(error),
     );
 
     setIsSubmitting(false);
 
     if (submitError) {
+      // The old code is useless now; clearing it lets the user paste a fresh one.
+      setCredential("");
       setErrorMessage(submitError);
       return;
     }
@@ -132,18 +136,6 @@ export function PairingRouteSurface({
   );
 }
 
-function errorMessageFromUnknown(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  if (typeof error === "string" && error.trim().length > 0) {
-    return error;
-  }
-
-  return "身份验证失败。";
-}
-
 function describeAuthGate(bootstrapMethods: ReadonlyArray<string>): string {
   if (bootstrapMethods.includes("desktop-bootstrap")) {
     return "这台电脑需要可信的配对码，应用才能连接。";
@@ -164,5 +156,5 @@ function describeSupportedMethods(bootstrapMethods: ReadonlyArray<string>): stri
     return "这台电脑由桌面版托管。请从桌面应用打开；如果另外签发了配对码，也可以粘贴在这里。";
   }
 
-  return "这台电脑接受一次性配对码。配对链接可以直接打开此页面，你也可以在这里粘贴配对码。";
+  return `这台电脑接受一次性配对码。配对链接可以直接打开此页面，你也可以在这里粘贴配对码。${pairingRejectionHint("this")}`;
 }

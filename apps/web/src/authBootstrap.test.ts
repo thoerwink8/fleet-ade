@@ -20,6 +20,11 @@ type TestWindow = {
     replaceState: (_data: unknown, _unused: string, url?: string) => void;
   };
   desktopBridge?: DesktopBridge;
+  sessionStorage: {
+    getItem: (key: string) => string | null;
+    setItem: (key: string, value: string) => void;
+    removeItem: (key: string) => void;
+  };
 };
 
 const LOOPBACK_AUTH = {
@@ -68,6 +73,14 @@ function installTestBrowser(url: string) {
         }
       },
     },
+    sessionStorage: (() => {
+      const entries = new Map<string, string>();
+      return {
+        getItem: (key: string) => entries.get(key) ?? null,
+        setItem: (key: string, value: string) => void entries.set(key, value),
+        removeItem: (key: string) => void entries.delete(key),
+      };
+    })(),
   };
 
   vi.stubGlobal("window", testWindow);
@@ -228,7 +241,7 @@ describe("resolveInitialServerAuthGateState", () => {
   );
 
   it.each([false, true])(
-    "keeps rejected replacement pairing open when cached=%s",
+    "restores an authenticated browser after a rejected replacement when cached=%s",
     async (cached) => {
       const existingSession = {
         ...authenticatedSession(LOOPBACK_AUTH),
@@ -253,6 +266,7 @@ describe("resolveInitialServerAuthGateState", () => {
       const {
         resolveInitialServerAuthGateState,
         submitServerAuthCredential,
+        takePairingRecoveryNotice,
         takePairingTokenFromUrl,
       } = await import("./environments/primary");
       const { fetchSessionState } = await import("./environments/primary/auth");
@@ -282,15 +296,16 @@ describe("resolveInitialServerAuthGateState", () => {
         const token = takePairingTokenFromUrl();
         expect(gateLoads).toHaveLength(1);
         await expect(gateLoads[0]).resolves.toEqual(requiresAuth);
-        const rejected = expect(submitServerAuthCredential(token!)).rejects.toMatchObject({
-          _tag: "PrimaryEnvironmentPairingCredentialRejectedError",
-          message: "配对码无效。请检查后重试。",
-        });
+        const submitted = submitServerAuthCredential(token!);
         await exchangeStarted.promise;
         await expect(resolveInitialServerAuthGateState()).resolves.toEqual(requiresAuth);
         finishExchange.resolve();
-        await rejected;
-        await expect(resolveInitialServerAuthGateState()).resolves.toEqual(requiresAuth);
+        await submitted;
+        await expect(resolveInitialServerAuthGateState()).resolves.toEqual({
+          status: "authenticated",
+        });
+        expect(takePairingRecoveryNotice()).toBe("这台浏览器已经连着，配对链接用过了也没关系。");
+        expect(takePairingRecoveryNotice()).toBeNull();
         expect(testApi.calls.browserSession).toEqual([{ credential: "invalid-replacement" }]);
         await expect(fetchSessionState()).resolves.toEqual(existingSession);
 
@@ -356,18 +371,14 @@ describe("resolveInitialServerAuthGateState", () => {
       releaseExchange();
     }
 
-    const rejectedState = {
-      status: "requires-auth",
-      auth: LOOPBACK_AUTH,
-      errorMessage: "配对码无效。请检查后重试。",
-    } as const;
-    await expect(explicitPairing).resolves.toEqual(rejectedState);
-    await expect(laterCaller).resolves.toEqual(rejectedState);
+    const recoveredState = { status: "authenticated" } as const;
+    await expect(explicitPairing).resolves.toEqual(recoveredState);
+    await expect(laterCaller).resolves.toEqual(recoveredState);
     expect(testApi.calls.browserSession).toEqual([{ credential: "reusable-token" }]);
     expect(testApi.calls.session).toBe(2);
   });
 
-  it("reports a rejected URL token without caching false success", async () => {
+  it("recovers an authenticated browser when a URL token is rejected", async () => {
     const cause = new EnvironmentAuthInvalidError({
       code: "auth_invalid",
       reason: "invalid_credential",
@@ -382,17 +393,71 @@ describe("resolveInitialServerAuthGateState", () => {
       browserSession: () => Effect.fail(cause),
     });
     installTestBrowser("http://localhost/#token=rejected-token");
-    const { resolveInitialServerAuthGateState } = await import("./environments/primary");
+    const { resolveInitialServerAuthGateState, takePairingRecoveryNotice } =
+      await import("./environments/primary");
 
     await expect(resolveInitialServerAuthGateState()).resolves.toEqual({
-      status: "requires-auth",
-      auth: LOOPBACK_AUTH,
-      errorMessage: "配对码无效。请检查后重试。",
+      status: "authenticated",
     });
-    await expect(resolveInitialServerAuthGateState()).resolves.toEqual({
-      status: "requires-auth",
-      auth: LOOPBACK_AUTH,
-    });
+    expect(takePairingRecoveryNotice()).toBe("这台浏览器已经连着，配对链接用过了也没关系。");
     expect(testApi.calls.browserSession).toEqual([{ credential: "rejected-token" }]);
+  });
+
+  it("recovers an authenticated browser onto the app after a dead URL token", async () => {
+    const cause = new EnvironmentAuthInvalidError({
+      code: "auth_invalid",
+      reason: "invalid_credential",
+      credentialFailureReason: "consumed",
+      traceId: "trace-consumed-url-credential",
+    });
+    const testApi = await installAuthApi({
+      session: () => authenticatedSession(LOOPBACK_AUTH),
+      browserSession: () => Effect.fail(cause),
+    });
+    installTestBrowser("http://localhost/#token=consumed-token");
+    const { resolveInitialServerAuthGateState, takePairingRecoveryNotice } =
+      await import("./environments/primary");
+
+    await expect(resolveInitialServerAuthGateState()).resolves.toEqual({
+      status: "authenticated",
+    });
+    expect(takePairingRecoveryNotice()).toBe("这台浏览器已经连着，配对链接用过了也没关系。");
+    expect(testApi.calls.browserSession).toEqual([{ credential: "consumed-token" }]);
+  });
+
+  it("still rejects a dead credential when no session is valid", async () => {
+    const cause = new EnvironmentAuthInvalidError({
+      code: "auth_invalid",
+      reason: "invalid_credential",
+      credentialFailureReason: "expired",
+      traceId: "trace-expired-credential",
+    });
+    await installAuthApi({
+      session: () => unauthenticatedSession(LOOPBACK_AUTH),
+      browserSession: () => Effect.fail(cause),
+    });
+    installTestBrowser("http://localhost/pair#token=expired-token");
+    const { submitServerAuthCredential, takePairingRecoveryNotice, takePairingTokenFromUrl } =
+      await import("./environments/primary");
+
+    await expect(submitServerAuthCredential(takePairingTokenFromUrl()!)).rejects.toMatchObject({
+      _tag: "PrimaryEnvironmentPairingCredentialRejectedError",
+      credentialFailureReason: "expired",
+      message:
+        "这个配对码已过期。在这台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在这台电脑上运行 t3 pair。",
+    });
+    expect(takePairingRecoveryNotice()).toBeNull();
+  });
+
+  it("describes transport failures as a connectivity problem", async () => {
+    const { describePairingSubmitError, PrimaryEnvironmentRequestError } =
+      await import("./environments/primary");
+    const error = PrimaryEnvironmentRequestError.fromCause({
+      operation: "exchange-bootstrap-credential",
+      cause: new TypeError("fetch failed"),
+    });
+    expect(describePairingSubmitError(error)).toBe(
+      "连不上这台电脑。检查网络，或确认这台电脑上的服务还在运行，再重试。",
+    );
   });
 });

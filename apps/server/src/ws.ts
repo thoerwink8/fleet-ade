@@ -3300,6 +3300,7 @@ export const layer = Layer.unwrap(
             failEnvironmentAuthInvalid(
               EnvironmentAuth.serverAuthCredentialReason(error),
               EnvironmentAuth.serverAuthDpopFailureReason(error),
+              EnvironmentAuth.serverAuthCredentialFailureReason(error),
             ),
           ),
           Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>

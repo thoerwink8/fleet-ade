@@ -1,5 +1,6 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 
+import { pairingRejectionMessage } from "@t3tools/shared/remote";
 import type { RemoteEnvironmentAuthError } from "../authorization/remote.ts";
 import {
   ConnectionBlockedError,
@@ -40,7 +41,12 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentAuthInvalidError":
       return new ConnectionBlockedError({
         reason: "authentication",
-        detail: "电脑配对信息无效。",
+        detail:
+          error.credentialFailureReason !== undefined
+            ? pairingRejectionMessage(error.credentialFailureReason, "that")
+            : error.reason === "invalid_credential"
+              ? pairingRejectionMessage(undefined, "that")
+              : "电脑配对信息无效。",
         traceId: error.traceId,
         hop: "server",
       });

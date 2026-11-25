@@ -10,6 +10,7 @@ import {
   type AuthClientSession,
   type AuthCreatePairingCredentialInput,
   type AuthEnvironmentScope,
+  EnvironmentAuthCredentialFailureReason,
   type AuthPairingLink,
   type AuthPairingCredentialResult,
   type AuthSessionId,
@@ -285,6 +286,7 @@ export class ServerAuthInvalidCredentialError extends Schema.TaggedError<ServerA
     diagnostic: Schema.optional(Schema.String),
     dpopFailureReason: Schema.optionalKey(DpopFailureReason),
     cause: Schema.optional(Schema.Defect()),
+    credentialFailureReason: Schema.optionalKey(EnvironmentAuthCredentialFailureReason),
   },
 ) {
   override get message(): string {
@@ -307,6 +309,11 @@ export const serverAuthDpopFailureReason = (
   error: ServerAuthCredentialError,
 ): DpopFailureReasonType | undefined =>
   error._tag === "ServerAuthInvalidCredentialError" ? error.dpopFailureReason : undefined;
+
+export const serverAuthCredentialFailureReason = (
+  error: ServerAuthCredentialError,
+): EnvironmentAuthCredentialFailureReason | undefined =>
+  error._tag === "ServerAuthInvalidCredentialError" ? error.credentialFailureReason : undefined;
 
 export class ServerAuthInvalidScopeError extends Schema.TaggedError<ServerAuthInvalidScopeError>()(
   "ServerAuthInvalidScopeError",
@@ -516,8 +523,25 @@ function toBootstrapExchangeError(
 
   return new ServerAuthInvalidCredentialError({
     cause,
+    credentialFailureReason: bootstrapCredentialFailureReason(cause),
   });
 }
+
+const bootstrapCredentialFailureReason = (
+  cause: Exclude<
+    PairingGrantStore.BootstrapCredentialError,
+    PairingGrantStore.BootstrapCredentialInternalError
+  >,
+): EnvironmentAuthCredentialFailureReason => {
+  switch (cause._tag) {
+    case "ConsumedBootstrapCredentialError":
+      return "consumed";
+    case "ExpiredBootstrapCredentialError":
+      return "expired";
+    default:
+      return "invalid";
+  }
+};
 
 const rejectMcpClientAudience = <S extends { readonly subject: string }>(session: S) =>
   session.subject === MCP_CLIENT_SUBJECT

@@ -341,6 +341,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodePlatformCrypto.layer))(
           )
           .pipe(Effect.flip);
         expect(reused._tag).toBe("ServerAuthInvalidCredentialError");
+        if (reused._tag === "ServerAuthInvalidCredentialError") {
+          expect(reused.credentialFailureReason).toBe("consumed");
+        }
       }).pipe(Effect.provide(layerEnvironmentAuth())),
     );
 

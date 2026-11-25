@@ -53,6 +53,8 @@ for each new device; you do not need the original pairing link to reconnect. Lin
 created in Settings can only be copied from the client that created them while
 its Connections page stays open. If you leave or reload that page, create
 another link to share.
+If a link says it was already used, expired, or invalid, create a new link under
+**Settings → Connections** on the computer being connected, or run `t3 pair` there.
 
 ### Reach one computer several ways
 

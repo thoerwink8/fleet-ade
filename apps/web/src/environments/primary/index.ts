@@ -9,6 +9,8 @@ export {
   type ServerClientSessionRecord,
   type ServerPairingLinkRecord,
   __resetServerAuthBootstrapForTests,
+  describePairingSubmitError,
+  takePairingRecoveryNotice,
 } from "./auth";
 
 export {
