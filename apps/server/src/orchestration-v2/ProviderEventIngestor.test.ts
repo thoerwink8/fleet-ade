@@ -505,12 +505,12 @@ layer("ProviderEventIngestorV2", (it) => {
       const endedAt = yield* DateTime.now;
       yield* ingestRoster([{ taskId: "cmd-1", kind: "command", status: "completed" }]);
       const afterSuccess = yield* stored();
-      assert.deepEqual(afterSuccess?.pendingBackgroundTasks, []);
-      assert.deepEqual(afterSuccess?.completedBackgroundTasks, [
+      assert.deepEqual(afterSuccess?.pendingBackgroundTasks, [
         { taskId: "cmd-1", kind: "command", status: "completed", startedAt, completedAt: endedAt },
       ]);
+      assert.deepEqual(afterSuccess?.completedBackgroundTasks, []);
 
-      // The next emission no longer lists the task; the ledger keeps it.
+      // The next emission no longer lists the task; the ledger files it.
       yield* TestClock.adjust("1 minute");
       yield* ingestRoster([]);
       assert.deepEqual((yield* stored())?.completedBackgroundTasks, [
@@ -539,6 +539,10 @@ layer("ProviderEventIngestorV2", (it) => {
         yield* TestClock.adjust("1 minute");
         const endedAt = yield* DateTime.now;
         yield* ingestRoster([{ taskId: "cmd-1", kind: "command", status }]);
+        assert.deepEqual((yield* stored())?.pendingBackgroundTasks, [
+          { taskId: "cmd-1", kind: "command", status, startedAt, completedAt: endedAt },
+        ]);
+        yield* ingestRoster([]);
 
         assert.deepEqual((yield* stored())?.completedBackgroundTasks, [
           { taskId: "cmd-1", kind: "command", status, startedAt, completedAt: endedAt },
@@ -591,23 +595,23 @@ layer("ProviderEventIngestorV2", (it) => {
         { taskId: "cmd-1", kind: "command", description: "build", status: "failed" },
       ]);
       const owed = yield* stored();
-      assert.deepEqual(owed?.pendingBackgroundTasks, []);
-      assert.deepEqual(owed?.completedBackgroundTasks, [
-        {
-          taskId: "cmd-1",
-          kind: "command",
-          description: "build",
-          status: "failed",
-          startedAt: running?.startedAt,
-          completedAt: endedAt,
-        },
-      ]);
+      // Until then it still counts as owed work, so readers of the roster see it.
+      const filed = {
+        taskId: "cmd-1",
+        kind: "command",
+        description: "build",
+        status: "failed",
+        startedAt: running?.startedAt,
+        completedAt: endedAt,
+      } as const;
+      assert.deepEqual(owed?.pendingBackgroundTasks, [filed]);
+      assert.deepEqual(owed?.completedBackgroundTasks, []);
 
       // The wake consumes the copy and the roster drops it; the outcome stays filed.
       yield* ingestRoster([]);
       const consumed = yield* stored();
       assert.deepEqual(consumed?.pendingBackgroundTasks, []);
-      assert.deepEqual(consumed?.completedBackgroundTasks, owed?.completedBackgroundTasks);
+      assert.deepEqual(consumed?.completedBackgroundTasks, [filed]);
     }),
   );
 

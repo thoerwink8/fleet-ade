@@ -540,7 +540,7 @@ describe("mergeBackgroundTaskLedger", () => {
   });
 
   it.each([["completed" as const], ["failed" as const], ["cancelled" as const]])(
-    "files a %s entry with completedAt and drops it from the active roster",
+    "keeps a %s entry on the roster with completedAt, then files it once the roster drops it",
     (status) => {
       const first = mergeBackgroundTaskLedger({
         pending: [{ taskId: "cmd-1", kind: "command" }],
@@ -552,10 +552,23 @@ describe("mergeBackgroundTaskLedger", () => {
         priorCompleted: first.completedBackgroundTasks,
         occurredAt: ended,
       });
-      expect(second.pendingBackgroundTasks).toEqual([]);
-      expect(second.completedBackgroundTasks).toEqual([
-        { taskId: "cmd-1", kind: "command", status, startedAt: started, completedAt: ended },
-      ]);
+      const ended1 = {
+        taskId: "cmd-1",
+        kind: "command",
+        status,
+        startedAt: started,
+        completedAt: ended,
+      };
+      expect(second.pendingBackgroundTasks).toEqual([ended1]);
+      expect(second.completedBackgroundTasks).toEqual([]);
+      const third = mergeBackgroundTaskLedger({
+        pending: [],
+        priorPending: second.pendingBackgroundTasks,
+        priorCompleted: second.completedBackgroundTasks,
+        occurredAt: at("2026-11-21T10:06:00.000Z"),
+      });
+      expect(third.pendingBackgroundTasks).toEqual([]);
+      expect(third.completedBackgroundTasks).toEqual([ended1]);
     },
   );
 
@@ -564,11 +577,17 @@ describe("mergeBackgroundTaskLedger", () => {
       pending: [{ taskId: "cmd-1", kind: "command", status: "completed" }],
       occurredAt: ended,
     });
-    const second = mergeBackgroundTaskLedger({
+    const dropped = mergeBackgroundTaskLedger({
       pending: [],
-      priorPending: [],
+      priorPending: first.pendingBackgroundTasks,
       priorCompleted: first.completedBackgroundTasks,
       occurredAt: at("2026-11-21T10:06:00.000Z"),
+    });
+    const second = mergeBackgroundTaskLedger({
+      pending: [],
+      priorPending: dropped.pendingBackgroundTasks,
+      priorCompleted: dropped.completedBackgroundTasks,
+      occurredAt: at("2026-11-21T10:07:00.000Z"),
     });
     expect(second.completedBackgroundTasks).toEqual([
       {

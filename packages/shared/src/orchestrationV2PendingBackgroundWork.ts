@@ -152,10 +152,10 @@ function isTerminalBackgroundTaskStatus(status: PendingBackgroundWorkTask["statu
 // growing provider-thread payloads without bound.
 const COMPLETED_BACKGROUND_TASK_CAP = 64;
 
-// Terminal entries leave the active roster for `completedBackgroundTasks`; active entries keep
-// their first `startedAt`. Entries dropped without an outcome file as interrupted unless they
-// reappear, which a process restart can do. `occurredAt` is the event's time, so replaying the
-// event log reproduces the same ledger. The emission's own `completedBackgroundTasks` is ignored.
+// An ended entry stays in the roster, stamped with its outcome, until an emission drops it, then
+// files as completed; readers treat presence as owed work. Entries dropped without an outcome file
+// as interrupted unless they reappear. `occurredAt` is the event's time, so replay reproduces the
+// ledger. The emission's own `completedBackgroundTasks` is ignored.
 export function mergeBackgroundTaskLedger(input: {
   readonly pending: ReadonlyArray<PendingBackgroundWorkTask>;
   readonly priorPending?: ReadonlyArray<PendingBackgroundWorkTask> | undefined;
@@ -169,6 +169,7 @@ export function mergeBackgroundTaskLedger(input: {
     (input.priorPending ?? []).map((task) => [task.taskId, task]),
   );
   const filedByTaskId = new Map<string, PendingBackgroundWorkTask>();
+  const emittedEndedTaskIds = new Set<string>();
   const interruptedByTaskId = new Map<string, PendingBackgroundWorkTask>();
   for (const entry of input.priorCompleted ?? []) {
     if (entry.status === "interrupted") interruptedByTaskId.set(entry.taskId, entry);
@@ -179,10 +180,11 @@ export function mergeBackgroundTaskLedger(input: {
   for (const task of input.pending) {
     const prior = priorPendingByTaskId.get(task.taskId);
     if (isTerminalBackgroundTaskStatus(task.status)) {
-      filedByTaskId.set(task.taskId, {
+      emittedEndedTaskIds.add(task.taskId);
+      pendingBackgroundTasks.push({
         ...task,
         startedAt: task.startedAt ?? prior?.startedAt ?? input.occurredAt,
-        completedAt: task.completedAt ?? input.occurredAt,
+        completedAt: task.completedAt ?? prior?.completedAt ?? input.occurredAt,
       });
       continue;
     }
@@ -197,16 +199,17 @@ export function mergeBackgroundTaskLedger(input: {
   }
 
   for (const prior of input.priorPending ?? []) {
-    if (emittedActiveTaskIds.has(prior.taskId) || filedByTaskId.has(prior.taskId)) continue;
-    if (isTerminalBackgroundTaskStatus(prior.status)) continue;
-    filedByTaskId.set(prior.taskId, {
-      ...prior,
-      status: "interrupted",
-      completedAt: input.occurredAt,
-    });
+    if (emittedActiveTaskIds.has(prior.taskId) || emittedEndedTaskIds.has(prior.taskId)) continue;
+    filedByTaskId.set(
+      prior.taskId,
+      isTerminalBackgroundTaskStatus(prior.status)
+        ? { ...prior, completedAt: prior.completedAt ?? input.occurredAt }
+        : { ...prior, status: "interrupted", completedAt: input.occurredAt },
+    );
   }
 
   for (const entry of input.priorCompleted ?? []) {
+    if (emittedEndedTaskIds.has(entry.taskId)) continue;
     if (interruptedByTaskId.has(entry.taskId) && emittedActiveTaskIds.has(entry.taskId)) continue;
     if (!filedByTaskId.has(entry.taskId)) filedByTaskId.set(entry.taskId, entry);
   }

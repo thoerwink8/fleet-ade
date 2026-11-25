@@ -1125,8 +1125,9 @@ const PendingBackgroundTaskFields = {
   awaited: Schema.optional(Schema.Literal(true)),
   /**
    * Same values as the subagent status. Absent on entries written before the ledger was kept;
-   * those are active work. Terminal entries move to `completedBackgroundTasks` instead of
-   * staying here, so a status in this list is never one of its terminal values for long.
+   * those are active work. An ended entry keeps its place here, stamped with its outcome, until the
+   * roster drops it (the provider holds it until its wake consumes it); then it moves to
+   * `completedBackgroundTasks`.
    */
   status: ForwardCompatibleOptional(OrchestrationV2SubagentStatus),
   /** Written when the work starts and unchanged after. Absent on entries written before it was kept. */
@@ -1247,8 +1248,7 @@ export const OrchestrationV2ProviderThread = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   /**
-   * Roster entries whose work ended, newest first, bounded. Terminal entries never stay in
-   * `pendingBackgroundTasks`, so its readers keep treating presence there as live work.
+   * Roster entries whose work ended and left `pendingBackgroundTasks`, newest first, bounded.
    */
   completedBackgroundTasks: Schema.optional(
     Schema.Array(OrchestrationV2PendingBackgroundTask),
