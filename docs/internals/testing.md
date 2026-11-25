@@ -22,6 +22,7 @@ Rules for writing tests, and for asking for them in review. AGENTS.md carries th
 - Use the Node pinned in `engines`. Never record "main is already red" without a root cause; compare against the same file on `main` before blaming or excusing a change.
 - Server suites that assume POSIX paths are skipped on Windows. CI on Linux decides.
 - `pnpm check:changed` over a very large change can time out browser test files that pass alone. Rerun the red file by itself before judging it.
+- `docs-links` (in `pnpm check` and `check:changed`) fails when a link in `README.md`, `AGENTS.md`, `docs/`, or a `docs/` URL in client and package sources points at a missing file or heading. Renaming a heading goes red until its links follow.
 
 ## Waiting for work
 

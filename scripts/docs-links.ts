@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off
-// Checks that relative links in README.md and docs/**/*.md, plus repo docs links
+// Checks that relative links in README.md, AGENTS.md and docs/**/*.md, plus repo docs links
 // in apps/web/src and packages/*/src, point to existing files and headings.
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
@@ -467,8 +467,10 @@ function safeDecode(
 
 function collectMarkdownFiles(rootDir: string): string[] {
   const files: string[] = [];
-  const rootReadme = NodePath.join(rootDir, "README.md");
-  if (NodeFS.existsSync(rootReadme)) files.push(rootReadme);
+  for (const name of ["README.md", "AGENTS.md"]) {
+    const rootFile = NodePath.join(rootDir, name);
+    if (NodeFS.existsSync(rootFile)) files.push(rootFile);
+  }
   const docsFiles: string[] = [];
   walkFiles(NodePath.join(rootDir, "docs"), docsFiles);
   for (const file of docsFiles) {

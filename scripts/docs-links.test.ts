@@ -226,4 +226,33 @@ describe("docs-links", () => {
       NodeFS.rmSync(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it("turns red when a heading is renamed under a link in AGENTS.md", () => {
+    const tempRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-docs-links-"));
+    try {
+      NodeFS.mkdirSync(NodePath.join(tempRoot, "docs"));
+      NodeFS.writeFileSync(
+        NodePath.join(tempRoot, "AGENTS.md"),
+        "See [setup](docs/guide.md#first-setup).\n",
+        "utf8",
+      );
+      const guide = NodePath.join(tempRoot, "docs", "guide.md");
+      NodeFS.writeFileSync(guide, "# Guide\n\n## First setup\n", "utf8");
+      expect(scanDocsLinks(tempRoot)).toEqual([]);
+
+      NodeFS.writeFileSync(guide, "# Guide\n\n## Initial setup\n", "utf8");
+      expect(scanDocsLinks(tempRoot)).toEqual([
+        {
+          file: "AGENTS.md",
+          line: 1,
+          kind: "missing-anchor",
+          link: "docs/guide.md#first-setup",
+          target: "docs/guide.md",
+          anchor: "first-setup",
+        },
+      ]);
+    } finally {
+      NodeFS.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
