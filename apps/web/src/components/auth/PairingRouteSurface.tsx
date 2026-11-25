@@ -118,13 +118,12 @@ export function PairingRouteSurface({
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          <Button disabled={isSubmitting} size="sm" type="submit">
+          <Button disabled={isSubmitting} type="submit">
             {isSubmitting ? "正在配对…" : "继续"}
           </Button>
           <Button
             disabled={isSubmitting}
             onClick={() => window.location.reload()}
-            size="sm"
             variant="secondary"
           >
             重新加载应用
