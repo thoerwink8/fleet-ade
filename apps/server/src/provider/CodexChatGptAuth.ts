@@ -636,7 +636,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
           "sharing",
           previous && previous.clientId !== clientId
             ? "新账号没有启用 token 共享。现有的 ChatGPT 连接没有改变。"
-            : "已使用 ChatGPT 登录，但 token 共享处于关闭状态。请重新登录并启用 token 共享，或改用其他提供方。",
+            : "已使用 ChatGPT 登录，但 token 共享处于关闭状态。请重新登录并启用 token 共享，或改用其他智能体。",
         );
     }).pipe(
       Effect.onExit((result) =>

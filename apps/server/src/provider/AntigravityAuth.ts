@@ -37,11 +37,11 @@ const AUTH_TIMEOUT_MS = 300_000;
 const NO_RESPONSE_HINT_MS = 30_000;
 const STARTUP_HINT_MS = 90_000;
 const NOT_STARTED_MESSAGE =
-  "Antigravity 在 90 秒后仍未启动。它的运行时可能卡在这台机器的启动过程中。";
-const NOT_RESPONDING_MESSAGE = "Antigravity 没有响应。它的运行时可能无法在这台机器上运行。";
+  "Antigravity 在 90 秒后仍未启动。它的运行时可能卡在这台电脑的启动过程中。";
+const NOT_RESPONDING_MESSAGE = "Antigravity 没有响应。它的运行时可能无法在这台电脑上运行。";
 const NO_RESPONSE_MESSAGE =
-  "Antigravity 在 30 秒后仍未连上 Google。请检查此机器的网络连接，IPv6 故障是常见原因。";
-const UNREACHABLE_MESSAGE = "Antigravity 无法连接 Google。请检查此机器的网络连接后重新登录。";
+  "Antigravity 在 30 秒后仍未连上 Google。请检查此电脑的网络连接，IPv6 故障是常见原因。";
+const UNREACHABLE_MESSAGE = "Antigravity 无法连接 Google。请检查此电脑的网络连接后重新登录。";
 const FORWARDING_FAILED_MESSAGE = "无法发送登录响应。请重新登录。";
 const isSetupError = Schema.is(ProviderSetupError);
 const isAcpRequestError = Schema.is(AcpErrors.AcpRequestError);
@@ -129,7 +129,7 @@ function safeAuthFailure(cause: Cause.Cause<unknown>, usesBrowser: boolean): str
         return "Antigravity 已通过身份验证，但无法初始化会话或加载模型。";
       }
       if (!usesBrowser && error.value.code === -32602) {
-        return "Antigravity 拒绝了已配置的凭证。请检查提供方设置。";
+        return "Antigravity 拒绝了已配置的凭证。请检查智能体设置。";
       }
     }
   }
@@ -515,7 +515,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
               if (!initialized.agentCapabilities?.auth?.logout) {
                 return yield* setupError(
                   "logout",
-                  "此版本的 Antigravity 不支持退出登录。请更新该提供方。",
+                  "此版本的 Antigravity 不支持退出登录。请更新该智能体。",
                 );
               }
               yield* runtime.request("logout", {});

@@ -110,6 +110,7 @@ vi.mock("../state/threads", () => ({
     [
       "archive",
       "unarchive",
+      "batch",
       "delete",
       "settle",
       "unsettle",
@@ -201,7 +202,6 @@ vi.mock("./useSettings", () => ({
     select({
       sidebarThreadSortOrder: "createdAt",
       confirmThreadDelete: true,
-      confirmThreadUnpin: true,
     }),
 }));
 
@@ -323,7 +323,17 @@ describe("thread action permissions", () => {
     },
   );
 
-  it.each(["confirmAndDeleteThread", "confirmAndUnpinThread"] as const)(
+  it("batch archive without the grant sends nothing and shows no undo notice", async () => {
+    const outcome = await useThreadActions().archiveThreads([
+      { environmentId: secondary, id: target.threadId },
+    ]);
+    expect([...outcome.archivedKeys]).toEqual([]);
+    expect(outcome.failures).toEqual(["此连接无法修改会话。"]);
+    expect(state.requests).toEqual([]);
+    expect(state.toasts).toEqual([]);
+  });
+
+  it.each(["confirmAndDeleteThread"] as const)(
     "%s blocks a forbidden confirmation",
     async (action) => {
       await useThreadActions()[action](target);
@@ -332,7 +342,7 @@ describe("thread action permissions", () => {
     },
   );
 
-  it.each(["confirmAndDeleteThread", "confirmAndUnpinThread"] as const)(
+  it.each(["confirmAndDeleteThread"] as const)(
     "%s rechecks after the confirmation",
     async (action) => {
       state.scopes.get(secondary)!.add(AuthOrchestrationOperateScope);

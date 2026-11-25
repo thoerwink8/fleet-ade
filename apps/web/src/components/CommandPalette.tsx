@@ -420,8 +420,13 @@ function OpenCommandPaletteDialog(props: {
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
-  const { deleteThreads, markThreadsUnread, markCommanderThread, unmarkCommanderThread } =
-    useThreadActions();
+  const {
+    archiveThreads,
+    deleteThreads,
+    markThreadsUnread,
+    markCommanderThread,
+    unmarkCommanderThread,
+  } = useThreadActions();
   // Keyed by palette session: the intent and restored search only seed this
   // mount, and closing must not change what the closing palette shows.
   const [initialSearch] = useState(
@@ -1819,6 +1824,20 @@ function OpenCommandPaletteDialog(props: {
           stackedThreadToast({
             type: "error",
             title: "无法删除部分会话",
+            description: failures.join("\n"),
+          }),
+        );
+      }
+      useThreadSelectionStore.getState().clearSelection();
+      return;
+    }
+    if (operation === "archive") {
+      const { archivedKeys, failures } = await archiveThreads(selectedBatchThreads());
+      if (failures.length > 0) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: archivedKeys.size > 0 ? "无法归档部分会话" : "无法归档会话",
             description: failures.join("\n"),
           }),
         );

@@ -7,11 +7,9 @@ import {
   moveThreadContextDrag as moveThreadContextDragGhost,
 } from "./chat/threadContextDrag";
 import { discardComposerDraft } from "../lib/discardComposerDraft";
-import {
-  batchArchiveConfirmCopy,
-  batchDeleteConfirmCopy,
-  threadArchiveConfirmCopy,
-} from "../lib/threadConfirmCopy";
+import { batchDeleteConfirmCopy } from "../lib/threadConfirmCopy";
+import { showThreadUndoNotice } from "../hooks/showThreadUndoNotice";
+import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
@@ -979,7 +977,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const { isMobile, setOpenMobile } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
-  const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const {
@@ -989,7 +986,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     unsnoozeThread,
     pinThread,
     unpinThread,
-    confirmAndUnpinThread,
     markCommanderThread,
     unmarkCommanderThread,
     setThreadAutoSettle,
@@ -998,6 +994,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     reorderActiveThread,
     markThreadUnread,
     archiveThread,
+    archiveThreads,
     markThreadsUnread,
     deleteThreads,
     deleteThread,
@@ -1937,7 +1934,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   };
   const attemptUnpin = (threadRef: ScopedThreadRef) => {
     void (async () => {
-      const result = await confirmAndUnpinThread(threadRef);
+      const result = await unpinThread(threadRef);
       if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         toastManager.add(
@@ -2576,7 +2573,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         clearSelection();
         return;
       }
-      const finishBatch = async (operation: "archive" | "unarchive") => {
+      const finishBatch = async (operation: "unarchive") => {
         const { prunedKeys, failures } = await applyThreadBatch({
           threads: batchTargets,
           dispatch: (group) =>
@@ -2596,15 +2593,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         }
         removeFromSelection([...prunedKeys]);
       };
-      if (clicked.value === "archive" || clicked.value === "unarchive") {
-        if (clicked.value === "archive" && confirmThreadArchive) {
-          const copy = batchArchiveConfirmCopy(count);
-          const confirmed = await settlePromise(() =>
-            api.dialogs.confirm(copy.message, copy.options),
+      if (clicked.value === "archive") {
+        const { archivedKeys, prunedKeys, failures } = await archiveThreads(batchTargets);
+        if (failures.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: archivedKeys.size > 0 ? "无法归档部分会话" : "无法归档会话",
+              description: failures.join("\n"),
+            }),
           );
-          if (confirmed._tag === "Failure" || !confirmed.value) return;
         }
-        await finishBatch(clicked.value);
+        removeFromSelection([...prunedKeys]);
+        return;
+      }
+      if (clicked.value === "unarchive") {
+        await finishBatch("unarchive");
         return;
       }
       if (clicked.value !== "delete") return;
@@ -2905,27 +2909,28 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             const canUndo =
               serverConfigs.get(threadRef.environmentId)?.environment.capabilities
                 .threadVisitedTracking === true;
+            if (canUndo) {
+              const claim = ThreadUndo.begin("dismiss-attention", scopedThreadKey(threadRef));
+              showThreadUndoNotice({
+                action: "DismissedAttention",
+                title: thread.title,
+                claim,
+                undo: () => markThreadUnread(threadRef),
+                failureTitle: "无法撤销移出等你处理",
+              });
+              return;
+            }
             toastManager.add(
               stackedThreadToast({
                 type: "success",
                 title: "已移出等你处理",
-                description: canUndo
-                  ? "已把这条会话标记为看过，所有设备同步。撤销会把它标为未读，同样影响所有设备。"
-                  : "已把这条会话标记为看过，所有设备同步。",
-                ...(canUndo
-                  ? {
-                      actionProps: {
-                        children: "撤销",
-                        onClick: () => markThreadUnread(threadRef),
-                      },
-                    }
-                  : {}),
+                description: "已把这条会话标记为看过，所有设备同步。",
               }),
             );
             return;
           }
           case "mark-unread":
-            markThreadUnread(threadRef);
+            void markThreadUnread(threadRef);
             return;
           case "copy-path":
             if (!threadWorkspacePath) {
@@ -2952,13 +2957,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             copyThreadIdToClipboard(thread.id, { threadId: thread.id });
             return;
           case "archive": {
-            if (confirmThreadArchive) {
-              const copy = threadArchiveConfirmCopy(thread.title);
-              const confirmed = await settlePromise(() =>
-                api.dialogs.confirm(copy.message, copy.options),
-              );
-              if (confirmed._tag === "Failure" || !confirmed.value) return;
-            }
             let didArchive = false;
             const result = await archiveThread(threadRef, {
               onArchived: () => {

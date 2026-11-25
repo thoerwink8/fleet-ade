@@ -5,11 +5,16 @@ import {
   scopedThreadKey,
 } from "@t3tools/client-runtime/environment";
 import {
+  type AtomCommandResult,
   isAtomCommandInterrupted,
   settlePromise,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { canSnooze, threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
+import {
+  canSnooze,
+  effectiveSnoozed,
+  threadWokeAt,
+} from "@t3tools/client-runtime/state/thread-settled";
 import {
   threadRuntimeCanArchive,
   type EnvironmentThreadShell,
@@ -17,9 +22,9 @@ import {
 import {
   AuthOrchestrationOperateScope,
   AuthSourceControlWriteScope,
-  type ConfirmDialogOptions,
   EnvironmentAuthorizationError,
   EnvironmentId,
+  ProjectId,
   type ScopedThreadRef,
   ThreadId,
   sessionGrantsScope,
@@ -44,11 +49,7 @@ import { useNewThreadHandler } from "./useHandleNewThread";
 import { refreshArchivedThreadsForEnvironment } from "../lib/archivedThreadsState";
 import { releaseComposerDraftUploads } from "../lib/composerDraftUploads";
 import { announce } from "../lib/announce";
-import {
-  batchWorktreeDeleteConfirmCopy,
-  threadDeleteConfirmCopy,
-  threadUnpinConfirmCopy,
-} from "../lib/threadConfirmCopy";
+import { batchWorktreeDeleteConfirmCopy, threadDeleteConfirmCopy } from "../lib/threadConfirmCopy";
 import { readLocalApi } from "../localApi";
 import {
   readEnvironmentServerConfigLoaded,
@@ -68,7 +69,8 @@ import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { presentVersionControlError } from "../components/versionControlError.logic";
 import { useClientSettings } from "./useSettings";
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
-import { showThreadUndoNotice } from "./showThreadUndoNotice";
+import { showThreadUndoNotice, showThreadUndoNotices } from "./showThreadUndoNotice";
+import { useThreadSelectionStore } from "../threadSelectionStore";
 import { useAtomCommand } from "../state/use-atom-command";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
@@ -190,18 +192,27 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
   }
 }
 
-async function requestThreadUnpinConfirmation(input: {
-  enabled: boolean;
-  title: string;
-  confirm: ((message: string, options: ConfirmDialogOptions) => Promise<boolean>) | null;
-}) {
-  const { confirm } = input;
-  if (!input.enabled || confirm === null) {
-    return AsyncResult.success(true);
+export function selectNextThreadKeyAfterArchive(input: {
+  readonly orderedThreadKeys: readonly string[];
+  readonly currentThreadKey: string;
+  readonly removedThreadKeys?: ReadonlySet<string>;
+}): string | null {
+  const { orderedThreadKeys, currentThreadKey, removedThreadKeys } = input;
+  const isRemoved = (key: string) =>
+    key === currentThreadKey || removedThreadKeys?.has(key) === true;
+  const currentIndex = orderedThreadKeys.indexOf(currentThreadKey);
+  if (currentIndex === -1) {
+    return orderedThreadKeys.find((key) => !isRemoved(key)) ?? null;
   }
-
-  const copy = threadUnpinConfirmCopy(input.title);
-  return settlePromise(() => confirm(copy.message, copy.options));
+  for (let index = currentIndex + 1; index < orderedThreadKeys.length; index++) {
+    const key = orderedThreadKeys[index]!;
+    if (!isRemoved(key)) return key;
+  }
+  for (let index = currentIndex - 1; index >= 0; index--) {
+    const key = orderedThreadKeys[index]!;
+    if (!isRemoved(key)) return key;
+  }
+  return null;
 }
 
 export async function navigateAfterThreadDeletion(navigate: () => Promise<void>) {
@@ -223,16 +234,17 @@ function useMarkThreadUnread() {
     reportFailure: false,
   });
   const markThreadUnreadLocal = useUiStateStore((state) => state.markThreadUnread);
-  return (target: ScopedThreadRef) => {
+  return async (target: ScopedThreadRef): Promise<AtomCommandResult<unknown, unknown>> => {
+    ThreadUndo.invalidate("dismiss-attention", scopedThreadKey(target));
     if (readEnvironmentServerConfigLoaded(target.environmentId)) {
-      void markThreadUnreadMutation({
+      return markThreadUnreadMutation({
         environmentId: target.environmentId,
         input: { threadId: target.threadId },
       });
-      return;
     }
     const thread = readThreadShell(target);
     markThreadUnreadLocal(scopedThreadKey(target), thread?.latestRun?.completedAt);
+    return AsyncResult.success(undefined);
   };
 }
 
@@ -252,7 +264,7 @@ export function useAcknowledgeThreadWoke() {
 }
 
 // These Undos restore a thread's place in the list, which archiving or deleting it ends.
-const LIST_PLACEMENT_UNDO_KINDS = ["settle", "snooze", "pin"];
+const LIST_PLACEMENT_UNDO_KINDS = ["settle", "snooze", "pin", "dismiss-attention"];
 
 function expireThreadUndos(target: ScopedThreadRef, kinds: readonly string[]) {
   for (const kind of kinds) ThreadUndo.invalidate(kind, scopedThreadKey(target));
@@ -360,7 +372,6 @@ export function useThreadActions() {
   });
   const sidebarThreadSortOrder = useClientSettings((settings) => settings.sidebarThreadSortOrder);
   const confirmThreadDelete = useClientSettings((settings) => settings.confirmThreadDelete);
-  const confirmThreadUnpin = useClientSettings((settings) => settings.confirmThreadUnpin);
   const clearComposerDraftForThread = useComposerDraftStore((store) => store.clearDraftThread);
   const clearProjectDraftThreadById = useComposerDraftStore(
     (store) => store.clearProjectDraftThreadById,
@@ -406,6 +417,31 @@ export function useThreadActions() {
     return result;
   };
 
+  const navigateAfterArchive = async (
+    nextThreadKey: string | null,
+    fallbackProject: {
+      readonly environmentId: EnvironmentId;
+      readonly projectId: ProjectId;
+    } | null,
+  ): Promise<void> => {
+    const nextThreadRef = nextThreadKey ? parseScopedThreadKey(nextThreadKey) : null;
+    const nextThread = nextThreadRef ? readThreadShell(nextThreadRef) : null;
+    if (nextThread !== null && nextThread.archivedAt == null) {
+      await router.navigate({
+        to: "/$environmentId/$threadId",
+        params: buildThreadRouteParams(scopeThreadRef(nextThread.environmentId, nextThread.id)),
+      });
+      return;
+    }
+    if (fallbackProject !== null) {
+      await handleNewThread(
+        scopeProjectRef(fallbackProject.environmentId, fallbackProject.projectId),
+      );
+      return;
+    }
+    await router.navigate({ to: "/" });
+  };
+
   const archiveThread = async (target: ScopedThreadRef, opts: { onArchived?: () => void } = {}) => {
     const resolved = resolveThreadTarget(target);
     if (!resolved) return AsyncResult.success(undefined);
@@ -423,10 +459,17 @@ export function useThreadActions() {
 
     const requestingRouteHref = router.state.location.href;
     const currentRouteThreadRef = getCurrentRouteThreadRef();
-    const shouldNavigateToDraft =
+    const threadKey = scopedThreadKey(threadRef);
+    const shouldNavigateAfterArchive =
       currentRouteThreadRef?.threadId === threadRef.threadId &&
       currentRouteThreadRef.environmentId === threadRef.environmentId;
-    const action = ThreadUndo.begin("archive", scopedThreadKey(threadRef));
+    const nextThreadKey = shouldNavigateAfterArchive
+      ? selectNextThreadKeyAfterArchive({
+          orderedThreadKeys: useThreadSelectionStore.getState().visibleThreadKeys,
+          currentThreadKey: threadKey,
+        })
+      : null;
+    const action = ThreadUndo.begin("archive", threadKey);
     const archiveResult = await archiveThreadMutation({
       environmentId: threadRef.environmentId,
       input: { threadId: threadRef.threadId },
@@ -438,20 +481,24 @@ export function useThreadActions() {
     expireThreadUndos(threadRef, LIST_PLACEMENT_UNDO_KINDS);
     const wokeAt = threadWokeAt(thread, { now: new Date().toISOString() });
     if (wokeAt !== null) {
-      markThreadVisited(scopedThreadKey(threadRef), wokeAt);
+      markThreadVisited(threadKey, wokeAt);
     }
     refreshArchivedThreadsForEnvironment(threadRef.environmentId);
     opts.onArchived?.();
     showThreadUndoNotice({
       action: "Archived",
+      title: thread.title,
       claim: action,
-      undo: () => unarchiveThread(threadRef, { navigate: shouldNavigateToDraft }),
+      undo: () => unarchiveThread(threadRef, { navigate: shouldNavigateAfterArchive }),
       failureTitle: "无法撤销归档",
     });
 
-    if (shouldNavigateToDraft && router.state.location.href === requestingRouteHref) {
+    if (shouldNavigateAfterArchive && router.state.location.href === requestingRouteHref) {
       const navigationResult = await settlePromise(() =>
-        handleNewThread(scopeProjectRef(thread.environmentId, thread.projectId)),
+        navigateAfterArchive(nextThreadKey, {
+          environmentId: thread.environmentId,
+          projectId: thread.projectId,
+        }),
       );
       if (navigationResult._tag === "Failure") {
         return navigationResult;
@@ -460,6 +507,187 @@ export function useThreadActions() {
     }
 
     return archiveResult;
+  };
+
+  /** Batch archive across environments with a single unified Undo notice for succeeded items. */
+  const archiveThreads = async (
+    targets: ReadonlyArray<{
+      readonly environmentId: EnvironmentId;
+      readonly id: ThreadId;
+      readonly title?: string;
+    }>,
+  ): Promise<{
+    readonly archivedKeys: ReadonlySet<string>;
+    readonly prunedKeys: ReadonlySet<string>;
+    readonly failures: readonly string[];
+  }> => {
+    const archivedKeys = new Set<string>();
+    const prunedKeys = new Set<string>();
+    const failures: string[] = [];
+    if (targets.length === 0) {
+      return { archivedKeys, prunedKeys, failures };
+    }
+
+    const requestingRouteHref = router.state.location.href;
+    const currentRouteThreadRef = getCurrentRouteThreadRef();
+    const currentRouteThreadKey = currentRouteThreadRef
+      ? scopedThreadKey(currentRouteThreadRef)
+      : null;
+    const orderedThreadKeysSnapshot = useThreadSelectionStore.getState().visibleThreadKeys;
+    const nowIso = new Date().toISOString();
+
+    type ArchiveCandidate = {
+      readonly threadRef: ScopedThreadRef;
+      readonly key: string;
+      readonly title: string;
+      readonly projectId: ProjectId | null;
+      readonly wokeAt: string | null;
+      readonly claim: ReturnType<typeof ThreadUndo.begin>;
+    };
+
+    const candidatesByKey = new Map<string, ArchiveCandidate>();
+    const groups = new Map<EnvironmentId, ArchiveCandidate[]>();
+    for (const target of targets) {
+      const threadRef = scopeThreadRef(target.environmentId, target.id);
+      const key = scopedThreadKey(threadRef);
+      if (candidatesByKey.has(key)) continue;
+      const shell = readThreadShell(threadRef);
+      const candidate: ArchiveCandidate = {
+        threadRef,
+        key,
+        title: shell?.title ?? target.title ?? target.id,
+        projectId: shell?.projectId ?? null,
+        wokeAt: shell ? threadWokeAt(shell, { now: nowIso }) : null,
+        claim: ThreadUndo.begin("archive", key),
+      };
+      candidatesByKey.set(key, candidate);
+      const group = groups.get(target.environmentId);
+      if (group) group.push(candidate);
+      else groups.set(target.environmentId, [candidate]);
+    }
+
+    const succeededEntries: ArchiveCandidate[] = [];
+    const affectedEnvironments = new Set<EnvironmentId>();
+    let interrupted = false;
+
+    for (const [environmentId, entries] of groups) {
+      if (interrupted) {
+        for (const entry of entries) entry.claim.finish();
+        continue;
+      }
+      const permissionFailure = threadOperationFailure(entries[0]!.threadRef);
+      if (permissionFailure) {
+        for (const entry of entries) entry.claim.finish();
+        const error = squashAtomCommandFailure(permissionFailure);
+        failures.push(error instanceof Error ? error.message : "发生错误。");
+        continue;
+      }
+      const result = await batchThreadsMutation({
+        environmentId,
+        input: {
+          operation: "archive",
+          threadIds: entries.map((entry) => entry.threadRef.threadId),
+        },
+      });
+      if (result._tag === "Failure") {
+        for (const entry of entries) entry.claim.finish();
+        if (isAtomCommandInterrupted(result)) {
+          interrupted = true;
+          continue;
+        }
+        const error = squashAtomCommandFailure(result);
+        failures.push(error instanceof Error ? error.message : "请求失败");
+        continue;
+      }
+      const entryByThreadId = new Map(
+        entries.map((entry) => [entry.threadRef.threadId, entry] as const),
+      );
+      const handled = new Set<ThreadId>();
+      for (const item of result.value.batch?.items ?? []) {
+        const entry = entryByThreadId.get(item.threadId);
+        if (!entry) continue;
+        handled.add(item.threadId);
+        if (item.status === "applied") {
+          archivedKeys.add(entry.key);
+          prunedKeys.add(entry.key);
+          succeededEntries.push(entry);
+          affectedEnvironments.add(environmentId);
+          continue;
+        }
+        entry.claim.finish();
+        if (
+          item.status === "deleted" ||
+          item.status === "not_found" ||
+          item.status === "already_target"
+        ) {
+          prunedKeys.add(entry.key);
+        } else if (item.status === "running") {
+          failures.push(`${entry.title} 正在运行，未归档`);
+        } else if (item.status === "rejected") {
+          failures.push(`${entry.title} 未归档`);
+        }
+      }
+      for (const entry of entries) {
+        if (!handled.has(entry.threadRef.threadId)) entry.claim.finish();
+      }
+    }
+
+    if (succeededEntries.length > 0) {
+      for (const entry of succeededEntries) {
+        expireThreadUndos(entry.threadRef, LIST_PLACEMENT_UNDO_KINDS);
+        if (entry.wokeAt !== null) {
+          markThreadVisited(entry.key, entry.wokeAt);
+        }
+      }
+      for (const environmentId of affectedEnvironments) {
+        refreshArchivedThreadsForEnvironment(environmentId);
+      }
+      const archivedCurrentRoute =
+        currentRouteThreadKey !== null && archivedKeys.has(currentRouteThreadKey);
+      showThreadUndoNotices(
+        succeededEntries.map((entry) => ({
+          action: "Archived",
+          title: entry.title,
+          claim: entry.claim,
+          undo: () =>
+            unarchiveThread(entry.threadRef, {
+              navigate: archivedCurrentRoute && entry.key === currentRouteThreadKey,
+            }),
+          failureTitle: "无法撤销归档",
+        })),
+      );
+      if (archivedCurrentRoute && router.state.location.href === requestingRouteHref) {
+        const nextThreadKey = selectNextThreadKeyAfterArchive({
+          orderedThreadKeys: orderedThreadKeysSnapshot,
+          currentThreadKey: currentRouteThreadKey,
+          removedThreadKeys: archivedKeys,
+        });
+        const currentEntry = candidatesByKey.get(currentRouteThreadKey);
+        const navigationResult = await settlePromise(() =>
+          navigateAfterArchive(
+            nextThreadKey,
+            currentEntry?.projectId !== null && currentEntry !== undefined
+              ? {
+                  environmentId: currentEntry.threadRef.environmentId,
+                  projectId: currentEntry.projectId,
+                }
+              : null,
+          ),
+        );
+        if (navigationResult._tag === "Failure" && !isAtomCommandInterrupted(navigationResult)) {
+          const error = squashAtomCommandFailure(navigationResult);
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "会话已归档，但无法跳转页面",
+              description: error instanceof Error ? error.message : "发生错误。",
+            }),
+          );
+        }
+      }
+    }
+
+    return { archivedKeys, prunedKeys, failures };
   };
 
   const deleteThread = async (
@@ -1115,6 +1343,7 @@ export function useThreadActions() {
     if (result._tag === "Success" && action.isCurrent()) {
       showThreadUndoNotice({
         action: "Unpinned",
+        title: thread?.title,
         claim: action,
         undo: () => runUndoPlan(target, undoPlan),
         failureTitle: "无法撤销取消置顶",
@@ -1197,30 +1426,12 @@ export function useThreadActions() {
     }
     showThreadUndoNotice({
       action: "Settled",
+      title: resolved?.thread.title,
       claim: action,
       undo: () => runUndoPlan(target, undoPlan),
       failureTitle: "无法撤销标为完成",
     });
     return result;
-  };
-
-  const confirmAndUnpinThread = async (target: ScopedThreadRef) => {
-    const permissionFailure = threadOperationFailure(target);
-    if (permissionFailure) return permissionFailure;
-    const localApi = readLocalApi();
-    const resolved = resolveThreadTarget(target);
-    const confirmationResult = await requestThreadUnpinConfirmation({
-      enabled: confirmThreadUnpin,
-      title: resolved?.thread.title ?? "这个会话",
-      confirm: localApi ? (message, options) => localApi.dialogs.confirm(message, options) : null,
-    });
-    if (confirmationResult._tag === "Failure") {
-      return confirmationResult;
-    }
-    if (!confirmationResult.value) {
-      return AsyncResult.success(undefined);
-    }
-    return unpinThread(target);
   };
 
   const reorderPinnedThread = async (target: ScopedThreadRef, orderKey: string) => {
@@ -1289,7 +1500,8 @@ export function useThreadActions() {
     }
     const resolved = resolveThreadTarget(target);
     // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
-    if (resolved && !canSnooze(resolved.thread, { now: new Date().toISOString() })) {
+    const nowIso = new Date().toISOString();
+    if (resolved && !canSnooze(resolved.thread, { now: nowIso })) {
       return AsyncResult.failure(
         Cause.fail(
           new ThreadSnoozeBlockedError({
@@ -1299,6 +1511,10 @@ export function useThreadActions() {
         ),
       );
     }
+    const previousSnoozedUntil =
+      resolved && effectiveSnoozed(resolved.thread, { now: nowIso })
+        ? (resolved.thread.snoozedUntil ?? null)
+        : null;
     const action = ThreadUndo.begin("snooze", scopedThreadKey(target));
     const result = await snoozeThreadMutation({
       environmentId: target.environmentId,
@@ -1310,8 +1526,15 @@ export function useThreadActions() {
     }
     showThreadUndoNotice({
       action: "Snoozed",
+      title: resolved?.thread.title,
       claim: action,
-      undo: () => runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
+      undo: () =>
+        previousSnoozedUntil !== null && Date.parse(previousSnoozedUntil) > Date.now()
+          ? snoozeThreadMutation({
+              environmentId: target.environmentId,
+              input: { threadId: target.threadId, snoozedUntil: previousSnoozedUntil },
+            })
+          : runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
       failureTitle: "无法取消暂缓",
     });
     return result;
@@ -1354,6 +1577,7 @@ export function useThreadActions() {
     deleteThreads,
     markThreadsUnread,
     archiveThread,
+    archiveThreads,
     unarchiveThread,
     deleteThread,
     confirmAndDeleteThread,
@@ -1363,7 +1587,6 @@ export function useThreadActions() {
     unsnoozeThread,
     pinThread,
     unpinThread,
-    confirmAndUnpinThread,
     markCommanderThread,
     unmarkCommanderThread,
     reorderPinnedThread,

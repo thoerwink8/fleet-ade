@@ -864,7 +864,7 @@ const makePendingCodexProvider = Effect.fn("CodexProvider.makePendingCodexProvid
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "本次会话还没有检查过 Codex 提供方状态。",
+      message: "本次会话还没有检查过 Codex 智能体状态。",
     },
   });
 });

@@ -346,7 +346,7 @@ export const makeAntigravityUsageProbe = Effect.fn("makeAntigravityUsageProbe")(
         return makeUnavailableUsageLimits({
           checkedAt: DateTime.formatIso(yield* DateTime.now),
           reason: "probeFailed",
-          message: "读不到 Antigravity 用量。请刷新提供方状态后再试。",
+          message: "读不到 Antigravity 用量。请刷新智能体状态后再试。",
         });
       }),
     ),

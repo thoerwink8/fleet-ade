@@ -1,38 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  batchArchiveConfirmCopy,
   batchDeleteConfirmCopy,
   batchWorktreeDeleteConfirmCopy,
   sideChatDeleteConfirmCopy,
-  threadArchiveConfirmCopy,
   threadDeleteConfirmCopy,
-  threadUnpinConfirmCopy,
 } from "./threadConfirmCopy";
 
 describe("thread confirmation copy", () => {
   it.each([
-    {
-      name: "archive one",
-      copy: threadArchiveConfirmCopy("修复登录"),
-      title: "归档这个会话？",
-      confirmLabel: "归档",
-      destructive: false,
-    },
-    {
-      name: "archive many",
-      copy: batchArchiveConfirmCopy(3),
-      title: "归档 3 个会话？",
-      confirmLabel: "归档",
-      destructive: false,
-    },
-    {
-      name: "unpin",
-      copy: threadUnpinConfirmCopy("修复登录"),
-      title: "取消置顶这个会话？",
-      confirmLabel: "取消置顶",
-      destructive: false,
-    },
     {
       name: "delete one",
       copy: threadDeleteConfirmCopy("修复登录", null),

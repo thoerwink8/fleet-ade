@@ -913,7 +913,7 @@ export const makePendingClaudeProvider = Effect.fn("ClaudeProvider.makePendingCl
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "本次会话还没有检查过 Claude 提供方状态。",
+        message: "本次会话还没有检查过 Claude 智能体状态。",
       },
     });
   },

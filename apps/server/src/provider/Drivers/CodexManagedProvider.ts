@@ -90,7 +90,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         version: executable.value.version,
         models: [],
         message:
-          "已使用 ChatGPT 登录，但 token 共享处于关闭状态。请重新登录并启用 token 共享，或改用其他提供方。",
+          "已使用 ChatGPT 登录，但 token 共享处于关闭状态。请重新登录并启用 token 共享，或改用其他智能体。",
         auth: {
           status: "unauthenticated" as const,
           label: "ChatGPT",
@@ -203,7 +203,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
             ...(Option.isSome(current) && current.value.scopes.includes("chatgpt.tokens.use.direct")
               ? { usageLimits }
               : {}),
-            message: "现在无法检查 Codex。请重试，或在提供方设置中重新连接。",
+            message: "现在无法检查 Codex。请重试，或在智能体设置中重新连接。",
           })),
         ),
       ),
