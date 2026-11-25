@@ -212,7 +212,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>
           <div className="flex flex-col gap-2">
-            <div className="flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-row font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground max-md:h-10 max-md:bg-sidebar-control-surface max-md:px-3 max-md:ring-1 max-md:ring-sidebar-border">
+            <div className="flex h-8 items-center gap-2 rounded-md px-2 text-row font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground max-md:h-10 max-md:bg-sidebar-control-surface max-md:px-3 max-md:ring-1 max-md:ring-sidebar-border">
               <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
               {/* Native search inputs clear on Escape even during IME composition. */}
               <SidebarInput
