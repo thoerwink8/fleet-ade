@@ -299,9 +299,9 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "font-size",
-    title: "字号",
+    title: "阅读字号",
     to: "/settings/appearance",
-    searchTerms: ["typography font size text larger smaller code terminal composer reading"],
+    searchTerms: ["字号", "typography font size text larger smaller composer reading"],
   },
   {
     id: "word-wrap",

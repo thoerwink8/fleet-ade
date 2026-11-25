@@ -1,5 +1,5 @@
 import { DEFAULT_UNIFIED_SETTINGS, type FontScale } from "@t3tools/contracts/settings";
-import { FONT_SCALES } from "../../appearanceFonts";
+import { READING_FONT_SCALES } from "../../appearanceFonts";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
@@ -22,11 +22,11 @@ function FontScaleRow() {
   return (
     <SettingsRow
       {...searchableSetting("font-size")}
-      description="界面、输入框、会话正文、代码和终端一起放大或缩小。"
+      description="只调整会话正文、消息内代码和输入框字号，侧栏、菜单、弹窗、终端和文件预览保持基础字号。"
       resetAction={
         settings.fontScale !== DEFAULT_UNIFIED_SETTINGS.fontScale ? (
           <SettingResetButton
-            label="字号"
+            label="阅读字号"
             onClick={() => updateSettings({ fontScale: DEFAULT_UNIFIED_SETTINGS.fontScale })}
           />
         ) : null
@@ -39,13 +39,13 @@ function FontScaleRow() {
               if (isFontScale(value)) updateSettings({ fontScale: value });
             }}
           >
-            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="字号">
+            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="阅读字号">
               <SelectValue>{FONT_SCALE_LABELS[settings.fontScale]}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
               {(Object.keys(FONT_SCALE_LABELS) as FontScale[]).map((scale) => (
                 <SelectItem key={scale} value={scale}>
-                  {`${FONT_SCALE_LABELS[scale]}（正文 ${FONT_SCALES[scale].prose} px）`}
+                  {`${FONT_SCALE_LABELS[scale]}（正文 ${READING_FONT_SCALES[scale].prose} px）`}
                 </SelectItem>
               ))}
             </SelectPopup>
