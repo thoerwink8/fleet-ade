@@ -28,6 +28,7 @@ import {
   alternateComposerDispatchAction,
   resolveComposerDispatchMode,
 } from "@t3tools/client-runtime/state/composer-dispatch";
+import { stopButtonName, stopButtonTooltip, type StopPhase } from "./stopPhase.logic";
 
 interface PendingActionState {
   questionIndex: number;
@@ -97,8 +98,6 @@ const preventPointerFocus: PointerEventHandler<HTMLElement> = (event) => {
   event.preventDefault();
 };
 
-type StopPhase = "pending" | "timedOut" | "landed" | null;
-
 function useStopPhase(input: {
   runId: string | null;
   canInterrupt: boolean;
@@ -161,7 +160,7 @@ function StopGenerationButton({
               onStopRequested();
               onInterrupt();
             }}
-            aria-label={stopPhase === "pending" ? "正在停止" : "停止"}
+            aria-label={stopButtonName(stopPhase)}
           />
         }
       >
@@ -169,7 +168,7 @@ function StopGenerationButton({
           <rect x="2" y="2" width="8" height="8" rx="1.5" />
         </svg>
       </TooltipTrigger>
-      <TooltipPopup>{stopPhase === "pending" ? "正在停止…" : "停止"}</TooltipPopup>
+      <TooltipPopup>{stopButtonTooltip(stopPhase)}</TooltipPopup>
     </Tooltip>
   );
 }
