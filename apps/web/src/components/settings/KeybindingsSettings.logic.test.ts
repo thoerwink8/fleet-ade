@@ -15,6 +15,8 @@ import {
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
   shortcutToKeybindingInput,
+  keybindingDraftDisplay,
+  keybindingInputValue,
   unknownWhenVariables,
   whenAstToExpression,
 } from "./KeybindingsSettings.logic";
@@ -38,6 +40,23 @@ describe("KeybindingsSettings.logic", () => {
     expect(after.find((row) => row.command === "chat.new")?.id).not.toBe(
       before.find((row) => row.command === "chat.new")?.id,
     );
+  });
+
+  it.each([
+    ["mod+alt+j", "Win32", "Ctrl+Alt+J"],
+    ["mod+alt+j", "MacIntel", "⌥⌘J"],
+    ["ctrl+shift+space", "Linux", "Ctrl+Shift+Space"],
+    ["not+a+chord", "Win32", "not+a+chord"],
+  ])("shows %s as %s on %s", (value, platform, label) => {
+    expect(keybindingDraftDisplay(value, platform)).toBe(label);
+  });
+
+  it.each([
+    ["Ctrl+Alt+J", "ctrl+alt+j"],
+    ["mod+alt+j", "mod+alt+j"],
+    ["unfinished", "unfinished"],
+  ])("normalizes typed %s back to %s", (value, stored) => {
+    expect(keybindingInputValue(value)).toBe(stored);
   });
 
   it("shares a stable editor for resolved duplicates but separates commands, shortcuts, and conditions", () => {

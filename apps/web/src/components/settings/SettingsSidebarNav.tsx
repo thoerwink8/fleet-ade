@@ -39,6 +39,8 @@ import {
   type SettingsSearchItem,
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
+import { useEnvironments } from "../../state/environments";
+import { multiEnvironmentControlsVisible } from "./settingsScopeAxis";
 import { handleSettingsSectionKeyDown } from "./settingsSectionNavigation";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
 
@@ -90,6 +92,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const isSettingsIndex = isSettingsIndexPath(pathname);
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { environments } = useEnvironments();
+  const showConnections = multiEnvironmentControlsVisible(environments);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems();
@@ -323,6 +327,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                     <div role="group" aria-labelledby={`settings-nav-group-${index}`}>
                       <SidebarMenu>
                         {group.paths.map((to) => {
+                          if (to === "/settings/connections" && !showConnections) return null;
                           const Icon = SETTINGS_SECTION_ICONS[to];
                           const isActive = activePath === to || activePath.startsWith(`${to}/`);
                           return (

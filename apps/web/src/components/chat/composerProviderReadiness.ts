@@ -42,7 +42,7 @@ type ProviderReadinessSnapshot = Pick<
   ServerProvider,
   "instanceId" | "driver" | "displayName" | "enabled" | "installed" | "auth" | "models" | "status"
 > &
-  Partial<Pick<ServerProvider, "setup">>;
+  Partial<Pick<ServerProvider, "setup" | "message">>;
 
 function providerDisplayLabel(provider: Pick<ServerProvider, "displayName" | "driver">): string {
   const custom = provider.displayName?.trim();
@@ -83,6 +83,18 @@ export function evaluateProviderInstanceReadiness(
       agentName,
       instanceId: provider.instanceId,
       reason: `${agentName} 已停用，无法发送消息。`,
+      primaryActionLabel: "打开智能体设置",
+      primaryActionMode: "setup",
+      supportsInAppSetup: inAppSetup,
+    };
+  }
+  if (!provider.installed && provider.driver === "claudeAgent") {
+    // Claude starts through reclaude, so the server's own guidance is the honest text.
+    return {
+      kind: "not_installed",
+      agentName,
+      instanceId: provider.instanceId,
+      reason: provider.message?.trim() || `${agentName} 还没准备好，无法发送消息。`,
       primaryActionLabel: "打开智能体设置",
       primaryActionMode: "setup",
       supportsInAppSetup: inAppSetup,

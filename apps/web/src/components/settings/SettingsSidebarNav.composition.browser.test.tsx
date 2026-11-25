@@ -18,6 +18,24 @@ import { SettingsShell } from "./SettingsShell";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
 import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
+vi.mock(import("../../connection/catalog"), async (original) => {
+  const actual = await original();
+  const { Atom } = await import("effect/reactivity");
+  return {
+    ...actual,
+    environmentCatalog: {
+      ...actual.environmentCatalog,
+      catalogValueAtom: Atom.make({
+        isReady: true,
+        entries: new Map([
+          ["local", { target: { _tag: "DirectConnectionTarget" } }],
+          ["remote", { target: { _tag: "DirectConnectionTarget" } }],
+        ]),
+      }) as never,
+    },
+  };
+});
+
 vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
     { id: "theme", title: "主题", to: "/settings/appearance" },
