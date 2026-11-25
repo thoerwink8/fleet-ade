@@ -2,11 +2,14 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as Layer from "effect/Layer";
 import { assert, it } from "@effect/vitest";
 import { ProviderInstanceId, ProviderSetupError, type ProviderAuthState } from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
+import * as Fiber from "effect/Fiber";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
 
 import { makeClaudeAuth } from "./ClaudeAuth.ts";
@@ -25,6 +28,7 @@ const makeHarness = Effect.fn("makeClaudeAuthHarness")(function* (
   const written: string[] = [];
   const changes: boolean[] = [];
   let killed = 0;
+  let ptyBroken = false;
   let emit: (data: string) => void = () => {};
   let exit: (exitCode: number) => void = () => {};
   const spawnedProcess = yield* Deferred.make<void>();
@@ -35,8 +39,13 @@ const makeHarness = Effect.fn("makeClaudeAuthHarness")(function* (
         Deferred.doneUnsafe(spawnedProcess, Effect.void);
         return {
           pid: 1,
-          write: (data: string) => void written.push(data),
-          resize: () => {},
+          write: (data: string) => {
+            if (ptyBroken) throw new Error("pty is gone");
+            written.push(data);
+          },
+          resize: () => {
+            if (ptyBroken) throw new Error("pty is gone");
+          },
           kill: () => void (killed += 1),
           onData: (callback: (data: string) => void) => {
             emit = callback;
@@ -71,6 +80,8 @@ const makeHarness = Effect.fn("makeClaudeAuthHarness")(function* (
     spawnedProcess,
     emit: (data: string) => emit(data),
     exit: (code: number) => exit(code),
+    // The pty rejects writes and resizes; the exit event may still be on its way.
+    breakPty: () => void (ptyBroken = true),
   };
 });
 
@@ -163,6 +174,53 @@ it.layer(NodeCrypto.layer)("ClaudeAuth", (it) => {
       assert.deepEqual(harness.written, []);
       const failed = yield* phase(harness, "failed");
       assert.equal(failed.message, "Claude 登录命令没有成功结束。");
+    }),
+  );
+
+  it.effect("does not fail terminal input that hits a dead pty before its exit event arrives", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness();
+      const state = yield* harness.auth.start(owner);
+      yield* Deferred.await(harness.spawnedProcess);
+      yield* phase(harness, "waiting");
+      harness.breakPty();
+      // The terminal's own startup traffic (resize, replies) lands in this window.
+      const sent = yield* harness.auth.respond!(owner, {
+        instanceId,
+        flowId: state.flowId!,
+        interactionId: "terminal",
+        response: { type: "terminal", data: "", size: { cols: 80, rows: 24 } },
+      }).pipe(Effect.exit, Effect.forkChild);
+      yield* TestClock.adjust("100 millis");
+      harness.exit(1);
+      const result = yield* Fiber.join(sent);
+      // Either accepted, or cut short because the flow finished; never a new error.
+      assert.isTrue(Exit.isSuccess(result) || Cause.hasInterruptsOnly(result.cause));
+      const failed = yield* phase(harness, "failed");
+      assert.equal(failed.message, "Claude 登录命令没有成功结束。");
+    }),
+  );
+
+  it.effect("still reports an unavailable terminal while the login process stays alive", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness();
+      const state = yield* harness.auth.start(owner);
+      yield* Deferred.await(harness.spawnedProcess);
+      yield* phase(harness, "waiting");
+      harness.breakPty();
+      const sent = yield* harness.auth.respond!(owner, {
+        instanceId,
+        flowId: state.flowId!,
+        interactionId: "terminal",
+        response: { type: "terminal", data: "x" },
+      }).pipe(Effect.exit, Effect.forkChild);
+      yield* TestClock.adjust("10 seconds");
+      const result = yield* Fiber.join(sent);
+      assert.isTrue(Exit.isFailure(result));
+      assert.include(
+        String(Exit.isFailure(result) ? result.cause : ""),
+        "Claude 登录终端已不可用。",
+      );
     }),
   );
 

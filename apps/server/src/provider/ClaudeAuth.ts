@@ -11,6 +11,9 @@ import * as Queue from "effect/Queue";
 import * as ProviderAuthFlow from "@t3tools/provider-core/server/providerAuthFlow";
 import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
 
+/** How long a failed pty write waits for the exit event that explains it. */
+const DEAD_PTY_EXIT_GRACE = "2 seconds";
+
 const AUTH_METHOD = {
   id: "claude",
   name: "Claude",
@@ -79,7 +82,19 @@ export const makeClaudeAuth = Effect.fn("makeClaudeAuth")(function* (options: {
                     if (response.data) process.write(response.data);
                   },
                   catch: () => failure("respond", "Claude 登录终端已不可用。"),
-                })
+                }).pipe(
+                  // A pty that rejects input has usually just lost its process, and the exit
+                  // event trails the write failure. The command's own result reports that;
+                  // only a pty that fails while the command stays alive is a broken terminal.
+                  Effect.catch((error) =>
+                    Deferred.await(exited).pipe(
+                      Effect.timeoutOption(DEAD_PTY_EXIT_GRACE),
+                      Effect.flatMap((exit) =>
+                        Option.isSome(exit) ? Effect.void : Effect.fail(error),
+                      ),
+                    ),
+                  ),
+                )
               : Effect.void,
         );
       yield* update();
