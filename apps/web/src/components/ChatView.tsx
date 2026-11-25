@@ -150,7 +150,7 @@ import {
 import { AsyncResult } from "effect/reactivity";
 import { isElectron } from "../env";
 import { useActiveThreadRef } from "../hooks/useActiveThreadRef";
-import { composerRequiresModifier } from "../composer-logic";
+import { collapseExpandedComposerCursor, composerRequiresModifier } from "../composer-logic";
 import {
   derivePhase,
   deriveActiveWorkStartedAt,
@@ -320,7 +320,12 @@ import {
   findAlternativeReadyProvider,
 } from "./chat/composerProviderReadiness";
 import { useRecheckProviderStatusOnReturn } from "./chat/useRecheckProviderStatusOnReturn";
-import { QueuedRunsControl, type QueuedRunsControlHandle } from "./chat/QueuedRunsControl";
+import {
+  QueuedRunsControl,
+  type QueuedRunsControlHandle,
+  type WithdrawQueuedRunRequest,
+} from "./chat/QueuedRunsControl";
+import { recoverWithdrawnQueuedRun } from "./chat/queuedRunWithdraw";
 import { useThreadLinkedPullRequest } from "./pullRequest/useThreadLinkedPullRequest";
 import { useProactivePanels } from "../hooks/useProactivePanels";
 import { useIncrementalTimelineEntries } from "../hooks/useIncrementalTimelineEntries";
@@ -3124,6 +3129,32 @@ export default function ChatView(props: ChatViewProps) {
       activeProviderStatus.compatibilityAdvisory.status === "unknown");
   const canResendEndedTurn =
     latestUserTurnMessageText !== null && providerSendBlockedReason === null;
+  const onQueuedRunWithdrawnStable = useStableCallback((request: WithdrawQueuedRunRequest) => {
+    if (!activeThread) return;
+    const routeKey = routeThreadKey;
+    const target = baseComposerDraftTarget;
+    void recoverWithdrawnQueuedRun({
+      environmentId: activeThread.environmentId,
+      threadId: activeThread.id,
+      threadDraftTarget: target,
+      isComposerOccupied: queuedRunEdit.editingRunId !== null || pendingUserInputs.length > 0,
+      request,
+      onRestoredToComposer: ({ prompt, images, files, terminalContexts }) => {
+        if (currentRouteThreadKeyRef.current === routeKey && queuedRunEdit.editingRunId === null) {
+          promptRef.current = prompt;
+          composerImagesRef.current = [...images];
+          composerFilesRef.current = [...files];
+          composerTerminalContextsRef.current = [...terminalContexts];
+          composerRef.current?.resetCursorState({
+            cursor: collapseExpandedComposerCursor(prompt, prompt.length),
+            prompt,
+            detectTrigger: true,
+          });
+        }
+      },
+      onRestoreStashEntry: (entryId) => composerRef.current?.restoreStashEntry(entryId),
+    });
+  });
   const queuedRunsControl =
     isServerThread && activeThread ? (
       <>
@@ -3145,6 +3176,7 @@ export default function ChatView(props: ChatViewProps) {
           sendBlockedReason={providerSendBlockedReason}
           onEditQueuedRun={queuedRunEdit.beginEdit}
           onCancelEdit={queuedRunEdit.cancelEdit}
+          onQueuedRunWithdrawn={onQueuedRunWithdrawnStable}
           timestampFormat={timestampFormat}
           onOpenThread={onOpenRelatedThreadStable}
         />
