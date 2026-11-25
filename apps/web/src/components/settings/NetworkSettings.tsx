@@ -65,9 +65,7 @@ export function NetworkSettingsPanel() {
   const [probing, setProbing] = useState(false);
   const seenLine = useRef(networkKey);
 
-  const save = (next: NetworkSettings) => {
-    updateSettings({ network: next });
-  };
+  const save = (next: NetworkSettings) => updateSettings({ network: next });
 
   const loadRoute = useEffectEvent(
     (id: NonNullable<typeof environmentId>, isStale: () => boolean) => {

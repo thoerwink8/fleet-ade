@@ -111,7 +111,7 @@ export function WorktreesDirectoryRow() {
       }
       control={
         <DraftInput
-          key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
+          key={`${scopeKey}:${mixed}`}
           aria-label="工作树位置"
           autoCapitalize="none"
           spellCheck={false}
