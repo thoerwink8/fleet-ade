@@ -16,7 +16,7 @@ function showAnchoredInputToast(
   anchoredToastManager.add({
     ...(options.type ? { type: options.type } : {}),
     data: { tooltipStyle: true },
-    positionerProps: { anchor: ref.current },
+    positionerProps: { anchor: ref.current, side: "inline-start" },
     timeout: options.timeout,
     title: options.title,
   });
