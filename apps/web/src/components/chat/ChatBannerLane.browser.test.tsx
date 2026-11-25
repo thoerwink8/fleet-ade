@@ -30,6 +30,7 @@ vi.mock("@effect/atom-react", () => ({ useAtomValue: () => true }));
 vi.mock("../../state/server", () => ({
   serverEnvironment: { refreshProviders: { permissionAtom: () => null } },
 }));
+vi.mock("../../state/environments", () => ({ useEnvironment: () => ({ label: "办公室电脑" }) }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.refresh }));
 
 useMode(modeRgb);

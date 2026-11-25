@@ -318,7 +318,7 @@ it.effect(
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 
-it.effect("cancels the login PTY and rejects further terminal input", () =>
+it.effect("cancels the login PTY and drops further terminal input without writing it", () =>
   Effect.gen(function* () {
     const h = yield* makeHarness(terminalMethod);
     const flow = yield* h.controller.start("owner");
@@ -334,8 +334,9 @@ it.effect("cancels the login PTY and rejects further terminal input", () =>
         interactionId: "terminal",
         response: { type: "terminal", data: "late\r" },
       }).pipe(Effect.result))._tag,
-      "Failure",
+      "Success",
     );
+    assert.deepEqual(h.written, []);
   }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 

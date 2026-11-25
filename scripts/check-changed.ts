@@ -369,11 +369,13 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   }
   // It reads files other than the ones beside it, so no changed file selects it.
   if (affected.includes("t3")) tests.add("apps/server/src/provider/AgentContextBudget.test.ts");
-  if (
-    shouldRunCssFontWeightTest(files) &&
-    (yield* fs.exists(inRoot("apps/web/src/cssFontWeight.test.ts")))
-  ) {
-    tests.add("apps/web/src/cssFontWeight.test.ts");
+  if (shouldRunCssFontWeightTest(files)) {
+    if (yield* fs.exists(inRoot("apps/web/src/cssFontWeight.test.ts"))) {
+      tests.add("apps/web/src/cssFontWeight.test.ts");
+    }
+    if (yield* fs.exists(inRoot("oxlint-plugin-t3code/rules/no-text-13px.test.ts"))) {
+      tests.add("oxlint-plugin-t3code/rules/no-text-13px.test.ts");
+    }
   }
   const { vitestTests, nodeTests } = splitTests(tests);
 

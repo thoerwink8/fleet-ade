@@ -13,7 +13,10 @@ import {
 import { useEnvironments } from "../state/environments";
 import { SettingsScopeNotice } from "../components/settings/SettingsScopeNotice";
 import { SETTINGS_DEVICE_ONLY_PATHS } from "../components/settings/SettingsScopeSentence";
-import { SettingsPageContainer } from "../components/settings/settingsLayout";
+import {
+  SettingsDisconnectedHold,
+  SettingsPageContainer,
+} from "../components/settings/settingsLayout";
 import {
   retainSettingsScope,
   validateSettingsRouteSearch,
@@ -105,14 +108,22 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         <p className="text-sm text-muted-foreground">{scope.message}</p>
       </SettingsPageContainer>
     );
-  if (scope.kind === "environment" && connectedEnvironments.length === 0) {
-    return (
-      <SettingsPageContainer>
-        <p className="text-sm text-muted-foreground">重新连接 {scope.label}，才能改它的设置。</p>
-      </SettingsPageContainer>
-    );
-  }
-  return children;
+  const disconnected = scope.kind === "environment" && connectedEnvironments.length === 0;
+  return (
+    <SettingsDisconnectedHold
+      notice={
+        disconnected ? (
+          <SettingsPageContainer>
+            <p className="text-sm text-muted-foreground">
+              重新连接 {scope.label}，才能改它的设置。
+            </p>
+          </SettingsPageContainer>
+        ) : null
+      }
+    >
+      {children}
+    </SettingsDisconnectedHold>
+  );
 }
 
 function isMobileSettingsViewport(): boolean {

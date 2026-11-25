@@ -56,7 +56,15 @@ import {
 import { AuthOrchestrationOperateScope, ProjectId, type ScopedThreadRef } from "@t3tools/contracts";
 import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
 
-import { CheckIcon, ChevronDownIcon, FolderIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  FolderIcon,
+  FolderPlusIcon,
+  PlusIcon,
+  SettingsIcon,
+  SquarePenIcon,
+} from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -179,6 +187,7 @@ import {
   shouldNavigateAfterThreadSnooze,
   shouldShowSidebarEmptyState,
   sidebarListItemId,
+  sidebarProjectScopeLabel,
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
   sortCommanderThreadsForSidebar,
@@ -1235,6 +1244,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? null
       : (projectScopeItems.find((item) => item.value === (projectScopeKeys[0] ?? "all")) ??
         projectScopeItems[0]!);
+  const projectScopeLabel = sidebarProjectScopeLabel({
+    selectedCount: projectScopeKeys.length,
+    oneLabel: projectScopeKeys.length === 1 ? selectedProjectScopeItem?.label : undefined,
+  });
   const filteredProjectScopeItems = filterSidebarProjectScopeItems({
     items: projectScopeItems,
     query: projectScopeMenuState.query,
@@ -2977,17 +2990,45 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       );
                     }}
                   </ComboboxList>
+                  <div className="flex flex-col gap-0.5 border-t border-border/70 p-1">
+                    {scopeGroups.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          dispatchProjectScopeMenu({ type: "open-changed", open: false });
+                          openNewThreadInPicker();
+                        }}
+                      >
+                        <SquarePenIcon className="size-4" />
+                        在以下位置新建会话…
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        dispatchProjectScopeMenu({ type: "open-changed", open: false });
+                        openAddProjectCommandPalette();
+                      }}
+                    >
+                      <FolderPlusIcon className="size-4" />
+                      添加项目
+                    </Button>
+                  </div>
                 </ComboboxPopup>
               </Combobox>
             }
-            projectScopeActive={scopedProjectGroups.length > 0}
+            projectScopeLabel={projectScopeLabel}
             projectScopeAnchorRef={projectScopeAnchorRef}
             onOpenProjectScope={() =>
               dispatchProjectScopeMenu({ type: "open-changed", open: true })
             }
-            onNewProject={openAddProjectCommandPalette}
             onNewThread={handleNewThreadClick}
-            onNewThreadIn={scopeGroups.length > 1 ? openNewThreadInPicker : undefined}
             newThreadDisabled={projects.length === 0}
             newThreadShortcutLabel={newThreadShortcutLabel}
             newThreadTooltipTitle={newThreadTooltipTitle}

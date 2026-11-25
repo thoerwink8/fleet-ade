@@ -5,7 +5,11 @@ import type {
   SidebarProjectGroupMember,
   SidebarProjectSnapshot,
 } from "../../sidebarProjectGrouping";
-import { resolveSettingsScope, validateSettingsScopeSearch } from "./settingsScope";
+import {
+  resolveSettingsScope,
+  settingsScopeKey,
+  validateSettingsScopeSearch,
+} from "./settingsScope";
 
 const laptopId = EnvironmentId.make("laptop");
 const serverId = EnvironmentId.make("server");
@@ -158,5 +162,16 @@ describe("settings scope resolution", () => {
       members: [],
       environmentIds: [],
     });
+  });
+});
+
+describe("settingsScopeKey", () => {
+  it("depends on the picked scope only, not on who is connected", () => {
+    expect(settingsScopeKey({ project: "fleet", machine: "laptop" })).toBe(
+      settingsScopeKey({ machine: "laptop", project: "fleet" }),
+    );
+    expect(settingsScopeKey({ project: "fleet" })).not.toBe(
+      settingsScopeKey({ project: "fleet", machine: "laptop" }),
+    );
   });
 });

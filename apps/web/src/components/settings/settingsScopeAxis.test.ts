@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {
+  multiEnvironmentControlsVisible,
   selectEnvironmentAxis,
   selectProjectAxis,
   settingsScopeCheckoutChoices,
@@ -47,6 +48,25 @@ describe("settings scope axes", () => {
 
     expect(settingsScopeCheckoutLabel(second, [first, second, other])).toBe("C:\\work\\two\\app");
     expect(settingsScopeCheckoutLabel(other, [first, second, other])).toBe("tools");
+  });
+
+  describe("multiEnvironmentControlsVisible", () => {
+    const target = (_tag: string, connectionId = "") =>
+      ({ entry: { target: { _tag, connectionId } } }) as never;
+    const primary = target("PrimaryConnectionTarget");
+    const desktopLocal = target("BearerConnectionTarget", "local:wsl");
+    const remote = target("BearerConnectionTarget", "remote:box");
+
+    it.each([
+      ["no computers", [], false],
+      ["only the primary computer", [primary], false],
+      ["only the desktop-local computer", [desktopLocal], false],
+      ["only a remote computer", [remote], true],
+      ["primary plus remote", [primary, remote], true],
+      ["two local computers", [primary, desktopLocal], true],
+    ])("%s", (_name, environments, visible) => {
+      expect(multiEnvironmentControlsVisible(environments as never)).toBe(visible);
+    });
   });
 
   it.each([

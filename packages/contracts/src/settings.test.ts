@@ -24,6 +24,7 @@ import {
   resolveProviderInstanceEnabled,
   ServerSettings,
   ServerSettingsPatch,
+  ServerSettingsError,
   withIdleCompaction,
 } from "./settings.ts";
 
@@ -44,6 +45,23 @@ const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const encodeServerSettingsPatch = Schema.encodeSync(ServerSettingsPatch);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 
+const serverSettingsErrorJson = Schema.toCodecJson(ServerSettingsError);
+const encodeServerSettingsError = Schema.encodeSync(serverSettingsErrorJson);
+const decodeServerSettingsError = Schema.decodeUnknownSync(serverSettingsErrorJson);
+const LegacyServerSettingsWriteFailureReason = Schema.Literals(["permission_denied"]);
+class LegacyServerSettingsError extends Schema.TaggedError<LegacyServerSettingsError>()(
+  "ServerSettingsError",
+  {
+    settingsPath: Schema.String,
+    operation: Schema.String,
+    providerInstanceId: Schema.optional(Schema.String),
+    environmentVariable: Schema.optional(Schema.String),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {}
+const decodeLegacyServerSettingsError = Schema.decodeSync(
+  Schema.fromJsonString(Schema.toCodecJson(LegacyServerSettingsError)),
+);
 describe("retired client settings", () => {
   it("decodes stored client settings that still name the old sidebar switches", () => {
     const decoded = decodeClientSettings({
@@ -156,6 +174,67 @@ describe("storage cleanup settings", () => {
     expect(() =>
       decodeServerSettingsPatch({ storageCleanup: { worktreeKeepWhen: "unknown" } }),
     ).toThrow();
+  });
+});
+
+describe("ServerSettingsError write failures", () => {
+  it("round-trips known reasons and keeps the path out of the message", () => {
+    for (const reason of ["permission_denied", "disk_full", "write_failed"] as const) {
+      const path = "/private/home/settings.json";
+      const decoded = decodeServerSettingsError(
+        encodeServerSettingsError(
+          new ServerSettingsError({
+            settingsPath: path,
+            operation: "write-file",
+            reason,
+            detail: `${path}: EACCES`,
+            cause: new Error("EACCES"),
+          }),
+        ),
+      );
+      expect(decoded.reason).toBe(reason);
+      expect(decoded.detail).toBe(`${path}: EACCES`);
+      expect(decoded.settingsPath).toBe(path);
+      expect(decoded.message).toBe(`Server settings write-file failed (${reason}).`);
+      expect(decoded.message).not.toContain(path);
+    }
+  });
+
+  it("decodes an unknown reason as absent and preserves the diagnostic detail", () => {
+    const decoded = decodeServerSettingsError({
+      _tag: "ServerSettingsError",
+      settingsPath: "/private/home/settings.json",
+      operation: "write-file",
+      reason: "added_by_a_newer_server",
+      detail: "/private/home/settings.json: EIO",
+    });
+    expect(decoded.reason).toBeUndefined();
+    expect(decoded.detail).toBe("/private/home/settings.json: EIO");
+    expect(decoded.message).toBe("Server settings write-file failed.");
+  });
+
+  it("lets a legacy client decode a newer write failure without its reason", () => {
+    const encoded = JSON.stringify(
+      encodeServerSettingsError(
+        new ServerSettingsError({
+          settingsPath: "/private/home/settings.json",
+          operation: "write-file",
+          reason:
+            LegacyServerSettingsWriteFailureReason.literals[0] === "permission_denied"
+              ? "disk_full"
+              : "permission_denied",
+          detail: "/private/home/settings.json: ENOSPC",
+        }),
+      ),
+    );
+    const decoded = decodeLegacyServerSettingsError(encoded);
+    expect(decoded).toMatchObject({
+      _tag: "ServerSettingsError",
+      operation: "write-file",
+      settingsPath: "/private/home/settings.json",
+    });
+    expect(decoded).not.toHaveProperty("reason");
+    expect(decoded).not.toHaveProperty("detail");
   });
 });
 

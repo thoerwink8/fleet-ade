@@ -2,6 +2,9 @@ import * as DateTime from "effect/DateTime";
 
 import { resolveDesktopPairingUrl } from "./pairingUrls";
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "@t3tools/shared/remote";
+import type { ConnectionTarget } from "@t3tools/client-runtime/connection";
+
+import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import {
   type ServerClientSessionRecord,
   type ServerPairingLinkRecord,
@@ -404,4 +407,95 @@ export function resolveAccessEnvironmentId(input: {
     (input.environments.find((environment) => environment.connected) ?? input.environments[0])
       ?.environmentId ?? null
   );
+}
+
+export interface PeerLinkHostSectionSource {
+  readonly environmentId: EnvironmentId;
+  readonly label: string;
+  readonly displayUrl: string | null;
+  readonly target: ConnectionTarget;
+}
+
+export interface PeerLinkHostSection {
+  readonly environmentId: EnvironmentId;
+  /** Null when this is the only section, so the title stays「关联电脑」. */
+  readonly environmentLabel: string | null;
+}
+
+const PEER_LINK_HOST_ROLE = {
+  primary: "本机",
+  "desktop-local": "WSL",
+  remote: "远程",
+  ssh: "远程",
+} as const;
+
+type PeerLinkHostRole = keyof typeof PEER_LINK_HOST_ROLE;
+
+interface QualifiedPeerLinkHost extends PeerLinkHostSectionSource {
+  readonly role: PeerLinkHostRole;
+  readonly address: string | null;
+}
+
+/** One section per environment id. Same names stay separate and gain 本机, 远程, WSL, or an address. */
+export function peerLinkHostSections(
+  hosts: ReadonlyArray<PeerLinkHostSectionSource>,
+): ReadonlyArray<PeerLinkHostSection> {
+  const unique: QualifiedPeerLinkHost[] = [];
+  const seen = new Set<EnvironmentId>();
+  for (const host of hosts) {
+    if (seen.has(host.environmentId)) continue;
+    seen.add(host.environmentId);
+    unique.push({
+      ...host,
+      role: peerLinkHostRole(host.target),
+      address: peerLinkHostAddress(host.displayUrl),
+    });
+  }
+  if (unique.length <= 1) {
+    return unique.map((host) => ({
+      environmentId: host.environmentId,
+      environmentLabel: null,
+    }));
+  }
+  return unique.map((host) => ({
+    environmentId: host.environmentId,
+    environmentLabel: peerLinkHostSectionLabel(host, unique),
+  }));
+}
+
+function peerLinkHostRole(target: ConnectionTarget): PeerLinkHostRole {
+  if (target._tag === "PrimaryConnectionTarget") return "primary";
+  if (target._tag === "SshConnectionTarget") return "ssh";
+  if (isDesktopLocalConnectionTarget(target)) return "desktop-local";
+  return "remote";
+}
+
+function peerLinkHostAddress(displayUrl: string | null): string | null {
+  if (displayUrl === null) return null;
+  const trimmed = displayUrl.trim();
+  if (trimmed.length === 0) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return trimmed;
+    return url.host;
+  } catch {
+    return trimmed;
+  }
+}
+
+function peerLinkHostSectionLabel(
+  host: QualifiedPeerLinkHost,
+  hosts: ReadonlyArray<QualifiedPeerLinkHost>,
+): string {
+  const sameName = hosts.filter((other) => other.label === host.label);
+  if (sameName.length === 1) return host.label;
+  const role = PEER_LINK_HOST_ROLE[host.role];
+  const sameRole = sameName.filter((other) => PEER_LINK_HOST_ROLE[other.role] === role);
+  if (sameRole.length === 1) return `${host.label}（${role}）`;
+  if (host.address !== null) {
+    const sameAddress = sameRole.filter((other) => other.address === host.address);
+    if (sameAddress.length === 1) return `${host.label}（${host.address}）`;
+    return `${host.label}（${host.address} · ${host.environmentId}）`;
+  }
+  return `${host.label}（${role} · ${host.environmentId}）`;
 }

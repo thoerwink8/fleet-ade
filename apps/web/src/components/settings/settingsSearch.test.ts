@@ -21,6 +21,7 @@ import {
   sourceControlHostSettingsSearchId,
   type SettingsSearchItem,
 } from "./settingsSearch";
+import { multiEnvironmentControlsVisible } from "./settingsScopeAxis";
 
 const desktop = vi.hoisted(() => ({ enabled: false }));
 vi.mock(import("~/env"), async (importOriginal) => ({
@@ -170,6 +171,7 @@ describe("searchSettings", () => {
       localEnvironmentDisabled: true,
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: false,
+      hasMultipleEnvironments: true,
     };
     const results = (hasPeerLinkHost: boolean) =>
       searchSettings(
@@ -184,6 +186,50 @@ describe("searchSettings", () => {
         targetId: "linked-environments",
       }),
     );
+  });
+
+  it("shows connection entries only once a second computer exists", () => {
+    const availability = {
+      hasEnvironment: true,
+      hasProviderSettingsEnvironment: true,
+      canManageLocalBackend: true,
+      localEnvironmentDisabled: false,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: false,
+      hasPeerLinkHost: true,
+      hasPrimaryEnvironment: true,
+    };
+    const ids = (hasMultipleEnvironments: boolean) =>
+      filterAvailableSettingsSearchItems({ ...availability, hasMultipleEnvironments }).map(
+        (item) => item.id,
+      );
+    const connectionIds = [
+      "connections-environment",
+      "linked-environments",
+      "remote-environments",
+      "load-balancing",
+      "pull-request-routing",
+    ];
+    expect(ids(false).filter((id) => connectionIds.includes(id))).toEqual([]);
+    expect(ids(true)).toEqual(expect.arrayContaining(connectionIds));
+  });
+
+  it("keeps connection entries visible for a single remote computer", () => {
+    const remoteOnly = [
+      { entry: { target: { _tag: "BearerConnectionTarget", connectionId: "remote:box" } } },
+    ];
+    const ids = filterAvailableSettingsSearchItems({
+      hasEnvironment: true,
+      hasProviderSettingsEnvironment: true,
+      canManageLocalBackend: false,
+      localEnvironmentDisabled: true,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: false,
+      hasPeerLinkHost: true,
+      hasPrimaryEnvironment: true,
+      hasMultipleEnvironments: multiEnvironmentControlsVisible(remoteOnly as never),
+    }).map((item) => item.id);
+    expect(ids).toEqual(expect.arrayContaining(["remote-environments", "load-balancing"]));
   });
 
   it("finds keybinding commands by label, command id, and default key", () => {
