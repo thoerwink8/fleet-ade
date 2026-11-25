@@ -369,13 +369,15 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     if (checkoutResult._tag === "Failure") {
       finishRestore();
       if (!isAtomCommandInterrupted(checkoutResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(checkoutResult),
+          "切换项目目录分支",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            ...presentVersionControlError(
-              squashAtomCommandFailure(checkoutResult),
-              "切换项目目录分支",
-            ),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

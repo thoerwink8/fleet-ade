@@ -511,7 +511,6 @@ export default function DiffPanel({
   const selectedPatchErrorPresentation = selectedPatchQuery.error
     ? presentVersionControlError(selectedPatchQuery.failure ?? selectedPatchQuery.error, "加载差异")
     : null;
-  const selectedPatchError = selectedPatchErrorPresentation?.description ?? null;
   const hasResolvedPatch = typeof selectedPatch === "string";
   const hasNoNetChanges =
     hasResolvedPatch &&
@@ -998,7 +997,13 @@ export default function DiffPanel({
                 </DropdownMenuRadioGroup>
                 {branchCommitsErrorPresentation ? (
                   <DropdownMenuItem disabled>
-                    {`${branchCommitsErrorPresentation.title}\n${branchCommitsErrorPresentation.description}`}
+                    <span className="flex flex-col">
+                      <span>{branchCommitsErrorPresentation.title}</span>
+                      {branchCommitsErrorPresentation.nextStep ? (
+                        <span>{branchCommitsErrorPresentation.nextStep}</span>
+                      ) : null}
+                      <span>{branchCommitsErrorPresentation.detail}</span>
+                    </span>
                   </DropdownMenuItem>
                 ) : !canReadFiles ? (
                   <DropdownMenuItem disabled>
@@ -1329,7 +1334,7 @@ export default function DiffPanel({
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
             {preview?.incomplete && (
               <p className="shrink-0 border-b border-border/70 bg-muted/40 px-3 py-1.5 text-2xs text-muted-foreground">
-                {selectedPatchError
+                {selectedPatchErrorPresentation
                   ? "正在显示已跟踪的改动。无法加载未跟踪的改动。刷新以重试。"
                   : "正在显示已跟踪的改动。正在检查未跟踪的文件…"}
               </p>
@@ -1348,13 +1353,18 @@ export default function DiffPanel({
                 {omittedToolCallFiles} 个。
               </p>
             )}
-            {selectedPatchError && !renderablePatch && (
+            {selectedPatchErrorPresentation && !renderablePatch && (
               <div className="px-3">
                 <p className="mb-1 text-2xs font-medium text-error/80">
-                  {selectedPatchErrorPresentation?.title}
+                  {selectedPatchErrorPresentation.title}
                 </p>
+                {selectedPatchErrorPresentation.nextStep ? (
+                  <p className="mb-1 text-2xs text-error/80">
+                    {selectedPatchErrorPresentation.nextStep}
+                  </p>
+                ) : null}
                 <p className="mb-2 whitespace-pre-wrap text-2xs text-error/80">
-                  {selectedPatchError}
+                  {selectedPatchErrorPresentation.detail}
                 </p>
               </div>
             )}

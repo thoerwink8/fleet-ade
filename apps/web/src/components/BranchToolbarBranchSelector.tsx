@@ -483,10 +483,15 @@ export function BranchToolbarBranchSelector({
       }
       setOptimisticBranch(previousBranch);
       if (!isAtomCommandInterrupted(checkoutResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(checkoutResult),
+          "切换分支",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            ...presentVersionControlError(squashAtomCommandFailure(checkoutResult), "切换分支"),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }
@@ -521,13 +526,15 @@ export function BranchToolbarBranchSelector({
       }
       setOptimisticBranch(previousBranch);
       if (!isAtomCommandInterrupted(createBranchResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(createBranchResult),
+          "创建并切换分支",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            ...presentVersionControlError(
-              squashAtomCommandFailure(createBranchResult),
-              "创建并切换分支",
-            ),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

@@ -185,7 +185,11 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   const submit = async () => {
     if (!project || !target || submitting) return;
     if (destinationPath.trim().length === 0) {
-      setError({ title: "无法开始克隆", description: "请选择另一台电脑上的文件夹。" });
+      setError({
+        title: "无法开始克隆",
+        detail: "请选择另一台电脑上的文件夹。",
+        description: "请选择另一台电脑上的文件夹。",
+      });
       return;
     }
     setSubmitting(true);
@@ -386,8 +390,9 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             {error ? (
               <div className="text-destructive-foreground text-sm">
                 <p className="font-medium">{error.title}</p>
-                {error.description.length > 0 ? (
-                  <p className="mt-0.5 whitespace-pre-wrap">{error.description}</p>
+                {error.nextStep ? <p className="mt-0.5">{error.nextStep}</p> : null}
+                {error.detail.length > 0 ? (
+                  <p className="mt-0.5 whitespace-pre-wrap">{error.detail}</p>
                 ) : null}
               </div>
             ) : null}

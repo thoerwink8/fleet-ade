@@ -874,8 +874,11 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
               >
                 <p className="text-meta font-medium">{publishError.title}</p>
+                {publishError.nextStep ? (
+                  <p className="mt-0.5 text-destructive/90">{publishError.nextStep}</p>
+                ) : null}
                 <p className="mt-0.5 whitespace-pre-wrap text-destructive/90">
-                  {publishError.description}
+                  {publishError.detail}
                 </p>
               </div>
             ) : null}
@@ -1090,9 +1093,6 @@ export default function GitActionsControl({
   const gitStatusErrorPresentation = gitStatusQueryError
     ? presentVersionControlError(gitStatusFailure ?? gitStatusQueryError, "读取 Git 状态")
     : null;
-  const gitStatusError = gitStatusErrorPresentation
-    ? `${gitStatusErrorPresentation.title}\n${gitStatusErrorPresentation.description}`
-    : null;
   const sourceControlPresentation = getSourceControlPresentation(gitStatus?.sourceControlProvider);
   const changeRequestTerminology = sourceControlPresentation.terminology;
   const SourceControlIcon = sourceControlPresentation.Icon;
@@ -1219,7 +1219,7 @@ export default function GitActionsControl({
   const quietEmptyDraft =
     (draftId !== undefined || activeServerThreadShell?.latestRun === null) &&
     gitActionProgress === null &&
-    !gitStatusError &&
+    !gitStatusErrorPresentation &&
     quickAction.disabled &&
     !changesTotals.insertions &&
     !changesTotals.deletions;
@@ -1317,7 +1317,9 @@ export default function GitActionsControl({
       }
 
       const error = squashAtomCommandFailure(result);
-      const presentation = presentVersionControlError(error, gitActionActionLabel(action));
+      const presentation = presentVersionControlError(error, gitActionActionLabel(action), {
+        composite: true,
+      });
       const errorToastTiming = resolveGitActionResultToastTiming("error");
       toastManager.add(
         stackedThreadToast({
@@ -1511,7 +1513,7 @@ export default function GitActionsControl({
     menuItems: gitActionMenuItems,
     canWriteSourceControl,
     canPublishRepository,
-    hasNotice: isDetachedHead || isCleanAndBehind || Boolean(gitStatusError),
+    hasNotice: isDetachedHead || isCleanAndBehind || Boolean(gitStatusErrorPresentation),
   });
 
   // A disabled menu cannot refresh on open, and terminal edits or commits publish no status.
@@ -1597,8 +1599,14 @@ export default function GitActionsControl({
       {isCleanAndBehind && (
         <p className="px-2 py-1.5 text-xs text-warning">落后于上游。请先拉取或变基。</p>
       )}
-      {gitStatusError && (
-        <p className="whitespace-pre-line px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>
+      {gitStatusErrorPresentation && (
+        <div className="space-y-0.5 px-2 py-1.5 text-xs text-destructive">
+          <p className="font-medium">{gitStatusErrorPresentation.title}</p>
+          {gitStatusErrorPresentation.nextStep ? (
+            <p>{gitStatusErrorPresentation.nextStep}</p>
+          ) : null}
+          <p>{gitStatusErrorPresentation.detail}</p>
+        </div>
       )}
     </>
   );
