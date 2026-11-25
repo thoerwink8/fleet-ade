@@ -13,7 +13,7 @@ import {
   US_SHIFTED_TO_UNSHIFTED_KEYS,
 } from "@t3tools/shared/keybindings";
 
-import { shortcutConflictKey, shortcutKeyFromEvent } from "../../keybindings";
+import { shortcutConflictKey, shortcutKeyFromEvent, formatShortcutLabel } from "../../keybindings";
 import { isMacPlatform } from "../../lib/utils";
 import { METRIC_OPTIONS, WINDOW_OPTIONS } from "../usage/usageShortcuts";
 
@@ -86,6 +86,15 @@ export function shortcutToKeybindingInput(shortcut: KeybindingShortcut): string 
   if (shortcut.shiftKey) parts.push("shift");
   parts.push(shortcut.key === " " ? "space" : shortcut.key === "escape" ? "esc" : shortcut.key);
   return parts.join("+");
+}
+export function keybindingInputValue(value: string): string {
+  const shortcut = parseKeybindingShortcut(value);
+  return shortcut ? shortcutToKeybindingInput(shortcut) : value;
+}
+export function keybindingDraftDisplay(value: string, platform = navigator.platform): string {
+  if (value.length === 0) return "";
+  const shortcut = parseKeybindingShortcut(value);
+  return shortcut ? formatShortcutLabel(shortcut, platform) : value;
 }
 
 export function whenAstToExpression(node: KeybindingWhenNode | undefined): string {

@@ -3,9 +3,13 @@ import {
   SourceControlRepositoryError,
   SourceControlSignInError,
   VcsError,
+  type GitCommandAction,
   type GitCommandFailureReason,
   type SourceControlSignInFailure,
+  type TextGenerationFailureReason,
   type VcsProcessExitFailureKind,
+  type VcsProcessSpawnFailureReason,
+  type VcsSnapshotFailure,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
@@ -46,13 +50,19 @@ const ACTION_NEXT_STEPS: Readonly<Record<string, string>> = {
   提交: "请确认已选择要提交的改动，且没有未解决的冲突，然后重试。",
 };
 
-const GIT_REASON_NEXT_STEPS: Partial<Record<GitCommandFailureReason, string>> = {
+const GIT_REASON_NEXT_STEPS: Record<GitCommandFailureReason, string> = {
   authentication_failed: "请检查托管平台的登录状态和访问权限，然后重试。",
+  author_identity_unknown: "请在 Git 里设置用户名和邮箱，然后重试。",
   branch_already_exists: "请换一个分支名称，或选择已有分支。",
   branch_checked_out_in_worktree: "请选择其他分支，或先移除已检出该分支的工作树。",
   config_locked: "请等正在修改 Git 配置的进程结束，然后重试。",
+  executable_not_found: "请安装 Git，并确认它在这台电脑上可以运行，然后重试。",
   host_key_unverified: "请先在终端连接此托管平台并确认主机密钥，然后重试。",
+  index_locked:
+    "请结束正在使用这个仓库的 Git 操作；确认没有操作后，可以删除仓库里的索引锁文件，然后重试。",
+  merge_conflict: "请打开差异，解决标出的冲突并完成提交，然后重试。",
   not_a_repository: "请选择 Git 仓库目录，或先初始化 Git。",
+  not_fast_forward: "请先拉取远端改动，再重新推送。",
   path_already_exists: "请选择其他目录，或移走同名文件后重试。",
   push_rejected_by_remote: "请根据详情中的拒绝原因处理，然后重试。",
   push_rejected_non_fast_forward: "请先拉取远端改动，再重新推送。",
@@ -60,6 +70,44 @@ const GIT_REASON_NEXT_STEPS: Partial<Record<GitCommandFailureReason, string>> = 
   ref_not_found: "请刷新分支列表，确认分支或标签仍然存在。",
   remote_unreachable: "请检查网络连接和远端仓库地址，然后重试。",
   tag_would_be_clobbered: "请先同步远端标签，或保留本地同名标签后重试。",
+  working_tree_dirty: "请先提交、暂存或放弃未提交的改动，然后重试。",
+};
+
+const COMMAND_ACTIONS: Record<GitCommandAction, string> = {
+  push: "推送",
+  pull: "拉取",
+  fetch: "获取远端改动",
+  commit: "提交",
+  switch_branch: "切换分支",
+  create_branch: "创建并切换分支",
+  delete_branch: "删除分支",
+  rename_branch: "重命名分支",
+  create_worktree: "创建工作树",
+  remove_worktree: "删除工作树",
+  checkout_pr: "检出 PR",
+  clone: "克隆仓库",
+  publish: "发布仓库",
+  init: "初始化 Git",
+  read_status: "读取 Git 状态",
+  read_diff: "加载差异",
+  list_branches: "加载分支",
+  cleanup: "清理 Git 状态",
+  checkpoint: "保存文件快照",
+  other: "完成版本控制操作",
+};
+
+const SPAWN_REASON_NEXT_STEPS: Record<VcsProcessSpawnFailureReason, string> = {
+  executable_not_found: GIT_REASON_NEXT_STEPS.executable_not_found,
+  permission_denied: "请允许这台电脑运行此版本控制工具，然后重试。",
+};
+
+const TEXT_REASON_NEXT_STEPS: Record<TextGenerationFailureReason, string> = {
+  not_installed: "请安装并设置用于生成文字的智能体，然后重试。",
+  unauthenticated: "请先登录用于生成文字的智能体，然后重试。",
+  rate_limited: "生成文字的用量暂时达到上限，请稍后再试。",
+  network: "请检查网络连接，然后重试。",
+  timeout: "生成文字超时，请重试。",
+  unavailable: "用于生成文字的智能体暂时不可用，请稍后再试。",
 };
 
 const VCS_FAILURE_NEXT_STEPS: Record<
@@ -165,11 +213,14 @@ export function describeVersionControlError(
   fallbackAction = "完成版本控制操作",
   options: VersionControlErrorOptions = {},
 ): VersionControlErrorPresentation {
+  const typedAction = "action" in error ? error.action : undefined;
   const operationName = "operation" in error ? operationAction(error.operation) : undefined;
   const action = options.composite
     ? fallbackAction
-    : (operationName ??
-      (error._tag === "GitPullRequestMaterializationError" ? "检出 PR" : fallbackAction));
+    : typedAction === undefined
+      ? (operationName ??
+        (error._tag === "GitPullRequestMaterializationError" ? "检出 PR" : fallbackAction))
+      : COMMAND_ACTIONS[typedAction];
   const base = { title: `无法${action}`, detail: detailOf(error) } as const;
 
   switch (error._tag) {
@@ -181,23 +232,50 @@ export function describeVersionControlError(
           actionNextStep(action),
       };
     case "TextGenerationError":
-      return { ...base, nextStep: "请检查智能体的登录状态和可用性，然后重试。" };
+      return {
+        ...base,
+        nextStep:
+          error.reason === undefined
+            ? "请检查智能体的登录状态和可用性，然后重试。"
+            : TEXT_REASON_NEXT_STEPS[error.reason],
+      };
     case "GitManagerError":
-      return { ...base, nextStep: actionNextStep(action) };
+      return {
+        ...base,
+        nextStep:
+          error.reason === "working_tree_dirty"
+            ? GIT_REASON_NEXT_STEPS.working_tree_dirty
+            : actionNextStep(action),
+      };
     case "GitPullRequestMaterializationError":
       return { ...base, nextStep: "请确认分支和工作树目录可用，然后重试。" };
     case "SourceControlProviderError":
-    case "SourceControlRepositoryError":
       return { ...base, nextStep: providerNextStep(action) };
+    case "SourceControlRepositoryError":
+      return {
+        ...base,
+        nextStep:
+          error.reason === "path_already_exists"
+            ? GIT_REASON_NEXT_STEPS.path_already_exists
+            : providerNextStep(action),
+      };
     case "VcsProcessSpawnError":
-      return { ...base, nextStep: "请确认版本控制工具已安装且可以运行，然后重试。" };
+      return {
+        ...base,
+        nextStep:
+          error.reason === undefined
+            ? "请确认版本控制工具已安装且可以运行，然后重试。"
+            : SPAWN_REASON_NEXT_STEPS[error.reason],
+      };
     case "VcsProcessExitError":
       return {
         ...base,
         nextStep:
-          error.failureKind === undefined || error.failureKind === "command-failed"
-            ? actionNextStep(action)
-            : VCS_FAILURE_NEXT_STEPS[error.failureKind],
+          error.reason === "index_locked"
+            ? GIT_REASON_NEXT_STEPS.index_locked
+            : error.failureKind === undefined || error.failureKind === "command-failed"
+              ? actionNextStep(action)
+              : VCS_FAILURE_NEXT_STEPS[error.failureKind],
       };
     case "VcsProcessTimeoutError":
       return {
@@ -243,4 +321,86 @@ export function presentVersionControlError(
   const detail =
     typeof error === "string" ? error : error instanceof Error ? error.message : "发生错误。";
   return { title: `无法${fallbackAction}`, detail, description: detail };
+}
+
+/** Snapshot reasons are free strings from the server, so only own keys count as known. */
+function knownStep(table: Readonly<Record<string, string>>, reason: string | undefined) {
+  return reason !== undefined && Object.hasOwn(table, reason) ? table[reason] : undefined;
+}
+
+function snapshotNextStep(failure: VcsSnapshotFailure, action: string): string {
+  switch (failure._tag) {
+    case "GitCommandError":
+      return knownStep(GIT_REASON_NEXT_STEPS, failure.reason) ?? actionNextStep(action);
+    case "GitManagerError":
+      return failure.reason === "working_tree_dirty"
+        ? GIT_REASON_NEXT_STEPS.working_tree_dirty
+        : actionNextStep(action);
+    case "TextGenerationError":
+      return (
+        knownStep(TEXT_REASON_NEXT_STEPS, failure.reason) ??
+        "请检查智能体的登录状态和可用性，然后重试。"
+      );
+    case "VcsProcessSpawnError":
+      return (
+        knownStep(SPAWN_REASON_NEXT_STEPS, failure.reason) ??
+        "请确认版本控制工具已安装且可以运行，然后重试。"
+      );
+    case "VcsProcessExitError":
+      return failure.reason === "index_locked"
+        ? GIT_REASON_NEXT_STEPS.index_locked
+        : actionNextStep(action);
+    case "SourceControlRepositoryError":
+      return failure.reason === "path_already_exists"
+        ? GIT_REASON_NEXT_STEPS.path_already_exists
+        : providerNextStep(action);
+    default:
+      return knownStep(GIT_REASON_NEXT_STEPS, failure.reason) ?? actionNextStep(action);
+  }
+}
+
+export function presentVcsSnapshotFailure(
+  failure: VcsSnapshotFailure,
+  fallbackAction: string,
+): VersionControlErrorToastPresentation {
+  const action = failure.action === undefined ? fallbackAction : COMMAND_ACTIONS[failure.action];
+  const presentation = {
+    title: `无法${action}`,
+    nextStep: snapshotNextStep(failure, action),
+    detail: failure.detail,
+  };
+  return {
+    ...presentation,
+    description: joinNextStepAndDetail(presentation.nextStep, presentation.detail),
+  };
+}
+
+export function projectCloneFailureDescription(
+  failure: VcsSnapshotFailure | undefined,
+  legacyError: string | null,
+): string {
+  return failure === undefined
+    ? (legacyError ?? "克隆失败。")
+    : presentVcsSnapshotFailure(failure, "克隆仓库").description;
+}
+
+export function worktreeSetupFailureDescription(
+  failure: VcsSnapshotFailure | undefined,
+  legacyError: string | null,
+): string | null {
+  return failure === undefined
+    ? legacyError
+    : presentVcsSnapshotFailure(failure, "准备工作树").description;
+}
+
+export function newProjectCommitWarningDescription(
+  failure: VcsSnapshotFailure | undefined,
+  legacyError: string | undefined,
+  workspaceRoot: string,
+): string {
+  const detail =
+    failure === undefined
+      ? (legacyError ?? "")
+      : presentVcsSnapshotFailure(failure, "提交").description;
+  return `${detail} 项目位于 ${workspaceRoot}。`;
 }

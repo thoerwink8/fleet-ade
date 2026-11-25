@@ -15,19 +15,26 @@ import {
   VcsProcessTimeoutError,
   VcsRepositoryDetectionError,
   VcsUnsupportedOperationError,
+  type GitCommandAction,
   type GitCommandFailureReason,
   type SourceControlProviderKind,
   type SourceControlSignInFailure,
+  type TextGenerationFailureReason,
   type VcsProcessExitFailureKind,
+  type VcsSnapshotFailure,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   describeVersionControlError,
   joinNextStepAndDetail,
+  newProjectCommitWarningDescription,
   operationAction,
   operationMethodName,
+  presentVcsSnapshotFailure,
   presentVersionControlError,
+  projectCloneFailureDescription,
+  worktreeSetupFailureDescription,
   type VersionControlError,
 } from "./versionControlError.logic";
 
@@ -265,6 +272,261 @@ describe("describeVersionControlError", () => {
     ["remote_unreachable", "请检查网络连接和远端仓库地址，然后重试。"],
     ["tag_would_be_clobbered", "请先同步远端标签，或保留本地同名标签后重试。"],
   ];
+
+  const newGitReasons: ReadonlyArray<readonly [GitCommandFailureReason, string]> = [
+    ["author_identity_unknown", "请在 Git 里设置用户名和邮箱，然后重试。"],
+    ["executable_not_found", "请安装 Git，并确认它在这台电脑上可以运行，然后重试。"],
+    [
+      "index_locked",
+      "请结束正在使用这个仓库的 Git 操作；确认没有操作后，可以删除仓库里的索引锁文件，然后重试。",
+    ],
+    ["merge_conflict", "请打开差异，解决标出的冲突并完成提交，然后重试。"],
+    ["not_fast_forward", "请先拉取远端改动，再重新推送。"],
+    ["working_tree_dirty", "请先提交、暂存或放弃未提交的改动，然后重试。"],
+  ];
+
+  it.each(newGitReasons)("gives the new Git reason %s its own next step", (reason, nextStep) => {
+    expect(describeVersionControlError(gitError("GitVcsDriver.commit", reason))).toEqual({
+      title: "无法提交",
+      nextStep,
+      detail: rawDetail,
+    });
+  });
+
+  const commandActions: ReadonlyArray<readonly [GitCommandAction, string]> = [
+    ["push", "推送"],
+    ["pull", "拉取"],
+    ["fetch", "获取远端改动"],
+    ["commit", "提交"],
+    ["switch_branch", "切换分支"],
+    ["create_branch", "创建并切换分支"],
+    ["delete_branch", "删除分支"],
+    ["rename_branch", "重命名分支"],
+    ["create_worktree", "创建工作树"],
+    ["remove_worktree", "删除工作树"],
+    ["checkout_pr", "检出 PR"],
+    ["clone", "克隆仓库"],
+    ["publish", "发布仓库"],
+    ["init", "初始化 Git"],
+    ["read_status", "读取 Git 状态"],
+    ["read_diff", "加载差异"],
+    ["list_branches", "加载分支"],
+    ["cleanup", "清理 Git 状态"],
+    ["checkpoint", "保存文件快照"],
+    ["other", "完成版本控制操作"],
+  ];
+
+  it.each(commandActions)("uses the typed action %s instead of the operation", (action, label) => {
+    const error = new GitCommandError({
+      ...processContext("GitVcsDriver.getReviewDiffPreview.commitStat"),
+      action,
+      detail: rawDetail,
+    });
+
+    expect(describeVersionControlError(error, "加载差异").title).toBe(`无法${label}`);
+  });
+
+  it("keeps deriving the action from the operation when an older server sends none", () => {
+    expect(describeVersionControlError(gitError("GitVcsDriver.pushCurrentBranch")).title).toBe(
+      "无法推送",
+    );
+  });
+
+  it("names a missing Git executable when the process cannot start", () => {
+    const error = new VcsProcessSpawnError({
+      ...processContext("GitVcsDriver.commit"),
+      reason: "executable_not_found",
+      cause: new Error("spawn git ENOENT"),
+    });
+
+    expect(describeVersionControlError(error)).toEqual({
+      title: "无法提交",
+      nextStep: "请安装 Git，并确认它在这台电脑上可以运行，然后重试。",
+      detail: error.message,
+    });
+  });
+
+  it("explains a denied executable separately from a missing one", () => {
+    const error = new VcsProcessSpawnError({
+      ...processContext("GitVcsDriver.commit"),
+      reason: "permission_denied",
+      cause: new Error("spawn git EACCES"),
+    });
+
+    expect(describeVersionControlError(error).nextStep).toBe(
+      "请允许这台电脑运行此版本控制工具，然后重试。",
+    );
+  });
+
+  it("keeps the generic startup guidance when an older server sends no spawn reason", () => {
+    const error = new VcsProcessSpawnError({
+      ...processContext("GitVcsDriver.commit"),
+      cause: new Error("spawn git ENOENT"),
+    });
+
+    expect(describeVersionControlError(error).nextStep).toBe(
+      "请确认版本控制工具已安装且可以运行，然后重试。",
+    );
+  });
+
+  it("tells the user how to clear an index lock reported by a VCS process", () => {
+    const error = new VcsProcessExitError({
+      ...processContext("GitVcsDriver.commit"),
+      exitCode: 1,
+      detail: rawDetail,
+      failureKind: "command-failed",
+      reason: "index_locked",
+    });
+
+    expect(describeVersionControlError(error).nextStep).toBe(
+      "请结束正在使用这个仓库的 Git 操作；确认没有操作后，可以删除仓库里的索引锁文件，然后重试。",
+    );
+  });
+
+  it("asks the user to commit or set aside changes before a dirty-tree operation", () => {
+    const error = new GitManagerError({
+      operation: "runStackedAction",
+      cwd: "/repo",
+      reason: "working_tree_dirty",
+      detail: rawDetail,
+    });
+
+    expect(describeVersionControlError(error, "提交")).toEqual({
+      title: "无法提交",
+      nextStep: "请先提交、暂存或放弃未提交的改动，然后重试。",
+      detail: rawDetail,
+    });
+  });
+
+  it("points to another directory when the repository path already exists", () => {
+    const error = new SourceControlRepositoryError({
+      provider,
+      operation: "cloneRepository",
+      reason: "path_already_exists",
+      detail: rawDetail,
+    });
+
+    expect(describeVersionControlError(error).nextStep).toBe(
+      "请选择其他目录，或移走同名文件后重试。",
+    );
+  });
+
+  const textReasons: ReadonlyArray<readonly [TextGenerationFailureReason, string]> = [
+    ["not_installed", "请安装并设置用于生成文字的智能体，然后重试。"],
+    ["unauthenticated", "请先登录用于生成文字的智能体，然后重试。"],
+    ["rate_limited", "生成文字的用量暂时达到上限，请稍后再试。"],
+    ["network", "请检查网络连接，然后重试。"],
+    ["timeout", "生成文字超时，请重试。"],
+    ["unavailable", "用于生成文字的智能体暂时不可用，请稍后再试。"],
+  ];
+
+  it.each(textReasons)("gives text generation reason %s its own next step", (reason, nextStep) => {
+    const error = new TextGenerationError({
+      operation: "generateCommitMessage",
+      reason,
+      detail: rawDetail,
+    });
+
+    expect(describeVersionControlError(error)).toEqual({
+      title: "无法生成提交说明",
+      nextStep,
+      detail: rawDetail,
+    });
+  });
+
+  it("keeps the generic text guidance when an older server sends no reason", () => {
+    const error = new TextGenerationError({
+      operation: "generateCommitMessage",
+      detail: rawDetail,
+    });
+
+    expect(describeVersionControlError(error).nextStep).toBe(
+      "请检查智能体的登录状态和可用性，然后重试。",
+    );
+  });
+
+  const snapshotFailure = (overrides: Partial<VcsSnapshotFailure> = {}): VcsSnapshotFailure => ({
+    _tag: "GitCommandError",
+    operation: "SourceControlRepositoryService.cloneRepository",
+    action: "clone",
+    reason: "authentication_failed",
+    detail: rawDetail,
+    ...overrides,
+  });
+
+  it("presents a structured snapshot failure through its action and reason", () => {
+    expect(presentVcsSnapshotFailure(snapshotFailure(), "克隆仓库")).toEqual({
+      title: "无法克隆仓库",
+      nextStep: AUTH,
+      detail: rawDetail,
+      description: `请检查托管平台的登录状态和访问权限，然后重试。详情：${rawDetail}`,
+    });
+  });
+
+  it.each(["not_a_known_reason", "toString", "constructor"])(
+    "falls back to the action guidance for the unknown snapshot reason %s",
+    (reason) => {
+      for (const _tag of ["GitCommandError", "TextGenerationError", "VcsProcessSpawnError"]) {
+        const result = presentVcsSnapshotFailure(snapshotFailure({ _tag, reason }), "克隆仓库");
+        expect(typeof result.nextStep).toBe("string");
+        expect(result.nextStep).not.toBe("");
+        expect(result.description).toContain(rawDetail);
+      }
+    },
+  );
+
+  it("keeps the caller's action when an older snapshot has no typed action", () => {
+    expect(
+      presentVcsSnapshotFailure(snapshotFailure({ action: undefined }), "克隆仓库").title,
+    ).toBe("无法克隆仓库");
+  });
+
+  it("uses the structured clone failure instead of the legacy error string", () => {
+    expect(projectCloneFailureDescription(snapshotFailure(), "旧的英文错误")).toBe(
+      `请检查托管平台的登录状态和访问权限，然后重试。详情：${rawDetail}`,
+    );
+  });
+
+  it("keeps the legacy clone error when an older snapshot has no failure", () => {
+    expect(projectCloneFailureDescription(undefined, "旧的英文错误")).toBe("旧的英文错误");
+  });
+
+  it("uses a generic clone failure when neither structured nor legacy text exists", () => {
+    expect(projectCloneFailureDescription(undefined, null)).toBe("克隆失败。");
+  });
+
+  it("uses the structured worktree failure instead of the legacy error string", () => {
+    expect(
+      worktreeSetupFailureDescription(
+        snapshotFailure({ action: "create_worktree", reason: "path_already_exists" }),
+        "旧的英文错误",
+      ),
+    ).toBe(
+      "请选择其他目录，或移走同名文件后重试。详情：fatal: raw git output\nerror: keep this verbatim",
+    );
+  });
+
+  it("keeps the legacy worktree error when an older snapshot has no failure", () => {
+    expect(worktreeSetupFailureDescription(undefined, "旧的英文错误")).toBe("旧的英文错误");
+  });
+
+  it("puts the structured commit failure before the project location", () => {
+    expect(
+      newProjectCommitWarningDescription(
+        snapshotFailure({ action: "commit", reason: "author_identity_unknown" }),
+        "Git has no name or email.",
+        "/workspace/new",
+      ),
+    ).toBe(
+      "请在 Git 里设置用户名和邮箱，然后重试。详情：fatal: raw git output\nerror: keep this verbatim 项目位于 /workspace/new。",
+    );
+  });
+
+  it("keeps the legacy commit warning when an older result has no failure", () => {
+    expect(
+      newProjectCommitWarningDescription(undefined, "Git has no name or email.", "/workspace/new"),
+    ).toBe("Git has no name or email. 项目位于 /workspace/new。");
+  });
 
   it.each(gitReasons)("gives Git reason %s its own next step", (reason, nextStep) => {
     const error = new GitCommandError({

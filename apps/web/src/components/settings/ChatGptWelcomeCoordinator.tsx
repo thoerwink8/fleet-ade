@@ -1,20 +1,17 @@
 import { useAtomValue } from "@effect/atom-react";
-import { usesChatGptSharing } from "@t3tools/shared/usageLimits";
-import { useState } from "react";
+import { CHATGPT_USAGE_URL } from "@t3tools/shared/usageLimits";
+import { useEffect, useRef, useState } from "react";
+import { ensureLocalApi } from "../../localApi";
 import { environmentPresentations } from "../../state/presentation";
-import { OpenAI } from "../Icons";
-import { Button } from "../ui/button";
+import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
-  Dialog,
-  DialogPopup,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "../ui/dialog";
-import { ChatGptUsageButton } from "./ChatGptUsageButton";
+  chatGptWelcomeProfiles,
+  nextChatGptWelcomeProfile,
+  type ChatGptWelcomeProfile,
+} from "./ChatGptWelcome.logic";
 
 const STORAGE_KEY = "t3:chatgpt-sharing-welcome:v1";
+
 function readAcknowledgedProfiles(): string[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
@@ -26,58 +23,53 @@ function readAcknowledgedProfiles(): string[] {
   }
 }
 
+function announceProfile(profile: ChatGptWelcomeProfile): void {
+  toastManager.add(
+    stackedThreadToast({
+      type: "info",
+      title: "已连接你的 ChatGPT 套餐",
+      description: `${profile.providerName}（${profile.environmentLabel}）的用量会计入你的 ChatGPT 套餐。`,
+      actionProps: {
+        children: "管理用量",
+        onClick: () => void ensureLocalApi().shell.openExternal(CHATGPT_USAGE_URL),
+      },
+    }),
+  );
+}
+
+/**
+ * Each ChatGPT-sharing account is announced once, as a toast that times out on
+ * its own. A dialog here would take focus away from whatever is being typed.
+ */
 export function ChatGptWelcomeCoordinator() {
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const providersByEnvironment = useAtomValue(environmentPresentations.providersByEnvironmentAtom);
   const [acknowledged, setAcknowledged] = useState(readAcknowledgedProfiles);
-  const profiles = [...presentations].flatMap(([environmentId, presentation]) =>
-    presentation.connection.phase !== "connected"
-      ? []
-      : (providersByEnvironment.get(environmentId) ?? [])
-          .filter(usesChatGptSharing)
-          .map((provider) => ({
-            key: JSON.stringify([
-              environmentId,
-              provider.instanceId,
-              provider.auth.profileId ?? provider.auth.email ?? "default",
-            ]),
-            environmentLabel: presentation.entry.target.label,
-            providerName: provider.displayName ?? "Codex",
-          })),
+  const announcedRef = useRef(new Set<string>());
+  const next = nextChatGptWelcomeProfile(
+    chatGptWelcomeProfiles(
+      [...presentations].map(([environmentId, presentation]) => ({
+        environmentId,
+        environmentLabel: presentation.entry.target.label,
+        connected: presentation.connection.phase === "connected",
+        providers: providersByEnvironment.get(environmentId) ?? [],
+      })),
+    ),
+    acknowledged,
   );
-  const next = profiles.find((profile) => !acknowledged.includes(profile.key));
-  const dismiss = () => {
-    if (!next) return;
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- announces a newly seen account outside React, then records it so the announcement never repeats
+  useEffect(() => {
+    // A ref, not only the stored list: StrictMode replays this effect before the state update lands.
+    if (!next || announcedRef.current.has(next.key)) return;
+    announcedRef.current.add(next.key);
+    announceProfile(next);
     const updated = [...acknowledged, next.key];
     setAcknowledged(updated);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch {}
-  };
-  return (
-    <Dialog
-      open={next !== undefined}
-      onOpenChange={(open) => {
-        if (!open) dismiss();
-      }}
-    >
-      <DialogPopup>
-        <DialogHeader>
-          <OpenAI className="mb-2 size-8" aria-hidden="true" />
-          <DialogTitle>已连接你的 ChatGPT 套餐</DialogTitle>
-          <DialogDescription>
-            Fleet ADE 中符合条件的用量会计入你的 ChatGPT 套餐。请在 ChatGPT
-            中管理共享用量和额度设置。
-          </DialogDescription>
-          <p className="text-xs text-muted-foreground">
-            {next?.providerName} 星期 {next?.environmentLabel}
-          </p>
-        </DialogHeader>
-        <DialogFooter>
-          <ChatGptUsageButton />
-          <Button onClick={dismiss}>继续</Button>
-        </DialogFooter>
-      </DialogPopup>
-    </Dialog>
-  );
+  }, [next, acknowledged]);
+
+  return null;
 }

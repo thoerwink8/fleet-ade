@@ -103,6 +103,28 @@ describe("composerProviderReadiness", () => {
     expect(readiness.alternativeAgent).toBeNull();
   });
 
+  it("uses the server's guidance when Claude's reclaude is missing, without install wording", () => {
+    const message =
+      "未找到 reclaude，Claude 渠道未启用。请先安装 reclaude，或在设置里填写它的完整路径。";
+    const claude = makeEntry("claudeAgent", "claudeAgent", "Claude", {
+      installed: false,
+      status: "warning",
+      auth: { status: "unknown" },
+      message,
+    });
+    const readiness = evaluateComposerProviderReadiness({
+      selectedEntry: claude,
+      selectedModel: "claude-sonnet",
+      entries: [claude],
+    });
+    expect(readiness.block).toMatchObject({
+      kind: "not_installed",
+      reason: message,
+      primaryActionLabel: "打开智能体设置",
+      primaryActionMode: "setup",
+    });
+  });
+
   it("allows Antigravity while installed auth status is unknown until session start", () => {
     const antigravity = makeEntry("antigravity", "antigravity", "Antigravity", {
       status: "warning",

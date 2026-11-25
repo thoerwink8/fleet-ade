@@ -2,6 +2,7 @@ import {
   ProviderSetupError,
   type ProviderAuthInteraction,
   type ProviderAuthMethod,
+  type ProviderAuthRespondInput,
   type ProviderAuthResponse,
   type ProviderAuthState,
   type ProviderInstanceId,
@@ -88,6 +89,8 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
   };
   const snapshot = yield* SubscriptionRef.make({ owner: null as string | null, state: empty });
   let active: Flow | undefined;
+  // The last flow that ended, so its terminal's trailing traffic can be told from a stranger's.
+  let ended: { readonly owner: string; readonly id: string } | undefined;
   let operation: "idle" | "auth" | "stopping" | "closed" = "idle";
   const sessions = new Set<Scope.Closeable>();
   const stopOwnedSessions = Effect.suspend(() =>
@@ -138,6 +141,56 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
     ),
   );
   yield* refreshMethods.pipe(Effect.forkIn(scope));
+
+  const respondToLiveFlow = (owner: string, input: ProviderAuthRespondInput) =>
+    Effect.uninterruptibleMask((restore) =>
+      Effect.gen(function* () {
+        const { flow, fiber, ready } = yield* lock.withPermit(
+          Effect.gen(function* () {
+            const flow = yield* requireFlow(owner, input.flowId);
+            const interaction = snapshot.value.state.interaction;
+            if (
+              !interaction ||
+              interaction.id !== input.interactionId ||
+              interaction.type !== input.response.type ||
+              !flow.respond
+            )
+              return yield* new ProviderSetupError({
+                instanceId: options.instanceId,
+                operation: "respond",
+                detail: "这次登录交互已不可用。",
+              });
+            if (flow.responseFiber)
+              return yield* new ProviderSetupError({
+                instanceId: options.instanceId,
+                operation: "respond",
+                detail: "已有一个登录响应正在处理。",
+              });
+            const ready = yield* Deferred.make<void>();
+            const callback = flow.respond;
+            const fiber = yield* Deferred.await(ready).pipe(
+              Effect.andThen(Effect.suspend(() => callback(input.response))),
+              Effect.interruptible,
+              Effect.forkIn(scope),
+            );
+            flow.responseFiber = fiber;
+            return { flow, fiber, ready };
+          }),
+        );
+        yield* Deferred.succeed(ready, undefined);
+        yield* restore(Fiber.join(fiber)).pipe(
+          Effect.onInterrupt(() => Fiber.interrupt(fiber).pipe(Effect.asVoid)),
+          Effect.ensuring(
+            lock.withPermit(
+              Effect.sync(() => {
+                if (flow.responseFiber === fiber) delete flow.responseFiber;
+              }),
+            ),
+          ),
+        );
+        return snapshot.value.state;
+      }),
+    );
 
   const controller: ProviderAuth.ProviderAuthController = {
     credentialBinding: options.credentialBinding,
@@ -365,6 +418,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                       expiresAt: null,
                       message: Exit.isSuccess(result) ? "登录完成。" : failureMessage(result.cause),
                     });
+                    ended = { owner: flow.owner, id: flow.id };
                     active = undefined;
                     operation = "idle";
                   }),
@@ -378,54 +432,24 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
         }).pipe(Effect.uninterruptible),
       ),
     respond: (owner, input) =>
-      Effect.uninterruptibleMask((restore) =>
-        Effect.gen(function* () {
-          const { flow, fiber, ready } = yield* lock.withPermit(
-            Effect.gen(function* () {
-              const flow = yield* requireFlow(owner, input.flowId);
-              const interaction = snapshot.value.state.interaction;
-              if (
-                !interaction ||
-                interaction.id !== input.interactionId ||
-                interaction.type !== input.response.type ||
-                !flow.respond
-              )
-                return yield* new ProviderSetupError({
-                  instanceId: options.instanceId,
-                  operation: "respond",
-                  detail: "这次登录交互已不可用。",
-                });
-              if (flow.responseFiber)
-                return yield* new ProviderSetupError({
-                  instanceId: options.instanceId,
-                  operation: "respond",
-                  detail: "已有一个登录响应正在处理。",
-                });
-              const ready = yield* Deferred.make<void>();
-              const callback = flow.respond;
-              const fiber = yield* Deferred.await(ready).pipe(
-                Effect.andThen(Effect.suspend(() => callback(input.response))),
-                Effect.interruptible,
-                Effect.forkIn(scope),
-              );
-              flow.responseFiber = fiber;
-              return { flow, fiber, ready };
-            }),
-          );
-          yield* Deferred.succeed(ready, undefined);
-          yield* restore(Fiber.join(fiber)).pipe(
-            Effect.onInterrupt(() => Fiber.interrupt(fiber).pipe(Effect.asVoid)),
-            Effect.ensuring(
-              lock.withPermit(
-                Effect.sync(() => {
-                  if (flow.responseFiber === fiber) delete flow.responseFiber;
-                }),
-              ),
-            ),
-          );
-          return snapshot.value.state;
-        }),
-      ),
+      // Terminal traffic (data, resize, replies) trails a finished command; the flow's own outcome
+      // is already published, so it is dropped rather than reported as a second error. Checked under
+      // the lock so a flow that has published its end but not yet been cleared counts as ended.
+      lock
+        .withPermit(
+          Effect.sync(
+            () =>
+              input.response.type === "terminal" &&
+              ended?.owner === owner &&
+              ended.id === input.flowId &&
+              active?.id !== input.flowId,
+          ),
+        )
+        .pipe(
+          Effect.flatMap((trailing) =>
+            trailing ? Effect.sync(() => snapshot.value.state) : respondToLiveFlow(owner, input),
+          ),
+        ),
     complete: (owner, input) =>
       lock.withPermit(
         Effect.gen(function* () {
@@ -457,6 +481,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             expiresAt: null,
             message: "登录已取消。",
           });
+          ended = { owner: flow.owner, id: flow.id };
           active = undefined;
           operation = "stopping";
           return flow;

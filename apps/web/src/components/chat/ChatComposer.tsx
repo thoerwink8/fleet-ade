@@ -77,6 +77,8 @@ import {
 import { getComposerPlaceholder } from "../../composerPlaceholder";
 import { deriveComposerSendState } from "../ChatView.logic";
 import { evaluateComposerProviderReadiness } from "./composerProviderReadiness";
+import { AgentSetupCard } from "../agentSetup/AgentSetupCard";
+import { useAgentSetupCard } from "../agentSetup/useAgentSetupCard";
 import {
   dataTransferHasComposerMention,
   makeComposerMentionDragHandlers,
@@ -202,6 +204,7 @@ import {
 import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
+import { EMPTY_TAKEOVER_DRAFT, takeoverDraftSnapshot } from "./questionTakeoverNotice.logic";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
 import { buildPullRequestReferenceContext } from "../pullRequest/pullRequestDetail.logic";
 import { getComposerPromptInjectionState, getComposerReasoningStep } from "./composerProviderState";
@@ -678,6 +681,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const applyThreadModelPick = useApplyThreadModelPick();
   const composerDraft = useComposerThreadDraft(composerDraftTarget);
   const composerDraftTargetKeyRef = useRef("");
+  const [takeoverDraft, setTakeoverDraft] = useState(EMPTY_TAKEOVER_DRAFT);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the committed draft target key to a ref read by async handlers
   useLayoutEffect(() => {
     composerDraftTargetKeyRef.current = composerDraftTargetKey;
@@ -702,6 +706,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   const questionPreparations = useQuestionAttachmentPreparation((state) => state.counts);
   const prompt = composerDraft.prompt;
+  const nextTakeoverDraft = takeoverDraftSnapshot(
+    takeoverDraft,
+    activePendingProgress ? (pendingUserInputs[0]?.requestId ?? "") : "",
+    prompt,
+  );
+  if (nextTakeoverDraft !== takeoverDraft) setTakeoverDraft(nextTakeoverDraft);
   const composerImages = attachmentDraft.images;
   const composerFiles = attachmentDraft.files;
   const inlineFileIdSet = (() => {
@@ -946,6 +956,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     selectedProviderEntry === undefined && multipleModelSelections === null;
   const providerCatalogPending = noProviderAvailable && !providerCatalogKnown;
   const showProviderUnavailable = noProviderAvailable && !providerCatalogPending;
+  const agentSetupModel = useAgentSetupCard({
+    environmentId,
+    providers: providerStatuses,
+    catalogKnown: providerCatalogKnown,
+  });
+  const agentSetupCard = routeKind === "draft" ? agentSetupModel : null;
   const providerSetupInstanceId = noProviderAvailable
     ? (unavailableProviderInstanceId ??
       (lockedProvider === null
@@ -3774,6 +3790,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
+      {agentSetupCard ? (
+        <div className="mb-3 flex justify-center">
+          <AgentSetupCard model={agentSetupCard} environmentId={environmentId} inset />
+        </div>
+      ) : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />
@@ -3797,6 +3818,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onAdvance={onAdvanceActivePendingUserInput}
                     onDismiss={onDismissActivePendingUserInput}
                     onResendLastUserMessage={onResendLastUserMessage}
+                    setAsideDraft={activePendingProgress ? nextTakeoverDraft.draft : null}
                   />
                 ) : null}
               </ComposerBanner.Root>

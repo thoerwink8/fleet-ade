@@ -16,10 +16,22 @@ import { SidebarDraftBlock } from "./SidebarDraftBlock";
 import { SidebarHeaderActions, SidebarThreadHeader } from "./SidebarThreadHeader";
 import { SortableThreadRow } from "./SidebarThreadRow";
 
-vi.mock("../../state/environments", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../state/environments")>()),
-  usePullRequestsSupported: () => true,
-}));
+vi.mock("../../state/environments", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../state/environments")>();
+  return {
+    ...original,
+    usePullRequestsSupported: () => true,
+    useEnvironments: () => ({
+      environments: ["a", "b"].map((environmentId) => ({
+        environmentId,
+        label: environmentId.toUpperCase(),
+        serverConfig: null,
+        connection: { phase: "connected" },
+        entry: { target: { label: environmentId.toUpperCase() } },
+      })),
+    }),
+  };
+});
 
 vi.mock("../../state/session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../state/session")>()),
@@ -218,10 +230,9 @@ function SidebarTouchHarness(props?: {
             <SidebarHeaderActions
               hasProjects
               projectScope={null}
-              projectScopeActive={false}
+              projectScopeLabel="所有项目"
               projectScopeAnchorRef={projectScopeAnchorRef}
               onOpenProjectScope={noop}
-              onNewProject={noop}
               onNewThread={noop}
               newThreadDisabled={false}
               newThreadShortcutLabel={null}
@@ -382,7 +393,9 @@ function expectPointHitsButton(button: Element) {
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
   const hit = document.elementFromPoint(cx, cy);
-  expect(hit, `${label} elementFromPoint(${cx.toFixed(1)}, ${cy.toFixed(1)})`).toBe(button);
+  const hitButton = hit?.closest("button");
+  expect(hitButton, `${label} elementFromPoint(${cx.toFixed(1)}, ${cy.toFixed(1)})`).not.toBeNull();
+  expect(hitButton, `${label} hit target remains inside the button`).toBe(button);
 }
 
 function expectVisibleInlineLabelBeforeActions(
@@ -512,7 +525,7 @@ describe("sidebar mobile touch targets", () => {
 
     const chromeTargets = [
       screen.container.querySelector('button[aria-label="切换主侧边栏"]')!,
-      screen.container.querySelector('button[aria-label="更多"]')!,
+      screen.container.querySelector('button[aria-label="按项目筛选会话，当前是所有项目"]')!,
       screen.container.querySelector('button[aria-label="新建会话"]')!,
       screen.container.querySelector('button[aria-label="清除会话搜索"]')!,
       screen.container.querySelector('button[title="取消置顶 fleet-ade"]')!,

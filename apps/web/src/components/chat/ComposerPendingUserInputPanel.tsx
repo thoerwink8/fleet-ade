@@ -14,6 +14,7 @@ import { Kbd } from "../ui/kbd";
 import { cn } from "~/lib/utils";
 import { isInSideChatPane } from "~/lib/sideChatPane";
 import { ComposerBanner } from "./ComposerBanner";
+import { questionTakeoverNotice } from "./questionTakeoverNotice.logic";
 import ChatMarkdown from "../ChatMarkdown";
 
 interface PendingUserInputPanelProps {
@@ -28,6 +29,8 @@ interface PendingUserInputPanelProps {
   onAdvance: () => void;
   onDismiss: (requestId: RuntimeRequestId) => void;
   onResendLastUserMessage?: (() => void) | undefined;
+  /** The draft the question is hiding, when the composer now holds the answer. */
+  setAsideDraft?: string | null;
 }
 
 export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserInputPanel({
@@ -42,26 +45,40 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
   onAdvance,
   onDismiss,
   onResendLastUserMessage,
+  setAsideDraft = null,
 }: PendingUserInputPanelProps) {
   if (pendingUserInputs.length === 0) return null;
   const activePrompt = pendingUserInputs[0];
   if (!activePrompt) return null;
 
+  const takeoverNotice = questionTakeoverNotice({
+    draftText: setAsideDraft ?? "",
+    questionOwnsComposer: setAsideDraft !== null,
+  });
   return (
-    <ComposerPendingUserInputCard
-      key={activePrompt.requestId}
-      prompt={activePrompt}
-      cwd={cwd}
-      threadRef={threadRef}
-      disabled={disabled}
-      isResponding={respondingRequestIds.includes(activePrompt.requestId)}
-      answers={answers}
-      questionIndex={questionIndex}
-      onToggleOption={onToggleOption}
-      onAdvance={onAdvance}
-      onDismiss={onDismiss}
-      onResendLastUserMessage={onResendLastUserMessage}
-    />
+    <>
+      {takeoverNotice === null ? null : (
+        <ComposerBanner.Row>
+          <ComposerBanner.Content className="ps-2">
+            <span className="min-w-0 truncate text-muted-foreground">{takeoverNotice}</span>
+          </ComposerBanner.Content>
+        </ComposerBanner.Row>
+      )}
+      <ComposerPendingUserInputCard
+        key={activePrompt.requestId}
+        prompt={activePrompt}
+        cwd={cwd}
+        threadRef={threadRef}
+        disabled={disabled}
+        isResponding={respondingRequestIds.includes(activePrompt.requestId)}
+        answers={answers}
+        questionIndex={questionIndex}
+        onToggleOption={onToggleOption}
+        onAdvance={onAdvance}
+        onDismiss={onDismiss}
+        onResendLastUserMessage={onResendLastUserMessage}
+      />
+    </>
   );
 });
 
