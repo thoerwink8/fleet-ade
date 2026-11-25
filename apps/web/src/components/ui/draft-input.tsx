@@ -1,9 +1,9 @@
-import { useCommitOnBlur } from "~/hooks/useCommitOnBlur";
+import { useCommitOnBlur, type CommitVerdict } from "~/hooks/useCommitOnBlur";
 import { Input, type InputProps } from "./input";
 
 export type DraftInputProps = Omit<InputProps, "value" | "onChange" | "defaultValue"> & {
   readonly value: string;
-  readonly onCommit: (next: string) => void;
+  readonly onCommit: (next: string) => CommitVerdict;
   readonly normalizeDraft?: (previous: string, next: string) => string;
 };
 

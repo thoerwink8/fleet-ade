@@ -63,7 +63,7 @@ function useRunScopedPlan() {
   return (
     plan: ReturnType<typeof planScopedSettingsPatch>,
     options?: ScopedSettingsSaveOptions,
-  ) => {
+  ): Promise<boolean> => {
     if (plan.unavailableReason) {
       toastManager.add({
         type: "warning",
@@ -72,9 +72,9 @@ function useRunScopedPlan() {
       });
       options?.onFailed?.();
       options?.onComplete?.({ savedEnvironmentIds: [], failedCount: 1 });
-      return;
+      return Promise.resolve(false);
     }
-    void persistScopedSettingsPatch(
+    return persistScopedSettingsPatch(
       plan,
       async (request) => {
         const missing = requiredScopesForServerSettingsPatch(request.input.patch).find(
@@ -110,6 +110,7 @@ function useRunScopedPlan() {
         savedEnvironmentIds: savedEnvironments.map((environment) => environment.environmentId),
         failedCount: failedEnvironments.length,
       });
+      return failedEnvironments.length === 0;
     });
   };
 }

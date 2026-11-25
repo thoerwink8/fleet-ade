@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
 import { resolvePastedPath } from "@t3tools/shared/path";
@@ -6,6 +6,14 @@ import { resolvePastedPath } from "@t3tools/shared/path";
 import { render } from "../../test/render";
 import { parseSessionLimitDraft } from "../components/settings/SettingsPanels.logic";
 import { DraftInput } from "../components/ui/draft-input";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
 
 describe("settings draft commits", () => {
   it("preserves an external update when an untouched field loses focus", async () => {
@@ -62,7 +70,7 @@ describe("settings draft commits", () => {
   });
 
   it.each(["abc", "e", "0", "-2", "1.5"])(
-    "keeps a saved session limit when %s is typed",
+    "keeps the typed session limit visible when %s is rejected as invalid",
     async (invalidDraft) => {
       let saved: number | null = 2;
       await using screen = await render(
@@ -72,7 +80,8 @@ describe("settings draft commits", () => {
           value={String(saved)}
           onCommit={(next) => {
             const parsed = parseSessionLimitDraft(next);
-            if (parsed !== undefined) saved = parsed;
+            if (parsed === undefined) return false;
+            saved = parsed;
           }}
         />,
       );
@@ -82,11 +91,12 @@ describe("settings draft commits", () => {
       await userEvent.tab();
 
       expect(saved).toBe(2);
-      await expect.element(input).toHaveValue("2");
+      await expect.element(input).toHaveValue(invalidDraft);
+      await expect.element(input).toHaveAttribute("aria-invalid", "true");
     },
   );
 
-  it("keeps a saved session limit when abc replaces the selected value", async () => {
+  it("saves a corrected value after an invalid draft was rejected", async () => {
     let saved: number | null = 2;
     await using screen = await render(
       <DraftInput
@@ -95,17 +105,49 @@ describe("settings draft commits", () => {
         value={String(saved)}
         onCommit={(next) => {
           const parsed = parseSessionLimitDraft(next);
-          if (parsed !== undefined) saved = parsed;
+          if (parsed === undefined) return false;
+          saved = parsed;
         }}
       />,
     );
     const input = screen.getByRole("textbox");
-    await input.click();
-    await userEvent.keyboard("{Control>}a{/Control}");
+    await userEvent.clear(input);
     await userEvent.type(input, "abc");
     await userEvent.tab();
-    expect(saved).toBe(2);
-    await expect.element(input).toHaveValue("2");
+    await expect.element(input).toHaveValue("abc");
+
+    await input.click();
+    await userEvent.clear(input);
+    await userEvent.type(input, "4");
+    await userEvent.tab();
+
+    expect(saved).toBe(4);
+  });
+
+  it("keeps the typed text when the asynchronous save fails and clears it once it saves", async () => {
+    const saves: string[] = [];
+    let outcome = deferred<boolean>();
+    const commit = vi.fn((next: string) => {
+      saves.push(next);
+      return outcome.promise;
+    });
+    await using screen = await render(<DraftInput value="~" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await input.fill("/projects");
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    outcome.resolve(false);
+    await expect.element(input).toHaveValue("/projects");
+    await expect.element(input).toHaveAttribute("aria-invalid", "true");
+
+    outcome = deferred<boolean>();
+    await input.click();
+    await input.fill("/fixed");
+    await userEvent.tab();
+    outcome.resolve(true);
+    await expect.element(input).not.toHaveAttribute("aria-invalid", "true");
+    expect(saves).toEqual(["/projects", "/fixed"]);
   });
 
   it.each([
@@ -120,7 +162,8 @@ describe("settings draft commits", () => {
         value={String(saved)}
         onCommit={(next) => {
           const parsed = parseSessionLimitDraft(next);
-          if (parsed !== undefined) saved = parsed;
+          if (parsed === undefined) return false;
+          saved = parsed;
         }}
       />,
     );

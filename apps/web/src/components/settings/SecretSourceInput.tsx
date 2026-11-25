@@ -217,7 +217,7 @@ type SecretSourceInputProps = Omit<ComponentProps<typeof SecretInput>, "value" |
   /** Offers a check of the committed reference on this environment. */
   readonly environmentId?: EnvironmentId | undefined;
   readonly sources: ReadonlyArray<SecretSource>;
-  readonly onSecretChange: (secret: SecretReference | undefined) => void;
+  readonly onSecretChange: (secret: SecretReference | undefined) => Promise<boolean> | false | void;
   /** Whether the selected source and committed field can be saved or used. */
   readonly onValidityChange?: (valid: boolean) => void;
   /** Places the parts in the caller's layout; `source` is null when there is nothing to pick. */
@@ -283,7 +283,9 @@ export function SecretSourceInput({
               if (next.trim().length === 0) {
                 setRejectedReference(null);
                 onValidityChange?.(pendingProvider === null && secret !== undefined);
-                if (pendingProvider === null && secret !== undefined) onSecretChange(undefined);
+                if (pendingProvider === null && secret !== undefined) {
+                  return onSecretChange(undefined);
+                }
                 return;
               }
               const decoded = decodeSecretReference({ provider, reference: next });
@@ -293,12 +295,12 @@ export function SecretSourceInput({
               ) {
                 setRejectedReference(next);
                 onValidityChange?.(false);
-                return;
+                return false;
               }
               setRejectedReference(null);
               setPendingProvider(null);
               onValidityChange?.(true);
-              onSecretChange(decoded.value);
+              return onSecretChange(decoded.value);
             }}
             autoComplete="off"
             placeholder={definition?.referencePlaceholder}

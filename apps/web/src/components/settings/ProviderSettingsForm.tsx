@@ -239,7 +239,7 @@ function ProviderCommandArguments({
     setDraft({ rows: nextRows, seen: draft.seen, lastPublished: next });
     const config =
       value !== null && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {};
-    onChange({ ...config, commandArgs: next });
+    return onChange({ ...config, commandArgs: next });
   };
 
   return (
@@ -457,7 +457,6 @@ function ProviderSettingsTextInput({
   readonly descriptionId: string | undefined;
   readonly onChange: ProviderSettingsFormProps["onChange"];
 }) {
-  const [rejected, setRejected] = useState<string | null>(null);
   return (
     <div className="flex w-full min-w-0 flex-col gap-1 @min-[32rem]/settings-row:w-56">
       <DraftInput
@@ -467,23 +466,15 @@ function ProviderSettingsTextInput({
         className="w-full max-w-full"
         type={field.control === "password" ? "password" : undefined}
         autoComplete={field.control === "password" ? "off" : undefined}
-        value={rejected ?? readProviderConfigString(value, field.key)}
+        value={readProviderConfigString(value, field.key)}
         placeholder={field.placeholder}
         onCommit={(next) => {
           const clears = field.clearWhenEmpty === "omit" && next.trim().length === 0;
-          if (!clears && field.accepts?.(next) === false) {
-            setRejected(next);
-            return;
-          }
-          setRejected(null);
-          onChange(nextProviderConfigWithFieldValue(value, field, next));
+          if (!clears && field.accepts?.(next) === false) return false;
+          return onChange(nextProviderConfigWithFieldValue(value, field, next));
         }}
-        aria-invalid={rejected !== null || undefined}
         spellCheck={false}
       />
-      {rejected !== null ? (
-        <p className="text-2xs text-destructive">请输入有效的值。尚未保存。</p>
-      ) : null}
     </div>
   );
 }

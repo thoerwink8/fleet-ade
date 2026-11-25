@@ -790,7 +790,9 @@ export function EnvironmentProviderSettings({
         title: "无法更新智能体",
         description: error instanceof Error ? error.message : "设置更新失败。",
       });
+      return false;
     }
+    return true;
   };
 
   const updateInstance = useStableCallback(
@@ -798,13 +800,13 @@ export function EnvironmentProviderSettings({
       instanceId: ProviderInstanceId,
       previous: ProviderInstanceConfig,
       next: ProviderInstanceConfig,
-    ) => {
+    ): Promise<boolean> => {
       const isDisabling = next.enabled === false && resolveProviderInstanceEnabled(previous);
       const shouldClearTextGen =
         isDisabling &&
         resolveAppModelSelectionState(settings, serverProviders).instanceId === instanceId &&
         readEnvironmentScope(environmentId, AuthSettingsWriteScope);
-      void persistInstance(
+      return persistInstance(
         instanceId,
         next,
         shouldClearTextGen ? DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection : undefined,
@@ -1182,11 +1184,11 @@ interface ProviderInstanceRowActions {
     instanceId: ProviderInstanceId,
     previous: ProviderInstanceConfig,
     next: ProviderInstanceConfig,
-  ) => void;
+  ) => Promise<boolean>;
   readonly enableInstance: (
     instanceId: ProviderInstanceId,
     next: ProviderInstanceConfig,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   readonly deleteInstance: (
     instanceId: ProviderInstanceId,
     instance: ProviderInstanceConfig,

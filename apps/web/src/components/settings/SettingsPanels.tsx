@@ -1386,7 +1386,8 @@ export function ThreadsSettingsPanel() {
               aria-label="同时运行的会话上限"
               onCommit={(value) => {
                 const parsed = parseSessionLimitDraft(value);
-                if (parsed !== undefined) updateSettings({ maxConcurrentSessions: parsed });
+                if (parsed === undefined) return false;
+                return updateSettings({ maxConcurrentSessions: parsed });
               }}
             />
           }
