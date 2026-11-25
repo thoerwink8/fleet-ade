@@ -640,10 +640,12 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     modelCatalog.models.map((entry) => entry.model),
     claudeSettings.customModels,
   );
-  const buildClaudeSnapshot: typeof buildServerProvider = (input) => {
+  const buildClaudeSnapshot = (
+    input: Parameters<typeof buildServerProvider>[0],
+    options?: { readonly cliMissing?: boolean },
+  ) => {
     const draft = buildServerProvider(input);
-    const claudeMissing =
-      !draft.installed && draft.message === "还没装 Claude Code，装好后会自动识别。";
+    const claudeMissing = options?.cliMissing === true && !draft.installed;
     return {
       ...draft,
       setup: claudeMissing
@@ -707,21 +709,24 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     yield* Effect.logWarning("Claude Agent CLI health check failed.", {
       errorTag: error._tag,
     });
-    return buildClaudeSnapshot({
-      presentation: CLAUDE_PRESENTATION,
-      enabled: claudeSettings.enabled,
-      checkedAt,
-      models: allModels,
-      probe: {
-        installed: !isCommandMissingCause(error),
-        version: null,
-        status: "error",
-        auth: { status: "unknown" },
-        message: isCommandMissingCause(error)
-          ? "还没装 Claude Code，装好后会自动识别。"
-          : "执行 Claude Agent CLI 健康检查失败。",
+    return buildClaudeSnapshot(
+      {
+        presentation: CLAUDE_PRESENTATION,
+        enabled: claudeSettings.enabled,
+        checkedAt,
+        models: allModels,
+        probe: {
+          installed: !isCommandMissingCause(error),
+          version: null,
+          status: "error",
+          auth: { status: "unknown" },
+          message: isCommandMissingCause(error)
+            ? "还没装 Claude Code，装好后会自动识别。"
+            : "执行 Claude Agent CLI 健康检查失败。",
+        },
       },
-    });
+      { cliMissing: isCommandMissingCause(error) },
+    );
   }
 
   if (Option.isNone(versionProbe.success)) {

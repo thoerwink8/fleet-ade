@@ -3479,6 +3479,7 @@ it.layer(
         assert.strictEqual(status.installed, false);
         assert.strictEqual(status.status, "warning");
         assert.strictEqual(status.message, CLAUDE_RECLAUDE_MISSING_MESSAGE);
+        assert.deepStrictEqual(status.setup, { canAuthenticate: false, canInstall: false });
       }),
     );
 

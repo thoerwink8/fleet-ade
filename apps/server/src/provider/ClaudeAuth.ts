@@ -108,7 +108,7 @@ export const makeClaudeAuth = Effect.fn("makeClaudeAuth")(function* (options: {
 
   const logout = run(["auth", "logout"]).pipe(
     Effect.scoped,
-    Effect.andThen(options.onChanged(false)),
+    Effect.andThen(Effect.suspend(() => options.onChanged(false))),
   );
 
   return yield* ProviderAuthFlow.make({

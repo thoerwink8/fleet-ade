@@ -56,6 +56,7 @@ import {
 import {
   makeClaudeCapabilitiesCacheKey,
   makeClaudeContinuationGroupKey,
+  makeClaudeEnvironment,
   mergeClaudeProcessEnvironment,
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
@@ -312,7 +313,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       instanceId,
       credentialKey: continuationGroupKey,
       cwd: stateDir,
-      environment: processEnv,
+      // Same environment the probe and sessions use, so a custom homePath gets its own login.
+      environment: yield* makeClaudeEnvironment(effectiveConfig, processEnv),
       resolveExecutable: resolveClaudeSdkExecutablePath(
         effectiveConfig.binaryPath,
         processEnv,
