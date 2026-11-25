@@ -1,6 +1,7 @@
 import { ProviderInstanceId, type EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 
+import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -20,12 +21,18 @@ const STATUS_BADGE: Readonly<Record<AgentSetupState, "warning" | "error" | "seco
 export function AgentSetupCard({
   model,
   environmentId,
+  inset = false,
 }: {
   readonly model: AgentSetupCardModel;
   readonly environmentId: EnvironmentId;
+  /** Pads the card when it sits inside a framed container such as the composer. */
+  readonly inset?: boolean;
 }) {
   return (
-    <section aria-label={model.title} className="w-full max-w-lg text-left">
+    <section
+      aria-label={model.title}
+      className={cn("w-full max-w-lg text-left", inset && "px-3 pt-3")}
+    >
       <h2 className="text-sm font-medium text-foreground">{model.title}</h2>
       {model.rows.length === 0 ? (
         <div className="mt-3">

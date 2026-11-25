@@ -30,6 +30,7 @@ describe("resolveAgentSetupCard", () => {
     readonly providers: readonly AgentSetupProvider[];
     readonly catalogKnown?: boolean;
     readonly computerName?: string | null;
+    readonly configured?: readonly string[];
     readonly shown: boolean;
     readonly title?: string;
     readonly rows?: ReadonlyArray<readonly [string, string, string, string]>;
@@ -130,6 +131,7 @@ describe("resolveAgentSetupCard", () => {
         provider("devReplay", "acpRegistry", { displayName: "Replay (dev)" }),
       ],
       shown: true,
+      configured: ["antigravity"],
       title: "先在「工作室」上装或登录一个智能体",
       rows: [
         ["codex", "Codex", "not_installed", "provider-instance-codex-status"],
@@ -176,6 +178,15 @@ describe("resolveAgentSetupCard", () => {
       rows: [["codex", "Codex", "error", "provider-instance-codex-status"]],
     },
     {
+      name: "leaves out a stopped agent that agent settings has no row for",
+      providers: [
+        provider("grok", "grok", { displayName: "Grok", enabled: false, status: "disabled" }),
+        provider("codex", "codex", { displayName: "Codex", enabled: false, status: "disabled" }),
+      ],
+      shown: true,
+      rows: [["codex", "Codex", "disabled", "provider-instance-codex-status"]],
+    },
+    {
       name: "offers the settings page when the catalog has no real agents",
       providers: [provider("devReplay", "acpRegistry", { displayName: "Replay (dev)" })],
       shown: true,
@@ -188,6 +199,7 @@ describe("resolveAgentSetupCard", () => {
       providers: entry.providers,
       catalogKnown: entry.catalogKnown ?? true,
       computerName: entry.computerName ?? null,
+      configuredInstanceIds: new Set(entry.configured ?? []),
     });
     if (!entry.shown) {
       expect(card).toBeNull();

@@ -4,35 +4,36 @@ import { MessageSquareDashedIcon, PlusIcon } from "lucide-react";
 import { openCommandPalette } from "../commandPaletteBus";
 import { isElectron } from "../env";
 import { useScratchProject } from "../hooks/useScratchProject";
-import {
-  useEnvironment,
-  useEnvironmentProviders,
-  usePrimaryEnvironmentId,
-} from "../state/environments";
+import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../state/environments";
 import { Button } from "./ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
 import { AgentSetupCard } from "./agentSetup/AgentSetupCard";
-import { resolveAgentSetupCard, toAgentSetupProvider } from "./agentSetup/agentSetupCard.logic";
+import { useAgentSetupCard } from "./agentSetup/useAgentSetupCard";
+import type { EnvironmentId } from "@t3tools/contracts";
+
+function PrimaryAgentSetupCard({ environmentId }: { readonly environmentId: EnvironmentId }) {
+  const providersByEnvironment = useEnvironmentProviders();
+  const providerSnapshots = providersByEnvironment.get(environmentId);
+  const model = useAgentSetupCard({
+    environmentId,
+    providers: providerSnapshots ?? [],
+    catalogKnown: providerSnapshots !== undefined,
+  });
+  if (!model) return null;
+  return (
+    <div className="mt-6 flex w-full justify-center">
+      <AgentSetupCard model={model} environmentId={environmentId} />
+    </div>
+  );
+}
 
 export function NoProjectsHero() {
   const contentArea = workspaceAreaProps("home", 1, "Home");
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const scratchTargetEnvironmentId = scratchEnvironmentId(primaryEnvironmentId);
-  const primaryEnvironment = useEnvironment(primaryEnvironmentId);
-  const providersByEnvironment = useEnvironmentProviders();
-  const providerSnapshots =
-    primaryEnvironmentId === null ? undefined : providersByEnvironment.get(primaryEnvironmentId);
-  const agentSetupCard = resolveAgentSetupCard({
-    providers: (providerSnapshots ?? []).map(toAgentSetupProvider),
-    catalogKnown: providerSnapshots !== undefined,
-    computerName:
-      primaryEnvironment?.entry.target._tag === "PrimaryConnectionTarget"
-        ? null
-        : (primaryEnvironment?.label ?? null),
-  });
 
   return (
     <SidebarInset
@@ -67,10 +68,8 @@ export function NoProjectsHero() {
                 </Button>
               )}
             </div>
-            {agentSetupCard && primaryEnvironmentId !== null ? (
-              <div className="mt-6 flex w-full justify-center">
-                <AgentSetupCard model={agentSetupCard} environmentId={primaryEnvironmentId} />
-              </div>
+            {primaryEnvironmentId !== null ? (
+              <PrimaryAgentSetupCard environmentId={primaryEnvironmentId} />
             ) : null}
           </EmptyHeader>
         </Empty>

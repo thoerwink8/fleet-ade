@@ -99,6 +99,16 @@ function settingsHash(provider: AgentSetupProvider, state: AgentSetupState): str
   return `provider-instance-${provider.instanceId}-${opensSetup ? "setup" : "status"}`;
 }
 
+// Agent settings always list Codex and Claude, and any agent that is on or has its own entry.
+function hasSettingsRow(provider: AgentSetupProvider, configured: ReadonlySet<string>): boolean {
+  if (setupState(provider) !== "disabled") return true;
+  return (
+    configured.has(provider.instanceId) ||
+    provider.instanceId === "codex" ||
+    provider.instanceId === "claudeAgent"
+  );
+}
+
 function providerName(provider: AgentSetupProvider): string {
   const displayName = provider.displayName?.trim();
   if (displayName) return displayName;
@@ -114,11 +124,14 @@ export function resolveAgentSetupCard(input: {
   readonly providers: readonly AgentSetupProvider[];
   readonly catalogKnown: boolean;
   readonly computerName: string | null;
+  /** Instances with their own entry in agent settings; a stopped agent outside it has no row to open. */
+  readonly configuredInstanceIds: ReadonlySet<string>;
 }): AgentSetupCardModel | null {
   if (!input.catalogKnown) return null;
   const real = input.providers.filter((provider) => provider.instanceId !== DEV_REPLAY_INSTANCE_ID);
   if (real.some(isUsable) || real.some(isChecking)) return null;
   const rows = real
+    .filter((provider) => hasSettingsRow(provider, input.configuredInstanceIds))
     .map((provider) => {
       const state = setupState(provider);
       return {
