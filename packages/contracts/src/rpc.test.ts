@@ -189,9 +189,9 @@ describe("WebSocket RPC contracts", () => {
     expect(
       decodeRecentlyDeleted({
         ...response,
-        totals: { count: 2, attachmentBytes: 3, worktreeBytes: null },
+        totals: { count: 2, attachmentBytes: null, worktreeBytes: null },
       }).totals,
-    ).toEqual({ count: 2, attachmentBytes: 3, worktreeBytes: null });
+    ).toEqual({ count: 2, attachmentBytes: null, worktreeBytes: null });
   });
 
   it("lets the server pick a new worktree's folder", () => {

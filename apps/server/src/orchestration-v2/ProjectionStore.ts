@@ -503,7 +503,7 @@ export interface OlderSettledThreadsListing {
 
 export interface RecentlyDeletedProjection {
   readonly items: ReadonlyArray<OrchestrationV2RecentlyDeletedThread>;
-  readonly totals: { readonly count: number; readonly attachmentBytes: number };
+  readonly totals: { readonly count: number; readonly attachmentBytes: number | null };
 }
 
 export interface ProjectionStoreV2Shape {
@@ -9212,6 +9212,28 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         ) AS attachment_bytes
       `;
       const totals = totalRows[0] ?? { attachment_bytes: 0 };
+      // HTML renders, MCP App snapshots and recordings keep an attachment id but no
+      // size, so their bytes are unknown: report null rather than a short total.
+      const toolRows = yield* sql<{ readonly thread_id: string; readonly payload_json: string }>`
+        SELECT item.thread_id, item.payload_json
+        FROM orchestration_v2_projection_thread_trash AS trash
+        JOIN orchestration_v2_projection_turn_items AS item USING (thread_id)
+        WHERE item.type = 'dynamic_tool'
+          AND (item.payload_json LIKE '%htmlRender%'
+            OR item.payload_json LIKE ${`%${MCP_APP_OUTPUT_KEY}%`}
+            OR item.payload_json LIKE '%preview_recording_stop%')
+      `;
+      const hasUnsizedToolAttachments = toolRows.some((row) => {
+        const item = parseEncodedPayload(row.payload_json);
+        return (
+          threadHtmlRenderAttachmentIds(row.thread_id, [
+            {
+              toolName: typeof item.toolName === "string" ? item.toolName : null,
+              output: item.output,
+            },
+          ]).length > 0
+        );
+      });
       return {
         items: rows.map((row): OrchestrationV2RecentlyDeletedThread => ({
           threadId: ThreadId.make(row.thread_id),
@@ -9224,7 +9246,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           sideChatCount: row.side_chat_count,
           worktreePath: row.worktree_path,
         })),
-        totals: { count: rows.length, attachmentBytes: totals.attachment_bytes },
+        totals: {
+          count: rows.length,
+          attachmentBytes: hasUnsizedToolAttachments ? null : totals.attachment_bytes,
+        },
       };
     }, Effect.mapError(shellSnapshotReadError));
 

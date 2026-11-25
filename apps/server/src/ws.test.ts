@@ -2420,15 +2420,14 @@ it.effect("orchestration.getRecentlyDeleted returns items with server time and s
       Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({}),
       Layer.mock(DirectEndpoints.DirectEndpoints)({}),
       Layer.mock(ProviderRegistry.ProviderRegistry)({}),
-      Layer.mock(ThreadManagement.ThreadManagementService)({
-        listRecentlyDeleted: () =>
-          Effect.succeed({ items: [item], totals: { count: 1, attachmentBytes: 24 } }),
-      }),
       Layer.mock(OrchestrationEventStore.OrchestrationEventStore)({
         latestApplicationSequence: Effect.succeed(41),
       }),
       Layer.mock(StorageCleanup.StorageCleanup)({
-        recentlyDeletedWorktreeBytes: () => Effect.succeed(null),
+        listRecentlyDeleted: Effect.succeed({
+          items: [item],
+          totals: { count: 1, attachmentBytes: 24, worktreeBytes: null },
+        }),
       }),
     );
     const client = yield* RpcTest.makeClient(WsRpcGroup).pipe(

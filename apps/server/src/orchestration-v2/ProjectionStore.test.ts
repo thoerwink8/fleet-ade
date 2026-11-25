@@ -48,6 +48,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as Statement from "effect/sql/Statement";
 import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
 
+import { createAttachmentId } from "../attachmentStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -2179,8 +2180,33 @@ const threadTrashLifecycle = Effect.gen(function* () {
   yield* remove(purged, deletedAt, "purged-deleted");
   const { statements, tracer } = traceSqlStatements();
   const beforeRestoreAndPurge = yield* store.getRecentlyDeleted().pipe(Effect.withTracer(tracer));
-  assert.equal(statements.length, 2);
+  assert.equal(statements.length, 3);
   assert.deepEqual(beforeRestoreAndPurge.totals, { count: 3, attachmentBytes: 71 });
+  // An HTML render keeps an attachment id but no size: the total becomes unknown, not a short number.
+  const renderId = createAttachmentId(newer.id, "html");
+  assert.isNotNull(renderId);
+  yield* sql`
+    INSERT INTO orchestration_v2_projection_turn_items
+      (turn_item_id, thread_id, ordinal, type, status, updated_at, payload_json)
+    VALUES (
+      ${"item:trash:render"}, ${newer.id}, 0, 'dynamic_tool', 'completed',
+      ${DateTime.formatIso(createdAt)},
+      ${JSON.stringify({
+        type: "dynamic_tool",
+        toolName: "mcp__t3-code__html_render",
+        output: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              htmlRender: { attachmentId: renderId, title: "x", height: 300 },
+            }),
+          },
+        ],
+      })}
+    )
+  `;
+  assert.isNull((yield* store.getRecentlyDeleted()).totals.attachmentBytes);
+  yield* sql`DELETE FROM orchestration_v2_projection_turn_items WHERE turn_item_id = ${"item:trash:render"}`;
   yield* store.apply({
     id: EventId.make("event:trash:purged"),
     type: "thread.purged",

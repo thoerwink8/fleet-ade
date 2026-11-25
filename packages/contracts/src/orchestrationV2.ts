@@ -3995,7 +3995,8 @@ export type OrchestrationV2RecentlyDeletedThread = typeof OrchestrationV2Recentl
 
 export const OrchestrationV2RecentlyDeletedTotals = Schema.Struct({
   count: NonNegativeInt,
-  attachmentBytes: NonNegativeInt,
+  // null means unknown (a trashed thread holds sizeless tool outputs); never a stand-in 0.
+  attachmentBytes: Schema.NullOr(NonNegativeInt),
   worktreeBytes: Schema.NullOr(NonNegativeInt),
 });
 export type OrchestrationV2RecentlyDeletedTotals = typeof OrchestrationV2RecentlyDeletedTotals.Type;

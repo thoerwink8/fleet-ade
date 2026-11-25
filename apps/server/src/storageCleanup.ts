@@ -4,6 +4,7 @@ import {
   GitCommandError,
   OrchestrationV2AppThreadJson,
   OrchestrationV2ProviderSessionJson,
+  type OrchestrationV2RecentlyDeletedThread,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -354,6 +355,17 @@ export class StorageCleanup extends Context.Service<
     ) => Effect.Effect<StorageCleanupPreview, ServerSettingsError>;
     readonly latestReport: Effect.Effect<StorageCleanupReport | null>;
     readonly reports: Stream.Stream<StorageCleanupReport | null>;
+    readonly listRecentlyDeleted: Effect.Effect<
+      {
+        readonly items: ReadonlyArray<OrchestrationV2RecentlyDeletedThread>;
+        readonly totals: {
+          readonly count: number;
+          readonly attachmentBytes: number | null;
+          readonly worktreeBytes: number | null;
+        };
+      },
+      Orchestrator.OrchestratorV2Error
+    >;
     readonly recentlyDeletedWorktreeBytes: (
       items: ReadonlyArray<{ readonly threadId: ThreadId; readonly worktreePath: string | null }>,
     ) => Effect.Effect<number | null>;
@@ -1153,6 +1165,7 @@ const make = Effect.gen(function* () {
       }),
       ...deletedThreads.filter((_thread, index) => !groups.has(deletedKeys[index]!)),
     ];
+    const recentlyDeletedDeadline = now + 30_000;
     for (const thread of candidates) {
       const settings = resolveWorktreeCleanup(serverSettings, thread.projectId);
       if (!worktreeCleanupEnabled(settings)) continue;
@@ -1203,10 +1216,15 @@ const make = Effect.gen(function* () {
         );
         if (!exists) return;
         if (deleted && protectedDeletedIds.has(thread.id)) {
-          const measured = yield* measureWorktree(worktreePath);
+          // Sizing is a courtesy: the sweep budget running out leaves it unknown.
+          const remaining = recentlyDeletedDeadline - (yield* Clock.currentTimeMillis);
+          const measured =
+            remaining > 0
+              ? yield* measureWorktree(worktreePath).pipe(Effect.timeoutOption(remaining))
+              : Option.none();
           return keep(
             "会话在最近删除里，7 天后自动清理。现在要释放空间，请到最近删除里永久删除它。",
-            measured.bytes,
+            Option.isSome(measured) ? measured.value.bytes : null,
           );
         }
         if (deleted && !settings.worktreeOnDelete) return keep("没有适用的规则");
@@ -1798,6 +1816,12 @@ const make = Effect.gen(function* () {
     },
   );
 
+  const listRecentlyDeleted = Effect.fn("StorageCleanup.listRecentlyDeleted")(function* () {
+    const { items, totals } = yield* engine.listRecentlyDeleted();
+    const worktreeBytes = yield* recentlyDeletedWorktreeBytes(items);
+    return { items, totals: { ...totals, worktreeBytes } };
+  });
+
   const start = Effect.fn("StorageCleanup.start")(function* () {
     const unsubscribe = yield* terminals.subscribeMetadata((event) =>
       Effect.sync(() => {
@@ -1873,6 +1897,7 @@ const make = Effect.gen(function* () {
     previewWithPatch,
     latestReport: SubscriptionRef.get(reportRef),
     reports: SubscriptionRef.changes(reportRef),
+    listRecentlyDeleted: listRecentlyDeleted(),
     recentlyDeletedWorktreeBytes,
     drain: worker.drain,
   });
