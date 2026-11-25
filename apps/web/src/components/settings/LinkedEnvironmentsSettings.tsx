@@ -68,13 +68,13 @@ export function LinkedEnvironmentsSettings({
       headerAction={canLink ? <LinkEnvironmentAction environmentId={environmentId} /> : null}
     >
       {links.error ? (
-        <SettingsRow title="无法加载已关联的环境" description={links.error} />
+        <SettingsRow title="无法加载已关联的电脑" description={links.error} />
       ) : !links.data ? (
-        <SettingsRow title="正在加载已关联的环境…" role="status" />
+        <SettingsRow title="正在加载已关联的电脑…" role="status" />
       ) : links.data.links.length === 0 ? (
         <SettingsRow
-          title="没有已关联的环境"
-          description="关联另一台运行 Fleet ADE 的机器（例如 VPS），让这里的智能体能够在那台机器上启动和操作会话。"
+          title="没有已关联的电脑"
+          description="关联另一台运行 Fleet ADE 的电脑（例如 VPS），让这里的智能体能够在那台电脑上启动和操作会话。"
         />
       ) : (
         links.data.links.map((link) => (
@@ -98,7 +98,7 @@ function LinkedEnvironmentRow({
 }) {
   const nowMinute = useNowMinute();
   const health = peerLinkHealth(link, DateTime.makeUnsafe(nowMinute));
-  const unlink = useAtomCommand(peerLinkEnvironment.unlink, { label: "取消关联环境" });
+  const unlink = useAtomCommand(peerLinkEnvironment.unlink, { label: "取消关联电脑" });
   const canUnlink = useAtomValue(peerLinkEnvironment.unlink.permissionAtom(environmentId));
   const [busy, setBusy] = useState(false);
   const forget = async () => {
@@ -180,7 +180,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
   // Enter then a click can both run before a re-render; this guard is synchronous.
   const inFlight = useRef(false);
   const formId = useId();
-  const link = useAtomCommand(peerLinkEnvironment.link, { label: "关联环境" });
+  const link = useAtomCommand(peerLinkEnvironment.link, { label: "关联电脑" });
   const selected = choice ?? (machines.length === 0 ? ANOTHER_ADDRESS : null);
   const machine = machines.find((candidate) => candidate.environmentId === selected) ?? null;
   const targetId = machine?.environmentId ?? null;
@@ -217,7 +217,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
     const minted = await mintPairingCodeOn(targetId, access);
     if (Result.isSuccess(minted)) return minted.success;
     setMintFailed((failed) => new Set(failed).add(targetId));
-    failureToast("无法关联环境", linkRequestFailureMessage(minted.failure));
+    failureToast("无法关联电脑", linkRequestFailureMessage(minted.failure));
     return null;
   };
   const submit = async () => {
@@ -250,7 +250,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
       toastManager.add({ type: "success", title: `已关联 ${result.value.label}` });
       handleOpenChange(false);
     } else if (!isAtomCommandInterrupted(result)) {
-      failureToast("无法关联环境", String(squashAtomCommandFailure(result)));
+      failureToast("无法关联电脑", String(squashAtomCommandFailure(result)));
     }
   };
   return (
@@ -271,9 +271,9 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
       />
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>关联环境</DialogTitle>
+          <DialogTitle>关联电脑</DialogTitle>
           <DialogDescription>
-            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在该环境的「连接」里的已授权客户端中，可以在那里撤销。
+            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在这台电脑「连接」页的已授权客户端里，可以在那里撤销。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -317,7 +317,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    此应用没有其他机器能够访问的 {machine.label} 地址。请输入它的 https 或 Tailscale
+                    此应用没有其他电脑能够访问的 {machine.label} 地址。请输入它的 https 或 Tailscale
                     地址。
                   </span>
                 ) : null}

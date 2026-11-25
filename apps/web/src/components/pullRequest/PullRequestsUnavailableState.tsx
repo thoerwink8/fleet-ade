@@ -6,7 +6,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "..
 import { PullRequestGlyph } from "./pullRequestIcons";
 
 export function PullRequestsUnavailableState({
-  title = "无法加载 pull request",
+  title = "无法加载 PR",
   error,
   onRetry,
   refreshing = false,

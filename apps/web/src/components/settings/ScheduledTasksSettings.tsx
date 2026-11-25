@@ -164,8 +164,8 @@ const NEW_THREAD_DESTINATION = " new-thread";
 
 const WORKSPACE_MODE_LABELS: Record<WorkspaceMode, string> = {
   worktree: "创建新工作树",
-  root: "使用项目工作副本",
-  existing_worktree: "使用指定工作副本",
+  root: "使用项目目录",
+  existing_worktree: "使用指定工作树",
 };
 
 const EMPTY_DRAFT: DraftState = {
@@ -497,8 +497,8 @@ export function ScheduledTasksSettings(target: {
               <EmptyMedia variant="icon">
                 <Clock3Icon />
               </EmptyMedia>
-              <EmptyTitle>没有可用的环境</EmptyTitle>
-              <EmptyDescription>连接一个环境以管理定时任务。</EmptyDescription>
+              <EmptyTitle>没有可用的电脑</EmptyTitle>
+              <EmptyDescription>连接一台电脑以管理定时任务。</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : environments.length > 1 ? (
@@ -651,7 +651,7 @@ function ScheduledTaskEnvironmentList({
       {populated.length === 0 && loaded.length > 0 ? (
         <SettingsRow
           title="没有定时任务"
-          description="没有符合所选环境和项目的任务。可以从下方模板快速开始："
+          description="没有符合所选电脑和项目的任务。可以从下方模板快速开始："
         >
           <div className="pt-3 pb-2">
             <ScheduledTaskTemplates disabled={!canCreate} onSelect={onCreateFromTemplate} />
@@ -740,7 +740,7 @@ function ScheduledTaskEnvironmentSection({
     >
       {!connected ? (
         <SettingsRow
-          title="环境已断开"
+          title="电脑已断开"
           description={`请重新连接 ${environment.label}，查看其定时任务。`}
         />
       ) : tasksQuery.error ? (
@@ -759,7 +759,7 @@ function ScheduledTaskEnvironmentSection({
           {tasks.length === 0 ? (
             <SettingsRow
               title="没有定时任务"
-              description="没有符合所选环境和项目的任务。可以从下方模板快速开始："
+              description="没有符合所选电脑和项目的任务。可以从下方模板快速开始："
             >
               <div className="pt-3 pb-2">
                 <ScheduledTaskTemplates disabled={!canCreate} onSelect={onCreateFromTemplate} />
@@ -1193,7 +1193,7 @@ function WebhookEndpointField({
 
 const THREAD_MODE_LABELS: Record<ScheduledTaskThreadMode, string> = {
   new_thread: "每次运行新建会话",
-  continue: "在同一会话中继续对话",
+  continue: "在同一会话中继续",
   fresh_session: "在同一会话中运行，每次使用全新上下文",
 };
 
@@ -1254,13 +1254,13 @@ function ScheduledTaskDestination({
   };
   const detail =
     threadMode === "new_thread"
-      ? "每次运行都使用下方的工作区和模型创建新会话。"
+      ? "每次运行都使用下方的目录和模型创建新会话。"
       : ref === null
         ? threadMode === "continue"
-          ? "首次运行使用下方的工作区和模型创建会话，后续运行继续该会话的对话。"
-          : "首次运行使用下方的工作区和模型创建会话。后续运行在该会话中发送消息，每次使用全新上下文，不包含之前运行的内容。"
+          ? "首次运行使用下方的目录和模型创建会话，后续运行继续该会话。"
+          : "首次运行使用下方的目录和模型创建会话。后续运行在该会话中发送消息，每次使用全新上下文，不包含之前运行的内容。"
         : threadMode === "continue"
-          ? "每次运行都在此会话的工作区中使用其当前模型继续对话。"
+          ? "每次运行都在此会话的目录中使用其当前模型继续。"
           : "每次运行都在此会话中使用全新上下文，不包含之前运行的内容。";
   return (
     <Field label="目标会话" htmlFor="scheduled-task-destination">
@@ -1572,13 +1572,13 @@ function ScheduledTaskEditorDialog({
     }
     if (schedule.type === "once" && !offersOnce) {
       reportFailure(
-        "此环境不支持单次运行",
-        "此环境运行的是旧版 Fleet ADE。请更新后再创建单次定时任务，或选择其他定时规则。",
+        "这台电脑不支持单次运行",
+        "这台电脑运行的是旧版 Fleet ADE。请更新后再创建单次定时任务，或选择其他定时规则。",
       );
       return;
     }
     if (draft.workspaceMode === "existing_worktree" && !draft.existingWorktreePath.trim()) {
-      reportFailure("请填写工作副本路径", "请输入任务运行所在的工作副本路径。");
+      reportFailure("请填写工作树路径", "请输入任务运行所在的工作树路径。");
       return;
     }
     const modelSelection =
@@ -1678,7 +1678,7 @@ function ScheduledTaskEditorDialog({
           {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
           <fieldset ref={fieldsRef} disabled={saving} className="min-w-0 space-y-5">
             {!connected ? (
-              <p className="text-sm text-destructive">请重新连接此环境后再保存。</p>
+              <p className="text-sm text-destructive">请重新连接这台电脑后再保存。</p>
             ) : null}
             {task === null ? (
               <Field label="从模板开始">
@@ -1688,7 +1688,7 @@ function ScheduledTaskEditorDialog({
                 />
               </Field>
             ) : null}
-            <Field label="运行环境" htmlFor="scheduled-task-environment">
+            <Field label="电脑" htmlFor="scheduled-task-environment">
               <Select
                 value={environmentId}
                 disabled={task !== null || saving}
@@ -1714,7 +1714,7 @@ function ScheduledTaskEditorDialog({
                         kind={resolveEnvironmentMachineKind(environment?.serverConfig ?? null)}
                         className="size-4"
                       />
-                      {environment?.label ?? "环境不可用"}
+                      {environment?.label ?? "电脑不可用"}
                     </span>
                   </SelectValue>
                 </SelectTrigger>
@@ -1826,7 +1826,7 @@ function ScheduledTaskEditorDialog({
                 </Select>
               </Field>
 
-              <Field label="工作区" htmlFor="scheduled-task-workspace">
+              <Field label="目录" htmlFor="scheduled-task-workspace">
                 <Select
                   value={draft.workspaceMode}
                   onValueChange={(value) =>
@@ -1838,8 +1838,8 @@ function ScheduledTaskEditorDialog({
                   </SelectTrigger>
                   <SelectPopup>
                     <SelectItem value="worktree">创建新工作树</SelectItem>
-                    <SelectItem value="root">使用项目工作副本</SelectItem>
-                    <SelectItem value="existing_worktree">使用指定工作副本</SelectItem>
+                    <SelectItem value="root">使用项目目录</SelectItem>
+                    <SelectItem value="existing_worktree">使用指定工作树</SelectItem>
                   </SelectPopup>
                 </Select>
               </Field>
@@ -1863,7 +1863,7 @@ function ScheduledTaskEditorDialog({
               </Field>
             ) : null}
             {draft.workspaceMode === "existing_worktree" ? (
-              <Field label="工作副本路径" htmlFor="scheduled-task-checkout">
+              <Field label="工作树路径" htmlFor="scheduled-task-checkout">
                 <Input
                   id="scheduled-task-checkout"
                   value={draft.existingWorktreePath}

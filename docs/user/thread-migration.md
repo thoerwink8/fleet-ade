@@ -1,12 +1,12 @@
-# Threads from older T3 Code versions
+# Threads from older Fleet ADE versions
 
-On your first V2 launch, T3 Code copies the V1 database, `state.sqlite`, into `statev2.sqlite`
+On your first V2 launch, Fleet ADE copies the V1 database, `state.sqlite`, into `statev2.sqlite`
 in the same data directory and migrates the copy. Your threads appear automatically, with full
 transcripts imported as needed. You do not need to run an import command.
 
 V1 continues using its original database while V2 uses the copy. The database import can run while
 V1 is open. Opening V2 again resumes your V2 history. The copy happens only once: later conversations
-and changes in either version do not sync to the other. Settings, attachments, and workspace files
+and changes in either version do not sync to the other. Settings, attachments, and project files
 remain shared.
 
 The V2 desktop app uses a separate browser profile, so browser cookies and caches do not carry
@@ -14,20 +14,20 @@ over from V1. You may need to sign in again to websites opened inside the app. O
 the V2 desktop app copies stashed prompts, unsent drafts, layout, and theme from V1. Anything you
 change in V2 afterwards stays in V2.
 
-The migrated thread keeps its title, project, provider and model selection, permission and
-interaction modes, branch or worktree, archive state, settlement state, snooze and pin state, and
-linked pull request. T3 Code also brings over user and assistant messages, their timestamps, and
+The migrated thread keeps its title, project, agent and model selection, permission and
+interaction modes, branch or worktree, archive state, completion state, snooze and pin state, and
+linked PR. Fleet ADE also brings over user and assistant messages, their timestamps, and
 supported attachments. Large histories may appear in stages while the server imports transcripts.
 
-The migration does not recreate the old provider's live session. It also does not convert old run
+The migration does not recreate the old agent's live session. It also does not convert old run
 records, checkpoints and diffs, tool activity, approval history, or proposed plan history into the
 new format. These items may be absent from a migrated timeline even though the conversation text is
 present.
 
 ## Continuing a migrated thread
 
-The first new message starts a fresh provider session. T3 Code selects intact user and assistant
-messages using the same [handoff budget](./portable-handoffs.md) as a provider switch. Omitted text
+The first new message starts a fresh agent session. Fleet ADE selects intact user and assistant
+messages using the same [handoff budget](./portable-handoffs.md) as an agent switch. Omitted text
 remains in the thread and can be retrieved by the agent. The migration retains its separate
 32,000-character recovery excerpt; neither that excerpt nor the handoff replaces the full imported
 transcript.
@@ -38,7 +38,7 @@ handoff is also a good choice when the old conversation contains conflicting ins
 
 ## Keeping a recovery copy
 
-T3 Code does not currently have a whole-thread export command. Before a major server update, stop
+Fleet ADE does not currently have a whole-thread export command. Before a major background service update, stop
 the server and copy its `userdata` directory to a safe location. The default is
 `~/.t3/userdata`; a server started with `--base-dir <path>` uses `<path>/userdata`.
 
@@ -70,5 +70,4 @@ ORDER BY created_at, message_id;
 ```
 
 Open only the copied database. Do not edit it or point a newer or older server at your recovery
-copy. If the affected environment is remote, make and inspect the copy on the machine that runs
-that environment.
+copy. If the affected computer is remote, make and inspect the copy on that computer.

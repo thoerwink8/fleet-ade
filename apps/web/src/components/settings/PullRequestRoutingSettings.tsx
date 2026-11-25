@@ -66,8 +66,8 @@ export function PullRequestRoutingSettings({
       }
     >
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        此处信任的机器可借助彼此的版本控制访问权限读取 PR
-        数据。需要在两台机器上都启用。“读取并操作”可能使用比权限所属机器更广的权限。此设置仅适用于当前设备。
+        此处信任的电脑可借助彼此的版本控制访问权限读取 PR
+        数据。需要在两台电脑上都启用。“读取并操作”可能使用比权限所属电脑更广的权限。此设置仅适用于当前设备。
       </p>
       {environments.map((environment) => (
         <EnvironmentRow
@@ -93,7 +93,7 @@ export function PullRequestRoutingSettings({
                   if (result._tag === "Failure")
                     toastManager.add({
                       type: "error",
-                      title: "无法保存 pull request 路由权限",
+                      title: "无法保存 PR 路由权限",
                     });
                 },
               );

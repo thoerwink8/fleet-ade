@@ -634,7 +634,7 @@ export function PullRequestFiltersMenu({
           <>
             <MenuSeparator />
             <PullRequestFilterRadioSubmenu
-              label="服务器"
+              label="电脑"
               value={server ?? ALL_SERVERS_VALUE}
               options={serverOptions}
               onChange={(next) =>

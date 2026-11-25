@@ -137,11 +137,12 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
         destinationPath: input.destinationPath,
       },
     },
-    { label: "将项目添加到机器", reportFailure: false },
+    { label: "将项目添加到电脑", reportFailure: false },
   );
   if (started._tag === "Failure") {
     setFileCopy(requestedKey, null);
-    throw new Error(failureMessage(started));
+    const error = squashAtomCommandFailure(started);
+    throw error instanceof Error ? error : new Error("发生错误。");
   }
   // The server clones for the existing project when one already owns the empty destination.
   const { projectId } = started.value;
@@ -182,7 +183,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
             contents: read.contents,
           },
         },
-        { label: "将文件复制到机器", reportFailure: false },
+        { label: "将文件复制到电脑", reportFailure: false },
       );
       if (written._tag === "Failure")
         failed.push(`${read.relativePath}: ${failureMessage(written)}`);

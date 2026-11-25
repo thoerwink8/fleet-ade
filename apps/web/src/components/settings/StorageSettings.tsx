@@ -100,7 +100,7 @@ export function WorktreesDirectoryRow() {
     <SettingsRow
       {...searchableSetting("storage-worktrees-location")}
       description={
-        "新工作树的创建位置，可选择任意磁盘，例如 D:\\worktrees 或 ~/worktrees。现有工作树的位置不变。留空时使用 T3 主目录。"
+        "新工作树的创建位置，可选择任意磁盘，例如 D:\\worktrees 或 ~/worktrees。现有工作树的位置不变。留空时使用 Fleet ADE 主目录。"
       }
       serverScoped
       settingKeys={["worktreesDirectory"]}
@@ -118,7 +118,7 @@ export function WorktreesDirectoryRow() {
           aria-label="工作树位置"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={mixed ? "各不相同" : "默认"}
+          placeholder={mixed ? "多项不同" : "默认"}
           defaultValue={mixed ? "" : settings.worktreesDirectory}
           onFocus={(event) => {
             draft.current = event.target.value;
@@ -381,7 +381,7 @@ function lastRunSummary(
   if (!first) return "";
   if (machineCount <= 1) return first.counts;
   if (entries.length === machineCount && entries.every((entry) => entry.counts === first.counts)) {
-    return `每台机器均为 ${first.counts}`;
+    return `每台电脑均为 ${first.counts}`;
   }
   return entries.map((entry) => `${entry.label}: ${entry.counts}`).join(" · ");
 }
@@ -414,7 +414,7 @@ function CleanupResults({
                   {entry.reason}
                 </span>
                 <span className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-l border-border/60 pl-3">
-                  <span>机器</span>
+                  <span>电脑</span>
                   <span className="text-foreground/80">{environmentLabel}</span>
                   {entry.projectPath && (
                     <>
@@ -1104,7 +1104,7 @@ function StorageCleanupScopeNotice() {
         )
         .map((environment) => environment.environmentId)}
     >
-      更新所选环境后即可使用存储清理，或选择支持此功能的机器。
+      更新所选电脑后即可使用存储清理，或选择支持此功能的电脑。
     </SettingsScopeNotice>
   );
 }
@@ -1132,7 +1132,7 @@ export function WorktreeCleanupSection() {
           key
         ] !== settings[key],
     )
-      ? "所选机器的设置各不相同"
+      ? "所选电脑的设置多项不同"
       : undefined;
   const update = (
     patch: Partial<StorageCleanupSettings>,
@@ -1156,7 +1156,7 @@ export function WorktreeCleanupSection() {
     return (
       <SettingsSection id="storage-worktrees" title="清理" variant="plain">
         <SettingsScopeNotice inline target="all">
-          请先更新所选机器，再配置项目工作树清理。
+          请先更新所选电脑，再配置项目工作树清理。
         </SettingsScopeNotice>
       </SettingsSection>
     );
@@ -1180,7 +1180,7 @@ export function WorktreeCleanupSection() {
                 ? "保留此项目的工作树，直到你手动删除。"
                 : mode === "custom"
                   ? "此项目使用以下规则。"
-                  : "使用各机器的工作树清理设置。"
+                  : "使用各电脑的工作树清理设置。"
             }
             serverScoped
             settingKeys={["worktreeCleanup"]}
@@ -1200,7 +1200,7 @@ export function WorktreeCleanupSection() {
                 <SelectTrigger size="sm" aria-label="自动清理工作树">
                   <SelectValue>
                     {mixedModes
-                      ? "各不相同"
+                      ? "多项不同"
                       : mode === "inherit"
                         ? "继承"
                         : mode === "off"
@@ -1236,7 +1236,7 @@ export function WorktreeCleanupSection() {
             <SettingsRow
               title="删除已合并的工作树"
               status={ruleStatus("worktreeOnMerge")}
-              description="移除 pull request 已合并且提交已包含在默认分支中的工作树。"
+              description="移除 PR 已合并且提交已包含在默认分支中的工作树。"
               serverScoped={!isProjectScope}
               control={
                 <Switch
@@ -1274,20 +1274,20 @@ export function WorktreeCleanupSection() {
                     true,
                 ) && (
                   <SettingsRow
-                    title="删除已收尾的工作树"
+                    title="删除已完成的工作树"
                     status={[
                       ruleStatus("worktreeSettledAfterDays"),
                       environments.length > connectedEnvironments.length
-                        ? "离线机器不会收到此设置"
+                        ? "离线电脑不会收到此设置"
                         : undefined,
                     ]
                       .filter(Boolean)
                       .join(". ")}
-                    description="会话收尾达到设定天数后移除其工作树。设为 0 天时，在下次清理时移除。保留分支和会话历史。"
+                    description="会话标为完成达到设定天数后移除其工作树。设为 0 天时，在下次清理时移除。保留分支和会话历史。"
                     serverScoped={!isProjectScope}
                     control={
                       <RetentionControl
-                        label="删除已收尾的工作树"
+                        label="删除已完成的工作树"
                         value={settings.worktreeSettledAfterDays}
                         minimum={0}
                         disabled={busy}
@@ -1343,7 +1343,7 @@ export function WorktreeCleanupSection() {
                       <SelectTrigger size="sm" aria-label="保留有本地改动的工作树">
                         <SelectValue>
                           {ruleStatus("worktreeKeepWhen")
-                            ? "各不相同"
+                            ? "多项不同"
                             : KEEP_WHEN_LABELS[settings.worktreeKeepWhen]}
                         </SelectValue>
                       </SelectTrigger>
@@ -1398,11 +1398,11 @@ export function StorageCleanupSections() {
   const settledLogsStatus = useDebouncedValue(`${targetIdsKey}:${logsMixed}`, 300);
   const artifactsStatus =
     targets.length > 1 && settledArtifactsStatus === `${targetIdsKey}:true`
-      ? "所选机器的设置各不相同"
+      ? "所选电脑的设置多项不同"
       : undefined;
   const logsStatus =
     targets.length > 1 && settledLogsStatus === `${targetIdsKey}:true`
-      ? "所选机器的设置各不相同"
+      ? "所选电脑的设置多项不同"
       : undefined;
   if (scope.kind === "project" || scope.kind === "checkout") return null;
   const update = (

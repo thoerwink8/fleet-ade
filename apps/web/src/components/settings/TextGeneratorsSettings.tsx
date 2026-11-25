@@ -235,7 +235,7 @@ const TASKS = [
   { key: "textGenerationModelSelection", label: "会话标题和其他生成的文本" },
   {
     key: "sourceControlWriterModelSelection",
-    label: "提交信息、pull request 和分支名称",
+    label: "提交信息、PR 和分支名称",
   },
 ] as const;
 
@@ -325,7 +325,7 @@ function TextGeneratorWizard({
       <WizardPopup>
         <WizardHeader
           title={existing ? `编辑 ${textGeneratorDisplayName(existing)}` : "添加文本生成器"}
-          description="无需启动编程智能体即可撰写会话标题、提交信息等短文本。你的 API 密钥存储在此环境中。"
+          description="无需启动编程智能体即可撰写会话标题、提交信息等短文本。你的 API 密钥存储在这台电脑中。"
         >
           <WizardSteps
             steps={STEPS}

@@ -8,14 +8,14 @@ An agent that needs a token or password shows a secret request card in the threa
 you to paste it into the chat. Type or paste the value and select **Save securely**, or select
 **Decline**. You can answer from web or desktop, including on a phone.
 
-The value never appears in the conversation. Most requests keep it from the agent too: T3 Code
+The value never appears in the conversation. Most requests keep it from the agent too: Fleet ADE
 passes it to the tool that needs it. When an agent has to run a command with the value, the card
 says so instead: the value goes into a private file that the agent's commands can read for about 24
 hours.
 
-## Secret providers saved by an older version
+## Secret sources saved by an older version
 
-T3 Code no longer reads credentials from 1Password. A credential field that still holds a
-1Password reference cannot be read, and the provider or feature that needs it shows an error naming
-the secret provider. Open the field in Settings, pick **Value** as its source, and enter the
+Fleet ADE no longer reads credentials from 1Password. A credential field that still holds a
+1Password reference cannot be read, and the agent or feature that needs it shows an error naming
+the secret source. Open the field in Settings, pick **Value** as its source, and enter the
 credential itself.

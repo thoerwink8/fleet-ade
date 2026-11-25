@@ -50,6 +50,7 @@ import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
 import { AlarmClockIcon, CheckCircle2Icon } from "lucide-react";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { titleRegenerationToast } from "../threadTitleRegenerationToast";
+import { presentVersionControlError } from "../versionControlError.logic";
 import { newMessageId } from "~/lib/utils";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { composerDraftHasUserContent, useComposerDraftStore } from "../../composerDraftStore";
@@ -368,11 +369,15 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     if (checkoutResult._tag === "Failure") {
       finishRestore();
       if (!isAtomCommandInterrupted(checkoutResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(checkoutResult),
+          "切换项目目录分支",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法切换项目目录分支",
-            description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

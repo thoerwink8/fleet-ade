@@ -433,15 +433,15 @@ export function SettingsRow({
                   ? context.connectedEnvironments
                       .filter((target) => !writableIds.has(target.environmentId))
                       .map((target) => target.label)
-                      .join(", ") || "所选环境"
-                  : (primaryEnvironment?.label ?? "主环境")
+                      .join(", ") || "所选电脑"
+                  : (primaryEnvironment?.label ?? "主电脑")
               } 的设置。`
             : context
-              ? "请重新连接所选环境以修改此设置。"
+              ? "请重新连接所选电脑以修改此设置。"
               : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
         )
       : environmentWide && control
-        ? inertControl("这是环境级设置，请先选择一个环境再修改。")
+        ? inertControl("这是电脑级设置，请先选择一台电脑再修改。")
         : control;
   const customized =
     context !== null &&
@@ -455,7 +455,7 @@ export function SettingsRow({
       }),
     );
   const inheritance: { state: SettingInheritanceState; summary: string } = mixed
-    ? { state: "mixed", summary: "所选环境之间各不相同" }
+    ? { state: "mixed", summary: "所选电脑之间多项不同" }
     : source === "project"
       ? { state: "overridden", summary: "已为此项目覆盖" }
       : source === "t3.json"
@@ -463,7 +463,7 @@ export function SettingsRow({
         : source === "environment" && scopedKeys.length > 0
           ? { state: "inherited", summary: `继承自 ${inheritedFrom}` }
           : customized
-            ? { state: "environment", summary: "在环境上设置" }
+            ? { state: "environment", summary: "在电脑上设置" }
             : { state: "default", summary: "内置默认值" };
   const renderedInheritance =
     context && serverScoped && settingKeys.length > 0 ? (

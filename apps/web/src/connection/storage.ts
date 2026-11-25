@@ -624,7 +624,7 @@ export function makeBrowserPullRequestRoutingPermissions(
         else browser.localStorage.setItem(key, encodeStoredPullRequestRoutingPermission(value));
         browser.dispatchEvent(new Event(PULL_REQUEST_ROUTING_CHANGED));
       },
-      catch: (cause) => catalogError("save pull request routing permissions in", cause),
+      catch: (cause) => catalogError("保存 PR 共享权限到", cause),
     });
   return PullRequestRoutingPermissions.of({
     get: Effect.fn("PullRequestRoutingPermissions.get")(function (entry) {
@@ -660,7 +660,7 @@ export function makeBrowserPullRequestRoutingPermissions(
       if (connectionKey === null)
         return yield* new ConnectionBlockedError({
           reason: "configuration",
-          detail: "此环境没有已保存的连接端点。",
+          detail: "这台电脑没有已保存的连接端点。",
         });
       return yield* write(
         entry.target.environmentId,

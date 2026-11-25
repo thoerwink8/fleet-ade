@@ -106,8 +106,8 @@ position, so using **Unmark as done** returns it to the top. Pinning and snoozin
 position until you move it again. Thread activity does not change the order. The completed section
 continues to sort by completion time.
 
-If dragging is unavailable for one environment, update the Fleet ADE server running in that
-environment. Pinned and active reordering require server support. Threads from older servers keep
+If dragging is unavailable for one computer, update the Fleet ADE background service running on that
+computer. Pinned and active reordering require server support. Threads from older background services keep
 their default order until the server is updated.
 
 To generate a fresh title from the conversation, open a thread's menu and choose
@@ -153,10 +153,10 @@ when the thread completes** enabled in **Settings → Code → Actions**. You ca
 that action so T3 can stop its terminal and child processes. Commands started through an
 agent's own shell tools are managed by the agent.
 
-To reclaim disk space from settled work, turn on **Run in the thread's worktree when the
+To reclaim disk space from completed work, turn on **Run in the thread's worktree when the
 thread completes** for one of the project's actions, or set `"runOnSettle": true` on a
 `t3.json` script, for example `cargo clean`. It runs each time a thread in its own
-worktree settles, manually or automatically, even if a terminal there still runs a
+worktree completes, manually or automatically, even if a terminal there still runs a
 command such as a dev server. Threads in the project's main checkout skip it. Its terminal
 closes when the command succeeds and stays open when it fails.
 
@@ -181,16 +181,16 @@ a thread on **Follow settings** does not auto-complete either. Manual completion
 archive still work while it is set to **Never**.
 
 Change these rules in **Settings → Threads**.
-They continue to run when your apps are closed. On web and desktop, choose an environment at the
-top to change only its rules, or **All environments** to update connected environments together.
-When multiple values differ across selected computers, **Multiple values differ** is shown. Offline environments
-and older servers keep their previous values. Changing a rule does not reopen
+They continue to run when your apps are closed. On web and desktop, choose a computer at the
+top to change only its rules, or **All computers** to update connected computers together.
+When multiple values differ across selected computers, **Multiple values differ** is shown. Offline computers
+and older background services keep their previous values. Changing a rule does not reopen
 already completed threads.
 
 ## Link a PR
 
 The server finds the PR for each incomplete thread's saved branch, even when your
-apps are closed. Completed threads keep their saved links. Update the server if
+apps are closed. Completed threads keep their saved links. Update the background service if
 automatic branch links do not appear.
 
 On web and desktop, right-click a PR link in a thread and choose
@@ -201,7 +201,7 @@ The linked PR participates in auto-completion.
 ## Find and reference work
 
 On web and desktop, open the command palette with `Cmd/Ctrl+K` to search threads
-across connected environments by title, branch, PR, or project.
+across connected computers by title, branch, PR, or project.
 Threads you open often or recently rank higher, and for three weeks the thread
 you last picked for a query ranks higher when you type that query again.
 Threads whose messages contain all your words appear below, under **In
@@ -233,7 +233,7 @@ the continuation finishes. If the queue was held by a restart, resume it then.
 When the provider reports a reset time, choose **Resume at reset** to schedule a
 continuation. You can cancel it from the thread. Enable **Resume after
 usage limits** in **Settings → Threads** to schedule limit stops by default.
-The environment must be running when the reset arrives; it resumes overdue
+The computer must be running when the reset arrives; it resumes overdue
 continuations after a restart. Stopping the thread, sending a new message,
 archiving, or settling it prevents a pending continuation from starting.
 
@@ -288,8 +288,8 @@ side chats.
 To change the choices in the snooze menu, open **Settings → Threads → Snooze options**.
 Each option is a duration, such as 3 hours, or a time on a day, such as 9:00 PM
 tomorrow. A weekday means the next one after today. Menus list the options soonest
-first and hide a today option after its time passes. Saved with **All environments**
-selected, the options apply to every connected environment.
+first and hide a today option after its time passes. Saved with **All computers**
+selected, the options apply to every connected computer.
 
 Choose **Snooze → Custom…** from a thread's menu to pick a date and time in your
 local time zone, or a duration in minutes, hours, or days. Durations start when

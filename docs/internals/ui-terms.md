@@ -39,6 +39,6 @@
    - `对话` / `聊天` / `最近` / `未读`：指会话本体统一用「会话」；时间序（「最近一轮」「最近添加」）保留「最近」；操作动词「标为未读」保留「未读」，状态指示词统一改「有新结果」。
    - `token` / `凭据`：配对码统一「配对码」；API Token/OAuth 凭据或上下文词元上限（如「200,000 token」）按场景用「词元」「密钥」或「token」。
 
-## 扩展扫描范围
+## 扫描范围
 
-后续批次清理其余目录（如设置子页、`components/files/`、`components/pullRequest/`、`components/usage/`）时，将对应路径加入 `scripts/ui-no-old-terms.ts` 的 `CLEANED_DIRS` / `CLEANED_FILES` 并删掉对应的 `EXEMPT_TEXTS` 条目。
+`scripts/ui-no-old-terms.ts` 的 `CLEANED_DIRS` 已覆盖整个 `apps/web/src`、`packages/client-runtime/src`、`packages/shared/src`。与服务端或历史持久化文本严格对照的少量例外只按句登记在 `EXEMPT_TEXTS` 并附来源文件与行号，不加整文件豁免。

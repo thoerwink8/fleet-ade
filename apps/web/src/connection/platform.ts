@@ -167,7 +167,7 @@ function sshPreparationError(cause: unknown) {
   }
   return new ConnectionTransientError({
     reason: "remote-unavailable",
-    detail: `无法准备 SSH 环境：${message}`,
+    detail: `无法准备 SSH 电脑：${message}`,
   });
 }
 
@@ -213,7 +213,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
   if (pairingToken === null) {
     return yield* new ConnectionBlockedError({
       reason: "authentication",
-      detail: "SSH 环境没有签发配对凭据。",
+      detail: "SSH 电脑没有签发配对码。",
     });
   }
   const descriptor = yield* Effect.tryPromise({
@@ -223,7 +223,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
   if (expectedEnvironmentId !== undefined && descriptor.environmentId !== expectedEnvironmentId) {
     return yield* new ConnectionBlockedError({
       reason: "configuration",
-      detail: `该主机连接的是 ${descriptor.label}，属于另一台机器。请改为将其添加为独立的环境。`,
+      detail: `该主机连接的是 ${descriptor.label}，属于另一台电脑。请改为将其添加为独立的电脑。`,
     });
   }
   const access = yield* Effect.tryPromise({
@@ -241,7 +241,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
       }
       return new ConnectionBlockedError({
         reason: "configuration",
-        detail: `${descriptor.label} 运行的 Fleet ADE 是 ${descriptor.serverVersion}，而这台桌面是 ${APP_VERSION}，该服务器无法接受这次配对。请在 ${descriptor.label} 上重启 Fleet ADE 服务器，使它运行 ${APP_VERSION}，然后重试。`,
+        detail: `${descriptor.label} 运行的 Fleet ADE 是 ${descriptor.serverVersion}，而这台桌面是 ${APP_VERSION}，该后台服务无法接受这次配对。请在 ${descriptor.label} 上重启 Fleet ADE 后台服务，使它运行 ${APP_VERSION}，然后重试。`,
       });
     },
   });
@@ -277,7 +277,7 @@ export const prepareDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ss
       if (descriptor.environmentId !== input.expectedEnvironmentId) {
         return yield* new ConnectionBlockedError({
           reason: "configuration",
-          detail: `该主机连接的是 ${descriptor.label}，属于另一台机器。请改为将其添加为独立的环境。`,
+          detail: `该主机连接的是 ${descriptor.label}，属于另一台电脑。请改为将其添加为独立的电脑。`,
         });
       }
       const session = yield* Effect.tryPromise({
@@ -324,7 +324,7 @@ const layerCapabilities = Layer.effectContext(
           if (bridge === undefined) {
             return yield* new ConnectionBlockedError({
               reason: "unsupported",
-              detail: "SSH 环境仅在桌面应用中可用。",
+              detail: "SSH 电脑仅在桌面应用中可用。",
             });
           }
           return yield* provisionDesktopSshEnvironment(bridge, target, expectedEnvironmentId);
@@ -335,7 +335,7 @@ const layerCapabilities = Layer.effectContext(
         if (bridge === undefined) {
           return yield* new ConnectionBlockedError({
             reason: "unsupported",
-            detail: "SSH 环境仅在桌面应用中可用。",
+            detail: "SSH 电脑仅在桌面应用中可用。",
           });
         }
         return yield* prepareDesktopSshEnvironment(bridge, input);
@@ -351,7 +351,7 @@ const layerCapabilities = Layer.effectContext(
           catch: (cause) =>
             new ConnectionTransientError({
               reason: "remote-unavailable",
-              detail: `无法断开 SSH 环境：${String(cause)}`,
+              detail: `无法断开 SSH 电脑：${String(cause)}`,
             }),
         });
       }),
@@ -393,7 +393,7 @@ const loadSecondaryConnectionRegistration = Effect.fn(
   ) {
     return yield* new ConnectionTransientError({
       reason: "endpoint-unavailable",
-      detail: `本机桌面后端 ${entry.id} 尚未就绪。`,
+      detail: `本机桌面后台服务 ${entry.id} 尚未就绪。`,
     });
   }
   const httpBaseUrl = entry.httpBaseUrl;

@@ -74,7 +74,7 @@ export function DatabaseStorageNotice({
         description={`这些数据库仍占用着历史清理后空出来的空间。${
           visible.every((recommendation) => recommendation.reclaimable)
             ? ""
-            : "请在每台机器上运行命令收回空间。这会重启后台服务。如果桌面应用托管着这个环境，请先退出桌面应用。"
+            : "请在每台电脑上运行命令收回空间。这会重启后台服务。如果桌面应用托管着这台电脑，请先退出桌面应用。"
         }`}
       />
       {visible.map(({ environmentId, status, label, reclaimable }) => {
@@ -145,7 +145,7 @@ function ReclaimRow({
       toastManager.add({
         type: "success",
         title: `正在回收 ${amount} 上的 ${label}`,
-        description: `该设备上的 Fleet ADE 会重启，约 ${minutes} 分钟后恢复。`,
+        description: `这台电脑上的 Fleet ADE 会重启，约 ${minutes} 分钟后恢复。`,
       });
       return;
     }
@@ -163,7 +163,7 @@ function ReclaimRow({
       title={`${amount} 上的 ${label}`}
       description={
         status.reclaimFailure === undefined
-          ? `会重启该设备上的 Fleet ADE，大约离线 ${minutes} 分钟。`
+          ? `会重启这台电脑上的 Fleet ADE，大约离线 ${minutes} 分钟。`
           : `上次尝试失败：${status.reclaimFailure}`
       }
       control={

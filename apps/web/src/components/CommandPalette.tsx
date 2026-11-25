@@ -216,7 +216,6 @@ import {
   type AddProjectCloneFlow,
   type AddProjectEnvironmentOption,
   buildPaletteRemoteSourceReadiness,
-  errorMessage,
   getEnvironmentBrowsePlatform,
   remoteProjectInputPlaceholder,
   reduceCommandPaletteSearchState,
@@ -271,6 +270,7 @@ import { CommandDialog, CommandDialogPopup, CommandFooterAction } from "./ui/com
 import { Button } from "./ui/button";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { suggestAppAccessForRemote } from "./sourceControlAppAccessToast";
+import { presentVersionControlError } from "./versionControlError.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { ComposerHandleContext, useComposerHandleContext } from "../composerHandleContext";
 import type { ChatComposerHandle } from "./chat/ChatComposer";
@@ -2305,11 +2305,15 @@ function OpenCommandPaletteDialog(props: {
       setIsRemoteProjectLookingUp(false);
       if (lookupResult._tag === "Failure") {
         if (!isAtomCommandInterrupted(lookupResult)) {
+          const presentation = presentVersionControlError(
+            squashAtomCommandFailure(lookupResult),
+            "查询仓库",
+          );
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "无法查询仓库",
-              description: errorMessage(squashAtomCommandFailure(lookupResult)),
+              title: presentation.title,
+              description: presentation.description,
             }),
           );
         }
@@ -2397,11 +2401,15 @@ function OpenCommandPaletteDialog(props: {
     setIsRemoteProjectCloning(false);
     if (startResult._tag === "Failure") {
       if (!isAtomCommandInterrupted(startResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(startResult),
+          "克隆仓库",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法克隆仓库",
-            description: errorMessage(squashAtomCommandFailure(startResult)),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

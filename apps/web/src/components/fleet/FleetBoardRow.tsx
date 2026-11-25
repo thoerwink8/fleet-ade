@@ -19,9 +19,9 @@ function rowStatusBadge(row: FleetSummaryRow): {
   label: string;
 } {
   if (row.needsYou) return { variant: "dot-attention", label: "要你看" };
-  if (row.phase === "stuck") return { variant: "dot-blocked", label: "卡住" };
-  if (row.phase === "working") return { variant: "dot-active", label: "在做" };
-  return { variant: "dot-done", label: "做完" };
+  if (row.phase === "stuck") return { variant: "dot-blocked", label: "出错了" };
+  if (row.phase === "working") return { variant: "dot-active", label: "运行中" };
+  return { variant: "dot-done", label: "已完成" };
 }
 
 export const FleetBoardRow = memo(function FleetBoardRow({

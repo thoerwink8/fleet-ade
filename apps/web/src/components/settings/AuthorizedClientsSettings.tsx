@@ -210,10 +210,10 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
     onCopy: ({ kind }) => {
       toastManager.add({
         type: "success",
-        title: kind === "link" ? "已复制配对 URL" : "已复制配对码",
+        title: kind === "link" ? "已复制配对链接" : "已复制配对码",
         description:
           kind === "link"
-            ? "在要与此环境配对的客户端中打开此链接。"
+            ? "在要与这台电脑配对的客户端中打开此链接。"
             : "粘贴到另一个客户端中完成配对。",
       });
     },
@@ -227,7 +227,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
           type: "error",
           title: canCopyToClipboard
             ? kind === "link"
-              ? "无法复制配对 URL"
+              ? "无法复制配对链接"
               : "无法复制配对码"
             : "无法复制到剪贴板",
           description: canCopyToClipboard ? error.message : "已显示完整内容，请手动复制。",
@@ -283,7 +283,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             <p className="text-2xs text-muted-foreground/70">创建新链接，即可从此客户端分享。</p>
           ) : shareablePairingUrl === null ? (
             <p className="text-2xs text-muted-foreground/70">
-              复制 token，并用此后端可访问的主机从另一个客户端配对。
+              复制配对码，并用这台电脑可访问的地址从另一个客户端配对。
             </p>
           ) : null}
         </div>
@@ -310,7 +310,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             {!credential ? null : canCopyToClipboard ? (
               shareablePairingUrl ? null : (
                 <Button size="xs" variant="outline" onClick={handleCopyCode}>
-                  复制代码
+                  复制配对码
                 </Button>
               )
             ) : (
@@ -323,7 +323,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 <DialogTitle>{isRevealValueUrl ? "配对链接" : "配对码"}</DialogTitle>
                 <DialogDescription>
                   {isRevealValueUrl
-                    ? "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此完整配对 URL。"
+                    ? "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此完整配对链接。"
                     : "这里无法复制到剪贴板。请手动将此配对码复制到另一个客户端。"}
                 </DialogDescription>
               </DialogHeader>
@@ -591,11 +591,11 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
       setDialogOpen(false);
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
-      const message = error instanceof Error ? error.message : "无法创建配对 URL。";
+      const message = error instanceof Error ? error.message : "无法创建配对链接。";
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法创建配对 URL",
+          title: "无法创建配对链接",
           description: message,
         }),
       );
@@ -645,7 +645,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
           <DialogHeader>
             <DialogTitle>创建配对链接</DialogTitle>
             <DialogDescription>
-              生成一次性链接，让其他设备与此后端配对，成为已授权的客户端。
+              生成一次性链接，让其他设备与这台电脑配对，成为已授权的客户端。
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>

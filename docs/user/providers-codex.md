@@ -1,71 +1,71 @@
 # Codex
 
-Use your ChatGPT plan or an existing Codex CLI login to code in T3 Code.
+Use your ChatGPT plan or an existing Codex CLI login to code in Fleet ADE.
 
 ## Connect with ChatGPT
 
-Connect in **Settings → Providers**. For a remote machine,
-select that environment first. T3 Code handles Codex installation; sign in on
+Connect in **Settings → Agents**. For a remote computer,
+select that computer first. Fleet ADE handles Codex installation; sign in on
 OpenAI and allow sharing of your ChatGPT plan.
 
-Manage shared usage and credits in ChatGPT through **Manage usage** in T3 Code.
+Manage shared usage and credits in ChatGPT through **Manage usage** in Fleet ADE.
 If a request uses a feature that ChatGPT sharing does not support, use another
-provider for that request.
+agent for that request.
 
 Fast and Ultrafast speeds are unavailable with this connection. To use the speed
 options your account supports, [use an existing Codex login](#use-an-existing-codex-login).
 
-When reconnecting, choose the same account in T3 Code and on OpenAI's sign-in
-page. Disconnecting stops running threads but keeps their history and lets you
-reconnect later.
+When reconnecting, choose the same account in Fleet ADE and on OpenAI's sign-in
+page. Signing out stops running threads but keeps their history and lets you
+sign in again later.
 
 If remote sign-in cannot return automatically, paste the full URL from the final
 localhost page into the sign-in panel, even if that page could not load.
 
 ## Use an existing Codex login
 
-T3 Code can use your installed Codex and its existing login. Run `codex login`
-on the environment's machine to sign in. [Provider setup](./install.md#providers)
+Fleet ADE can use your installed Codex and its existing login. Run `codex login`
+on that computer to sign in. [Agent setup](./install.md#agents)
 covers installation and custom configuration.
 
 Running `codex login` does not change a managed ChatGPT connection. In
-**Settings > Providers**, add a Codex instance, choose **Configure manually**,
-and complete the wizard. Then select that instance from the thread's model
+**Settings > Agents**, add a Codex agent, choose **Configure manually**,
+and complete the wizard. Then select that agent from the thread's model
 picker. See [Use multiple accounts](#use-multiple-accounts).
 
-## Allow more time for provider checks
+## Allow more time for agent checks
 
 If an authenticated Codex installation reports “Timed out while checking Codex
 app-server provider status,” set `T3CODE_CODEX_PROBE_TIMEOUT_MS=60000` in the
-T3 server's environment and restart it. See [Provider check timeouts](./install.md#provider-check-timeouts)
-for configuration and other providers.
+background service's environment and restart it. See [Agent check timeouts](./install.md#agent-check-timeouts)
+for configuration and other agents.
 
 ## Generate images
 
-Codex can generate images directly in a T3 Code thread when your Codex version,
+Codex can generate images directly in a Fleet ADE thread when your Codex version,
 model, and account support native image generation.
 
 If Codex reports that its image tool is unavailable, image generation may be
-disabled in its configuration. In **Settings → Providers**, edit your existing
-Codex provider and add this to **Launch arguments**, keeping any other arguments:
+disabled in its configuration. In **Settings → Agents**, edit your existing
+Codex agent and add this to **Launch arguments**, keeping any other arguments:
 
 ```text
 -c features.image_generation=true
 ```
 
-This enables the feature for that T3 Code provider without changing your shared
-Codex configuration. You do not need another provider instance or a separate image
+This enables the feature for that Fleet ADE agent without changing your shared
+Codex configuration. You do not need another agent or a separate image
 API key. The flag does not add image support to an unsupported model or account.
 
 Launch arguments apply to Codex sessions started after you save them. Start a new
-thread with the same Codex provider and ask it to generate an image. The completed
+thread with the same Codex agent and ask it to generate an image. The completed
 image appears in the thread.
 
 ## Use multiple accounts
 
-Add another ChatGPT account in **Settings → Providers**, then select the account
+Add another ChatGPT account in **Settings → Agents**, then select the account
 from the thread's model picker. Compatible accounts can continue the same thread.
-Connecting accounts through T3 Code leaves your CLI login unchanged.
+Connecting accounts through Fleet ADE leaves your CLI login unchanged.
 
 ### Multiple CLI logins
 
@@ -73,7 +73,7 @@ A shared Codex home with a shadow home lets work and personal accounts continue
 the same threads. The accounts share Codex sessions and configuration while keeping
 their own login and available models.
 
-Keep your first account in `~/.codex`. On the environment's machine, sign the
+Keep your first account in `~/.codex`. On that computer, sign the
 second account into a fresh directory:
 
 ```bash
@@ -81,14 +81,14 @@ mkdir -p ~/.codex_personal
 CODEX_HOME=~/.codex_personal codex login
 ```
 
-Then add a second Codex instance in **Settings > Providers**:
+Then add a second Codex agent in **Settings > Agents**:
 
-| Instance       | CODEX_HOME path | Shadow home path    |
+| Agent          | CODEX_HOME path | Shadow home path    |
 | -------------- | --------------- | ------------------- |
 | Codex Work     | `~/.codex`      | Leave empty         |
 | Codex Personal | `~/.codex`      | `~/.codex_personal` |
 
-Both instances must use the same **CODEX_HOME path**. T3 Code prepares the shared
+Both agents must use the same **CODEX_HOME path**. Fleet ADE prepares the shared
 state in the shadow directory; do not populate it by copying your whole Codex
 home.
 
@@ -97,18 +97,18 @@ store, configure file storage for this setup. See
 [OpenAI's credential storage guide](https://learn.chatgpt.com/docs/auth#credential-storage).
 
 Use a completely separate **CODEX_HOME path**, with no shadow home, when you want
-separate Codex sessions and configuration. That instance cannot continue threads
+separate Codex sessions and configuration. That agent cannot continue threads
 from the other home.
 
 ## Switch accounts in an existing thread
 
-Choose the other account from the thread's model picker. T3 Code offers compatible
-Codex instances that share the thread's **CODEX_HOME path**. Changing accounts does
+Choose the other account from the thread's model picker. Fleet ADE offers compatible
+Codex agents that share the thread's **CODEX_HOME path**. Changing accounts does
 not move the conversation into a separate Codex home.
 
-If the account is missing from the picker, compare the home paths in provider
-settings. If two instances show the same unexpected account or models, check their
-reported accounts, refresh provider status, and confirm the second instance has
+If the account is missing from the picker, compare the home paths in agent
+settings. If two agents show the same unexpected account or models, check their
+reported accounts, refresh agent status, and confirm the second agent has
 its own shadow path and login. A shadow-home conflict usually means the directory
 contains a copied Codex setup. Use a fresh shadow directory and sign in again.
 

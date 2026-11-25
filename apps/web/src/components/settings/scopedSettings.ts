@@ -335,10 +335,10 @@ export function planScopedSettingsPatch(
       : scope.kind === "unavailable"
         ? scope.message
         : unscopableKeys.length > 0
-          ? "此设置是环境级设置，无法由项目覆盖。"
+          ? "此设置是电脑级设置，无法由项目覆盖。"
           : isProjectScope
-            ? "请连接所选工作副本，或更新它们所在的环境，以保存项目覆盖设置。"
-            : `请连接 ${scope.kind === "environment" ? scope.label : "某个环境"} 以保存此设置。`;
+            ? "请连接所选项目目录，或更新它们所在的电脑，以保存项目覆盖设置。"
+            : `请连接 ${scope.kind === "environment" ? scope.label : "一台电脑"} 以保存此设置。`;
   return { clientPatch, hasClientWrite, serverWrites, unavailableReason };
 }
 
@@ -360,7 +360,7 @@ export function planScopedSettingsClear(
     unavailableReason:
       serverWrites.length > 0
         ? null
-        : "请连接所选工作副本，或更新它们所在的环境，以重置此覆盖设置。",
+        : "请连接所选项目目录，或更新它们所在的电脑，以重置此覆盖设置。",
   };
 }
 
@@ -415,7 +415,7 @@ export function planProjectOverridesClear(
     clientPatch: {} as ClientSettingsPatch,
     hasClientWrite: false,
     serverWrites,
-    unavailableReason: serverWrites.length > 0 ? null : "请连接这些环境以重置覆盖设置。",
+    unavailableReason: serverWrites.length > 0 ? null : "请连接这些电脑以重置覆盖设置。",
   };
 }
 
@@ -482,7 +482,7 @@ export async function persistScopedSettingsPatch(
       return [
         {
           ...environment,
-          message: "此环境不支持该设置，请更新该环境上的 Fleet ADE。",
+          message: "这台电脑不支持该设置，请更新这台电脑上的 Fleet ADE。",
         },
       ];
     }

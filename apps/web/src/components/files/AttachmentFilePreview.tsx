@@ -175,7 +175,7 @@ export function AttachmentFilePreview(props: {
     void refresh()
       .then((url) => {
         if (cancelled) return;
-        if (!url) throw new Error("请重新连接环境后重试。");
+        if (!url) throw new Error("请重新连接电脑后重试。");
         authorizedAt.current = Date.now();
         setRemoteUrl(url);
       })
@@ -206,7 +206,7 @@ export function AttachmentFilePreview(props: {
       if (!file && Date.now() - authorizedAt.current > STALE_URL_MS) {
         const target = await refresh();
         if (controller.signal.aborted) return;
-        if (!target) throw new Error("请重新连接环境后重试。");
+        if (!target) throw new Error("请重新连接电脑后重试。");
         authorizedAt.current = Date.now();
         if (target !== url) {
           setRemoteUrl(target);
@@ -247,7 +247,7 @@ export function AttachmentFilePreview(props: {
       let file = props.file;
       if (!file) {
         const target = await prepareDownload();
-        if (!target) throw new Error("请重新连接环境后重试。");
+        if (!target) throw new Error("请重新连接电脑后重试。");
         const response = await fetch(target);
         if (!response.ok) throw new Error("无法加载文件，请重试。");
         file = await response.blob();

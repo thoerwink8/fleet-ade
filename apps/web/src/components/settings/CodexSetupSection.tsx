@@ -445,7 +445,7 @@ function ManagedCodexSetup({
     setError(
       handoffQuery.data?.phase === "auth"
         ? (handoffQuery.data.state.message ?? "无法完成 ChatGPT 登录。请重试。")
-        : "主环境上的 ChatGPT 登录已中断。请重试。",
+        : "主电脑上的 ChatGPT 登录已中断。请重试。",
     );
     setHandoff(null);
   }
@@ -1006,7 +1006,7 @@ function ManagedCodexSetup({
                   disabled={unavailable || busy}
                   onClick={() => void run(() => logoutAuth(target))}
                 >
-                  断开连接
+                  退出登录
                 </Button>
               </>
             ) : (
@@ -1123,7 +1123,7 @@ export function CodexManagedRuntimeFields({
       />
       <SettingsRow
         title="CODEX_HOME 路径"
-        description="共享的 Codex 配置、运行实例和状态。"
+        description="共享的 Codex 配置、会话和状态。"
         control={
           <div className="w-full sm:w-80">
             <Input
@@ -1141,7 +1141,7 @@ export function CodexManagedRuntimeFields({
         description={
           provider?.runtimePaths?.shadowHomePath
             ? "账户专用主目录，共享上方的 Codex 状态。"
-            : "此实例直接使用共享的 Codex 主目录。"
+            : "此智能体直接使用共享的 Codex 主目录。"
         }
         control={
           <div className="w-full sm:w-80">

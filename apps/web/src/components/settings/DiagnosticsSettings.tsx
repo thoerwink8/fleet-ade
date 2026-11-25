@@ -68,10 +68,6 @@ function shortenTraceId(traceId: string): string {
   return `${traceId.slice(0, 18)}...${traceId.slice(-10)}`;
 }
 
-function isStaleProcessSignalMessage(message: string | undefined): boolean {
-  return message?.includes("not a live descendant") ?? false;
-}
-
 function StatBlock({
   label,
   value,
@@ -878,15 +874,6 @@ function DiagnosticsSettingsBody() {
     if (!result.value.signaled) {
       const message = Option.getOrUndefined(result.value.message);
       refreshProcesses();
-      if (isStaleProcessSignalMessage(message)) {
-        toastManager.add({
-          type: "info",
-          title: "进程已退出",
-          description: "此进程不是 Fleet ADE 服务器的子进程，可能已经退出。",
-        });
-        return;
-      }
-
       toastManager.add({
         type: "error",
         title: `无法发送 ${signal}`,
@@ -909,7 +896,7 @@ function DiagnosticsSettingsBody() {
       <SettingsPageContainer>
         <p className="text-sm text-muted-foreground">
           {environmentId === null
-            ? "连接一个环境以查看诊断。"
+            ? "连接一台电脑以查看诊断。"
             : diagnosticsAccess.isPending
               ? "正在检查诊断访问权限…"
               : diagnosticsAccess.error}
@@ -943,15 +930,15 @@ function DiagnosticsSettingsBody() {
           <StatBlock
             label="CPU"
             value={processData ? `${processData.totalCpuPercent.toFixed(1)}%` : "..."}
-            tooltip="当前服务器进程下所有运行中子进程的 CPU 总占用，不含桌面外壳和其他父进程。"
+            tooltip="当前后台服务进程下所有运行中子进程的 CPU 总占用，不含桌面外壳和其他父进程。"
           />
           <StatBlock
             label="内存"
             value={processData ? formatBytes(processData.totalRssBytes) : "..."}
-            tooltip="当前服务器进程下所有运行中子进程的驻留内存总量，不含桌面外壳和其他父进程。"
+            tooltip="当前后台服务进程下所有运行中子进程的驻留内存总量，不含桌面外壳和其他父进程。"
           />
           <StatBlock
-            label="服务器 PID"
+            label="后台服务 PID"
             value={processData ? String(processData.serverPid) : "..."}
           />
         </StatsGrid>
@@ -1003,12 +990,12 @@ function DiagnosticsSettingsBody() {
           <StatBlock
             label="CPU 时间"
             value={resourceData ? formatCpuTime(resourceData.totalCpuSecondsApprox) : "..."}
-            tooltip="所选时段内，Fleet ADE 服务器根进程及其后代进程实际使用 CPU 的估算时长。仅在采样进程使用 CPU 时累加，旧样本会随时段移动而移出。"
+            tooltip="所选时段内，Fleet ADE 后台服务根进程及其后代进程实际使用 CPU 的估算时长。仅在采样进程使用 CPU 时累加，旧样本会随时段移动而移出。"
           />
           <StatBlock
             label="样本数"
             value={resourceData ? formatCount(resourceData.retainedSampleCount) : "..."}
-            tooltip="服务器保存在内存中的进程样本。仅在诊断页面打开时采样，服务器重启后清空。"
+            tooltip="后台服务保存在内存中的进程样本。仅在诊断页面打开时采样，后台服务重启后清空。"
           />
           <StatBlock
             label="间隔"

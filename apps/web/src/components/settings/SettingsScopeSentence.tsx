@@ -246,7 +246,7 @@ function EnvironmentScopeMenu({
     : environments;
   return (
     <ScopeMenu
-      ariaLabel="环境范围"
+      ariaLabel="电脑范围"
       icon={
         selected ? (
           <EnvironmentMachineIcon
@@ -260,20 +260,20 @@ function EnvironmentScopeMenu({
         selected
           ? settingsScopeEnvironmentLabel(selected, environments)
           : environmentValue !== ALL_ENVIRONMENTS_VALUE
-            ? "环境不可用"
+            ? "电脑不可用"
             : singleEnvironment
-              ? "没有环境"
-              : "所有环境"
+              ? "没有电脑"
+              : "所有电脑"
       }
       value={environmentValue}
       onChange={(next) => onChange(selectEnvironmentAxis(value, next))}
-      searchLabel="搜索环境"
+      searchLabel="搜索电脑"
       allOption={
         singleEnvironment
           ? null
           : {
               value: ALL_ENVIRONMENTS_VALUE,
-              label: "所有环境",
+              label: "所有电脑",
               icon: <LayersIcon aria-hidden className="size-3.5 shrink-0" />,
             }
       }
@@ -309,14 +309,14 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="shrink-0">的</span>
       <ScopeMenu
-        ariaLabel="工作副本范围"
+        ariaLabel="项目目录范围"
         icon={<FolderIcon aria-hidden className="size-3.5 shrink-0" />}
         label={
           selected
             ? settingsScopeCheckoutLabel(selected, checkouts)
             : value.checkout
-              ? "工作副本不可用"
-              : "全部工作副本"
+              ? "项目目录不可用"
+              : "全部项目目录"
         }
         value={value.checkout ?? ALL_CHECKOUTS_VALUE}
         onChange={(next) =>
@@ -327,8 +327,8 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
             ),
           )
         }
-        searchLabel="搜索工作副本"
-        allOption={{ value: ALL_CHECKOUTS_VALUE, label: "全部工作副本" }}
+        searchLabel="搜索项目目录"
+        allOption={{ value: ALL_CHECKOUTS_VALUE, label: "全部项目目录" }}
         options={checkouts.map((member) => ({
           value: member.physicalProjectKey,
           label: fileBasename(member.workspaceRoot),

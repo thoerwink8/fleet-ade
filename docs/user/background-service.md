@@ -1,12 +1,12 @@
-# Running T3 Code in the background
+# Running Fleet ADE in the background
 
-On Linux, macOS, and Windows, T3 Code can run as a service for your user so you
+On Linux, macOS, and Windows, Fleet ADE can run as a service for your user so you
 do not need to keep a terminal open.
 
 ## Manage the service
 
-Install the `t3` CLI first ([Install T3 Code](./install.md#command-line)), then
-run these commands on the machine that will host T3 Code:
+Install the `t3` CLI first ([Install Fleet ADE](./install.md#command-line)), then
+run these commands on the computer that will run Fleet ADE:
 
 | Task                                  | Command                                         |
 | ------------------------------------- | ----------------------------------------------- |
@@ -26,7 +26,7 @@ Install the release you want, then run `t3 service install` again. That
 switches the service to the CLI you just installed. Restarting interrupts
 running agent turns, terminals, and remote clients. A server you started by
 hand is left running; stop and start it again to pick up the new version.
-To match a remote client's version, follow [Updating T3 Code](./updating.md).
+To match a remote client's version, follow [Updating Fleet ADE](./updating.md).
 
 `preview` is a maintainers' test train: its builds can be broken and are never
 offered as updates, so the installer asks for confirmation before installing
@@ -39,7 +39,7 @@ under T3 home. Pass `--yes` from a script.
 
 ## Local network access
 
-A new service answers only on this machine. Other devices reach it
+A new service answers only on this computer. Other devices reach it
 directly once you choose the local network in `t3 up` (or run
 `t3 up --lan`, which sets `T3CODE_LAN=true` in `service.env`). It then listens on
 your local network and Tailscale addresses, so the desktop app and a browser on
@@ -77,7 +77,7 @@ If the file contains credentials, restrict access to that file with `chmod 600`
 
 ## Platform support
 
-Linux needs systemd user services. Setup enables lingering so T3 Code starts at
+Linux needs systemd user services. Setup enables lingering so Fleet ADE starts at
 boot and keeps running after logout. If this needs administrator permission,
 setup prints a recovery command before changing the service.
 
@@ -98,9 +98,9 @@ separately. Turning network access off does not stop or uninstall the service.
 
 ## Keep the server responsive when agents use all memory
 
-On Linux, agents already run with lower priority than the server. When they
-fill the machine's memory, though, the kernel may still slow down or stop the
-server, because only an administrator can reserve memory for it. Run, as your
+On Linux, agents already run with lower priority than the background service. When they
+fill the computer's memory, though, the kernel may still slow down or stop the
+service, because only an administrator can reserve memory for it. Run, as your
 normal user:
 
 ```sh
@@ -108,15 +108,15 @@ t3 service protect
 ```
 
 It shows the system settings it will change, asks before applying them, and
-then asks for your sudo password. If the machine runs Tailscale or SSH, it
-also offers to protect them, so you can still reach the machine. Memory
-protection takes effect at once. The server's protection from the kernel's
+then asks for your sudo password. If the computer runs Tailscale or SSH, it
+also offers to protect them, so you can still reach the computer. Memory
+protection takes effect at once. The service's protection from the kernel's
 out-of-memory killer takes effect after `t3 service restart`. `t3 service status` reports whether
 the protection is in place, and `t3 service protect --undo` removes it.
 
 ## Troubleshooting
 
-Start with `t3 service status` on the host. It prints the log path and, on Linux,
+Start with `t3 service status` on that computer. It prints the log path and, on Linux,
 checks whether the installed service is running, enabled, and allowed to survive
 logout.
 
@@ -134,7 +134,7 @@ ssh -t your-server 'sudo loginctl enable-linger "$(id -un)"'
 ```
 
 Then retry service setup as your normal user. Run only the `loginctl` command
-with sudo; running T3 Code as root creates a separate installation and Connect
+with sudo; running Fleet ADE as root creates a separate installation and Connect
 identity. Without administrator access, run `t3 serve` in a terminal and keep
 that session open.
 
@@ -142,7 +142,7 @@ that session open.
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                             |
 | `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support. |
-| `service-disabled` or `service-stopped` | Read the log and, on Linux, `systemctl --user status t3code.service`, then use the repair command printed by T3 Code.          |
+| `service-disabled` or `service-stopped` | Read the log and, on Linux, `systemctl --user status t3code.service`, then use the repair command printed by Fleet ADE.        |
 | `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `t3 service restart`.                            |
 
 On macOS, check **System Settings → General → Login Items** if the service no
@@ -153,20 +153,20 @@ Downloads, it may need Full Disk Access for the `t3` executable listed in
 
 ## Reclaim database space
 
-T3 Code removes internal history older than a day on its own while it runs;
+Fleet ADE removes internal history older than a day on its own while it runs;
 your conversations are kept. Databases created before this shrank automatically
 still hold the freed space on disk until a one-time offline repair returns it
 and turns on automatic shrinking. Settings > Maintenance suggests the repair when at least 1 GiB can be
 reclaimed.
 
-When the desktop app or the background service runs T3 Code on that machine,
-select **Reclaim** in Settings on web or desktop. T3 Code checks for free disk
+When the desktop app or the background service runs Fleet ADE on that computer,
+select **Reclaim** in Settings on web or desktop. Fleet ADE checks for free disk
 space, then stops, repairs the database, and starts again. It is offline while
 the repair runs, and running agents stop. If the repair fails, Settings shows
 why.
 
-In other cases, such as a server you started by hand, run `t3 doctor` on the
-machine that hosts the environment. It reports the database size and the
+In other cases, such as a service you started by hand, run `t3 doctor` on the
+computer that hosts it. It reports the database size and the
 space it can reclaim, then asks which repairs to run;
 pass `--fix` to run the recommended ones without a prompt (for scripts), or
 `--dry-run` to only report. An installed background service for the same data

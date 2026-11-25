@@ -128,7 +128,7 @@ export function PullRequestStackMenu({
     } else {
       toastManager.update(toastId, {
         type: "success",
-        title: action === "merge" ? "堆叠合并请求已完成" : "堆叠已变基",
+        title: action === "merge" ? "堆叠 PR 合并已完成" : "堆叠已变基",
         description:
           action === "merge" ? `${hostLabel} 已合并该堆叠，或已将其加入合并队列。` : undefined,
       });

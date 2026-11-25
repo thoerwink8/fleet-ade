@@ -138,7 +138,7 @@ export function SourceControlTokenSettings({
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             {savedHosts.length === 0
-              ? `尚未保存 token；服务器将使用 ${credentials.tokenEnvVar} 或 ${credentials.cliName} 登录账户。`
+              ? `尚未保存 token；这台电脑将使用 ${credentials.tokenEnvVar} 或 ${credentials.cliName} 登录账户。`
               : `已为 ${savedHosts.join(", ")} 保存。`}
           </p>
           <div className="flex shrink-0 gap-2">

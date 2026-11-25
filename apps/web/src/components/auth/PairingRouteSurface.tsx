@@ -15,7 +15,7 @@ export function PairingPendingSurface() {
   return (
     <StandalonePage>
       <StandalonePageHeader
-        title="正在与此环境配对"
+        title="正在与这台电脑配对"
         description="正在验证配对链接并准备登录状态。"
       />
     </StandalonePage>
@@ -81,14 +81,14 @@ export function PairingRouteSurface({
   return (
     <StandalonePage>
       <StandalonePageHeader
-        title="与此环境配对"
+        title="与这台电脑配对"
         description={describeAuthGate(auth.bootstrapMethods)}
       />
 
       <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <div className="space-y-2">
           <label className="text-row font-medium" htmlFor="pairing-token">
-            配对 token
+            配对码
           </label>
           <Input
             id="pairing-token"
@@ -98,7 +98,7 @@ export function PairingRouteSurface({
             disabled={isSubmitting}
             nativeInput
             onChange={(event) => setCredential(event.currentTarget.value)}
-            placeholder="粘贴一次性 token 或配对凭据"
+            placeholder="粘贴一次性配对码"
             spellCheck={false}
             value={credential}
           />
@@ -146,10 +146,10 @@ function errorMessageFromUnknown(error: unknown): string {
 
 function describeAuthGate(bootstrapMethods: ReadonlyArray<string>): string {
   if (bootstrapMethods.includes("desktop-bootstrap")) {
-    return "此环境需要可信的配对凭据，应用才能连接。";
+    return "这台电脑需要可信的配对码，应用才能连接。";
   }
 
-  return "输入配对 token，即可开始与此环境的连接。";
+  return "输入配对码，即可开始与这台电脑的连接。";
 }
 
 function describeSupportedMethods(bootstrapMethods: ReadonlyArray<string>): string {
@@ -157,12 +157,12 @@ function describeSupportedMethods(bootstrapMethods: ReadonlyArray<string>): stri
     bootstrapMethods.includes("desktop-bootstrap") &&
     bootstrapMethods.includes("one-time-token")
   ) {
-    return "此环境同时接受桌面版托管配对和一次性配对 token。";
+    return "这台电脑同时接受桌面版托管配对和一次性配对码。";
   }
 
   if (bootstrapMethods.includes("desktop-bootstrap")) {
-    return "此环境由桌面版托管。请从桌面应用打开；如果另外签发了引导凭据，也可以粘贴在这里。";
+    return "这台电脑由桌面版托管。请从桌面应用打开；如果另外签发了配对码，也可以粘贴在这里。";
   }
 
-  return "此环境接受一次性配对 token。配对链接可以直接打开此页面，你也可以在这里粘贴 token。";
+  return "这台电脑接受一次性配对码。配对链接可以直接打开此页面，你也可以在这里粘贴配对码。";
 }

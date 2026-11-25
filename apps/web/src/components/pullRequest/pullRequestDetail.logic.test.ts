@@ -2,6 +2,7 @@ import { SourceControlProviderKind } from "@t3tools/contracts";
 import {
   GitCommandError,
   ProjectId,
+  PullRequestOperationError,
   type PullRequestCheck,
   type PullRequestComment,
   type PullRequestDetail,
@@ -976,10 +977,13 @@ describe("what to say when an action fails", () => {
       });
     expect(
       checkoutFailureDescription(diagnostic("git worktree add failed", "path_already_exists")),
-    ).toBe("git worktree add failed (path_already_exists)");
+    ).toBe("请选择其他目录，或移走同名文件后重试。详情：git worktree add failed");
     const reason = "The worktree directory already exists. Choose another directory.";
-    expect(checkoutFailureDescription(diagnostic(reason))).toBe(reason);
-    expect(checkoutFailureDescription(diagnostic("x".repeat(900)))).toBe(`${"x".repeat(319)}…`);
+    const nextStep = "请根据详情中的原因处理，然后重试。";
+    expect(checkoutFailureDescription(diagnostic(reason))).toBe(`${nextStep}详情：${reason}`);
+    expect(checkoutFailureDescription(diagnostic("x".repeat(900)))).toBe(
+      `${nextStep}详情：${"x".repeat(319)}…`,
+    );
     for (const failure of [undefined, diagnostic(""), diagnostic("exited with code 1")]) {
       expect(checkoutFailureDescription(failure)).toBe(
         "请确认该分支仍然存在且未在其他位置检出，然后重试。",
@@ -1890,6 +1894,15 @@ describe("readableFailure", () => {
     expect(readableFailure(new Error("Branch is protected."), "请重试。")).toBe(
       "Branch is protected.",
     );
+    expect(readableFailure("exited with code 1", "请重试。")).toBe("请重试。");
+  });
+
+  it("keeps a pull request operation's detail without its English prefix", () => {
+    const failure = new PullRequestOperationError({
+      operation: "merge",
+      detail: "Branch is protected.",
+    });
+    expect(readableFailure(failure, "请重试。")).toBe("Branch is protected.");
   });
 });
 

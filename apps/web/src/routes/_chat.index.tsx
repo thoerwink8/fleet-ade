@@ -129,7 +129,7 @@ function LocalEnvironmentOffEmpty() {
           <EmptyDescription>重新启用此电脑，或连接另一台电脑。</EmptyDescription>
           <div className="mt-5 flex justify-center">
             <Button render={<Link to="/settings/connections" />} size="sm">
-              打开环境设置
+              打开连接设置
             </Button>
           </div>
         </EmptyHeader>
