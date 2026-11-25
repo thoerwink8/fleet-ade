@@ -367,6 +367,7 @@ export const GitCommandFailureReason = Schema.Literals([
   "host_key_unverified",
   "index_locked",
   "merge_conflict",
+  "network_unreachable",
   "not_a_repository",
   "not_fast_forward",
   "path_already_exists",
