@@ -101,7 +101,7 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
 
   const startNewLocal: CommandHandler = (event) => {
     claim(event);
-    const context = readThreadContext();
+    const context = readThreadContext(readProjectGroups());
     // With no current or open project, such as when every project is archived, pick one.
     void startNewThreadFromContext(context).then((started) => {
       if (!started) openCommandPalette({ open: "new-thread-in" });

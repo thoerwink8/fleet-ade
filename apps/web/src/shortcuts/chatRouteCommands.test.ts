@@ -11,6 +11,9 @@ import * as projectsState from "../state/projects";
 import { Atom } from "effect/reactivity";
 import { makeThreadFixture } from "../test-fixtures";
 import type { Project } from "../types";
+import { selectProjectGroupingSettings } from "@t3tools/client-runtime/state/project-grouping";
+import { getClientSettings } from "../hooks/useSettings";
+import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
 import { installChatRouteCommands } from "./chatRouteCommands";
 import * as dispatcher from "./dispatcher";
 
@@ -137,6 +140,43 @@ describe("new thread commands", () => {
     expect(startLocal.mock.calls[0]![0].currentProjectRef).toEqual({
       environmentId: "local",
       projectId: "active",
+    });
+  });
+
+  it("uses the project settings page's project for chat.newLocal", () => {
+    const active = project("active");
+    const idle = project("idle");
+    using _projects = vi.spyOn(entities, "readProjects").mockReturnValue([active, idle]);
+    using _ready = vi
+      .spyOn(projectsState, "defaultProjectFallbackReadyAtom")
+      .mockReturnValue(Atom.make(true));
+    using _storedProject = vi.spyOn(storage, "getLocalStorageItem").mockReturnValue("local:active");
+    using openPicker = vi.spyOn(commandPalette, "openCommandPalette").mockImplementation(() => {});
+    using startLocal = vi.spyOn(threadActions, "startNewThreadFromContext").mockResolvedValue(true);
+    using register = vi.spyOn(dispatcher, "registerCommands").mockReturnValue(() => {});
+    const idleKey = buildSidebarProjectSnapshots({
+      projects: [active, idle],
+      groupScratchProjects: true,
+      settings: selectProjectGroupingSettings(getClientSettings()),
+      primaryEnvironmentId: null,
+      resolveEnvironmentLabel: () => null,
+    }).find((group) => group.memberProjects.some((member) => member.id === idle.id))!.projectKey;
+    const router = {
+      state: {
+        location: { pathname: "/settings/projects", search: { project: idleKey } },
+        matches: [],
+      },
+    } as unknown as AnyRouter;
+    using stack = new DisposableStack();
+    stack.defer(installChatRouteCommands(router));
+    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as KeyboardEvent;
+
+    register.mock.calls[0]![0]["chat.newLocal"]!(event);
+
+    expect(openPicker).not.toHaveBeenCalled();
+    expect(startLocal.mock.calls[0]![0].currentProjectRef).toEqual({
+      environmentId: "local",
+      projectId: "idle",
     });
   });
 });
