@@ -6,7 +6,8 @@ export type PendingSendBlocker =
   | "preparing-images"
   | "loading-context"
   | "reconnecting"
-  | "previous-send-busy";
+  | "previous-send-busy"
+  | "uploading-attachments";
 
 export interface PendingSendBlockerInput {
   readonly preparingImages: boolean;
@@ -14,6 +15,8 @@ export interface PendingSendBlockerInput {
   readonly reconnecting: boolean;
   readonly previousSendBusy: boolean;
   readonly waitingForAttachmentCapabilities?: boolean;
+  /** Answers and approval redirects need their uploads first; they finish on their own. */
+  readonly uploadingAttachments?: boolean;
 }
 
 export interface PendingSendFailureBaseline {
@@ -77,6 +80,7 @@ export function collectPendingSendBlockers(
   if (input.reconnecting || input.waitingForAttachmentCapabilities === true) {
     blockers.push("reconnecting");
   }
+  if (input.uploadingAttachments === true) blockers.push("uploading-attachments");
   if (input.previousSendBusy) blockers.push("previous-send-busy");
   return blockers;
 }
@@ -89,6 +93,8 @@ export function pendingSendWaitingMessage(blocker: PendingSendBlocker): string {
       return "正在加载上下文，好了自动发送";
     case "reconnecting":
       return "正在重新连接，连上后自动发送";
+    case "uploading-attachments":
+      return "附件还在上传，传完自动发送";
     case "previous-send-busy":
       return "上一条还在发送，之后自动发送";
   }
@@ -189,9 +195,34 @@ export function resolvePendingSendDispatchMode(input: {
 
 let nextPendingSendId = 0;
 
+/** Said when an edit or another action of the user drops an armed send, so nobody waits for a send that is gone. */
+export const PENDING_SEND_EDITED_NOTICE = "你改了内容，自动发送已取消，内容还在输入框里。";
+/** Said when a stash or restore takes the draft away from an armed send. */
+export const PENDING_SEND_STASH_NOTICE = "自动发送已取消。";
+/** Said on return, because leaving a conversation drops its armed send. */
+export const PENDING_SEND_LEFT_NOTICE = "你离开过这个会话，自动发送已取消，内容还在输入框里。";
+
 const usePendingComposerSendStore = create<{
   readonly byTargetKey: Readonly<Record<string, PendingComposerSend>>;
-}>(() => ({ byTargetKey: {} }));
+  readonly cancelNoticeByTargetKey: Readonly<Record<string, string>>;
+}>(() => ({ byTargetKey: {}, cancelNoticeByTargetKey: {} }));
+
+export function usePendingSendCancelNotice(targetKey: string): string | null {
+  return usePendingComposerSendStore((state) => state.cancelNoticeByTargetKey[targetKey] ?? null);
+}
+
+export function getPendingSendCancelNotice(targetKey: string): string | null {
+  return usePendingComposerSendStore.getState().cancelNoticeByTargetKey[targetKey] ?? null;
+}
+
+export function dismissPendingSendCancelNotice(targetKey: string): void {
+  usePendingComposerSendStore.setState((state) => {
+    if (!(targetKey in state.cancelNoticeByTargetKey)) return state;
+    const cancelNoticeByTargetKey = { ...state.cancelNoticeByTargetKey };
+    delete cancelNoticeByTargetKey[targetKey];
+    return { cancelNoticeByTargetKey };
+  });
+}
 
 export function usePendingComposerSend(targetKey: string): PendingComposerSend | null {
   return usePendingComposerSendStore((state) => state.byTargetKey[targetKey] ?? null);
@@ -210,6 +241,7 @@ export function armPendingComposerSend(
     ...input,
     id: ++nextPendingSendId,
   };
+  dismissPendingSendCancelNotice(input.targetKey);
   usePendingComposerSendStore.setState((state) => ({
     byTargetKey: {
       ...state.byTargetKey,
@@ -219,14 +251,24 @@ export function armPendingComposerSend(
   return created;
 }
 
-export function cancelPendingComposerSend(targetKey: string): boolean {
+/**
+ * Removes the armed send. Pass `notice` when the user did not ask for the cancel (an edit, leaving
+ * the conversation), so the composer can say the send will not happen. Without `notice` (the
+ * user's own Cancel or Escape, or a direct send) any older notice is cleared too.
+ */
+export function cancelPendingComposerSend(targetKey: string, notice?: string): boolean {
   const current = getPendingComposerSend(targetKey);
-  if (current === null) return false;
+  if (current === null) {
+    if (notice === undefined) dismissPendingSendCancelNotice(targetKey);
+    return false;
+  }
   usePendingComposerSendStore.setState((state) => {
-    if (!(targetKey in state.byTargetKey)) return state;
     const byTargetKey = { ...state.byTargetKey };
     delete byTargetKey[targetKey];
-    return { byTargetKey };
+    const cancelNoticeByTargetKey = { ...state.cancelNoticeByTargetKey };
+    if (notice === undefined) delete cancelNoticeByTargetKey[targetKey];
+    else cancelNoticeByTargetKey[targetKey] = notice;
+    return { byTargetKey, cancelNoticeByTargetKey };
   });
   return true;
 }

@@ -229,6 +229,10 @@ import {
   cancelPendingComposerSend,
   claimPendingComposerSend,
   collectPendingSendBlockers,
+  dismissPendingSendCancelNotice,
+  PENDING_SEND_EDITED_NOTICE,
+  PENDING_SEND_LEFT_NOTICE,
+  usePendingSendCancelNotice,
   evaluatePendingComposerSend,
   pendingSendWaitingMessage,
   resolvePendingSendDispatchMode,
@@ -631,7 +635,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const hideKeyboardHints = useHideKeyboardShortcutHints();
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
+  // Drops the armed send because the draft changed under it, and says so.
   const cancelCurrentPendingSend = () => {
+    cancelPendingComposerSend(composerDraftTargetKey, PENDING_SEND_EDITED_NOTICE);
+  };
+  // The user's own Cancel button or Escape: they know, so nothing is announced.
+  const cancelPendingSendByUser = () => {
     cancelPendingComposerSend(composerDraftTargetKey);
   };
   const {
@@ -725,6 +734,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const hasPendingDraftWork = useHasPendingDraftWork(attachmentTargetKey);
   const pendingDraftWorkFailure = usePendingDraftWorkFailure(attachmentTargetKey);
   const pendingSend = usePendingComposerSend(composerDraftTargetKey);
+  const pendingSendCancelNotice = usePendingSendCancelNotice(composerDraftTargetKey);
   const previousSendFailure = props.previousSendFailure ?? null;
   const pendingSendStatusId = useId();
   const nonPersistedComposerImageIds = attachmentDraft.nonPersistedImageIds;
@@ -794,6 +804,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         supportsAttachmentUploads,
         maxFileAttachmentBytes,
       });
+  // Answers and approval redirects need their uploads first. A pending send waits for them
+  // instead of failing, because they finish on their own.
+  const needsUploadsBeforeSend =
+    questionAttachmentTarget ||
+    pendingApprovals.some((approval) => !heldRequestIds.has(approval.requestId));
+  const attachmentUploadWaitReason =
+    supportsAttachmentUploads && needsReattachFileCount === 0 && needsUploadsBeforeSend
+      ? attachmentUploadBlockReason({
+          imageIds: [...composerImages, ...composerFiles].map((attachment) => attachment.id),
+          uploadsByImageId,
+          environmentId,
+        })
+      : null;
   const attachmentBlockReason =
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
@@ -806,15 +829,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         ? needsReattachFileCount === 1
           ? "请重新添加中断的文件，或将其移除"
           : "请重新添加中断的文件，或将它们移除"
-        : // A plain send waits for its uploads. Answers and approval redirects need them first.
-          questionAttachmentTarget ||
-            pendingApprovals.some((approval) => !heldRequestIds.has(approval.requestId))
-          ? attachmentUploadBlockReason({
-              imageIds: [...composerImages, ...composerFiles].map((attachment) => attachment.id),
-              uploadsByImageId,
-              environmentId,
-            })
-          : null
+        : attachmentUploadWaitReason
       : null);
   const setComposerDraftPrompt = useComposerDraftStore((store) => store.setPrompt);
   const addComposerDraftImages = useComposerDraftStore((store) => store.addImages);
@@ -1884,13 +1899,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     reconnecting: canWaitForReconnecting,
     previousSendBusy: isSendBusy && !isEditingQueuedMessage && !activePendingProgress,
     waitingForAttachmentCapabilities,
+    uploadingAttachments: attachmentUploadWaitReason !== null,
   });
   const hardBlockedReasonForPending = !canOperateThread
     ? "此连接无法修改会话。"
     : activePendingProgress
       ? activePendingIsEnded
         ? "这一轮已经结束，无法继续回答。"
-        : attachmentBlockReason
+        : attachmentBlockReason === attachmentUploadWaitReason
+          ? null
+          : attachmentBlockReason
       : hardSendDisabledReason;
   const pendingSendEvaluation = pendingSend
     ? evaluatePendingComposerSend({
@@ -2204,6 +2222,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       reconnecting: canWaitForReconnecting,
       previousSendBusy: isSendBusy && !isEditingQueuedMessage && !activePendingProgress,
       waitingForAttachmentCapabilities,
+      uploadingAttachments: attachmentUploadWaitReason !== null,
     });
     const lengthValidationError = getComposerSubmissionValidationMessage({
       prompt: promptRef.current,
@@ -2269,6 +2288,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   };
   const submitComposerStable = useStableCallback(submitComposer);
   const cancelCurrentPendingSendStable = useStableCallback(cancelCurrentPendingSend);
+  const cancelPendingSendByUserStable = useStableCallback(cancelPendingSendByUser);
+  const dismissPendingSendCancelNoticeStable = useStableCallback(() => {
+    dismissPendingSendCancelNotice(composerDraftTargetKey);
+  });
   const handleMultipleModelSelectionsChange = useStableCallback(
     (selections: Parameters<typeof setMultipleModelSelections>[0]) => {
       cancelCurrentPendingSend();
@@ -2488,7 +2511,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       promptSuggestion: offeredPromptSuggestion,
       dismissPromptSuggestion,
       hasPendingSend: pendingSend !== null,
-      cancelPendingSend: cancelCurrentPendingSend,
+      cancelPendingSend: cancelPendingSendByUser,
       onUserPromptEdited: cancelCurrentPendingSend,
     })(key, event, isTaskItem);
 
@@ -2533,7 +2556,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the pending-send store outlives this component, so leaving a draft target must drop its armed send instead of auto-sending it whenever the user comes back
   useEffect(
     () => () => {
-      cancelPendingComposerSend(composerDraftTargetKey);
+      cancelPendingComposerSend(composerDraftTargetKey, PENDING_SEND_LEFT_NOTICE);
     },
     [composerDraftTargetKey],
   );
@@ -4051,7 +4074,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       isPreparingWorktree={false}
                       hasSendableContent={false}
                       preserveComposerFocusOnPointerDown
-                      onCancelPendingSend={cancelCurrentPendingSendStable}
+                      onCancelPendingSend={cancelPendingSendByUserStable}
                       onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                       onInterrupt={handleInterruptPrimaryActionStable}
                     />
@@ -4128,6 +4151,30 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </div>
             ) : null}
 
+            {pendingSendReason === null &&
+            pendingSendCancelNotice !== null &&
+            !isComposerCollapsedMobile ? (
+              <div
+                role="status"
+                aria-live="polite"
+                data-chat-composer-pending-send-cancelled="true"
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border/60 px-4 py-2 text-xs text-muted-foreground"
+              >
+                <span className="flex min-w-0 items-center gap-1.5 [overflow-wrap:anywhere]">
+                  <Clock3Icon className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span>{pendingSendCancelNotice}</span>
+                </span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={dismissPendingSendCancelNoticeStable}
+                >
+                  知道了
+                </Button>
+              </div>
+            ) : null}
+
             {isComposerCollapsedMobile ? null : (
               <div
                 data-chat-composer-footer="true"
@@ -4182,7 +4229,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     preserveComposerFocusOnPointerDown={isMobileViewport}
                     isEditingQueuedMessage={isEditingQueuedMessage}
                     onSubmitMessage={handleSubmitMessageStable}
-                    onCancelPendingSend={cancelCurrentPendingSendStable}
+                    onCancelPendingSend={cancelPendingSendByUserStable}
                     onResume={onResume}
                     onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                     onInterrupt={handleInterruptPrimaryActionStable}

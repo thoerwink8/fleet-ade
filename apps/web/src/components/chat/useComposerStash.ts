@@ -52,7 +52,7 @@ import {
   getPreparingComposerImageFailure,
   whenPreparingComposerImagesIdle,
 } from "./preparingComposerImages";
-import { cancelPendingComposerSend } from "./pendingComposerSend.logic";
+import { cancelPendingComposerSend, PENDING_SEND_STASH_NOTICE } from "./pendingComposerSend.logic";
 import { stashWaitReason, waitForStashReadiness } from "./composerStashReadiness.logic";
 import { remainingComposerAttachmentSlots } from "./composerThreadImport";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
@@ -189,7 +189,7 @@ export function useComposerStash(input: {
       });
       return;
     }
-    cancelPendingComposerSend(composerTargetKey(composerDraftTarget));
+    cancelPendingComposerSend(composerTargetKey(composerDraftTarget), PENDING_SEND_STASH_NOTICE);
     setIsStashMenuOpen(false);
 
     // An expired upload restores as a needs-reattach row instead of a reference
@@ -216,7 +216,7 @@ export function useComposerStash(input: {
     ) {
       return;
     }
-    cancelPendingComposerSend(composerTargetKey(composerDraftTarget));
+    cancelPendingComposerSend(composerTargetKey(composerDraftTarget), PENDING_SEND_STASH_NOTICE);
 
     const { entry, durable } = takeStashEntry(menuEntry.id);
     if (!entry) return;
@@ -481,7 +481,7 @@ export function useComposerStash(input: {
 
   const stashCurrentPrompt = async () => {
     const stashTarget = composerDraftTarget;
-    cancelPendingComposerSend(composerTargetKey(stashTarget));
+    cancelPendingComposerSend(composerTargetKey(stashTarget), PENDING_SEND_STASH_NOTICE);
     if (pendingStashAbortRef.current?.targetKey === attachmentTargetKey) return;
 
     const readUploadingFileIds = () =>

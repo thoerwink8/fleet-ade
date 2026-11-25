@@ -4,6 +4,10 @@ import {
   armPendingComposerSend,
   cancelPendingComposerSend,
   claimPendingComposerSend,
+  dismissPendingSendCancelNotice,
+  getPendingSendCancelNotice,
+  PENDING_SEND_EDITED_NOTICE,
+  PENDING_SEND_LEFT_NOTICE,
   collectPendingSendBlockers,
   evaluatePendingComposerSend,
   getPendingComposerSend,
@@ -29,6 +33,8 @@ const zeroBaseline = {
 afterEach(() => {
   cancelPendingComposerSend(TARGET_A);
   cancelPendingComposerSend(TARGET_B);
+  dismissPendingSendCancelNotice(TARGET_A);
+  dismissPendingSendCancelNotice(TARGET_B);
 });
 
 describe("collectPendingSendBlockers", () => {
@@ -429,6 +435,107 @@ describe("evaluatePendingComposerSend when the composer changed under the armed 
       editingQueuedMessage: true,
     });
     expect(result).toMatchObject({ status: "failed", kind: "target-changed" });
+  });
+});
+
+describe("uploads that an answer or approval redirect needs first", () => {
+  it("keeps the send waiting while attachments upload, then lets it go once they are done", () => {
+    const pending = armPendingComposerSend({
+      targetKey: TARGET_A,
+      dispatchMode: "auto",
+      submissionIntent: "foreground",
+      submissionTarget: "provider-turn",
+      waitedForPreviousSend: false,
+      baseline: zeroBaseline,
+    });
+    const evaluate = (uploading: boolean) =>
+      evaluatePendingComposerSend({
+        pending,
+        blockers: collectPendingSendBlockers({
+          preparingImages: false,
+          loadingContext: false,
+          reconnecting: false,
+          previousSendBusy: false,
+          uploadingAttachments: uploading,
+        }),
+        failures: noFailures,
+        hardBlockedReason: null,
+        currentSubmissionTarget: "provider-turn",
+        editingQueuedMessage: false,
+      });
+    expect(evaluate(true)).toEqual({
+      status: "waiting",
+      primaryBlocker: "uploading-attachments",
+      message: "附件还在上传，传完自动发送",
+    });
+    expect(evaluate(false)).toEqual({ status: "ready" });
+  });
+
+  it("reports the compression step first when images are still being prepared as well", () => {
+    expect(
+      collectPendingSendBlockers({
+        preparingImages: true,
+        loadingContext: false,
+        reconnecting: false,
+        previousSendBusy: false,
+        uploadingAttachments: true,
+      }),
+    ).toEqual(["preparing-images", "uploading-attachments"]);
+  });
+});
+
+describe("cancel notices", () => {
+  const arm = (targetKey: string) =>
+    armPendingComposerSend({
+      targetKey,
+      dispatchMode: "auto",
+      submissionIntent: "foreground",
+      submissionTarget: "provider-turn",
+      waitedForPreviousSend: false,
+      baseline: zeroBaseline,
+    });
+
+  it("leaves a notice when an edit drops the armed send, and none when the user cancels", () => {
+    arm(TARGET_A);
+    expect(cancelPendingComposerSend(TARGET_A, PENDING_SEND_EDITED_NOTICE)).toBe(true);
+    expect(getPendingComposerSend(TARGET_A)).toBeNull();
+    expect(getPendingSendCancelNotice(TARGET_A)).toBe(PENDING_SEND_EDITED_NOTICE);
+
+    arm(TARGET_B);
+    expect(cancelPendingComposerSend(TARGET_B)).toBe(true);
+    expect(getPendingSendCancelNotice(TARGET_B)).toBeNull();
+  });
+
+  it("keeps the notice across later keystrokes, so it is still there when the user looks", () => {
+    arm(TARGET_A);
+    cancelPendingComposerSend(TARGET_A, PENDING_SEND_EDITED_NOTICE);
+    expect(cancelPendingComposerSend(TARGET_A, PENDING_SEND_EDITED_NOTICE)).toBe(false);
+    expect(getPendingSendCancelNotice(TARGET_A)).toBe(PENDING_SEND_EDITED_NOTICE);
+  });
+
+  it("keeps the leave notice on the conversation that was left, not on the other one", () => {
+    arm(TARGET_A);
+    cancelPendingComposerSend(TARGET_A, PENDING_SEND_LEFT_NOTICE);
+    expect(getPendingSendCancelNotice(TARGET_A)).toBe(PENDING_SEND_LEFT_NOTICE);
+    expect(getPendingSendCancelNotice(TARGET_B)).toBeNull();
+  });
+
+  it("clears the notice when the user sends directly, arms again, or dismisses it", () => {
+    arm(TARGET_A);
+    cancelPendingComposerSend(TARGET_A, PENDING_SEND_EDITED_NOTICE);
+    cancelPendingComposerSend(TARGET_A);
+    expect(getPendingSendCancelNotice(TARGET_A)).toBeNull();
+
+    arm(TARGET_A);
+    cancelPendingComposerSend(TARGET_A, PENDING_SEND_EDITED_NOTICE);
+    arm(TARGET_A);
+    expect(getPendingSendCancelNotice(TARGET_A)).toBeNull();
+    cancelPendingComposerSend(TARGET_A, PENDING_SEND_EDITED_NOTICE);
+
+    arm(TARGET_B);
+    cancelPendingComposerSend(TARGET_B, PENDING_SEND_EDITED_NOTICE);
+    dismissPendingSendCancelNotice(TARGET_B);
+    expect(getPendingSendCancelNotice(TARGET_B)).toBeNull();
   });
 });
 
