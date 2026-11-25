@@ -32,11 +32,11 @@ const makeSweep = Effect.gen(function* () {
   return Effect.fn("ThreadTrashPurgeWorker.sweep")(function* () {
     const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
     if (yield* due.isIdle(nowMs)) return;
-    const roots = yield* projections.listDueThreadTrashRoots({
-      nowMs,
+    const rows = yield* projections.listThreadTrashRootsByDueAt({
       limit: THREAD_TRASH_PURGE_BATCH_LIMIT,
     });
-    for (const root of roots) {
+    for (const root of rows) {
+      if (root.purgeDueAt > nowMs) break;
       // A rejected receipt is permanent: retries must get a new command id each attempt.
       const uuid = yield* random.uuidV4();
       const deletedAtMs = DateTime.toEpochMillis(root.deletedAt);
@@ -55,11 +55,16 @@ const makeSweep = Effect.gen(function* () {
           ),
         );
     }
-    // A batch always records the earliest remaining due time (or Infinity when the
-    // table is empty); purged events bump `version`, so read the wake time after the
-    // dispatches and record with a fresh version to keep idle ticks cheap.
-    const next = (yield* projections.getThreadTrashWakeAt) ?? Infinity;
-    yield* due.record(yield* due.version, next, nowMs);
+    // Earliest purge_due_at doubles as the wake hint: rows are ordered, so the first row is
+    // due whenever anything is due; a nonempty batch re-checks next tick in case the limit
+    // cut off more work. Purged events bump `version` mid-batch, so record with a fresh one.
+    const wakeAtMs =
+      rows.length === 0
+        ? Infinity
+        : rows.some((root) => root.purgeDueAt <= nowMs)
+          ? nowMs
+          : rows[0]!.purgeDueAt;
+    yield* due.record(yield* due.version, wakeAtMs, nowMs);
   });
 });
 

@@ -24,7 +24,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as NodePath from "node:path";
-
 import { createDeterministicAttachmentId } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -90,9 +89,9 @@ const layerTest = (input: {
       const store = yield* ProjectionStore.ProjectionStoreV2;
       return {
         ...store,
-        listDueThreadTrashRoots: (args: { nowMs: number; limit: number }) =>
+        listThreadTrashRootsByDueAt: (args: { limit: number }) =>
           Ref.update(input.queries, (count) => count + 1).pipe(
-            Effect.andThen(store.listDueThreadTrashRoots(args)),
+            Effect.andThen(store.listThreadTrashRootsByDueAt(args)),
           ),
       };
     }),
@@ -449,7 +448,12 @@ it.effect("resumes committed cleanup effects after a restart without a second ev
       const directory = yield* fileSystem.makeTempDirectoryScoped({
         prefix: "trash-purge-resume-",
       });
-      const layerDb = SqlitePersistence.layerFromPath(NodePath.join(directory, "statev2.sqlite"));
+      // One SqlClient for the whole test; only the orchestration stack is rebuilt per scope.
+      const layerDb = Layer.succeedContext(
+        yield* Layer.build(
+          SqlitePersistence.layerFromPath(NodePath.join(directory, "statev2.sqlite")),
+        ),
+      );
       const config = yield* ProviderReplayHarness.makeReplayServerConfig("resume-purge").pipe(
         Effect.orDie,
       );
@@ -478,7 +482,6 @@ it.effect("resumes committed cleanup effects after a restart without a second ev
           const thread = yield* createThread("resume-purge");
           yield* seedAttachment(thread, "message:resume-purge");
           yield* deleteThread(thread, "resume-purge");
-
           const events = yield* watchPurged();
           yield* TestClock.adjust(RETENTION);
           yield* TestClock.adjust("5 seconds");
@@ -493,7 +496,6 @@ it.effect("resumes committed cleanup effects after a restart without a second ev
           return purged[0]!;
         }).pipe(Effect.provide(layerWithCommands)),
       );
-
       yield* Effect.scoped(
         Effect.gen(function* () {
           const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
@@ -518,7 +520,12 @@ it.effect("purges immediately at startup when the retention window passed while 
       const directory = yield* fileSystem.makeTempDirectoryScoped({
         prefix: "trash-purge-startup-",
       });
-      const layerDb = SqlitePersistence.layerFromPath(NodePath.join(directory, "statev2.sqlite"));
+      // One SqlClient for the whole test; only the orchestration stack is rebuilt per scope.
+      const layerDb = Layer.succeedContext(
+        yield* Layer.build(
+          SqlitePersistence.layerFromPath(NodePath.join(directory, "statev2.sqlite")),
+        ),
+      );
       const layerSeed = ProviderReplayHarness.layerWithRegistry(
         { name: "overdue-seed" },
         ProviderAdapterRegistry.layerFromAdapters([adapter]),
