@@ -21,7 +21,8 @@ import {
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
 import { attachSidebarToolbar } from "../../lib/sidebarTree";
-import { usePullRequestsSupported } from "../../state/environments";
+import { usePullRequestsSupported, useEnvironments } from "../../state/environments";
+import { multiEnvironmentControlsVisible } from "../settings/settingsScopeAxis";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -230,6 +231,8 @@ function SidebarUtilityItem({
 }
 
 const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+  const { environments } = useEnvironments();
+  const showMultiEnvironment = multiEnvironmentControlsVisible(environments);
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -297,7 +300,9 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label="用量"
             onClick={handleUsageClick}
           />
-          <SidebarUtilityItem icon={<NetworkIcon />} label="机群" onClick={handleFleetClick} />
+          {showMultiEnvironment ? (
+            <SidebarUtilityItem icon={<NetworkIcon />} label="机群" onClick={handleFleetClick} />
+          ) : null}
         </>
       )}
       <SidebarUpdatePill />

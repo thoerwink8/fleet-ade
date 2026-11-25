@@ -13,6 +13,7 @@ import {
   filterAvailableSettingsSearchItems,
   getThreadAutoSettlementSearchAvailability,
 } from "./settingsSearch";
+import { multiEnvironmentControlsVisible } from "./settingsScopeAxis";
 
 export function useAvailableSettingsSearchItems() {
   const { environments } = useEnvironments();
@@ -48,5 +49,6 @@ export function useAvailableSettingsSearchItems() {
     hasThreadAutoSettlement,
     hasPeerLinkHost,
     hasPrimaryEnvironment: primaryEnvironmentId !== null,
+    hasMultipleEnvironments: multiEnvironmentControlsVisible(environments),
   });
 }

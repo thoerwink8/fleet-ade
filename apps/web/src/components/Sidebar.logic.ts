@@ -1909,6 +1909,15 @@ export function pullRequestMatchesSearchQuery(
   return normalizedQuery.split(" ").every((token) => haystack.includes(token));
 }
 
+export function sidebarProjectScopeLabel(input: {
+  readonly selectedCount: number;
+  readonly oneLabel: string | undefined;
+}): string {
+  if (input.selectedCount === 0) return "所有项目";
+  if (input.selectedCount === 1 && input.oneLabel !== undefined) return input.oneLabel;
+  return `已选 ${input.selectedCount} 个项目`;
+}
+
 export function filterSidebarProjectScopeItems<TItem extends { readonly value: string }>(input: {
   items: readonly TItem[];
   query: string;
