@@ -288,7 +288,6 @@ describe("derivePinnedPlanView", () => {
     ["interrupted", "previous"],
     ["failed", "previous"],
     ["cancelled", "previous"],
-    ["rolled_back", "previous"],
   ])("marks a plan as %s -> %s based on its run status", (runStatus, expectedPhase) => {
     const run = makeRun("run-1", 1, runStatus);
     const view = derivePinnedPlanView({
@@ -306,6 +305,52 @@ describe("derivePinnedPlanView", () => {
     });
 
     expect(view?.phase).toBe(expectedPhase);
+  });
+
+  it("does not show the plan of a rewound turn", () => {
+    const run = makeRun("run-1", 1, "rolled_back");
+    const view = derivePinnedPlanView({
+      plans: [
+        makeTodoPlan({
+          id: "plan-1",
+          runId: "run-1",
+          status: "active",
+          steps: [makeStep("1", "Step 1", "running")],
+        }),
+      ],
+      runs: [run],
+      isWorking: false,
+      activeRunId: null,
+    });
+
+    expect(view).toBeNull();
+  });
+
+  it("falls back to the plan of an earlier turn that was not rewound", () => {
+    const run1 = makeRun("run-1", 1, "completed");
+    const run2 = makeRun("run-2", 2, "rolled_back");
+
+    const view = derivePinnedPlanView({
+      plans: [
+        makeTodoPlan({
+          id: "plan-run-1",
+          runId: "run-1",
+          status: "active",
+          steps: [makeStep("1", "Kept work", "completed")],
+        }),
+        makeTodoPlan({
+          id: "plan-run-2",
+          runId: "run-2",
+          status: "active",
+          steps: [makeStep("1", "Rewound work", "running")],
+        }),
+      ],
+      runs: [run1, run2],
+      isWorking: false,
+      activeRunId: null,
+    });
+
+    expect(view).toMatchObject({ id: PlanId.make("plan-run-1"), phase: "previous" });
   });
 
   it("keeps an earlier finished turn's plan marked previous while a newer turn runs without a plan", () => {

@@ -191,7 +191,11 @@ export function rollbackNowItem(input: {
       : progress.step === "stopping"
         ? "正在停止，随后回退…"
         : "正在回退…",
-    description: unanswered ? "强制停止会结束它的进程，回退随后接着完成。" : undefined,
+    description: unanswered
+      ? "强制停止会结束它的进程，回退随后接着完成。"
+      : progress.step === "rewinding" && !progress.canCancel
+        ? "已经排上回退，取消不了了。"
+        : undefined,
     actions: (
       <>
         {unanswered && input.canForceStop ? (

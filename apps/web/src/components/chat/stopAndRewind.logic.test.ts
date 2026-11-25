@@ -104,6 +104,22 @@ describe("deriveRollbackProgress", () => {
     });
   });
 
+  it("shows rewinding for any client while the server marks a rewind in progress", () => {
+    expect(deriveRollbackProgress({ ...base, rollbackInProgressRequestId: requestId })).toEqual({
+      step: "rewinding",
+      canCancel: false,
+    });
+    // Pending still wins while the run has not stopped: the rewind is not queued yet.
+    expect(
+      deriveRollbackProgress({
+        ...base,
+        pendingRollback: pending,
+        hasActiveRun: true,
+        rollbackInProgressRequestId: null,
+      }),
+    ).toEqual({ step: "stopping", forceStop: false, canCancel: true });
+  });
+
   it("offers force stop when this rewind's stop went unanswered", () => {
     const failure = { requestId, message: "x", code: "interrupt-unresponsive" } as const;
     expect(
@@ -166,6 +182,33 @@ describe("classifyRewindOutcome", () => {
         requestId,
       ),
     ).toEqual({ kind: "waiting" });
+  });
+
+  it("reports a cancel and a queued rewind only for the id this client sent", () => {
+    expect(
+      classifyRewindOutcome({ ...thread, rollbackCancelledRequestId: requestId }, requestId),
+    ).toEqual({ kind: "cancelled" });
+    expect(
+      classifyRewindOutcome({ ...thread, rollbackInProgressRequestId: requestId }, requestId),
+    ).toEqual({ kind: "rewinding" });
+    const other = CommandId.make("other");
+    expect(
+      classifyRewindOutcome(
+        { ...thread, rollbackCancelledRequestId: other, rollbackInProgressRequestId: other },
+        requestId,
+      ),
+    ).toEqual({ kind: "waiting" });
+    // A finished rewind outranks a marker left over from an earlier step.
+    expect(
+      classifyRewindOutcome(
+        {
+          ...thread,
+          rollbackInProgressRequestId: requestId,
+          rollbackCompletedRequestId: requestId,
+        },
+        requestId,
+      ),
+    ).toEqual({ kind: "completed" });
   });
 
   it("keeps waiting when the stop went unanswered but the rewind is still held", () => {
