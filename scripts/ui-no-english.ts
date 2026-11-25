@@ -44,7 +44,6 @@ import {
   isInternalTextCall,
   isLogCall,
   lineOf,
-  literalText,
   propertyName,
   qualifiesAsCopyScope,
   reconstructTemplateSample,
@@ -84,6 +83,9 @@ const ROOTS = [
   "apps/server/src/orchestration-v2/Orchestrator.ts",
   "packages/shared/src/usageLimits.ts",
   "apps/server/src/provider/CodexManagedErrors.ts",
+  "packages/shared/src/model.ts",
+  "packages/shared/src/paletteSearch.ts",
+  "packages/client-runtime/src/operations/threadTitle.ts",
 ];
 
 const CJK = /[一-鿿]/;
@@ -245,6 +247,7 @@ function isDurationFormatter(rel: string): boolean {
   return (
     rel.endsWith("/orchestrationTiming.ts") ||
     rel.endsWith("/TimelineWorkGroupRows.logic.ts") ||
+    rel.endsWith("/GitActionsControl.logic.ts") ||
     rel.endsWith("/AgentElapsed.tsx")
   );
 }
@@ -284,6 +287,9 @@ const SERVER_COPY = [
   "/antigravityAuthSupport.ts",
   "/antigravityUsageLimits.ts",
   "/CodexManagedErrors.ts",
+  "/model.ts",
+  "/paletteSearch.ts",
+  "/threadTitle.ts",
 ];
 
 function isServerCopyFile(rel: string): boolean {
@@ -400,14 +406,16 @@ for (const file of files.filter(included)) {
       }
       // `children: "Retry"` or `generated: "Generated"`: one capitalized English
       // word as a property value is a label unless the property carries a machine tag.
-      if (uiSurface && name !== undefined && NON_COPY_PROPS[name] !== true) {
-        const text = literalText(node.initializer);
-        if (
-          text !== undefined &&
-          /^[A-Z][a-z]{2,}$/.test(text) &&
-          leftoverEnglishWords(text, allowlist).length > 0
-        ) {
-          flagged.add(`${file}:${String(lineOf(source, node))}  ${text}`);
+      // `?? "Environment"` fallbacks count too; curated copy modules also check `label:`.
+      if (
+        (uiSurface || serverCopy) &&
+        name !== undefined &&
+        (serverCopy ? NON_COPY_PROPS_BASE[name] !== true : NON_COPY_PROPS[name] !== true)
+      ) {
+        for (const text of expressionCandidateTexts(node.initializer)) {
+          if (/^[A-Z][a-z]{2,}$/.test(text) && leftoverEnglishWords(text, allowlist).length > 0) {
+            flagged.add(`${file}:${String(lineOf(source, node))}  ${text}`);
+          }
         }
       }
     }
@@ -430,11 +438,11 @@ for (const file of files.filter(included)) {
       ts.isReturnStatement(node) &&
       node.expression !== undefined &&
       copyScope !== "none" &&
-      uiSurface &&
-      fileHasCjk
+      ((uiSurface && fileHasCjk) || rel.endsWith("/model.ts"))
     ) {
       for (const text of expressionCandidateTexts(node.expression)) {
-        report(node.expression, text, copyScope === "component" ? "loose-bare" : "loose", "ret");
+        const mode = copyScope === "component" || serverCopy ? "loose-bare" : "loose";
+        report(node.expression, text, mode, "ret");
       }
     }
 

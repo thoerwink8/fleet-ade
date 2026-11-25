@@ -1738,6 +1738,7 @@ export const layerWsRpc = (
           ...(config.maxConcurrentSessions === undefined
             ? {}
             : { startupMaxConcurrentSessions: config.maxConcurrentSessions }),
+          ...(config.devUrl !== undefined ? { devMode: true } : {}),
           shellResumeCompletionMarker: true,
           shellThreadFamilies: true,
           threadLinkMetadata: true,

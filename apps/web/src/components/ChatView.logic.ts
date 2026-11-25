@@ -96,6 +96,7 @@ import type { ReviewCommentContext } from "../reviewCommentContext";
 import { derivePhase, type TimelineEntry } from "../session-logic";
 import type { RightPanelSurface } from "../rightPanelStore";
 import {
+  findUsableDevReplayEntry,
   NO_PROVIDER_MODEL_SELECTION,
   resolveSelectableProviderInstanceEntry,
   type ProviderInstanceEntry,
@@ -432,6 +433,7 @@ export function resolveComposerProviderSelection(input: {
   candidateInstanceIds: ReadonlyArray<ProviderInstanceId | null | undefined>;
   lockedProvider: ProviderDriverKind | null;
   lockedInstanceId: ProviderInstanceId | null | undefined;
+  preferDevReplay?: boolean | undefined;
 }) {
   const requestedInstanceId = input.candidateInstanceIds.find(
     (candidate) => candidate != null && candidate !== NO_PROVIDER_MODEL_SELECTION.instanceId,
@@ -456,19 +458,30 @@ export function resolveComposerProviderSelection(input: {
       (!lockedContinuationGroupKey || entry.continuationGroupKey === lockedContinuationGroupKey) &&
       (!requiresExactInstance || entry.instanceId === input.lockedInstanceId),
   );
+  const selectionOptions = { preferDevReplay: input.preferDevReplay };
+  const candidateMatch = input.candidateInstanceIds
+    .map((candidate) =>
+      compatibleEntries.find(
+        (entry) => entry.instanceId === candidate && entry.enabled && entry.isAvailable,
+      ),
+    )
+    .find((entry) => entry !== undefined);
+  const devReplayEntry =
+    candidateMatch === undefined &&
+    requestedInstanceId === undefined &&
+    input.lockedProvider === null &&
+    input.preferDevReplay === true
+      ? findUsableDevReplayEntry(compatibleEntries)
+      : undefined;
   const selectedProviderEntry =
-    input.candidateInstanceIds
-      .map((candidate) =>
-        compatibleEntries.find(
-          (entry) => entry.instanceId === candidate && entry.enabled && entry.isAvailable,
-        ),
-      )
-      .find((entry) => entry !== undefined) ??
+    candidateMatch ??
+    devReplayEntry ??
     resolveSelectableProviderInstanceEntry(
       compatibleEntries.filter((entry) => entry.driverKind === requestedDriverKind),
       undefined,
+      selectionOptions,
     ) ??
-    resolveSelectableProviderInstanceEntry(compatibleEntries, undefined);
+    resolveSelectableProviderInstanceEntry(compatibleEntries, undefined, selectionOptions);
   const unavailableProviderInstanceId = selectedProviderEntry
     ? undefined
     : input.lockedProvider

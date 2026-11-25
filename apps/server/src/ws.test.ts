@@ -2458,3 +2458,76 @@ it.effect("orchestration.getRecentlyDeleted returns items with server time and s
     assert.ok(DateTime.isUtc(result.now));
   }),
 );
+
+it.effect("server.getConfig sets devMode only when devUrl is configured", () =>
+  Effect.gen(function* () {
+    const fetchConfig = (devUrl: URL | undefined) =>
+      Effect.gen(function* () {
+        const baseConfig = yield* ServerConfigModule.ServerConfig;
+        const dependencies = Layer.mergeAll(
+          layerUnusedConfigRpcServices,
+          Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+            scratchRoot: Effect.succeedNone,
+            namedProjectsRoot: "/unused",
+          }),
+          Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
+          Layer.mock(ServerEnvironment.ServerEnvironment)({
+            getDescriptor: Effect.succeed({
+              environmentId: EnvironmentId.make("config-test"),
+              label: "Config test",
+              platform: { os: "linux", arch: "x64" },
+              serverVersion: "0.0.0",
+              capabilities: { repositoryIdentity: false },
+            }),
+          }),
+          Layer.mock(EnvironmentAuth.EnvironmentAuth)({
+            getDescriptor: () =>
+              Effect.succeed({
+                policy: "loopback-browser",
+                bootstrapMethods: [],
+                sessionMethods: ["browser-session-cookie"],
+                sessionCookieName: "config-test-session",
+              }),
+          }),
+          Layer.mock(UsageLimitSources.UsageLimitSources)({ current: Effect.succeed([]) }),
+          Layer.mock(ExternalLauncher.ExternalLauncher)({
+            resolveAvailableEditors: () => Effect.succeed([]),
+            resolveFileManagerRevealKind: () => Effect.undefined,
+          }),
+          Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({
+            resolveTargets: () => Effect.succeed([]),
+          }),
+          Layer.mock(DirectEndpoints.DirectEndpoints)({
+            resolve: () => Effect.succeed([]),
+            resolveAvailable: () => Effect.succeed([]),
+          }),
+          Layer.mock(ProviderRegistry.ProviderRegistry)({
+            getProviders: Effect.succeed([]),
+          }),
+        );
+        const client = yield* RpcTest.makeClient(WsRpcGroup).pipe(
+          Effect.provide(
+            layerWsRpc(
+              {
+                sessionId: AuthSessionId.make("dev-mode-test"),
+                subject: "dev-mode-test",
+                method: "browser-session-cookie",
+                scopes: [],
+              },
+              { secretReferences: true },
+            ).pipe(
+              Layer.provide(dependencies),
+              Layer.provide(
+                Layer.succeed(ServerConfigModule.ServerConfig, { ...baseConfig, devUrl }),
+              ),
+              Layer.merge(RpcAuthorization.layer([AuthOrchestrationReadScope])),
+            ),
+          ),
+        );
+        return yield* client[WS_METHODS.serverGetConfig]({});
+      }).pipe(Effect.provide(Layer.fresh(layerConfigSources)));
+
+    assert.isUndefined((yield* fetchConfig(undefined)).devMode);
+    assert.isTrue((yield* fetchConfig(new URL("http://localhost:5733"))).devMode);
+  }),
+);

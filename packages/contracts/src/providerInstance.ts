@@ -106,3 +106,6 @@ export type ProviderInstanceConfigMap = typeof ProviderInstanceConfigMap.Type;
 /** Driver-kind ids keep stored selections routable without migration. */
 export const defaultInstanceIdForDriver = (driver: ProviderDriverKind): ProviderInstanceId =>
   ProviderInstanceId.make(driver);
+
+/** Instance id registered by dev servers run from source; see ProviderInstanceRegistryHydration. */
+export const DEV_REPLAY_INSTANCE_ID = ProviderInstanceId.make("devReplay");

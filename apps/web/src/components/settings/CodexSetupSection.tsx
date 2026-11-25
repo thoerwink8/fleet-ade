@@ -1122,8 +1122,8 @@ export function CodexManagedRuntimeFields({
         }
       />
       <SettingsRow
-        title="CODEX_HOME 路径"
-        description="共享的 Codex 配置、会话和状态。"
+        title="配置目录"
+        description="共享的 Codex 配置、会话和状态（CODEX_HOME）。"
         control={
           <div className="w-full sm:w-80">
             <Input

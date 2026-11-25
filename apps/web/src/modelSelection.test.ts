@@ -35,6 +35,7 @@ import {
 function provider(input: {
   provider?: ProviderDriverKind;
   instanceId: string;
+  auth?: ServerProvider["auth"];
   models?: ReadonlyArray<string>;
   supportsTextGeneration?: boolean;
 }): ServerProvider {
@@ -53,7 +54,7 @@ function provider(input: {
     installed: true,
     version: null,
     status: "ready",
-    auth: { status: "authenticated" },
+    auth: input.auth ?? { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
     models: (input.models ?? []).map((slug) => ({
       slug,
@@ -176,6 +177,44 @@ describe("scoped default model selections", () => {
         inherited,
       ]),
     ).toBe(true);
+
+    const devReplayId = ProviderInstanceId.make("devReplay");
+    const replayProviders = [
+      ...codex.providers,
+      provider({
+        instanceId: "devReplay",
+        provider: ProviderDriverKind.make("acpRegistry"),
+        auth: { status: "unknown" },
+        models: ["showcase"],
+      }),
+    ];
+    const replaySettings = {
+      ...DEFAULT_UNIFIED_SETTINGS,
+      providerInstances: {
+        [devReplayId]: {
+          driver: ProviderDriverKind.make("acpRegistry"),
+          displayName: "Replay (dev)",
+        },
+      },
+    };
+    const devTarget = {
+      projectId: null,
+      settings: replaySettings,
+      providers: replayProviders,
+      preferDevReplay: true,
+    };
+    const prodTarget = {
+      projectId: null,
+      settings: replaySettings,
+      providers: replayProviders,
+      preferDevReplay: false,
+    };
+    expect(defaultModelSelectionsAreMixed(DEFAULT_CLIENT_SETTINGS, [devTarget, prodTarget])).toBe(
+      true,
+    );
+    expect(defaultModelSelectionsAreMixed(DEFAULT_CLIENT_SETTINGS, [devTarget, devTarget])).toBe(
+      false,
+    );
   });
 
   it("keeps automatic, explicit, and different saved options distinct", () => {
