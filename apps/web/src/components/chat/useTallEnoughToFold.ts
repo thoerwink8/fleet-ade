@@ -29,14 +29,61 @@ function ensureDocumentRootObserver(): void {
 
 function readRootRemPx(): number {
   if (cachedRootRemPx !== null) return cachedRootRemPx;
-  cachedRootRemPx =
-    Number.parseFloat(getComputedStyle(document.documentElement).fontSize) ||
-    SHELL_BASE_FONT_SIZE_PX;
+  const root = document.documentElement;
+  const typedFontSize =
+    typeof root.computedStyleMap === "function" ? root.computedStyleMap().get("font-size") : null;
+  if (
+    typedFontSize &&
+    "value" in typedFontSize &&
+    typeof typedFontSize.value === "number" &&
+    Number.isFinite(typedFontSize.value) &&
+    typedFontSize.value > 0
+  ) {
+    cachedRootRemPx = typedFontSize.value;
+    return cachedRootRemPx;
+  }
+  cachedRootRemPx = Number.parseFloat(getComputedStyle(root).fontSize) || SHELL_BASE_FONT_SIZE_PX;
   return cachedRootRemPx;
 }
 
-function measureFoldThresholdPx(content: HTMLElement): number {
+function readTypedCustomProperty(element: HTMLElement, name: string): string | null {
+  if (typeof element.computedStyleMap !== "function") return null;
+  const value = element.computedStyleMap().get(name);
+  return value ? String(value).trim() : null;
+}
+
+function measureFoldThresholdPx(content: HTMLElement, inReadingArea: boolean): number {
+  const root = document.documentElement;
   const rootRemPx = readRootRemPx();
+  const typedProseSize =
+    parseCssLengthPx(readTypedCustomProperty(content, "--font-size-prose") ?? "", rootRemPx) ??
+    (inReadingArea
+      ? parseCssLengthPx(
+          root.style.getPropertyValue("--reading-font-size-prose") ||
+            (readTypedCustomProperty(root, "--reading-font-size-prose") ?? ""),
+          rootRemPx,
+        )
+      : null);
+  if (typedProseSize !== null) {
+    const typedLineHeight =
+      parseLineHeightMultiplier(
+        readTypedCustomProperty(content, "--line-height-prose") ?? "",
+        typedProseSize,
+      ) ??
+      (inReadingArea
+        ? parseLineHeightMultiplier(
+            root.style.getPropertyValue("--reading-line-height-prose") ||
+              (readTypedCustomProperty(root, "--reading-line-height-prose") ?? ""),
+            typedProseSize,
+          )
+        : null);
+    if (typedLineHeight !== null) {
+      return resolveFoldThresholdPx({
+        proseFontSizePx: typedProseSize,
+        proseLineHeight: typedLineHeight,
+      });
+    }
+  }
   const styles = getComputedStyle(content);
   const proseFontSizePx =
     parseCssLengthPx(styles.getPropertyValue("--font-size-prose"), rootRemPx) ??
@@ -51,13 +98,15 @@ function measureFoldThresholdPx(content: HTMLElement): number {
 
 function readFoldThresholdPx(content: HTMLElement): number {
   ensureDocumentRootObserver();
+  const readingArea = content.closest("[data-reading-area]");
+  const inReadingArea = readingArea !== null;
   if (content.style.getPropertyValue("--font-size-prose").trim().length > 0) {
-    return measureFoldThresholdPx(content);
+    return measureFoldThresholdPx(content, inReadingArea);
   }
-  const scope = content.closest("[data-reading-area]") ?? document.documentElement;
+  const scope = readingArea ?? document.documentElement;
   const cached = cachedThresholdByScope.get(scope);
   if (cached !== undefined) return cached;
-  const measured = measureFoldThresholdPx(content);
+  const measured = measureFoldThresholdPx(content, inReadingArea);
   cachedThresholdByScope.set(scope, measured);
   return measured;
 }
