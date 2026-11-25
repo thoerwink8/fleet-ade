@@ -7,6 +7,7 @@ import {
   ThreadId,
   ServerSettingsError,
   type ServerSettings,
+  type CommandAssistRunResult,
 } from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -20,7 +21,6 @@ import * as TestClock from "effect/testing/TestClock";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettingsService from "../serverSettings.ts";
 import * as CommandAssist from "./CommandAssist.ts";
-import type { CommandAssistRunResult } from "./CommandAssist.ts";
 
 const projectId = ProjectId.make("project-assist");
 const named = {
@@ -508,7 +508,6 @@ it.effect(
         projectId: null,
         cwd: "/repo",
         text: "把解析修好",
-        childPhase: "在跑",
       });
       assert.strictEqual(tidied.goal, "修好解析");
       assert.strictEqual(tidied.done, "");
@@ -773,7 +772,6 @@ it.effect("tidies only when asked and leaves blank fields blank", () => {
       projectId: null,
       cwd: "/repo",
       text: "把解析修好，别动锁",
-      childPhase: "在跑",
     });
     assert.strictEqual(tidied.goal, "修好解析");
     assert.strictEqual(tidied.done, "");
@@ -795,6 +793,54 @@ it.effect("tidies only when asked and leaves blank fields blank", () => {
       ),
     ),
   );
+});
+
+it.effect("tidy reports skipped without calling the model, and failed with a reason code", () => {
+  const settings = ServerSettingsService.layerTest({
+    commandAssist: rows(false, false, false, false, false),
+  });
+  const { calls, model } = countingModel((input) =>
+    input.prompt.includes("慢")
+      ? Effect.sleep(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS + 1_000)).pipe(Effect.as("late"))
+      : Effect.fail({ reason: "Provider exploded in English detail" }),
+  );
+  const speechOn = rows(false, false, false, false, true);
+  return Effect.gen(function* () {
+    const assist = yield* CommandAssist.CommandAssist;
+    const settingsService = yield* ServerSettingsService.ServerSettingsService;
+
+    const off = yield* assist.tidy({
+      threadId,
+      projectId: null,
+      cwd: "/repo",
+      text: "把解析修好",
+    });
+    assert.strictEqual(off.result._tag, "skipped");
+    assert.strictEqual(off.note, "跳过");
+    assert.strictEqual(off.goal, "");
+    assert.strictEqual(calls.complete, 0);
+    assert.strictEqual((yield* assist.read(threadId)).speechNote, "跳过");
+
+    yield* settingsService.updateSettings({ commandAssist: speechOn });
+    const failed = yield* assist.tidy({
+      threadId,
+      projectId: null,
+      cwd: "/repo",
+      text: "把解析修好",
+    });
+    assert.deepStrictEqual(failed.result, { _tag: "failed", reason: "调用失败" });
+    assert.strictEqual(failed.note, "没整理成");
+    assert.strictEqual(calls.complete, 1);
+
+    const slow = yield* assist
+      .tidy({ threadId, projectId: null, cwd: "/repo", text: "慢" })
+      .pipe(Effect.forkChild);
+    yield* TestClock.adjust(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS));
+    const timedOut = yield* Fiber.join(slow);
+    assert.deepStrictEqual(timedOut.result, { _tag: "failed", reason: "超时" });
+    assert.strictEqual(timedOut.note, "没整理成");
+    assert.strictEqual(timedOut.original, "慢");
+  }).pipe(Effect.provide(harness(model, settings)));
 });
 
 it.effect("calls the model once when two observes share an input", () => {

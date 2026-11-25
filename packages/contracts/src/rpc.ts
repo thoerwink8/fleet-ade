@@ -1694,6 +1694,15 @@ const WsOrchestrationV2MarkChildDriftFalsePositiveRpc = Rpc.make(
   },
 );
 
+const WsOrchestrationV2CommandTidySpeechRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.commandTidySpeech,
+  {
+    payload: OrchestrationV2RpcSchemas.commandTidySpeech.input,
+    success: OrchestrationV2RpcSchemas.commandTidySpeech.output,
+    error: EnvironmentAuthorizationError,
+  },
+);
+
 const WsOrchestrationV2SubscribeCommandChildrenRpc = Rpc.make(
   ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren,
   {
@@ -2022,5 +2031,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2CommandChildrenRpc,
   WsOrchestrationV2CommandChildDetailRpc,
   WsOrchestrationV2MarkChildDriftFalsePositiveRpc,
+  WsOrchestrationV2CommandTidySpeechRpc,
   WsOrchestrationV2SubscribeCommandChildrenRpc,
 ).middleware(RpcScopeAuthorization);

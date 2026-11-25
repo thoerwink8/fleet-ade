@@ -227,6 +227,50 @@ it.effect("requires operate permission to mark child drift as a false positive",
   }),
 );
 
+it.effect("requires operate permission to tidy command speech", () =>
+  Effect.gen(function* () {
+    const method = ORCHESTRATION_V2_WS_METHODS.commandTidySpeech;
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, typeof method> => tag !== method,
+      ),
+    );
+    let handled = false;
+    const client = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          group.toLayerHandler(method, () =>
+            Effect.sync(() => {
+              handled = true;
+              return {
+                goal: "",
+                done: "",
+                avoid: "",
+                tests: "",
+                note: null,
+                original: "",
+                result: { _tag: "skipped" as const, reason: "off" as const },
+              };
+            }),
+          ),
+          RpcAuthorization.layer([AuthOrchestrationReadScope]),
+        ),
+      ),
+    );
+    const input = { threadId: "child", projectId: null, cwd: "/repo", text: "把解析修好" };
+    expect(clientRpcRequiredScopes(method, input)).toEqual([AuthOrchestrationOperateScope]);
+    expect(
+      yield* client[method]({
+        threadId: ThreadId.make("child"),
+        projectId: null,
+        cwd: "/repo",
+        text: "把解析修好",
+      }).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthOrchestrationOperateScope });
+    expect(handled).toBe(false);
+  }),
+);
+
 it.effect.each([
   WS_METHODS.subscribeVcsBranch,
   WS_METHODS.subscribeVcsStatus,
