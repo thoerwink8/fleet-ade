@@ -339,7 +339,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
               <Link
                 to="/settings/scheduled-tasks"
                 search={{ environmentId: ctx.activeThreadEnvironmentId, taskId: scheduledTaskId }}
-                className="rounded-sm text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                className="ade-touch-target ade-touch-target--y rounded-sm text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
               >
                 打开自动化
               </Link>
@@ -349,7 +349,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
               timestampFormat={ctx.timestampFormat}
               alwaysVisible
             />
-            <div className="flex items-center gap-0.5">
+            <div className="ade-touch-row ade-touch-row--gap-4 flex items-center gap-0.5 pointer-coarse:gap-4">
               {typeof revertTurnCount === "number" && (
                 <RevertUserMessageButton turnCount={revertTurnCount} messageId={row.message.id} />
               )}
@@ -394,7 +394,7 @@ function FoldedMessageHeader(props: {
       aria-expanded={props.expanded}
       data-scroll-anchor-ignore
       onClick={props.onToggle}
-      className="flex w-full min-w-0 items-center gap-1.5 rounded-xl px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
+      className="ade-touch-target ade-touch-target--y flex w-full min-w-0 items-center gap-1.5 rounded-xl px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
     >
       <Icon className="size-4 shrink-0 stroke-2 text-muted-foreground" />
       <span className="max-w-1/2 shrink-0 truncate text-muted-foreground">{props.label}</span>
@@ -772,6 +772,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         <InlineButton
           onClick={() => ctx.onOpenThread(senderRef.threadId, senderRef.environmentId)}
           tone="muted"
+          touchTarget="expand"
         >
           打开会话
         </InlineButton>
@@ -941,12 +942,15 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   );
                   if (file.downloadable !== false) {
                     return (
-                      <div key={file.id} className="flex min-w-0 items-center gap-1">
+                      <div
+                        key={file.id}
+                        className="flex min-w-0 items-center gap-1 pointer-coarse:gap-3"
+                      >
                         <button
                           type="button"
                           aria-label={`预览 ${label}`}
                           onClick={() => ctx.onFileOpen(file)}
-                          className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+                          className="ade-touch-target ade-touch-target--y focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
                         >
                           {fileIdentity}
                           <EyeIcon className="size-4 shrink-0" />
