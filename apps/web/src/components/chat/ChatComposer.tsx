@@ -377,6 +377,7 @@ export interface ChatComposerHandle {
   };
   validateProviderInput: (providerInput: string) => boolean;
   setMultipleModelSelections: (selections: ReadonlyArray<ModelSelection>) => void;
+  restoreStashEntry: (entryId: string) => Promise<void>;
   submit: (options?: {
     dispatchMode?: ComposerDispatchMode | undefined;
     submissionIntent?: ComposerSubmissionIntent | undefined;
@@ -2522,6 +2523,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setIsStashMenuOpen,
     stashPulseKey,
     restoreStashEntryStable,
+    restoreStashEntryByIdStable,
     deleteStashEntryStable,
     toggleStashMenuStable,
   } = useComposerStash({
@@ -2543,6 +2545,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerPreviewAnnotations,
     composerReviewComments,
     composerThreadContexts,
+    composerEnvironmentContexts,
     attachmentTargetKey,
     isComposerDraftTargetOpen: (key) => composerDraftTargetKeyRef.current === key,
     composerEditorRef,
@@ -3583,6 +3586,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         selectedProviderModels,
       }),
       setMultipleModelSelections: handleMultipleModelSelectionsChange,
+      restoreStashEntry: restoreStashEntryByIdStable,
       submit: (options) =>
         submitComposerStable(
           undefined,
@@ -3644,6 +3648,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       selectedModelSelection,
       multipleModelSelections,
       handleMultipleModelSelectionsChange,
+      restoreStashEntryByIdStable,
       cancelCurrentPendingSendStable,
       submitComposerStable,
       routeKind,
