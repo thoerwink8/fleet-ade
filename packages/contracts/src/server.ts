@@ -615,6 +615,8 @@ export const ServerConfig = Schema.Struct({
   startupMaxConcurrentSessions: Schema.optionalKey(
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
   ),
+  /** True when the server was started in dev mode (`--dev-url` / `VITE_DEV_SERVER_URL`). */
+  devMode: Schema.optionalKey(Schema.Boolean),
   shellResumeCompletionMarker: Schema.optionalKey(Schema.Boolean),
   /**
    * The shell can leave idle subagent children out of snapshots (`omitIdleSubagents`), and

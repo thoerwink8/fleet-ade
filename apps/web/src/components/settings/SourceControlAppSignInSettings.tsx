@@ -178,7 +178,7 @@ export function SourceControlAppSignInSettings({
         "已登录"
       );
     action = (
-      <Button size="xs" variant="outline" disabled={!canSignIn} onClick={() => void signOut()}>
+      <Button size="xs" variant="secondary" disabled={!canSignIn} onClick={() => void signOut()}>
         退出登录
       </Button>
     );
@@ -231,7 +231,8 @@ export function SourceControlAppSignInSettings({
           <div className="flex items-center gap-2">
             <DeviceCode code={waiting.userCode} />
             <Button
-              size="icon-xs"
+              size="xs"
+              icon
               variant="ghost"
               aria-label="复制代码"
               onClick={() => copyToClipboard(waiting.userCode, undefined)}

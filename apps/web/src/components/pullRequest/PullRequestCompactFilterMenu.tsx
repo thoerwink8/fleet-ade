@@ -40,9 +40,9 @@ export function PullRequestCompactFilterMenu<Value extends string>({
         title={iconOnly ? `${label}: ${current.label}` : undefined}
         render={
           outlined ? (
-            <Button variant="outline" size={iconOnly ? "icon" : "default"} />
+            <Button variant="secondary" size="md" icon={iconOnly} />
           ) : (
-            <Button variant="ghost-muted" size="sm" />
+            <Button variant="muted" size="sm" />
           )
         }
         className={cn("min-w-0", className)}

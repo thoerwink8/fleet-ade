@@ -354,7 +354,7 @@ function McpConsent({
             disabled={pending !== null}
             onClick={() => void decide("deny", details)}
             type="button"
-            variant="outline"
+            variant="secondary"
           >
             {pending === "deny" ? "正在拒绝…" : "拒绝"}
           </Button>

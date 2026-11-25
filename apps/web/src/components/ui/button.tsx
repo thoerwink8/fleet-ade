@@ -4,56 +4,43 @@ import {
   Button as FleetButton,
   type ButtonProps as FleetButtonProps,
 } from "@fleet/design/react/button";
+
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "~/lib/utils";
 
 type FleetButtonVariant = NonNullable<FleetButtonProps["variant"]>;
-type FleetButtonSize = NonNullable<FleetButtonProps["size"]>;
 
 const buttonExtensionVariants = cva("", {
   defaultVariants: {
-    size: "default",
-    variant: "default",
+    size: "md",
+    variant: "primary",
   },
   variants: {
     size: {
-      action: "",
-      compact: "",
-      default: "",
-      icon: "",
-      "icon-lg": "",
-      "icon-micro": "",
-      "icon-tiny": "",
-      "icon-sm": "",
-      "icon-sm-pill": "",
-      "icon-xl": "",
-      "icon-xs": "",
       lg: "",
-      micro: "",
-      multiline: "ade-btn--multiline",
+      md: "",
       sm: "",
-      "sm-pill": "",
-      "sm-multiline": "ade-btn--multiline",
-      xl: "",
       xs: "",
+    },
+    multiline: {
+      true: "ade-btn--multiline",
     },
     touchTarget: {
       compact: "ade-btn--touch-compact",
     },
     variant: {
-      default: "",
-      destructive: "",
-      "destructive-outline": "",
+      danger: "",
+      "danger-ghost": "",
+      "danger-secondary": "",
       ghost: "",
-      "ghost-muted": "",
-      "ghost-destructive": "",
       glass: "ade-btn--glass",
       link: "ade-btn--link",
       "media-close": "ade-btn--media-close",
       "media-navigation": "absolute top-1/2 z-20 -translate-y-1/2 ade-btn--media-navigation",
-      outline: "",
+      muted: "",
       overlay: "ade-btn--overlay",
+      primary: "",
       secondary: "",
       "warning-outline": "ade-btn--warning-outline",
     },
@@ -63,72 +50,50 @@ const buttonExtensionVariants = cva("", {
 type ButtonVariant = NonNullable<VariantProps<typeof buttonExtensionVariants>["variant"]>;
 type ButtonSize = NonNullable<VariantProps<typeof buttonExtensionVariants>["size"]>;
 type ButtonTouchTarget = NonNullable<VariantProps<typeof buttonExtensionVariants>["touchTarget"]>;
-
 const FLEET_VARIANT_BY_VARIANT: Readonly<Record<ButtonVariant, FleetButtonVariant>> = {
-  default: "primary",
-  destructive: "danger",
-  "destructive-outline": "danger-secondary",
+  danger: "danger",
+  "danger-ghost": "danger-ghost",
+  "danger-secondary": "danger-secondary",
   ghost: "ghost",
-  "ghost-muted": "muted",
-  "ghost-destructive": "danger-ghost",
   glass: "ghost",
   link: "ghost",
   "media-close": "ghost",
   "media-navigation": "ghost",
-  outline: "secondary",
+  muted: "muted",
   overlay: "ghost",
+  primary: "primary",
   secondary: "secondary",
   "warning-outline": "ghost",
-};
-
-const FLEET_SIZE_BY_SIZE: Readonly<
-  Record<ButtonSize, { readonly size: FleetButtonSize; readonly icon: boolean }>
-> = {
-  action: { size: "sm", icon: false },
-  compact: { size: "sm", icon: false },
-  default: { size: "md", icon: false },
-  icon: { size: "md", icon: true },
-  "icon-lg": { size: "lg", icon: true },
-  "icon-micro": { size: "xs", icon: true },
-  "icon-tiny": { size: "xs", icon: true },
-  "icon-sm": { size: "sm", icon: true },
-  "icon-sm-pill": { size: "sm", icon: true },
-  "icon-xl": { size: "lg", icon: true },
-  "icon-xs": { size: "xs", icon: true },
-  lg: { size: "lg", icon: false },
-  micro: { size: "xs", icon: false },
-  multiline: { size: "md", icon: false },
-  sm: { size: "sm", icon: false },
-  "sm-pill": { size: "sm", icon: false },
-  "sm-multiline": { size: "sm", icon: false },
-  xl: { size: "lg", icon: false },
-  xs: { size: "xs", icon: false },
 };
 
 type ButtonVariantOptions = {
   variant?: ButtonVariant | null | undefined;
   size?: ButtonSize | null | undefined;
+  icon?: boolean | null | undefined;
+  multiline?: boolean | null | undefined;
   touchTarget?: ButtonTouchTarget | null | undefined;
   className?: string | undefined;
 };
 
 function buttonVariants({
   className,
-  size = "default",
+  icon = false,
+  multiline = false,
+  size = "md",
   touchTarget,
-  variant = "default",
+  variant = "primary",
 }: ButtonVariantOptions = {}) {
-  const resolvedSize = size ?? "default";
-  const resolvedVariant = variant ?? "default";
+  const resolvedSize = size ?? "md";
+  const resolvedVariant = variant ?? "primary";
   const fleetVariant = FLEET_VARIANT_BY_VARIANT[resolvedVariant];
-  const { size: fleetSize, icon } = FLEET_SIZE_BY_SIZE[resolvedSize];
   return cn(
     "fa-btn",
     fleetVariant !== "ghost" && `fa-btn--${fleetVariant}`,
-    fleetSize !== "md" && `fa-btn--${fleetSize}`,
+    resolvedSize !== "md" && `fa-btn--${resolvedSize}`,
     icon && "fa-btn--icon",
     buttonExtensionVariants({
       size: resolvedSize,
+      ...(multiline ? { multiline: true } : {}),
       ...(touchTarget !== undefined ? { touchTarget } : {}),
       variant: resolvedVariant,
     }),
@@ -139,19 +104,23 @@ function buttonVariants({
 interface ButtonProps extends useRender.ComponentProps<"button"> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  icon?: boolean;
+  multiline?: boolean;
   touchTarget?: ButtonTouchTarget;
 }
 
 function RenderedButton({
   className,
-  variant = "default",
-  size = "default",
+  icon = false,
+  multiline = false,
+  size = "md",
   touchTarget,
+  variant = "primary",
   render,
   ...props
 }: ButtonProps & { render: NonNullable<ButtonProps["render"]> }) {
   const defaultProps = {
-    className: buttonVariants({ className, size, touchTarget, variant }),
+    className: buttonVariants({ className, icon, multiline, size, touchTarget, variant }),
     "data-slot": "button",
     type: undefined,
   };
@@ -165,9 +134,11 @@ function RenderedButton({
 
 function Button({
   className,
-  variant = "default",
-  size = "default",
+  icon = false,
+  multiline = false,
+  size = "md",
   touchTarget,
+  variant = "primary",
   render,
   ...props
 }: ButtonProps) {
@@ -176,6 +147,8 @@ function Button({
       <RenderedButton
         render={render}
         size={size}
+        icon={icon}
+        multiline={multiline}
         variant={variant}
         {...(className !== undefined ? { className } : {})}
         {...(touchTarget !== undefined ? { touchTarget } : {})}
@@ -185,15 +158,14 @@ function Button({
   }
 
   const fleetVariant = FLEET_VARIANT_BY_VARIANT[variant];
-  const { size: fleetSize, icon } = FLEET_SIZE_BY_SIZE[size];
   const { ref, style, type, ...restProps } = props;
 
   return (
     <FleetButton
-      className={cn(buttonExtensionVariants({ size, touchTarget, variant }), className)}
+      className={cn(buttonExtensionVariants({ size, multiline, touchTarget, variant }), className)}
       data-slot="button"
       icon={icon}
-      size={fleetSize}
+      size={size}
       variant={fleetVariant}
       {...(ref !== undefined ? { ref } : {})}
       {...(style !== undefined ? { style } : {})}

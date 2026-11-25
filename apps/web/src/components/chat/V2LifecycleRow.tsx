@@ -57,7 +57,7 @@ import {
   type ProviderInstanceEntry,
 } from "../../providerInstances";
 import { formatShortTimestamp } from "../../timestampFormat";
-import { getTriggerDisplayModelName } from "./providerIconUtils";
+import { resolveModelDisplayName } from "@t3tools/client-runtime/model-display";
 import { ProviderInstanceIcon, providerTextColor } from "./ProviderInstanceIcon";
 import { cn } from "~/lib/utils";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
@@ -120,7 +120,7 @@ export function V2LifecycleRow(props: {
           </span>
           <Button
             size="xs"
-            variant="outline"
+            variant="secondary"
             aria-label={`打开 ${item.title ?? "已创建会话"}`}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
@@ -615,8 +615,11 @@ export function ModelSwitchRow(props: {
   if (change === null) return null;
   const describe = (selection: ModelSelection, effort: string | undefined) => {
     const provider = providers.find((candidate) => candidate.instanceId === selection.instanceId);
-    const model = provider?.models.find((candidate) => candidate.slug === selection.model);
-    const modelName = model ? getTriggerDisplayModelName(model, provider?.driver) : selection.model;
+    const modelName = resolveModelDisplayName({
+      driverKind: provider?.driver,
+      model: selection.model,
+      models: provider?.models,
+    });
     return [change.modelChanged ? modelName : null, effort].filter(Boolean).join(" ");
   };
   const { from, to } = props.modelSwitch;
@@ -681,16 +684,14 @@ function HandoffEndpoint(props: {
   const entry = props.entries.find((candidate) => candidate.instanceId === props.instanceId);
   const showBadge = entry !== undefined && shouldShowInstanceBadge(entry, props.entries);
   const model = props.model?.trim();
-  const providerModel =
-    model === undefined || model.length === 0
-      ? undefined
-      : entry?.models.find((candidate) => candidate.slug === model);
   const label =
-    providerModel !== undefined
-      ? getTriggerDisplayModelName(providerModel, entry?.driverKind)
-      : model !== undefined && model.length > 0
-        ? model
-        : (entry?.displayName ?? props.instanceId);
+    model !== undefined && model.length > 0
+      ? resolveModelDisplayName({
+          driverKind: entry?.driverKind,
+          model,
+          models: entry?.models,
+        })
+      : (entry?.displayName ?? props.instanceId);
   const labelColor = providerTextColor(
     entry?.driverKind ?? ProviderDriverKind.make(props.instanceId),
   );

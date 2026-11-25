@@ -182,8 +182,9 @@ function SecretCheckButton(props: {
           <span className="inline-flex">
             <Button
               type="button"
-              size="icon-micro"
-              variant="ghost-muted"
+              size="xs"
+              icon
+              variant="muted"
               disabled={props.disabled === true || !canCheck || state?.status === "checking"}
               onClick={() => void run()}
               aria-label={

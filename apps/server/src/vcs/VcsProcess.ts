@@ -3,6 +3,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
+import * as PlatformError from "effect/PlatformError";
 import * as Schedule from "effect/Schedule";
 import * as Semaphore from "effect/Semaphore";
 import { ChildProcessSpawner } from "effect/process";
@@ -16,6 +17,7 @@ import {
   VcsProcessOutputLimitError,
   VcsProcessOutputReadError,
   VcsProcessSpawnError,
+  type VcsProcessSpawnFailureReason,
   VcsProcessStdinWriteError,
   VcsProcessTimeoutError,
 } from "@t3tools/contracts";
@@ -204,6 +206,31 @@ const canRetryFullFsync = (stderr: string) =>
   /fsync error on [^\r\n]+: operation not supported\r?$/im.test(stderr) ||
   /cannot update ref [^\r\n]+: couldn't write '[^\r\n]+\.lock'\r?$/im.test(stderr);
 
+function classifyProcessSpawnFailure(
+  cause: unknown,
+  cwd: string,
+): VcsProcessSpawnFailureReason | undefined {
+  if (PlatformError.isPlatformError(cause)) {
+    if (cause.reason._tag === "NotFound") {
+      return cause.reason.pathOrDescriptor === cwd ? undefined : "executable_not_found";
+    }
+    if (cause.reason._tag === "PermissionDenied") {
+      return "permission_denied";
+    }
+  }
+  if (typeof cause === "object" && cause !== null && "code" in cause) {
+    const code = cause.code;
+    if (code === "ENOENT") {
+      const errorPath = "path" in cause && typeof cause.path === "string" ? cause.path : undefined;
+      return errorPath === cwd ? undefined : "executable_not_found";
+    }
+    if (code === "EACCES" || code === "EPERM") {
+      return "permission_denied";
+    }
+  }
+  return undefined;
+}
+
 export const make = Effect.gen(function* () {
   const processRunner = yield* ProcessRunner.ProcessRunner;
   const hostPlatform = yield* HostProcess.Platform;
@@ -256,7 +283,11 @@ export const make = Effect.gen(function* () {
         Effect.mapError(
           Match.valueTags({
             ProcessSpawnError: (error) =>
-              VcsProcessSpawnError.fromProcessSpawnError(baseError, error),
+              VcsProcessSpawnError.fromProcessSpawnError(
+                baseError,
+                error,
+                classifyProcessSpawnFailure(error.cause, baseError.cwd),
+              ),
             ProcessOutputLimitError: (error) =>
               new VcsProcessOutputLimitError({
                 ...baseError,
@@ -360,6 +391,7 @@ export const make = Effect.gen(function* () {
         return yield* new VcsProcessExitError({
           ...error,
           detail: GIT_INDEX_LOCKED_DETAIL,
+          reason: "index_locked",
         });
       }
       return yield* error;

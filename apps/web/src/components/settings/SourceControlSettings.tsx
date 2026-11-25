@@ -269,8 +269,9 @@ function DiscoveryItemRow({
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
             {hasDetails ? (
               <Button
-                size="icon-xs"
-                variant="ghost-muted"
+                size="xs"
+                icon
+                variant="muted"
                 onClick={() => setIsExpanded((open) => !open)}
                 aria-expanded={isExpanded}
                 aria-label={`展开或收起 ${item.label} 详情`}
@@ -380,7 +381,7 @@ function EmptySourceControlDiscovery({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button size="sm" variant="outline" onClick={onScan} disabled={isPending}>
+          <Button size="sm" variant="secondary" onClick={onScan} disabled={isPending}>
             <RefreshIcon size="sm" refreshing={isPending} />
             扫描
           </Button>
@@ -481,8 +482,9 @@ export function SourceControlSettingsPanel() {
       <TooltipTrigger
         render={
           <Button
-            size="icon-xs"
-            variant="ghost-muted"
+            size="xs"
+            icon
+            variant="muted"
             onClick={handleScan}
             disabled={discovery.isPending}
             aria-label="重新扫描版本控制"

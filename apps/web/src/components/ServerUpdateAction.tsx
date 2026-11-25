@@ -137,7 +137,7 @@ export function useServerUpdate() {
 export function ServerUpdatesAction({
   targets,
   label = "全部更新",
-  variant = "outline",
+  variant = "secondary",
   size = "xs",
   className,
 }: UpdateButtonProps & {
@@ -219,7 +219,7 @@ export function ServerUpdateAction({
   desktopAppInstall = false,
   targetVersion,
   label = "Update",
-  variant = "outline",
+  variant = "secondary",
   size = "xs",
   className,
   appearance = "button",
@@ -293,8 +293,9 @@ export function ServerUpdateAction({
         <TooltipTrigger
           render={
             <Button
-              size="icon-xs"
-              variant="ghost-muted"
+              size="xs"
+              icon
+              variant="muted"
               className={className}
               aria-label={`对 ${serverLabel} ${actionLabel}`}
               disabled={manualCommand === null && !canUpdate}
@@ -365,7 +366,7 @@ export function OutdatedServerUpdateAction({
     return <CrossTrackNote />;
   }
   return (
-    <Button size="xs" variant="outline" onClick={() => void handleUpdate()}>
+    <Button size="xs" variant="secondary" onClick={() => void handleUpdate()}>
       {label}
     </Button>
   );

@@ -355,8 +355,9 @@ export function SavedBackendListRow({
           render={
             <Button
               type="button"
-              variant="ghost-muted"
-              size="icon-xs"
+              variant="muted"
+              size="xs"
+              icon
               disabled={isRemoving}
               aria-label={`${environment.label} 的更多操作`}
             />

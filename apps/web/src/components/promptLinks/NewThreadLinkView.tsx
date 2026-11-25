@@ -352,7 +352,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
         <LinkPage title="此链接已打开">
           <Button
             size="sm"
-            variant="outline"
+            variant="secondary"
             onClick={() => {
               openedLinkKeys.delete(locationKey);
               setStarted(false);
@@ -375,7 +375,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
           <Button size="sm" onClick={() => void cloneRepository(state.repository)}>
             克隆 {name}
           </Button>
-          <Button size="sm" variant="outline" onClick={openWithoutProject}>
+          <Button size="sm" variant="secondary" onClick={openWithoutProject}>
             不使用项目
           </Button>
         </LinkPage>

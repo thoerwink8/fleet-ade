@@ -467,7 +467,8 @@ export function McpAppFrame(props: {
             <span className="truncate">{app.server}</span>
             <Button
               aria-label="退出全屏"
-              size="icon-sm"
+              size="sm"
+              icon
               variant="ghost"
               onClick={() => setDisplayMode("inline")}
             >

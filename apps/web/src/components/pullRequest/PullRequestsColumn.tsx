@@ -57,7 +57,7 @@ function ExpandableSearch({
     );
   }
   return (
-    <Button size="icon-sm" variant="ghost" aria-label="搜索 PR" onClick={() => onOpenChange(true)}>
+    <Button size="sm" icon variant="ghost" aria-label="搜索 PR" onClick={() => onOpenChange(true)}>
       <SearchIcon className="size-4" />
     </Button>
   );
@@ -270,8 +270,9 @@ function PullRequestRefreshControl({
 }) {
   return (
     <Button
-      size={compact ? "icon-sm" : "icon"}
-      variant={compact ? "ghost" : "outline"}
+      size={compact ? "sm" : "md"}
+      icon
+      variant={compact ? "ghost" : "secondary"}
       aria-label="刷新 PR"
       onClick={onRefresh}
       disabled={refreshing}

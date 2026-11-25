@@ -33,8 +33,8 @@ export function ThreadDetailsControl({
   tone = "default",
   className,
   children,
-  size = "default",
-  variant = "default",
+  size = "md",
+  variant = "primary",
   render,
   ...props
 }: ComponentProps<typeof Button> & {
@@ -94,7 +94,8 @@ export function ThreadDetailsControl({
       <Button
         {...props}
         render={render}
-        size={multiline ? "sm-multiline" : size}
+        multiline={multiline}
+        size={multiline ? "sm" : size}
         variant={variant}
         className={className}
       >

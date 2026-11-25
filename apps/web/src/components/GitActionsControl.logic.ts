@@ -103,7 +103,7 @@ export function formatGitActionElapsed(startedAtMs: number | null, nowMs: number
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
-  return `${minutes}m ${seconds}s`;
+  return `${minutes} 分 ${seconds} 秒`;
 }
 
 export function buildMenuItems(

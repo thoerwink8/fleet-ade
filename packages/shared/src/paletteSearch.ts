@@ -957,9 +957,9 @@ function matchHint(
       label: "PR",
       text: `#${pullRequest.number}${pullRequest.title ? ` ${pullRequest.title}` : ""}`,
     })),
-    { label: "Branch", text: searchableBranch(thread.branch) },
-    { label: "Project", text: thread.projectTitle },
-    { label: "Environment", text: thread.environmentLabel },
+    { label: "分支", text: searchableBranch(thread.branch) },
+    { label: "项目", text: thread.projectTitle },
+    { label: "电脑", text: thread.environmentLabel },
   ];
   const holds = (text: string, query: string) =>
     matchSearchFields(query, [{ value: text, weight: 1 }], { typos })?.primaryRanges;
@@ -1059,7 +1059,7 @@ export function scoreThreadSearch(
     ? undefined
     : (): SearchMatchHint | undefined =>
         referenceMatch
-          ? { label: "ID or link", text: normalizedQuery, ranges: [] }
+          ? { label: "ID 或链接", text: normalizedQuery, ranges: [] }
           : (checkedHint ?? matchHint(fieldQuery, thread, typos));
   const pick = options?.picks === false ? undefined : activePick(thread, normalizedQuery, now);
   return {

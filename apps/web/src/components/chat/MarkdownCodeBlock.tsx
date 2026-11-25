@@ -186,8 +186,9 @@ export function MarkdownCodeBlock({
         render={
           <Button
             type="button"
-            variant="ghost-muted"
-            size="icon-xs"
+            variant="muted"
+            size="xs"
+            icon
             onClick={handleCopy}
             aria-label={copyLabel}
           />
@@ -230,8 +231,9 @@ export function MarkdownCodeBlock({
                 render={
                   <Button
                     type="button"
-                    variant={wrapped ? "secondary" : "ghost-muted"}
-                    size="icon-xs"
+                    variant={wrapped ? "secondary" : "muted"}
+                    size="xs"
+                    icon
                     aria-pressed={wrapped}
                     onClick={() => setWrapOverride(!wrapped)}
                     aria-label={wrapLabel}
@@ -249,8 +251,9 @@ export function MarkdownCodeBlock({
                 render={
                   <Button
                     type="button"
-                    variant="ghost-muted"
-                    size="icon-xs"
+                    variant="muted"
+                    size="xs"
+                    icon
                     onClick={() => onRunShellCommand(command)}
                     aria-label="在终端中运行"
                   />

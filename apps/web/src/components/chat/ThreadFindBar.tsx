@@ -103,7 +103,8 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
           ) : null}
           <span className="ade-touch-row ade-touch-row--gap-1 flex items-center gap-0.5 pointer-coarse:gap-1">
             <Button
-              size="icon-xs"
+              size="xs"
+              icon
               variant="ghost"
               aria-label="上一个匹配项"
               disabled={navigationDisabled}
@@ -112,7 +113,8 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
               <ChevronUpIcon />
             </Button>
             <Button
-              size="icon-xs"
+              size="xs"
+              icon
               variant="ghost"
               aria-label="下一个匹配项"
               disabled={navigationDisabled}
@@ -120,7 +122,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
             >
               <ChevronDownIcon />
             </Button>
-            <Button size="icon-xs" variant="ghost" aria-label="关闭查找" onClick={props.onClose}>
+            <Button size="xs" icon variant="ghost" aria-label="关闭查找" onClick={props.onClose}>
               <XIcon />
             </Button>
           </span>

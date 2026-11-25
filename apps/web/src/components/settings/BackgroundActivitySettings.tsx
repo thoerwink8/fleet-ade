@@ -305,7 +305,7 @@ function BackgroundActivityAdvancedDialog({
         </DialogPanel>
         <DialogFooter>
           <Button
-            variant="outline"
+            variant="secondary"
             disabled={!canWriteSettings}
             onClick={() => updateSettings(resetBackgroundActivitySettings())}
           >
@@ -405,8 +405,9 @@ export function BackgroundActivitySettingsRow() {
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-sm"
-                    variant="outline"
+                    size="sm"
+                    icon
+                    variant="secondary"
                     aria-label="配置高级后台活动"
                     onClick={() => setBackgroundActivityDialogOpen(true)}
                   >

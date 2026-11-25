@@ -427,7 +427,7 @@ export function AddEnvironmentDialog({
       {renderRemoteFields()}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <Button
-        variant="outline"
+        variant="secondary"
         className="w-full"
         disabled={isAddingSavedBackend}
         onClick={() => void handleAddSavedBackend()}
@@ -550,7 +550,7 @@ export function AddEnvironmentDialog({
           </Alert>
         ) : null}
         <Button
-          variant="outline"
+          variant="secondary"
           className="w-full"
           disabled={isAddingSavedBackend}
           onClick={() => void handleAddSavedBackend()}
@@ -569,7 +569,7 @@ export function AddEnvironmentDialog({
           render={
             <DialogTrigger
               render={
-                <Button size="xs" variant="ghost-muted" aria-label="添加电脑">
+                <Button size="xs" variant="muted" aria-label="添加电脑">
                   <PlusIcon className="size-3" />
                   <span>添加电脑</span>
                 </Button>

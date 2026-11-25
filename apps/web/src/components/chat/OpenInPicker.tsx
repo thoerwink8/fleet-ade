@@ -371,7 +371,7 @@ export const OpenInPicker = memo(function OpenInPicker({
       // Tooltip replaces the button data-slot, so toolbar theming needs a separate hook.
       data-toolbar-control=""
       size={isPanel ? "sm" : "xs"}
-      variant={isPanel ? "ghost" : "outline"}
+      variant={isPanel ? "ghost" : "secondary"}
       part="primary"
       panel={isPanel}
       disabled={!preferredEditor || !openInCwd || !canOpenEditor}
@@ -435,8 +435,9 @@ export const OpenInPicker = memo(function OpenInPicker({
                   <ThreadDetailsControl
                     aria-label="选择编辑器"
                     data-toolbar-control=""
-                    size={isPanel ? "sm" : "icon-xs"}
-                    variant={isPanel ? "ghost" : "outline"}
+                    size={isPanel ? "sm" : "xs"}
+                    icon={!isPanel}
+                    variant={isPanel ? "ghost" : "secondary"}
                     part="secondary"
                     panel={isPanel}
                   />

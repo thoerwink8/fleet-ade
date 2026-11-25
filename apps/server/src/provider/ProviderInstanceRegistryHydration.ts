@@ -1,5 +1,6 @@
 import {
   defaultInstanceIdForDriver,
+  DEV_REPLAY_INSTANCE_ID,
   ProviderDriverKind,
   ProviderInstanceId,
   providerInstanceConfigEnabledFlag,
@@ -85,8 +86,6 @@ export const deriveProviderInstanceConfigMap = (
 
   return merged as ProviderInstanceConfigMap;
 };
-
-export const DEV_REPLAY_INSTANCE_ID = ProviderInstanceId.make("devReplay");
 
 /**
  * Dev servers run from source keep a free ACP agent that replays recorded turns, so UI checks

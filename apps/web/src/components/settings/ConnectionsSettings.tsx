@@ -838,7 +838,7 @@ function ConnectionsSettingsContent({
             control={
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={loadWslState}
                 disabled={isLoadingWslState}
               >
@@ -866,7 +866,7 @@ function ConnectionsSettingsContent({
           control={
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={isUpdatingWslBackend}
               onClick={() => handleSelectWslMode(BACKEND_VALUE_WSL_OFF)}
             >
@@ -1111,8 +1111,9 @@ function ConnectionsSettingsContent({
                     render={
                       <Button
                         type="button"
-                        variant="ghost-muted"
-                        size="icon-xs"
+                        variant="muted"
+                        size="xs"
+                        icon
                         aria-label="这台电脑的更多操作"
                       />
                     }
@@ -1270,12 +1271,12 @@ function ConnectionsSettingsContent({
               <AlertDialogFooter>
                 <AlertDialogClose
                   disabled={isUpdatingDesktopServerExposure}
-                  render={<Button variant="outline" disabled={isUpdatingDesktopServerExposure} />}
+                  render={<Button variant="secondary" disabled={isUpdatingDesktopServerExposure} />}
                 >
                   <span className="[text-box:trim-both_cap_alphabetic]">取消</span>
                 </AlertDialogClose>
                 <Button
-                  variant="default"
+                  variant="primary"
                   onClick={handleConfirmDesktopServerExposureChange}
                   disabled={
                     !canManageLocalBackend ||
@@ -1334,14 +1335,14 @@ function ConnectionsSettingsContent({
               <AlertDialogFooter>
                 <AlertDialogClose
                   disabled={isUpdatingWslBackend}
-                  render={<Button variant="outline" disabled={isUpdatingWslBackend} />}
+                  render={<Button variant="secondary" disabled={isUpdatingWslBackend} />}
                 >
                   取消
                 </AlertDialogClose>
                 {pendingWslChange?.kind === "enable" ? (
                   <>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => handleConfirmEnableWsl("wsl-only")}
                       disabled={isUpdatingWslBackend || !canManageLocalBackend}
                     >
@@ -1355,7 +1356,7 @@ function ConnectionsSettingsContent({
                       )}
                     </Button>
                     <Button
-                      variant="default"
+                      variant="primary"
                       onClick={() => handleConfirmEnableWsl("both")}
                       disabled={isUpdatingWslBackend || !canManageLocalBackend}
                     >
@@ -1374,8 +1375,8 @@ function ConnectionsSettingsContent({
                     variant={
                       pendingWslChange?.kind === "disable" ||
                       (pendingWslChange?.kind === "wsl-only" && pendingWslChange.nextValue)
-                        ? "destructive"
-                        : "default"
+                        ? "danger"
+                        : "primary"
                     }
                     onClick={handleConfirmWslChange}
                     disabled={isUpdatingWslBackend || !canManageLocalBackend}
@@ -1420,12 +1421,12 @@ function ConnectionsSettingsContent({
               <AlertDialogFooter>
                 <AlertDialogClose
                   disabled={isUpdatingTailscaleServe}
-                  render={<Button variant="outline" disabled={isUpdatingTailscaleServe} />}
+                  render={<Button variant="secondary" disabled={isUpdatingTailscaleServe} />}
                 >
                   取消
                 </AlertDialogClose>
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   onClick={() => void handleConfirmTailscaleServeDisable()}
                   disabled={isUpdatingTailscaleServe || !canManageLocalBackend}
                 >
@@ -1493,7 +1494,7 @@ function ConnectionsSettingsContent({
               <DialogFooter>
                 <DialogClose
                   disabled={isUpdatingTailscaleServe}
-                  render={<Button variant="outline" disabled={isUpdatingTailscaleServe} />}
+                  render={<Button variant="secondary" disabled={isUpdatingTailscaleServe} />}
                 >
                   取消
                 </DialogClose>
@@ -1535,7 +1536,7 @@ function ConnectionsSettingsContent({
         headerAction={
           <div className="flex items-center gap-1">
             {savedServerUpdateTargets.length > 0 ? (
-              <ServerUpdatesAction targets={savedServerUpdateTargets} variant="ghost-muted" />
+              <ServerUpdatesAction targets={savedServerUpdateTargets} variant="muted" />
             ) : null}
             <AddEnvironmentDialog
               open={addBackendDialogOpen}

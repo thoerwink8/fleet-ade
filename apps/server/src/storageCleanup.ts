@@ -713,6 +713,7 @@ const make = Effect.gen(function* () {
     const failure = (detail: string) =>
       new GitCommandError({
         operation: "StorageCleanup.branchChanged",
+        action: "cleanup",
         command: "git",
         cwd,
         detail,
@@ -1021,6 +1022,7 @@ const make = Effect.gen(function* () {
     if (result.exitCode !== 0)
       return yield* new GitCommandError({
         operation: "StorageCleanup.cleanupGit",
+        action: "cleanup",
         command,
         cwd,
         detail: result.stderr.trim().split(/\r?\n/)[0]?.slice(0, 1000) || "command failed",

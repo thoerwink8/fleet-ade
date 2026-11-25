@@ -291,7 +291,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
           {shareablePairingUrl && canCopyToClipboard ? (
             <Button
               size="xs"
-              variant="outline"
+              variant="secondary"
               aria-expanded={isQrPanelOpen}
               aria-controls={qrPanelId}
               onClick={() => setIsQrPanelOpen((open) => !open)}
@@ -309,12 +309,12 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
           >
             {!credential ? null : canCopyToClipboard ? (
               shareablePairingUrl ? null : (
-                <Button size="xs" variant="outline" onClick={handleCopyCode}>
+                <Button size="xs" variant="secondary" onClick={handleCopyCode}>
                   复制配对码
                 </Button>
               )
             ) : (
-              <DialogTrigger render={<Button size="xs" variant="outline" />}>
+              <DialogTrigger render={<Button size="xs" variant="secondary" />}>
                 {shareablePairingUrl ? "显示链接" : "显示配对码"}
               </DialogTrigger>
             )}
@@ -348,11 +348,11 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 ) : null}
               </DialogPanel>
               <DialogFooter variant="bare">
-                <Button variant="outline" onClick={() => setIsRevealDialogOpen(false)}>
+                <Button variant="secondary" onClick={() => setIsRevealDialogOpen(false)}>
                   完成
                 </Button>
                 {canCopyToClipboard ? (
-                  <Button variant="outline" onClick={handleCopyCode}>
+                  <Button variant="secondary" onClick={handleCopyCode}>
                     复制代码
                   </Button>
                 ) : null}
@@ -361,7 +361,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
           </Dialog>
           <Button
             size="xs"
-            variant="destructive-outline"
+            variant="danger-secondary"
             disabled={!canRevoke || revokingPairingLinkId === pairingLink.id}
             onClick={() => void onRevoke(pairingLink.id)}
           >
@@ -528,7 +528,7 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
           {!clientSession.current ? (
             <Button
               size="xs"
-              variant="destructive-outline"
+              variant="danger-secondary"
               disabled={!canRevoke || revokingClientSessionId === clientSession.sessionId}
               onClick={() => void onRevokeSession(clientSession.sessionId)}
             >
@@ -609,13 +609,13 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button size="xs" variant="outline" onClick={() => openUseInAnotherApp(environmentId)}>
+      <Button size="xs" variant="secondary" onClick={() => openUseInAnotherApp(environmentId)}>
         <PlugIcon className="size-3" />
         在其他应用中使用（MCP）
       </Button>
       <Button
         size="xs"
-        variant="destructive-outline"
+        variant="danger-secondary"
         disabled={isRevokingOtherClients || !canRevokeOtherClients(clientSessions)}
         onClick={() => void onRevokeOtherClients()}
       >
@@ -635,7 +635,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
       >
         <DialogTrigger
           render={
-            <Button size="xs" variant="default">
+            <Button size="xs" variant="primary">
               <PlusIcon className="size-3" />
               创建链接
             </Button>
@@ -670,7 +670,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                 <div className="flex gap-1">
                   <Button
                     size="xs"
-                    variant="outline"
+                    variant="secondary"
                     disabled={isCreatingPairingLink}
                     onClick={() =>
                       setPairingScopes(
@@ -687,7 +687,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                   </Button>
                   <Button
                     size="xs"
-                    variant="outline"
+                    variant="secondary"
                     disabled={isCreatingPairingLink}
                     onClick={() =>
                       setPairingScopes(
@@ -733,7 +733,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
           </DialogPanel>
           <DialogFooter variant="bare">
             <Button
-              variant="outline"
+              variant="secondary"
               disabled={isCreatingPairingLink}
               onClick={() => setDialogOpen(false)}
             >
@@ -879,7 +879,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
           {needsTailscaleSetup ? (
             <Button
               size="xs"
-              variant="outline"
+              variant="secondary"
               onClick={() => onSetupTailscaleServe(endpoint)}
               disabled={isUpdatingTailscaleServe}
             >
@@ -889,7 +889,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
           {canDisableTailscaleServe ? (
             <Button
               size="xs"
-              variant="destructive-outline"
+              variant="danger-secondary"
               onClick={() => onDisableTailscaleServe(endpoint)}
               disabled={isUpdatingTailscaleServe}
             >
@@ -897,7 +897,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
             </Button>
           ) : null}
           {!needsTailscaleSetup && !isDefault ? (
-            <Button size="xs" variant="outline" onClick={() => onSetDefault(endpoint)}>
+            <Button size="xs" variant="secondary" onClick={() => onSetDefault(endpoint)}>
               设为默认
             </Button>
           ) : null}

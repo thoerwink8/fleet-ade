@@ -78,7 +78,8 @@ export function FileSurfaceAction(props: {
               onClick={props.onPress}
               aria-label={props.label}
               variant="ghost"
-              size="icon-sm"
+              size="sm"
+              icon
             >
               {props.children}
             </Button>

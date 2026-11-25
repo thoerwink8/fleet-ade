@@ -435,8 +435,8 @@ export const CodexSettings = makeProviderSettingsSchema(
     homePath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "CODEX_HOME 路径",
-        description: "自定义 Codex 主目录和配置目录。",
+        title: "配置目录",
+        description: "自定义 Codex 主目录和配置目录（CODEX_HOME）。",
         providerSettingsForm: {
           placeholder: "~/.codex",
           clearWhenEmpty: "omit",
@@ -504,7 +504,7 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     ),
     binaryPath: makeBinaryPathSetting("claude").pipe(
       Schema.annotateKey({
-        title: "启动程序",
+        title: "可执行文件路径",
         description:
           "留空时自动使用本机的 reclaude。找不到 reclaude 时不启用 Claude，也不会改用 claude。",
         providerSettingsForm: { placeholder: "reclaude 的完整路径", clearWhenEmpty: "omit" },
@@ -513,8 +513,9 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     homePath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "CLAUDE_CONFIG_DIR 路径",
-        description: "自定义 Claude 主目录和配置目录，.claude.json 与 .claude 分开保存。",
+        title: "配置目录",
+        description:
+          "自定义 Claude 主目录和配置目录（CLAUDE_CONFIG_DIR），.claude.json 与 .claude 分开保存。",
         providerSettingsForm: { placeholder: "~/.claude", clearWhenEmpty: "omit" },
       }),
     ),

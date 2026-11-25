@@ -269,4 +269,45 @@ describe("model switch change", () => {
       ),
     ).toBeNull();
   });
+
+  it("compares canonical model ids so display name differences never trigger a false switch and distinct ids with identical display names still do", () => {
+    const acpId = ProviderInstanceId.make("acp_kimi");
+    const customId = ProviderInstanceId.make("codex_custom");
+    const customProviders = [
+      {
+        instanceId: acpId,
+        driver: "acpRegistry",
+        models: [{ slug: "showcase", name: "Showcase", isDefault: true }],
+      },
+      {
+        instanceId: customId,
+        driver: "codex",
+        models: [
+          { slug: "model-a", name: "Same Display" },
+          { slug: "model-b", name: "Same Display" },
+        ],
+      },
+    ] as unknown as ServerProvider[];
+
+    expect(
+      resolveModelSwitchChange(
+        {
+          from: { instanceId: acpId, model: "default" },
+          to: { instanceId: acpId, model: "showcase" },
+        },
+        customProviders,
+      ),
+    ).toBeNull();
+
+    // Reverse check: distinct canonical IDs with identical display names still record a switch.
+    expect(
+      resolveModelSwitchChange(
+        {
+          from: { instanceId: customId, model: "model-a" },
+          to: { instanceId: customId, model: "model-b" },
+        },
+        customProviders,
+      ),
+    ).toEqual({ modelChanged: true, effort: null });
+  });
 });

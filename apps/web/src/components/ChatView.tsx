@@ -114,7 +114,7 @@ import {
   scopeProjectRef,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import { formatModelSlugName, resolveSelectableModel } from "@t3tools/shared/model";
+import { resolveModelDisplayName } from "@t3tools/client-runtime/model-display";
 import { projectScriptCwd, resolveProjectScripts } from "@t3tools/shared/projectScripts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
@@ -275,7 +275,6 @@ import { derivePinnedPlanView } from "./chat/PinnedPlanCard.logic";
 import { ThreadTimeline } from "./chat/ThreadTimeline";
 import { NativeChildWorkDialog } from "./chat/NativeChildWorkDialog";
 import { ProviderSubagentBar } from "./chat/ProviderSubagentBar";
-import { getTriggerDisplayModelName } from "./chat/providerIconUtils";
 import { resolveScrollToEndClearance } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ThreadHeaderContext } from "./chat/ThreadHeaderMeta";
@@ -824,6 +823,9 @@ export default function ChatView(props: ChatViewProps) {
   const draftProviders = draftThread
     ? (providersByEnvironment.get(draftThread.environmentId) ?? [])
     : [];
+  const draftPreferDevReplay = draftThread
+    ? environmentById.get(draftThread.environmentId)?.serverConfig?.devMode === true
+    : false;
   const draftDefaultModelSelection =
     draftThread && draftConfiguredDefaultModelSelection !== null
       ? resolveNewSessionDefaultModelSelection({
@@ -831,6 +833,7 @@ export default function ChatView(props: ChatViewProps) {
           providers: draftProviders,
           settings,
           projectId: draftThread.projectId,
+          preferDevReplay: draftPreferDevReplay,
         })
       : null;
   const draftModelResolution = draftThread
@@ -841,6 +844,7 @@ export default function ChatView(props: ChatViewProps) {
             draftProviders,
             settings,
             draftThread.projectId,
+            { preferDevReplay: draftPreferDevReplay },
           ),
         fallbackSelection: settings.fallbackModelSelection,
         providers: draftProviders,
@@ -1350,6 +1354,7 @@ export default function ChatView(props: ChatViewProps) {
     ],
     lockedProvider,
     lockedInstanceId: activeRuntime?.providerInstanceId ?? activeThreadModelInstanceId,
+    preferDevReplay: serverConfig?.devMode === true,
   });
   const selectedProvider = selectedProviderEntry?.driverKind ?? requestedDriverKind;
   const activeProviderInstanceId = selectedProviderEntry?.instanceId ?? null;
@@ -1787,20 +1792,11 @@ export default function ChatView(props: ChatViewProps) {
   const showProviderSubagentBar = isProviderSubagent;
   const composerMounted = !showProviderSubagentBar;
   const providerSubagentModels = selectedProviderEntry?.models ?? EMPTY_PROVIDER_MODELS;
-  // Providers can report dated model ids or aliases.
-  const providerSubagentModelSlug = selectedProviderEntry
-    ? resolveSelectableModel(
-        selectedProviderEntry.driverKind,
-        activeThread?.modelSelection.model,
-        providerSubagentModels,
-      )
-    : null;
-  const providerSubagentCatalogModel = providerSubagentModels.find(
-    (model) => model.slug === providerSubagentModelSlug,
-  );
-  const providerSubagentModelLabel = providerSubagentCatalogModel
-    ? getTriggerDisplayModelName(providerSubagentCatalogModel, selectedProviderEntry?.driverKind)
-    : formatModelSlugName(activeThread?.modelSelection.model ?? "");
+  const providerSubagentModelLabel = resolveModelDisplayName({
+    driverKind: selectedProviderEntry?.driverKind,
+    model: activeThread?.modelSelection.model,
+    models: providerSubagentModels,
+  });
   const providerSubagentEffortLabel =
     activeThread === undefined
       ? null
@@ -2637,6 +2633,7 @@ export default function ChatView(props: ChatViewProps) {
         providerStatuses,
         settings,
         draftThread?.projectId ?? null,
+        { preferDevReplay: serverConfig?.devMode === true },
       );
     const fallback =
       !isServerThread &&
@@ -2651,6 +2648,9 @@ export default function ChatView(props: ChatViewProps) {
     const fallbackWindow = fallback
       ? `${fallback.provider.instanceId}:${fallback.resetsAt ?? ""}`
       : null;
+    const fallbackProvider = fallbackSelection
+      ? providerStatuses.find((provider) => provider.instanceId === fallbackSelection.instanceId)
+      : undefined;
     const fallbackItems: ComposerBannerStackItem[] =
       fallback &&
       fallbackSelection &&
@@ -2658,15 +2658,17 @@ export default function ChatView(props: ChatViewProps) {
       fallbackWindow !== dismissedFallbackWindow
         ? [
             modelFallbackBannerItem({
-              fallbackModelName:
-                providerStatuses
-                  .find((provider) => provider.instanceId === fallbackSelection.instanceId)
-                  ?.models.find((model) => model.slug === fallbackSelection.model)?.name ??
-                fallbackSelection.model,
+              fallbackModelName: resolveModelDisplayName({
+                driverKind: fallbackProvider?.driver,
+                model: fallbackSelection.model,
+                models: fallbackProvider?.models,
+              }),
               defaultProviderName: fallback.provider.displayName ?? fallback.provider.driver,
-              defaultModelName:
-                fallback.provider.models.find((model) => model.slug === defaultSelection.model)
-                  ?.name ?? defaultSelection.model,
+              defaultModelName: resolveModelDisplayName({
+                driverKind: fallback.provider.driver,
+                model: defaultSelection.model,
+                models: fallback.provider.models,
+              }),
               resetsAt: fallback.resetsAt,
               timestampFormat,
               onUseDefault: () =>
@@ -3912,6 +3914,7 @@ export default function ChatView(props: ChatViewProps) {
                                 }
                                 providerStatuses={providerStatuses as ServerProvider[]}
                                 providerCatalogKnown={serverConfig !== null}
+                                preferDevReplay={serverConfig?.devMode === true}
                                 activeProjectDefaultModelSelection={
                                   activeProjectDefaultModelSelection
                                 }

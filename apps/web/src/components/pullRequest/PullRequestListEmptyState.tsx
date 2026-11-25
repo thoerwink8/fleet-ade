@@ -108,11 +108,11 @@ export function PullRequestListEmptyState({
           </EmptyDescription>
         </EmptyHeader>
         <div className="flex flex-wrap justify-center gap-2">
-          <Button size="sm" variant="outline" onClick={onClearQuery}>
+          <Button size="sm" variant="secondary" onClick={onClearQuery}>
             <SearchIcon className="size-3.5" />
             清除搜索
           </Button>
-          <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
+          <Button size="sm" variant="secondary" disabled={refreshing} onClick={onRefresh}>
             <RefreshIcon size="sm" refreshing={refreshing} />
             {refreshing ? "正在检查…" : "重新检查"}
           </Button>
@@ -132,11 +132,11 @@ export function PullRequestListEmptyState({
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">
         {canLoadMore ? (
-          <Button size="sm" variant="outline" disabled={loadingMore} onClick={onLoadMore}>
+          <Button size="sm" variant="secondary" disabled={loadingMore} onClick={onLoadMore}>
             {loadingMore ? "加载中…" : "加载更多 PR"}
           </Button>
         ) : null}
-        <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
+        <Button size="sm" variant="secondary" disabled={refreshing} onClick={onRefresh}>
           <RefreshIcon size="sm" refreshing={refreshing} />
           {refreshing ? "正在检查…" : "重新检查"}
         </Button>

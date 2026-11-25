@@ -129,7 +129,7 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 - User-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web. The primary agent does this once after integrating. Subagents do not launch their own dev servers.
 
-- Real agent turns cost money. To watch a turn stream through the pipeline and UI, use the free `Replay (dev)` provider that `pnpm dev` registers ([test-t3-app](.agents/skills/test-t3-app/SKILL.md) shows how), and check the picker says it before the first message: a new thread can default to a real provider. Use a real one only when the change depends on it, with its cheapest model (Haiku for Claude, Luna for Codex).
+- Real agent turns cost money. To watch a turn stream through the pipeline and UI, use the free `Replay (dev)` provider that `pnpm dev` registers ([test-t3-app](.agents/skills/test-t3-app/SKILL.md) shows how); new threads in dev default to it. Use a real one only when the change depends on it, with its cheapest model (Haiku for Claude, Luna for Codex).
 
 ## Evals
 

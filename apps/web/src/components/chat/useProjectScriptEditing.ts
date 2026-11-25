@@ -251,7 +251,7 @@ export function useProjectScriptEditing(input: {
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: `已删除操作“${deletedName ?? "Unknown"}”`,
+        title: `已删除操作“${deletedName ?? "未命名"}”`,
       });
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);

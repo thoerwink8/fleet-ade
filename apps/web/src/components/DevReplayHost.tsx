@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { ProviderInstanceId, type ThreadId } from "@t3tools/contracts";
+import { DEV_REPLAY_INSTANCE_ID, type ThreadId } from "@t3tools/contracts";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useState } from "react";
 
@@ -17,7 +17,6 @@ import { Dialog, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "./u
 import { toastManager } from "./ui/toast";
 
 // Dev servers register this free ACP agent; see ProviderInstanceRegistryHydration.ts.
-const DEV_REPLAY_INSTANCE_ID = ProviderInstanceId.make("devReplay");
 
 /**
  * Starts free replay threads on the primary environment in dev builds. Ctrl+Alt+Shift+R

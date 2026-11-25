@@ -107,8 +107,9 @@ export const ModelListRow = memo(function ModelListRow(props: {
           <TooltipTrigger
             render={
               <Button
-                size="icon-xs"
-                variant="ghost-muted"
+                size="xs"
+                icon
+                variant="muted"
                 onClick={(event) => {
                   event.stopPropagation();
                   props.onToggleFavorite(props.instanceId, props.slug);

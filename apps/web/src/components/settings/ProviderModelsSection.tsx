@@ -324,7 +324,7 @@ export function ProviderModelsSection({
             <Button
               type="button"
               size="xs"
-              variant="ghost-muted"
+              variant="muted"
               onClick={() =>
                 onHiddenModelsChange(
                   nextHiddenModelsForBulkToggle(models, hiddenModels),
@@ -345,7 +345,7 @@ export function ProviderModelsSection({
           <Button
             type="button"
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             // The ghost padding would inset the label from the column edge the toggles align to.
             className="-me-2 ml-auto"
             onClick={() => setIsAdding(true)}
@@ -425,7 +425,7 @@ export function ProviderModelsSection({
             spellCheck={false}
           />
           <div className="flex shrink-0 gap-2">
-            <Button size="sm" variant="outline" onClick={handleAdd}>
+            <Button size="sm" variant="secondary" onClick={handleAdd}>
               添加
             </Button>
             <Button size="sm" variant="ghost" onClick={cancelAdd}>
@@ -493,8 +493,9 @@ function ProviderModelRow({
         <TooltipTrigger
           render={
             <Button
-              size="icon-micro"
-              variant="ghost-muted"
+              size="xs"
+              icon
+              variant="muted"
               disabled={!canWritePreferences}
               onClick={() => onToggleFavorite(model.slug)}
               aria-label={isFavorite ? `将 ${model.name} 移出收藏` : `将 ${model.name} 添加到收藏`}
@@ -542,8 +543,9 @@ function ProviderModelRow({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-micro"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     disabled={!canWritePreferences || !canMoveUp}
                     onClick={() => onMove(model.slug, -1)}
                     aria-label={`上移 ${model.name}`}
@@ -558,8 +560,9 @@ function ProviderModelRow({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-micro"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     disabled={!canWritePreferences || !canMoveDown}
                     onClick={() => onMove(model.slug, 1)}
                     aria-label={`下移 ${model.name}`}
@@ -578,8 +581,9 @@ function ProviderModelRow({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-micro"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     disabled={!canManageCustomModels}
                     aria-label={`编辑 ${model.slug}`}
                     onClick={() => onToggleEdit(model.slug)}
@@ -594,8 +598,9 @@ function ProviderModelRow({
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-micro"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     disabled={!canManageCustomModels}
                     aria-label={`移除 ${model.slug}`}
                     onClick={() => onRemove(model.slug)}

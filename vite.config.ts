@@ -492,7 +492,7 @@ export default defineConfig({
       },
       {
         files: ["apps/web/src/**"],
-        rules: { "t3code/max-font-weight": "error" },
+        rules: { "t3code/max-font-weight": "error", "t3code/no-text-13px": "error" },
       },
       {
         files: ["apps/*/src/**", "packages/*/src/**"],

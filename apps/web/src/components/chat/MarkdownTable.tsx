@@ -45,12 +45,7 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
               render={
                 <MenuTrigger
                   render={
-                    <Button
-                      type="button"
-                      variant="ghost-muted"
-                      size="icon-xs"
-                      aria-label={copyLabel}
-                    />
+                    <Button type="button" variant="muted" size="xs" icon aria-label={copyLabel} />
                   }
                 />
               }

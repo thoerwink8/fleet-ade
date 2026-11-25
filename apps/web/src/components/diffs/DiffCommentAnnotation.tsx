@@ -82,7 +82,7 @@ export function DiffCommentAnnotation({
         </p>
         {onDelete ? (
           <span className="-my-1 -mr-1 flex shrink-0 opacity-0 transition-opacity group-hover/comment:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
-            <Button variant="ghost-muted" size="icon-xs" aria-label="删除评论" onClick={onDelete}>
+            <Button variant="muted" size="xs" icon aria-label="删除评论" onClick={onDelete}>
               <Trash2 className="size-3" />
             </Button>
           </span>
@@ -134,13 +134,13 @@ export function DiffCommentAnnotation({
         ) : (
           <span className="mr-auto text-3xs text-muted-foreground/70">⌘/Ctrl + Enter 发送</span>
         )}
-        <Button variant="ghost-muted" size="xs" onClick={onCancel}>
+        <Button variant="muted" size="xs" onClick={onCancel}>
           取消
         </Button>
         {secondaryAction ? (
           <Button
             size="xs"
-            variant="outline"
+            variant="secondary"
             disabled={pending || (!secondaryAction.allowEmpty && !trimmedText)}
             onClick={() => submit(secondaryAction.onAction, secondaryAction.allowEmpty)}
           >

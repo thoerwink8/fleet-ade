@@ -207,7 +207,8 @@ export default function ProjectScriptsControl({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon-xs"
+                  size="xs"
+                  icon
                   className="size-6"
                   aria-label={`编辑 ${script.name}`}
                   onPointerDown={(event) => {
@@ -288,7 +289,7 @@ export default function ProjectScriptsControl({
               render={
                 <ThreadDetailsControl
                   size="xs"
-                  variant={isPanel ? "ghost" : "outline"}
+                  variant={isPanel ? "ghost" : "secondary"}
                   part="primary"
                   panel={isPanel}
                   className={isPanel ? undefined : "w-7 sm:w-6 @3xl/header-actions:w-auto!"}
@@ -336,8 +337,9 @@ export default function ProjectScriptsControl({
                   <MenuTrigger
                     render={
                       <ThreadDetailsControl
-                        size={isPanel ? "sm" : "icon-xs"}
-                        variant={isPanel ? "ghost" : "outline"}
+                        size={isPanel ? "sm" : "xs"}
+                        icon={!isPanel}
+                        variant={isPanel ? "ghost" : "secondary"}
                         part="secondary"
                         panel={isPanel}
                         aria-label="脚本操作"
@@ -413,7 +415,7 @@ export default function ProjectScriptsControl({
               setActionsMenuOpen({ presentation, scripts: false, imports: open })
             }
           >
-            <MenuTrigger render={<Button size="xs" variant="outline" aria-label="项目操作" />}>
+            <MenuTrigger render={<Button size="xs" variant="secondary" aria-label="项目操作" />}>
               <WrenchIcon className="size-3.5" />
               <span className="sr-only @3xl/header-actions:not-sr-only @3xl/header-actions:ml-0.5">
                 操作
@@ -429,7 +431,7 @@ export default function ProjectScriptsControl({
             render={
               <ThreadDetailsControl
                 size="xs"
-                variant={isPanel ? "ghost" : "outline"}
+                variant={isPanel ? "ghost" : "secondary"}
                 part="row"
                 panel={isPanel}
                 className={isPanel ? undefined : "w-7 sm:w-6 @3xl/header-actions:w-auto!"}

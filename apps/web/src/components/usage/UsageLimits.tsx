@@ -298,7 +298,7 @@ export function ResetCreditDialog({
           <AlertDialogDescription>{choice?.confirmDescription}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
           <Button disabled={disabled} onClick={onConfirm}>
             使用额度
           </Button>
@@ -330,7 +330,7 @@ export function ResetCredits({
           {choice.availableCount > 0 ? (
             <Button
               size="xs"
-              variant="outline"
+              variant="secondary"
               disabled={busy || !canManageProviders}
               onClick={() => confirm(choice)}
             >

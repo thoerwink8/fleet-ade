@@ -117,9 +117,9 @@ export function BranchRestoreConfirmHost(props: {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
           <Button
-            variant="default"
+            variant="primary"
             disabled={!props.canWriteSourceControl}
             onClick={() => {
               closeThreadOverlay(branchRestoreConfirmAtom);
@@ -188,11 +188,11 @@ export function RevertConfirmHost(props: {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>
+          <AlertDialogClose render={<Button variant="secondary" />}>
             {view?.cancelActionLabel ?? "取消"}
           </AlertDialogClose>
           {view?.showRestoreFilesAction ? (
-            <Button variant="destructive-outline" onClick={() => confirm(true)}>
+            <Button variant="danger-secondary" onClick={() => confirm(true)}>
               {view.restoreFilesActionLabel}
             </Button>
           ) : null}

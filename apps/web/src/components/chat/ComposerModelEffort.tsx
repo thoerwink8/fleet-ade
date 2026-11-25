@@ -105,7 +105,7 @@ export function describeComposerEffort(
   const word = !reasoning
     ? null
     : reasoning.type === "boolean"
-      ? `${reasoning.label} ${reasoning.currentValue === true ? "On" : "Off"}`
+      ? `${reasoning.label} ${reasoning.currentValue === true ? "开" : "关"}`
       : ultrathink
         ? "Ultrathink"
         : (getProviderOptionCurrentLabel(
@@ -441,7 +441,7 @@ function OptionSwitchRow(props: {
   const checked = descriptor.currentValue === true;
   return (
     <label className={cn(OPTION_ROW, "has-focus-visible:bg-foreground/[0.09]")}>
-      <OptionRowText label={descriptor.label} value={checked ? "On" : "Off"} />
+      <OptionRowText label={descriptor.label} value={checked ? "开" : "关"} />
       <Switch
         size="sm"
         checked={checked}

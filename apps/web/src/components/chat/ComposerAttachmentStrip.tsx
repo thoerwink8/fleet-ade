@@ -196,7 +196,8 @@ export function ComposerAttachmentMediaRow({
                   render={
                     <Button
                       variant="overlay"
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       className="absolute bottom-1 left-1"
                       onClick={() =>
                         retryAttachmentUpload({
@@ -218,7 +219,8 @@ export function ComposerAttachmentMediaRow({
             <span className="absolute right-1 top-1 flex">
               <Button
                 variant="media-close"
-                size="icon-xs"
+                size="xs"
+                icon
                 onClick={() => onRemoveImage(image.id)}
                 aria-label={`移除 ${image.name}`}
               >
@@ -272,7 +274,8 @@ export function ComposerAttachmentMediaRow({
                   render={
                     <Button
                       variant="overlay"
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       className="absolute bottom-1 left-1"
                       onClick={() =>
                         retryAttachmentUpload({
@@ -293,7 +296,8 @@ export function ComposerAttachmentMediaRow({
             )}
             <Button
               variant="media-close"
-              size="icon-xs"
+              size="xs"
+              icon
               className="absolute right-1 top-1"
               onClick={() => onRemoveFile(file.id)}
               aria-label={`移除 ${file.name}`}
@@ -379,7 +383,8 @@ export function ComposerAttachmentFileList({
                   render={
                     <Button
                       variant="ghost"
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       onClick={() =>
                         retryAttachmentUpload({
                           environmentId,
@@ -399,7 +404,8 @@ export function ComposerAttachmentFileList({
             ) : null}
             <Button
               variant="ghost"
-              size="icon-xs"
+              size="xs"
+              icon
               onClick={() => onRemoveFile(file.id)}
               aria-label={`移除 ${file.name}`}
             >
@@ -572,7 +578,8 @@ export function ComposerQueuedAttachmentRow({
           )}
           <Button
             variant="media-close"
-            size="icon-xs"
+            size="xs"
+            icon
             className="absolute right-1 top-1"
             onClick={() => onRemove(attachment.id)}
             aria-label={`移除 ${attachment.name}`}
@@ -617,7 +624,8 @@ export function ComposerAttachButton({
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
+              size="sm"
+              icon
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => inputRef.current?.click()}
               aria-label="添加附件"

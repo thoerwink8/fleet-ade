@@ -359,11 +359,16 @@ export type VcsPullResult = typeof VcsPullResult.Type;
 // decode as absent through GitCommandError.
 export const GitCommandFailureReason = Schema.Literals([
   "authentication_failed",
+  "author_identity_unknown",
   "branch_already_exists",
   "branch_checked_out_in_worktree",
   "config_locked",
+  "executable_not_found",
   "host_key_unverified",
+  "index_locked",
+  "merge_conflict",
   "not_a_repository",
+  "not_fast_forward",
   "path_already_exists",
   "push_rejected_by_remote",
   "push_rejected_non_fast_forward",
@@ -371,11 +376,48 @@ export const GitCommandFailureReason = Schema.Literals([
   "ref_not_found",
   "remote_unreachable",
   "tag_would_be_clobbered",
+  "working_tree_dirty",
 ]);
 export type GitCommandFailureReason = typeof GitCommandFailureReason.Type;
 
+export const GitCommandAction = Schema.Literals([
+  "push",
+  "pull",
+  "fetch",
+  "commit",
+  "switch_branch",
+  "create_branch",
+  "delete_branch",
+  "rename_branch",
+  "create_worktree",
+  "remove_worktree",
+  "checkout_pr",
+  "clone",
+  "publish",
+  "init",
+  "read_status",
+  "read_diff",
+  "list_branches",
+  "cleanup",
+  "checkpoint",
+  "other",
+]);
+export type GitCommandAction = typeof GitCommandAction.Type;
+
+export const VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH = 1000;
+
+export const VcsSnapshotFailure = Schema.Struct({
+  _tag: TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(128)),
+  operation: Schema.optionalKey(TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(200))),
+  action: ForwardCompatibleOptional(GitCommandAction),
+  reason: Schema.optionalKey(TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(128))),
+  detail: Schema.String.check(Schema.isMaxLength(VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH)),
+});
+export type VcsSnapshotFailure = typeof VcsSnapshotFailure.Type;
+
 export class GitCommandError extends Schema.TaggedError<GitCommandError>()("GitCommandError", {
   operation: Schema.String,
+  action: ForwardCompatibleOptional(GitCommandAction),
   command: Schema.String,
   cwd: Schema.String,
   argumentCount: Schema.optional(Schema.Number),
@@ -393,10 +435,21 @@ export class GitCommandError extends Schema.TaggedError<GitCommandError>()("GitC
   }
 }
 
+export const TextGenerationFailureReason = Schema.Literals([
+  "not_installed",
+  "unauthenticated",
+  "rate_limited",
+  "network",
+  "timeout",
+  "unavailable",
+]);
+export type TextGenerationFailureReason = typeof TextGenerationFailureReason.Type;
+
 export class TextGenerationError extends Schema.TaggedError<TextGenerationError>()(
   "TextGenerationError",
   {
     operation: Schema.String,
+    reason: ForwardCompatibleOptional(TextGenerationFailureReason),
     detail: Schema.String,
     cause: Schema.optional(Schema.Defect()),
   },
@@ -406,9 +459,13 @@ export class TextGenerationError extends Schema.TaggedError<TextGenerationError>
   }
 }
 
+export const GitManagerFailureReason = Schema.Literals(["working_tree_dirty"]);
+export type GitManagerFailureReason = typeof GitManagerFailureReason.Type;
+
 export class GitManagerError extends Schema.TaggedError<GitManagerError>()("GitManagerError", {
   operation: Schema.String,
   cwd: Schema.String,
+  reason: ForwardCompatibleOptional(GitManagerFailureReason),
   detail: Schema.String,
   cause: Schema.optional(Schema.Defect()),
 }) {

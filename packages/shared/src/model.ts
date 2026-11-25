@@ -317,17 +317,17 @@ export function getProviderOptionCurrentLabel(
   if (descriptor.type === "boolean") {
     return typeof descriptor.currentValue === "boolean"
       ? descriptor.currentValue
-        ? "On"
-        : "Off"
+        ? "开"
+        : "关"
       : undefined;
   }
   const currentValue = getProviderOptionCurrentValue(descriptor, selection, reportedSelection);
   return (
     descriptor.options.find((option) => option.id === currentValue)?.label ??
     (getReportedOptionValue(descriptor.id, selection, reportedSelection) === "default"
-      ? "Default"
+      ? "默认"
       : descriptor.id === "variant"
-        ? "Unknown"
+        ? "未知"
         : undefined)
   );
 }
@@ -377,22 +377,6 @@ export function codexModelFamily(slug: string): string {
 
 export function formatCodexModelName(name: string): string {
   return name.replace(/^gpt/i, "GPT").replace(/-([a-z])/g, (_, c) => "-" + c.toUpperCase());
-}
-
-export function formatModelSlugName(slug: string): string {
-  const separator = slug.lastIndexOf("/") + 1;
-  const prefix = slug.slice(0, separator);
-  const name = slug.slice(separator);
-  if (/^gpt-\d/i.test(name)) return prefix + formatCodexModelName(name);
-  if (!/^(claude-(opus|sonnet|haiku|fable)|gemini|grok|composer)-\d/i.test(name)) return slug;
-  return (
-    prefix +
-    name
-      .replace(/^(claude-[a-z]+-\d+)-(\d{1,2})(?=-|\[|$)/i, "$1.$2")
-      .split("-")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ")
-  );
 }
 
 export function normalizeModelSlug(

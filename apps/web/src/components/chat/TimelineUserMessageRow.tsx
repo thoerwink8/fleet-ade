@@ -141,7 +141,7 @@ function UserFileCard({
       {file.downloadable === false ? (
         <>
           <div className="flex min-w-0 flex-1 items-center gap-3">{identity}</div>
-          <Button size="icon-xs" variant="ghost-muted" disabled aria-label="正在发送附件">
+          <Button size="xs" icon variant="muted" disabled aria-label="正在发送附件">
             <DownloadIcon />
           </Button>
         </>
@@ -159,8 +159,9 @@ function UserFileCard({
             <TooltipTrigger
               render={
                 <Button
-                  size="icon-xs"
-                  variant="ghost-muted"
+                  size="xs"
+                  icon
+                  variant="muted"
                   aria-label={`下载 ${label}`}
                   onClick={() => ctx.onFileDownload(file)}
                 />
@@ -954,8 +955,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                           <TooltipTrigger
                             render={
                               <Button
-                                size="icon-xs"
-                                variant="ghost-muted"
+                                size="xs"
+                                icon
+                                variant="muted"
                                 aria-label={`下载 ${label}`}
                                 onClick={() => ctx.onFileDownload(file)}
                               />
@@ -1081,7 +1083,8 @@ function RevertUserMessageButton({
       <TooltipTrigger render={<span className="inline-flex" />}>
         <Button
           type="button"
-          size="icon-sm"
+          size="sm"
+          icon
           variant="ghost"
           disabled={
             activity.isRevertingCheckpoint ||
@@ -1156,7 +1159,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
             <Button
               type="button"
               size="xs"
-              variant="ghost-muted"
+              variant="muted"
               aria-expanded={expanded}
               data-scroll-anchor-ignore
               onClick={() => setExpanded((value) => !value)}

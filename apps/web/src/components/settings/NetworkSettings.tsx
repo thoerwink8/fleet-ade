@@ -181,7 +181,7 @@ export function NetworkSettingsPanel() {
           control={
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={probing || environmentId === null}
               onClick={runProbe}
             >

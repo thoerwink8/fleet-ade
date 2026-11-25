@@ -241,8 +241,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
               {isSearching ? (
                 <Button
                   type="button"
-                  size="icon-micro"
-                  variant="ghost-muted"
+                  size="xs"
+                  icon
+                  variant="muted"
                   className="shrink-0"
                   aria-label={"清除设置搜索"}
                   onClick={() => {

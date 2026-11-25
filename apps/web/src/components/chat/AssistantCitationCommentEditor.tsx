@@ -81,7 +81,7 @@ export function AssistantCitationCommentEditor({
       ) : null}
       <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
           size="xs"
           onPointerDown={(event) => event.preventDefault()}
           onClick={onCancel}

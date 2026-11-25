@@ -128,12 +128,12 @@ export function AddCodexAccountDialog({
         </WizardPanel>
         <WizardFooter>
           {instanceId ? (
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose}>
               稍后完成
             </Button>
           ) : (
             <>
-              <Button variant="outline" disabled={pending} onClick={onClose}>
+              <Button variant="secondary" disabled={pending} onClick={onClose}>
                 取消
               </Button>
               <Button

@@ -397,7 +397,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <Button
               type="button"
               size="xs"
-              variant="outline"
+              variant="secondary"
               onClick={() => onRetryWorkspacePreparation(retryRunId)}
             >
               <RotateCcwIcon aria-hidden />

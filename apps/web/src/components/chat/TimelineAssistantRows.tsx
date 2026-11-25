@@ -123,7 +123,8 @@ function AssistantForkButton({
         render={
           <Button
             type="button"
-            size="icon-sm"
+            size="sm"
+            icon
             variant="ghost"
             disabled={busy}
             onClick={() => {
@@ -251,8 +252,9 @@ function AssistantReplyButton({ message, itemId }: { message: ChatMessage; itemI
         render={
           <Button
             type="button"
-            size="icon-sm"
-            variant="ghost-muted"
+            size="sm"
+            icon
+            variant="muted"
             onClick={reply}
             aria-label="回复这条回复"
           />

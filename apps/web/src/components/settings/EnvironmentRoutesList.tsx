@@ -116,7 +116,7 @@ export function EnvironmentRoutesList({
         </SortableContext>
       </DndContext>
       <div className="-ml-1.5 pt-1">
-        <Button size="xs" variant="ghost-muted" onClick={onAddRoute}>
+        <Button size="xs" variant="muted" onClick={onAddRoute}>
           <PlusIcon className="size-3" />
           添加线路
         </Button>
@@ -192,8 +192,9 @@ function SortableRouteRow({
             render={
               <Button
                 type="button"
-                variant="ghost-muted"
-                size="icon-xs"
+                variant="muted"
+                size="xs"
+                icon
                 aria-label={`移除 ${label} 线路`}
                 onClick={onRemove}
               />

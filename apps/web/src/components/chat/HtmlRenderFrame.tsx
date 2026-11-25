@@ -84,7 +84,8 @@ export function HtmlRenderFrame(props: {
                 render={
                   <Button
                     aria-label="全屏打开"
-                    size="icon-xs"
+                    size="xs"
+                    icon
                     variant="glass"
                     onClick={async () => {
                       const url =

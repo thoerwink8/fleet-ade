@@ -148,7 +148,12 @@ import {
   waitForProject,
 } from "../state/entities";
 import { visibleLinkedThreads } from "@t3tools/client-runtime/state/threads";
-import { resolveThreadActionProjectRef, startNewThreadFromContext } from "../lib/chatThreadActions";
+import {
+  resolveCurrentProjectRef,
+  resolveThreadActionProjectRef,
+  startNewThreadFromContext,
+  type CurrentProjectRouteContext,
+} from "../lib/chatThreadActions";
 import {
   appendBrowsePathSegment,
   ensureBrowseDirectoryPath,
@@ -416,6 +421,10 @@ function OpenCommandPaletteDialog(props: {
 }) {
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
+  const projectSettingsSearch = useLocation({
+    select: (location) =>
+      location.pathname === "/settings/projects" ? location.search : undefined,
+  });
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const {
@@ -549,7 +558,15 @@ function OpenCommandPaletteDialog(props: {
   const [isRemoteProjectCloning, setIsRemoteProjectCloning] = useState(false);
   const { environmentLabelById, projectEnvironmentLocationById } = useEnvironmentLookups();
   const projectGroups = useSortedProjectGroups(environmentLabelById);
+  const currentProjectRef = resolveCurrentProjectRef({
+    pathname,
+    search: projectSettingsSearch as CurrentProjectRouteContext["search"],
+    activeThread,
+    activeDraftThread,
+    projectGroups,
+  });
   const contextualProjectRef = resolveThreadActionProjectRef({
+    currentProjectRef,
     activeDraftThread,
     activeThread: activeThread ?? undefined,
     defaultProjectRef,
@@ -1103,7 +1120,7 @@ function OpenCommandPaletteDialog(props: {
               render={
                 <Button
                   variant="warning-outline"
-                  size="micro"
+                  size="xs"
                   onClick={() => {
                     openSourceControlSettings();
                   }}
@@ -1310,6 +1327,7 @@ function OpenCommandPaletteDialog(props: {
         shortcutCommand: "chat.newLocal",
         run: async () => {
           await startNewThreadFromContext({
+            currentProjectRef,
             activeDraftThread,
             activeThread: activeThread ?? undefined,
             defaultProjectRef,

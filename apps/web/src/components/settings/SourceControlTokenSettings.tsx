@@ -145,7 +145,7 @@ export function SourceControlTokenSettings({
             {isSaved ? (
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 disabled={saving}
                 onClick={() => void save(normalizedHost, "")}
               >

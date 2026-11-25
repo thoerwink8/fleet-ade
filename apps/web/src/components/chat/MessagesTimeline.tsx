@@ -1,5 +1,20 @@
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useAtomMount, useAtomSubscribe } from "@effect/atom-react";
+import { Atom } from "effect/reactivity";
+import { environmentCatalog } from "../../connection/catalog";
+import { appAtomRegistry } from "../../rpc/atomRegistry";
+import { environmentPresentations } from "../../state/presentation";
+import { Button } from "../ui/button";
+import {
+  failDeferredWorkLoad,
+  handleDeferredWorkReconnect,
+  INITIAL_DEFERRED_WORK_LOAD_STATE,
+  resetDeferredWorkLoad,
+  startDeferredWorkLoad,
+  succeedDeferredWorkLoad,
+  type DeferredWorkLoadState,
+} from "./deferredWorkLoading.logic";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
 import { AudioPreviewUnmountContext } from "../files/AudioPreview";
 import { ThreadFindTimelineContext } from "./ThreadFindProvider";
@@ -1987,6 +2002,10 @@ function ContextCompactionTimelineRow({
   );
 }
 
+const IDLE_SESSION_GENERATION_ATOM = Atom.make(0).pipe(
+  Atom.withLabel("messages-timeline:idle-session-generation"),
+);
+
 function useDeferredWorkLoading(
   row: { expanded: boolean; deferredWorkItemIds?: ReadonlyArray<string> },
   onToggle: () => void,
@@ -1997,33 +2016,104 @@ function useDeferredWorkLoading(
   const environmentId = ref?.environmentId;
   const threadId = ref?.threadId;
   const anchorsKey = row.deferredWorkItemIds?.join("\n") ?? "";
-  const [failed, setFailed] = useState(false);
-  const load = () => {
+  const scopeKey = `${environmentId ?? ""}\0${threadId ?? ""}\0${anchorsKey}`;
+  const [scopedLoadState, setScopedLoadState] = useState<{
+    readonly scopeKey: string;
+    readonly state: DeferredWorkLoadState;
+  }>({
+    scopeKey,
+    state: INITIAL_DEFERRED_WORK_LOAD_STATE,
+  });
+  const loadStateRef = useRef<DeferredWorkLoadState>(INITIAL_DEFERRED_WORK_LOAD_STATE);
+  const requestIdRef = useRef(0);
+  const runLoad = (nextState: DeferredWorkLoadState, options?: { readonly syncUi?: boolean }) => {
     if (!anchorsKey || environmentId === undefined || threadId === undefined) return;
+    loadStateRef.current = nextState;
+    if (options?.syncUi !== false) {
+      setScopedLoadState({ scopeKey, state: nextState });
+    }
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    const captureScopeKey = scopeKey;
     void Promise.all(
       anchorsKey
         .split("\n")
         .map((workAnchorId) => loadWork({ environmentId, input: { threadId, workAnchorId } })),
-    ).then((results) =>
-      setFailed(
-        results.some((result) => result._tag === "Failure" || result.value._tag === "error"),
-      ),
-    );
+    ).then((results) => {
+      if (requestIdRef.current !== requestId) return;
+      const failed = results.some(
+        (result) => result._tag === "Failure" || result.value._tag === "error",
+      );
+      const settled = failed
+        ? failDeferredWorkLoad(loadStateRef.current, {
+            isConnected:
+              appAtomRegistry.get(environmentPresentations.presentationAtom(environmentId))
+                ?.connection.phase === "connected",
+          })
+        : succeedDeferredWorkLoad();
+      loadStateRef.current = settled;
+      setScopedLoadState({ scopeKey: captureScopeKey, state: settled });
+    });
   };
-  const loadOnExpand = useEffectEvent(load);
+  const loadOnExpand = useEffectEvent(() => {
+    runLoad(startDeferredWorkLoad(loadStateRef.current), { syncUi: false });
+  });
+  const invalidateInFlight = useEffectEvent(() => {
+    requestIdRef.current += 1;
+    loadStateRef.current = resetDeferredWorkLoad();
+  });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Restored expanded folds load their deferred server history on mount.
   useEffect(() => {
-    if (row.expanded && anchorsKey && environmentId && threadId) loadOnExpand();
+    if (row.expanded && anchorsKey && environmentId && threadId) {
+      loadOnExpand();
+    }
+    return () => {
+      invalidateInFlight();
+    };
   }, [row.expanded, anchorsKey, environmentId, threadId]);
-  const error = anchorsKey && failed ? "无法加载工作记录，点击重试。" : null;
-  const loading = ref !== null && row.expanded && anchorsKey !== "" && !failed;
+
+  const sessionGeneration =
+    environmentId !== undefined
+      ? environmentCatalog.sessionGenerationAtom(environmentId)
+      : IDLE_SESSION_GENERATION_ATOM;
+  useAtomMount(sessionGeneration);
+  const handleReconnect = useEffectEvent(() => {
+    if (!row.expanded || !anchorsKey || environmentId === undefined || threadId === undefined) {
+      return;
+    }
+    const { nextState, shouldRetry } = handleDeferredWorkReconnect(loadStateRef.current);
+    if (!shouldRetry) return;
+    runLoad(nextState);
+  });
+  useAtomSubscribe(sessionGeneration, () => {
+    handleReconnect();
+  });
+
+  const effectiveLoadState =
+    row.expanded && scopedLoadState.scopeKey === scopeKey
+      ? scopedLoadState.state
+      : INITIAL_DEFERRED_WORK_LOAD_STATE;
+  const hasError = Boolean(anchorsKey && row.expanded && effectiveLoadState.status === "error");
+  const showManualRetry = hasError && effectiveLoadState.showManualRetry;
+  const errorMessage = hasError
+    ? showManualRetry
+      ? "无法加载工作记录。"
+      : "连接断开，恢复后将自动重试加载工作记录。"
+    : null;
+  const loading =
+    ref !== null && row.expanded && anchorsKey !== "" && effectiveLoadState.status !== "error";
+  const retry = () => {
+    runLoad(startDeferredWorkLoad(loadStateRef.current, { manual: true }));
+  };
   const toggle = () => {
-    setFailed(false);
-    if (error && row.expanded) load();
-    else onToggle();
+    requestIdRef.current += 1;
+    const next = resetDeferredWorkLoad();
+    loadStateRef.current = next;
+    setScopedLoadState({ scopeKey, state: next });
+    onToggle();
   };
 
-  return { loading, error, toggle };
+  return { loading, errorMessage, showManualRetry, retry, toggle };
 }
 
 function WorkHistorySkeleton() {
@@ -2044,8 +2134,9 @@ function WorkHistorySkeleton() {
 
 function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-fold" }> }) {
   const ctx = use(TimelineRowCtx);
-  const { loading, error, toggle } = useDeferredWorkLoading(row, () =>
-    ctx.onToggleTurnFold(row.runId),
+  const { loading, errorMessage, showManualRetry, retry, toggle } = useDeferredWorkLoading(
+    row,
+    () => ctx.onToggleTurnFold(row.runId),
   );
 
   return (
@@ -2059,10 +2150,7 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
           aria-busy={loading}
           className="flex cursor-pointer select-none items-center gap-1 rounded-md px-1 text-sm leading-relaxed text-muted-foreground tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
         >
-          <span>
-            {row.label}
-            {error ? ` · ${error}` : ""}
-          </span>
+          <span>{row.label}</span>
           {row.expanded ? (
             <ChevronDownIcon className="size-3.5" />
           ) : (
@@ -2075,6 +2163,19 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
           className="ms-auto"
         />
       </div>
+      {errorMessage ? (
+        <div
+          role="alert"
+          className="mt-1.5 flex items-center gap-2 px-1 text-xs text-muted-foreground"
+        >
+          <span>{errorMessage}</span>
+          {showManualRetry ? (
+            <Button type="button" variant="secondary" size="xs" onClick={retry}>
+              重试
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {loading ? <WorkHistorySkeleton /> : null}
     </div>
   );
@@ -2082,8 +2183,9 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
 
 function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "attempt-fold" }> }) {
   const ctx = use(TimelineRowCtx);
-  const { loading, error, toggle } = useDeferredWorkLoading(row, () =>
-    ctx.onToggleAttemptFold(row.attemptId),
+  const { loading, errorMessage, showManualRetry, retry, toggle } = useDeferredWorkLoading(
+    row,
+    () => ctx.onToggleAttemptFold(row.attemptId),
   );
 
   return (
@@ -2102,12 +2204,22 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
         ) : (
           <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="text-meta font-medium text-foreground/80">
-          {row.label}
-          {error ? ` · ${error}` : ""}
-        </span>
+        <span className="text-meta font-medium text-foreground/80">{row.label}</span>
         <span className="text-2xs text-muted-foreground">被立即发送打断</span>
       </button>
+      {errorMessage ? (
+        <div
+          role="alert"
+          className="mt-1.5 flex items-center gap-2 px-1 text-xs text-muted-foreground"
+        >
+          <span>{errorMessage}</span>
+          {showManualRetry ? (
+            <Button type="button" variant="secondary" size="xs" onClick={retry}>
+              重试
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {loading ? <WorkHistorySkeleton /> : null}
     </div>
   );
