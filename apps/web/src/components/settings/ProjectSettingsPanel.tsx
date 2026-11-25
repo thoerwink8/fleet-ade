@@ -28,7 +28,7 @@ import {
   type SidebarProjectSnapshot,
 } from "../../sidebarProjectGrouping";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
-import { useThreadShells, waitForProjectRemoval } from "../../state/entities";
+import { useProjects, useThreadShells, waitForProjectRemoval } from "../../state/entities";
 import { refreshProjectFaviconUrl } from "../../state/assets";
 import { projectEnvironment } from "../../state/projects";
 import { ProjectFavicon } from "../ProjectFavicon";
@@ -60,7 +60,7 @@ import {
 } from "./ProjectSettingsPanel.logic";
 import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
 import { readUnloadedThreadCount } from "../../state/olderSettledShelf";
-import { settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
+import { settingsScopeControlsVisible, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 
 const ProjectIconPickerDialog = lazy(() =>
   import("./ProjectIconPickerDialog").then((module) => ({
@@ -257,6 +257,7 @@ function ProjectDetail({
   const navigate = useNavigate({ from: "/settings" });
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { environments } = useEnvironments();
+  const projectCount = useProjects().length;
   const environmentById = new Map(
     environments.map((environment) => [environment.environmentId, environment]),
   );
@@ -648,7 +649,7 @@ function ProjectDetail({
         </SettingsSection>
         <ProjectDefaultsSettings category="project" />
         <ProjectActionsSettings />
-        {checkoutChoices}
+        {settingsScopeControlsVisible(environments.length, projectCount) ? checkoutChoices : null}
         <SettingsSection title="危险操作">
           <SettingsRow
             title={

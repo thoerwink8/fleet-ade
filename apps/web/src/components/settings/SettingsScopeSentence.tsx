@@ -41,6 +41,7 @@ import {
   selectProjectAxis,
   settingsScopeCheckoutChoices,
   settingsScopeCheckoutLabel,
+  settingsScopeControlsVisible,
   settingsScopeEnvironmentAddress,
   settingsScopeEnvironmentLabel,
   settingsScopeEnvironmentLabels,
@@ -65,6 +66,11 @@ export function SettingsScopeSentence() {
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
   if (scope === null || SETTINGS_DEVICE_ONLY_PATHS.has(pathname)) return null;
+  const projectCount = scope.groups.reduce(
+    (count, group) => count + group.memberProjects.length,
+    0,
+  );
+  if (!settingsScopeControlsVisible(environments.length, projectCount)) return null;
   const props: SettingsScopeMenuProps = {
     value: scope.search,
     singleEnvironment: scope.singleEnvironment,
