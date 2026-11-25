@@ -81,11 +81,8 @@ function isUsable(provider: AgentSetupProvider): boolean {
   if (provider.status === "error" || !provider.installed) return false;
   if (provider.availability === "unavailable") return false;
   if (provider.authStatus === "unauthenticated") return false;
-  if (provider.status === "ready") return true;
-  return (
-    provider.status === "warning" &&
-    (provider.authStatus === "authenticated" || provider.driver === "antigravity")
-  );
+  // Same bar as the composer's send check: a warning that is not signed out can still send.
+  return provider.status === "ready" || provider.status === "warning";
 }
 
 function setupState(provider: AgentSetupProvider): AgentSetupState {

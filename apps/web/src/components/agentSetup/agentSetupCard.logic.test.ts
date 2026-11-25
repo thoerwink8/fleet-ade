@@ -60,6 +60,17 @@ describe("resolveAgentSetupCard", () => {
       rows: [["claudeAgent", "Claude", "not_installed", "provider-instance-claudeAgent-status"]],
     },
     {
+      name: "hides when an installed Codex warns and its sign-in is merely unchecked",
+      providers: [
+        provider("codex", "codex", {
+          displayName: "Codex",
+          status: "warning",
+          authStatus: "unknown",
+        }),
+      ],
+      shown: false,
+    },
+    {
       name: "hides when Antigravity is installed and its sign-in is merely unchecked",
       providers: [
         provider("antigravity", "antigravity", {
