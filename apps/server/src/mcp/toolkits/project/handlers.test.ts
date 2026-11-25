@@ -1296,3 +1296,69 @@ it.effect("a failed fleet registration does not fail a launch and a replay regis
     }),
   ),
 );
+
+it.effect("t3_project_create returns commitError without exposing commitFailure", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const harness = clientLaunchHarness({ runtimeModeCeiling: "full-access", launched: [] });
+      const commitError =
+        "Git has no name or email on this machine. Set user.name and user.email, then commit.";
+      const dependencies = Layer.merge(
+        harness.dependencies,
+        Layer.merge(
+          Layer.mock(Project.ProjectService)({
+            getById: (id) =>
+              Effect.succeed(
+                id === harness.projectId
+                  ? Option.some({
+                      id,
+                      title: "No Identity",
+                      workspaceRoot: "/projects/no-identity",
+                      defaultModelSelection: null,
+                      scripts: [],
+                      createdAt: "2026-01-01T00:00:00.000Z",
+                      updatedAt: "2026-01-01T00:00:00.000Z",
+                      deletedAt: null,
+                    } as ProjectRecord)
+                  : Option.none(),
+              ),
+          }),
+          Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+            namedProjectsRoot: "/projects",
+            createNamedProject: () =>
+              Effect.succeed({
+                projectId: harness.projectId,
+                workspaceRoot: "/projects/no-identity",
+                commitError,
+                commitFailure: {
+                  _tag: "GitCommandError",
+                  operation: "ManagedProjectFolders.commit",
+                  action: "commit",
+                  reason: "author_identity_unknown",
+                  detail: "fatal: no email was given",
+                },
+              }),
+          }),
+        ),
+      );
+      const dependencyContext = yield* Layer.build(dependencies);
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+
+      const events = yield* toolkit
+        .handle("t3_project_create", { title: "No Identity" })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      const result = events.at(-1)?.result as Record<string, unknown> | undefined;
+      expect(result).toBeDefined();
+      expect(result?.commitError).toBe(commitError);
+      expect("commitFailure" in (result ?? {})).toBe(false);
+      expect(JSON.stringify(result)).not.toContain("commitFailure");
+      expect(JSON.stringify(result)).not.toContain("author_identity_unknown");
+    }),
+  ),
+);
