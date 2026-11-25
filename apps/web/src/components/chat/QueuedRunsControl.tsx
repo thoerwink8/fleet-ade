@@ -29,6 +29,7 @@ import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { useScheduledTaskTitle } from "./TimelineUserMessageRow";
+import { queuedRunHeldLabel } from "./queuedRunHold.logic";
 
 export interface EditQueuedRunRequest {
   readonly runId: RunId;
@@ -128,6 +129,7 @@ export function QueuedRunsControl({
       runId: run.id,
       messageId: run.userMessageId,
       freshContext: run.freshContext === true,
+      heldLabel: queuedRunHeldLabel(run),
       serverIndex,
       text,
       editable: true,
@@ -147,6 +149,7 @@ export function QueuedRunsControl({
       runId: null,
       messageId: null,
       freshContext: false,
+      heldLabel: null,
       serverIndex: null,
       text: message.text,
       editable: true,
@@ -254,7 +257,7 @@ export function QueuedRunsControl({
           return (
             <li
               key={item.key}
-              aria-label={`排队消息 ${position + 1}/${items.length}，尚未发送`}
+              aria-label={`排队消息 ${position + 1}/${items.length}，${item.heldLabel ?? "尚未发送"}`}
               aria-posinset={position + 1}
               aria-setsize={items.length}
               aria-current={isEditing ? "true" : undefined}
@@ -267,6 +270,7 @@ export function QueuedRunsControl({
                 thumbnails={item.thumbnails}
                 isEditing={isEditing}
                 tag={position === 0 ? "下一条" : "排队"}
+                heldLabel={isEditing ? null : item.heldLabel}
                 onOpenThread={props.onOpenThread}
               >
                 {canSendRun(item.freshContext) && !isEditing ? (
@@ -413,6 +417,8 @@ function QueuedMessage(props: {
   readonly thumbnails: ReadonlyArray<QueuedRowThumbnail>;
   readonly isEditing: boolean;
   readonly tag: string;
+  /** Shown beside the actions when the message waits for the user instead of sending itself. */
+  readonly heldLabel: string | null;
   readonly onOpenThread: (threadId: ThreadId, environmentId?: EnvironmentId) => void;
   readonly children: ReactNode;
 }) {
@@ -442,7 +448,7 @@ function QueuedMessage(props: {
     <div
       data-queued-strip
       className={cn(
-        "flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg border bg-sidebar px-3 py-1.5 text-meta text-secondary-label",
+        "flex min-h-9 w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border bg-sidebar px-3 py-1.5 text-meta text-secondary-label",
         props.isEditing ? "border-primary/60" : "border-border",
       )}
     >
@@ -469,6 +475,7 @@ function QueuedMessage(props: {
           <TooltipPopup className="max-w-96 whitespace-pre-wrap">{props.previewText}</TooltipPopup>
         ) : null}
       </Tooltip>
+      {props.heldLabel ? <span className="shrink-0">{props.heldLabel}</span> : null}
       <span className="ade-touch-row ade-touch-row--gap-2 flex shrink-0 items-center gap-0.5 pointer-coarse:gap-2">
         {attribution === "agent" &&
         senderRef &&

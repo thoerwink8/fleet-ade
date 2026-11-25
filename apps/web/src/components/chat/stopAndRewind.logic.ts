@@ -51,12 +51,15 @@ export type RollbackProgress =
 
 /**
  * Which step a rewind is on, read from the thread alone so a second client agrees with the first.
- * The server clears `pendingRollback` when it queues the rewind itself, so the last moments are
- * known only to the client that started it (`localRewinding`).
+ * The server clears `pendingRollback` when it queues the rewind itself. A server without
+ * `threadRollbackMarkers` leaves the last moments known only to the client that started it
+ * (`localRewinding`).
  */
 export function deriveRollbackProgress(input: {
   readonly pendingRollback: OrchestrationV2PendingRollback | null | undefined;
   readonly rollbackFailure: OrchestrationV2AppThread["rollbackFailure"];
+  /** Set by servers with `threadRollbackMarkers` from the commit that queues the rewind. */
+  readonly rollbackInProgressRequestId?: CommandId | null | undefined;
   readonly hasActiveRun: boolean;
   readonly localRewinding: boolean;
 }): RollbackProgress {
@@ -70,6 +73,8 @@ export function deriveRollbackProgress(input: {
     }
     return { step: "rewinding", canCancel: true };
   }
+  // The rewind is queued, so a cancel no longer reaches it.
+  if (input.rollbackInProgressRequestId != null) return { step: "rewinding", canCancel: false };
   if (input.localRewinding) return { step: "rewinding", canCancel: false };
   return { step: "idle" };
 }
@@ -88,6 +93,9 @@ export function rollbackSendBlockReason(progress: RollbackProgress): string | nu
 
 export type RewindOutcome =
   | { readonly kind: "waiting" }
+  /** Queued: it can no longer be cancelled, and ends in a completion or a failure. */
+  | { readonly kind: "rewinding" }
+  | { readonly kind: "cancelled" }
   | { readonly kind: "completed" }
   | {
       readonly kind: "failed";
@@ -99,13 +107,22 @@ export type RewindOutcome =
 export function classifyRewindOutcome(
   thread: Pick<
     OrchestrationV2AppThread,
-    "pendingRollback" | "rollbackFailure" | "rollbackCompletedRequestId"
+    | "pendingRollback"
+    | "rollbackFailure"
+    | "rollbackCompletedRequestId"
+    | "rollbackInProgressRequestId"
+    | "rollbackCancelledRequestId"
   >,
   requestId: CommandId,
 ): RewindOutcome {
   if (thread.rollbackCompletedRequestId === requestId) return { kind: "completed" };
+  if (thread.rollbackCancelledRequestId === requestId) return { kind: "cancelled" };
   const failure = thread.rollbackFailure;
-  if (failure?.requestId !== requestId) return { kind: "waiting" };
+  if (failure?.requestId !== requestId) {
+    return thread.rollbackInProgressRequestId === requestId
+      ? { kind: "rewinding" }
+      : { kind: "waiting" };
+  }
   // An unanswered stop keeps the rewind held: force stop lets it finish, so it is not the end.
   if (
     failure.code === "interrupt-unresponsive" &&

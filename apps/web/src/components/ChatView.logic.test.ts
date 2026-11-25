@@ -1600,6 +1600,83 @@ describe("waitForRollbackOutcome", () => {
     });
   });
 
+  describe("when the server marks cancelled and in-progress rewinds", () => {
+    const held = { requestId, turnCount: 1, restoreFiles: false, requestedAt: now };
+    afterEach(() => vi.useRealTimers());
+
+    it("ends at once, as cancelled, when another client cancels the held rewind", async () => {
+      // No run is active, which the grace-period path could not tell apart from a queued rewind.
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        markers: true,
+      });
+      await Promise.resolve();
+      setThread(handle, { pendingRollback: held });
+      setThread(handle, { pendingRollback: null, rollbackCancelledRequestId: requestId });
+      await expect(waiting).rejects.toMatchObject({
+        _tag: "RewindCancelledElsewhereError",
+        message: "回退已取消。",
+      });
+    });
+
+    it("waits without a deadline once the rewind is queued, then completes", async () => {
+      vi.useFakeTimers();
+      const handle = projectionAtom();
+      let outcome = "pending";
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        markers: true,
+        settleMs: 5_000,
+        timeoutMs: 8_000,
+      }).then(
+        () => {
+          outcome = "completed";
+        },
+        (error: Error) => {
+          outcome = error.message;
+        },
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      setThread(handle, { pendingRollback: held });
+      setThread(handle, { pendingRollback: null, rollbackInProgressRequestId: requestId });
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(outcome).toBe("pending");
+      setThread(handle, {
+        rollbackInProgressRequestId: null,
+        rollbackCompletedRequestId: requestId,
+      });
+      await waiting;
+      expect(outcome).toBe("completed");
+    });
+
+    it("does not wait out a grace period when the held rewind goes without any marker", async () => {
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        markers: true,
+      });
+      await Promise.resolve();
+      setThread(handle, { pendingRollback: held });
+      setThread(handle, { pendingRollback: null });
+      await expect(waiting).rejects.toMatchObject({ _tag: "RewindNotCompletedError" });
+    });
+
+    it("keeps the grace period on a server without the capability", async () => {
+      vi.useFakeTimers();
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+      });
+      const result = waiting.then(
+        () => "completed",
+        (error: Error) => error.message,
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      setThread(handle, { pendingRollback: held });
+      setThread(handle, { pendingRollback: null });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await result).toBe("回退没有完成，可能已被取消。可以重新回退。");
+    });
+  });
+
   it("stops quietly when cancelled and ignores a completion that arrives later", async () => {
     const handle = projectionAtom();
     const controller = new AbortController();

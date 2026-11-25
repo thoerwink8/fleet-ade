@@ -13794,6 +13794,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ...projection.thread,
           rollbackRequestId: command.commandId,
           rollbackFailure: null,
+          rollbackInProgressRequestId: command.commandId,
+          rollbackCancelledRequestId: null,
           updatedAt: now,
         },
       });
@@ -13840,6 +13842,26 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const thread = yield* projectionStore
         .getThread(command.threadId)
         .pipe(mapDispatchError(command));
+      // The in-progress marker is cleared whenever the rewind that set it ends, even on a deleted
+      // thread or when a newer request took over `rollbackRequestId`: a restored thread must not
+      // stay marked as rewinding for good.
+      if (
+        (thread.deletedAt !== null || thread.rollbackRequestId !== command.requestId) &&
+        thread.rollbackInProgressRequestId === command.requestId
+      ) {
+        const clearedAt = yield* DateTime.now;
+        yield* emit(
+          events,
+          command,
+        )({
+          type: "thread.metadata-updated",
+          threadId: command.threadId,
+          providerInstanceId: thread.providerInstanceId,
+          occurredAt: clearedAt,
+          payload: { ...thread, rollbackInProgressRequestId: null, updatedAt: clearedAt },
+        });
+        return;
+      }
       if (thread.deletedAt !== null) return;
       if (thread.rollbackRequestId !== command.requestId) {
         return yield* new OrchestratorDispatchError({
@@ -13885,6 +13907,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           },
           // A failed rewind must not leave sends blocked. Absent when this was not a pending rewind.
           ...(thread.pendingRollback == null ? {} : { pendingRollback: null }),
+          ...(thread.rollbackInProgressRequestId === command.requestId
+            ? { rollbackInProgressRequestId: null }
+            : {}),
           updatedAt: now,
         },
       });
@@ -14034,6 +14059,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             pendingRollback,
             rollbackRequestId: command.commandId,
             rollbackFailure: null,
+            rollbackCancelledRequestId: null,
             updatedAt: now,
           },
         });
@@ -14215,7 +14241,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         threadId: command.threadId,
         providerInstanceId: thread.providerInstanceId,
         occurredAt: now,
-        payload: { ...thread, pendingRollback: null, updatedAt: now },
+        payload: {
+          ...thread,
+          pendingRollback: null,
+          rollbackCancelledRequestId: thread.pendingRollback.requestId,
+          updatedAt: now,
+        },
       });
     },
   );
