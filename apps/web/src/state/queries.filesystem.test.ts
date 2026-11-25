@@ -14,6 +14,9 @@ const state = vi.hoisted(() => ({
   contentAtom: {},
   contentRequests: vi.fn(),
   contentError: null as string | null,
+  checkPathsAtom: {},
+  checkPathsRequests: vi.fn(),
+  metadataEntries: [{ kind: "file" }, null] as Array<{ kind: string } | null>,
   contentData: {
     matches: [{ path: "src/index.ts", lineNumber: 3, lineContent: "a match", matchRanges: [] }],
     truncated: false,
@@ -52,6 +55,15 @@ vi.mock("./projects", () => ({
     return state.contentAtom;
   },
 }));
+vi.mock("./filesystem", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./filesystem")>()),
+  filesystemEnvironment: {
+    checkPaths: (target: unknown) => {
+      state.checkPathsRequests(target);
+      return state.checkPathsAtom;
+    },
+  },
+}));
 vi.mock("../rpc/atomRegistry", () => ({ appAtomRegistry: {} }));
 vi.mock("./orchestration", () => ({ orchestrationEnvironment: {} }));
 vi.mock("./threads", () => ({ useEnvironmentThread: vi.fn() }));
@@ -65,9 +77,11 @@ vi.mock("./query", () => ({
           ? { entries: [{ path: "src/index.ts", kind: "file" }] }
           : atom === state.listAtom
             ? { entries: [{ path: "README.md", kind: "file" }], truncated: false }
-            : atom === state.contentAtom
-              ? state.contentData
-              : null,
+            : atom === state.checkPathsAtom
+              ? { entries: state.metadataEntries }
+              : atom === state.contentAtom
+                ? state.contentData
+                : null,
     error:
       atom === state.sessionAtom
         ? state.sessionError
@@ -82,7 +96,12 @@ vi.mock("./query", () => ({
   }),
 }));
 
-import { useComposerPathSearch, useComposerRootEntries, useProjectContentSearch } from "./queries";
+import {
+  useComposerPathSearch,
+  useComposerRecentPathExistence,
+  useComposerRootEntries,
+  useProjectContentSearch,
+} from "./queries";
 
 const target = {
   environmentId: EnvironmentId.make("test-environment"),
@@ -98,6 +117,8 @@ beforeEach(() => {
   state.searchRequests.mockClear();
   state.listRequests.mockClear();
   state.contentRequests.mockClear();
+  state.checkPathsRequests.mockClear();
+  state.metadataEntries = [{ kind: "file" }, null];
   state.contentError = null;
 });
 
@@ -227,4 +248,52 @@ it("lists project root entries for bare @ when enabled and permitted, and skips 
   });
   expect(state.listRequests).not.toHaveBeenCalled();
   expect(deniedResult.entries).toEqual([]);
+});
+
+it("checks remembered @ paths in one batched metadata request", () => {
+  state.session = { authenticated: true, scopes: [AuthFilesystemReadScope] };
+  const result = useComposerRecentPathExistence({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    paths: ["src/index.ts", "src/deleted.ts"],
+  });
+
+  expect(state.checkPathsRequests).toHaveBeenCalledExactlyOnceWith({
+    environmentId: target.environmentId,
+    input: { paths: ["/repo/src/index.ts", "/repo/src/deleted.ts"] },
+  });
+  expect(result.checkedPaths).toEqual(["src/index.ts", "src/deleted.ts"]);
+  expect(result.entries).toEqual([{ kind: "file" }, null]);
+});
+
+it("bounds the batched path check and skips it without read access or paths", () => {
+  state.session = { authenticated: true, scopes: [AuthFilesystemReadScope] };
+  const manyPaths = Array.from({ length: 70 }, (_, index) => `src/file-${index}.ts`);
+  const capped = useComposerRecentPathExistence({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    paths: manyPaths,
+  });
+  expect(capped.checkedPaths).toHaveLength(64);
+  expect(state.checkPathsRequests).toHaveBeenCalledExactlyOnceWith({
+    environmentId: target.environmentId,
+    input: { paths: manyPaths.slice(0, 64).map((path) => `/repo/${path}`) },
+  });
+
+  state.checkPathsRequests.mockClear();
+  const empty = useComposerRecentPathExistence({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    paths: [],
+  });
+  expect(empty.entries).toBeNull();
+
+  state.session = { authenticated: true, scopes: [] };
+  const denied = useComposerRecentPathExistence({
+    environmentId: target.environmentId,
+    cwd: target.cwd,
+    paths: ["src/index.ts"],
+  });
+  expect(denied.entries).toBeNull();
+  expect(state.checkPathsRequests).not.toHaveBeenCalled();
 });

@@ -34,7 +34,7 @@ import { useClosedViewStore } from "../../closedViewStore";
 import {
   buildEmptyPathQueryEntries,
   collectRecentThreadFilePaths,
-  filterRecentPathsMissingFromRoot,
+  filterRecentPathsToExistingFiles,
   getRecentComposerPaths,
   resolveComposerPathMenuState,
 } from "./composerPathSuggestions.logic";
@@ -55,6 +55,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import {
   useComposerPathSearch,
   useComposerRootEntries,
+  useComposerRecentPathExistence,
   useDebouncedValue,
   useThreadSearch,
 } from "~/state/queries";
@@ -226,42 +227,50 @@ export function useComposerMenuItems({
       ? []
       : composerPullRequestsFromLinks(threadPullRequests ?? [], pullRequestProjectId);
 
+  const activeRightPanelSurface = isEmptyPathQuery
+    ? rightPanelState.surfaces.find((surface) => surface.id === rightPanelState.activeSurfaceId)
+    : undefined;
+  const openSurfaces = !isEmptyPathQuery
+    ? []
+    : activeRightPanelSurface
+      ? [
+          activeRightPanelSurface,
+          ...rightPanelState.surfaces.filter(
+            (surface) => surface.id !== activeRightPanelSurface.id,
+          ),
+        ]
+      : rightPanelState.surfaces;
+  const closedSurfaces =
+    isEmptyPathQuery && activeThreadKey
+      ? closedViews.flatMap((entry) =>
+          scopedThreadKey(entry.threadRef) === activeThreadKey ? [entry.surface] : [],
+        )
+      : [];
+  const recentFilePaths = isEmptyPathQuery
+    ? collectRecentThreadFilePaths({
+        cwd: gitCwd,
+        recentPicks: getRecentComposerPaths(environmentId, gitCwd),
+        openSurfaces,
+        closedSurfaces,
+      })
+    : [];
+  const recentPathExistence = useComposerRecentPathExistence({
+    environmentId,
+    cwd: gitCwd,
+    paths: recentFilePaths,
+  });
+
   const items = ((): ComposerCommandItem[] => {
     if (!composerTrigger) return [];
     if (composerTrigger.kind === "path") {
-      const activeRightPanelSurface = rightPanelState.surfaces.find(
-        (surface) => surface.id === rightPanelState.activeSurfaceId,
-      );
-      const openSurfaces = activeRightPanelSurface
-        ? [
-            activeRightPanelSurface,
-            ...rightPanelState.surfaces.filter(
-              (surface) => surface.id !== activeRightPanelSurface.id,
-            ),
-          ]
-        : rightPanelState.surfaces;
-      const closedSurfaces = activeThreadKey
-        ? closedViews.flatMap((entry) =>
-            scopedThreadKey(entry.threadRef) === activeThreadKey ? [entry.surface] : [],
-          )
-        : [];
-      const recentFilePaths = isEmptyPathQuery
-        ? collectRecentThreadFilePaths({
-            cwd: gitCwd,
-            recentPicks: getRecentComposerPaths(environmentId, gitCwd),
-            openSurfaces,
-            closedSurfaces,
+      // One batched stat pairs entries by index; until it answers, the recents stay as they
+      // are rather than vanishing behind a pending or failed check.
+      const survivingRecentFilePaths = recentPathExistence.entries
+        ? filterRecentPathsToExistingFiles({
+            recentFilePaths: recentPathExistence.checkedPaths,
+            entries: recentPathExistence.entries,
           })
-        : [];
-      // Once the root listing has loaded, anything whose first segment is gone no longer exists.
-      // Before that, or after a failed read, the recents stay as they are rather than vanishing.
-      const survivingRecentFilePaths =
-        rootEntries.isSuccess && rootEntries.error === null
-          ? filterRecentPathsMissingFromRoot({
-              recentFilePaths,
-              rootEntries: rootEntries.entries,
-            })
-          : recentFilePaths;
+        : recentFilePaths;
       const suggestedPathEntries = isEmptyPathQuery
         ? buildEmptyPathQueryEntries({
             recentFilePaths: survivingRecentFilePaths,

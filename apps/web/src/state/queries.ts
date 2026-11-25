@@ -13,6 +13,7 @@ import {
   type ThreadSearchScope,
 } from "@t3tools/client-runtime/state/thread-search";
 import {
+  FILESYSTEM_METADATA_BATCH_LIMIT,
   PROJECT_SEARCH_CONTENTS_QUERY_MAX_LENGTH,
   THREAD_SEARCH_QUERY_MAX_LENGTH,
 } from "@t3tools/contracts";
@@ -29,12 +30,13 @@ import type {
   VcsListRefsResult,
   VcsRef,
 } from "@t3tools/contracts";
+import { resolveWorkspaceFilePath } from "@t3tools/shared/path";
 import * as Cause from "effect/Cause";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useEffect, useState } from "react";
 
 import { appAtomRegistry } from "../rpc/atomRegistry";
-import { useFilesystemReadAccess } from "./filesystem";
+import { filesystemEnvironment, useFilesystemReadAccess } from "./filesystem";
 import { orchestrationEnvironment } from "./orchestration";
 import { olderSettledThreads, threadFamilies } from "./threads";
 import { isPaginatedBranchesNextPagePending } from "./paginatedBranches";
@@ -382,6 +384,35 @@ export function useComposerRootEntries(target: {
     isPending: hasTarget && (fileAccess.isPending || result.isPending),
     isSuccess: canReadFiles && result.isSuccess,
     refresh: result.refresh,
+  };
+}
+
+export function useComposerRecentPathExistence(target: {
+  readonly environmentId: EnvironmentId | null;
+  readonly cwd: string | null;
+  readonly paths: ReadonlyArray<string>;
+}) {
+  // One batched request covers the whole list; paths beyond the batch cap stay unchecked.
+  const checkedPaths = target.paths.slice(0, FILESYSTEM_METADATA_BATCH_LIMIT);
+  const fileAccess = useFilesystemReadAccess(checkedPaths.length > 0 ? target.environmentId : null);
+  const cwd = target.cwd;
+  const checkTarget =
+    fileAccess.canReadFiles && target.environmentId !== null && cwd !== null
+      ? {
+          environmentId: target.environmentId,
+          input: {
+            paths: checkedPaths.map((path) => resolveWorkspaceFilePath(path, cwd)),
+          },
+        }
+      : null;
+  const result = useEnvironmentQuery(
+    checkTarget !== null ? filesystemEnvironment.checkPaths(checkTarget) : null,
+  );
+
+  return {
+    checkedPaths,
+    // Null until a check answers (or after one fails): callers keep the unfiltered list.
+    entries: checkTarget !== null ? (result.data?.entries ?? null) : null,
   };
 }
 

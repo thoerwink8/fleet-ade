@@ -1,4 +1,4 @@
-import type { EnvironmentId, ProjectEntry } from "@t3tools/contracts";
+import type { EnvironmentId, FilesystemEntryMetadata, ProjectEntry } from "@t3tools/contracts";
 
 import type { RightPanelSurface } from "../../rightPanelStore";
 
@@ -140,19 +140,14 @@ export function buildEmptyPathQueryEntries(input: {
 }
 
 /**
- * Drops remembered paths whose first segment is gone from the root listing. The listing only
- * covers the root, so a path inside a surviving directory passes unchecked. Callers skip this
- * until the listing has loaded, or every recent path would vanish on failure.
+ * Pairs remembered paths with one batched metadata answer, in request order. Missing,
+ * unreadable, and non-file entries drop out; callers keep the full list until an answer arrives.
  */
-export function filterRecentPathsMissingFromRoot(input: {
+export function filterRecentPathsToExistingFiles(input: {
   readonly recentFilePaths: ReadonlyArray<string>;
-  readonly rootEntries: ReadonlyArray<ProjectEntry>;
+  readonly entries: ReadonlyArray<Pick<FilesystemEntryMetadata, "kind"> | null>;
 }): string[] {
-  const rootPaths = new Set(input.rootEntries.map((entry) => entry.path));
-  return input.recentFilePaths.filter((recentPath) => {
-    const firstSegment = recentPath.split("/", 1)[0] ?? recentPath;
-    return rootPaths.has(firstSegment);
-  });
+  return input.recentFilePaths.filter((_, index) => input.entries[index]?.kind === "file");
 }
 
 export function resolveComposerPathMenuState(input: {

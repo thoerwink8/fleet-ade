@@ -5,7 +5,7 @@ import {
   buildEmptyPathQueryEntries,
   clearRecentComposerPaths,
   collectRecentThreadFilePaths,
-  filterRecentPathsMissingFromRoot,
+  filterRecentPathsToExistingFiles,
   getRecentComposerPaths,
   rememberRecentComposerPath,
   resolveComposerPathMenuState,
@@ -70,25 +70,6 @@ describe("composerPathSuggestions logic", () => {
       { path: "package.json", kind: "file" },
     ]);
   });
-  it("drops recent paths missing from the loaded root listing but keeps survivors", () => {
-    expect(
-      filterRecentPathsMissingFromRoot({
-        recentFilePaths: ["src/index.ts", "gone/deleted.ts", "README.md", "old-root-file.txt"],
-        rootEntries: [
-          { path: "src", kind: "directory" },
-          { path: "README.md", kind: "file" },
-          { path: "node_modules", kind: "directory", ignored: true },
-        ],
-      }),
-    ).toEqual(["src/index.ts", "README.md"]);
-
-    expect(
-      filterRecentPathsMissingFromRoot({
-        recentFilePaths: ["docs/guide.md"],
-        rootEntries: [],
-      }),
-    ).toEqual([]);
-  });
 
   it("shows loading state on empty @ query while pending and never reports no-match during load", () => {
     expect(
@@ -142,6 +123,22 @@ describe("composerPathSuggestions logic", () => {
       emptyStateText: "没有匹配的文件或文件夹。",
       hasError: false,
     });
+  });
+
+  it("drops recent paths whose batched metadata is missing or not a file", () => {
+    expect(
+      filterRecentPathsToExistingFiles({
+        recentFilePaths: ["src/index.ts", "src/deleted.ts", "src", "README.md"],
+        entries: [{ kind: "file" }, null, { kind: "directory" }, { kind: "file" }],
+      }),
+    ).toEqual(["src/index.ts", "README.md"]);
+
+    expect(
+      filterRecentPathsToExistingFiles({
+        recentFilePaths: ["src/index.ts", "src/deleted.ts"],
+        entries: [{ kind: "file" }],
+      }),
+    ).toEqual(["src/index.ts"]);
   });
 
   it("reports read failures as failures instead of an empty or no-match state", () => {

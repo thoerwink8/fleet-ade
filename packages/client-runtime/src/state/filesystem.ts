@@ -147,6 +147,14 @@ export function createFilesystemEnvironmentAtoms<R, E>(
       label: "environment-data:filesystem:get-metadata",
       tag: WS_METHODS.filesystemGetMetadata,
     }),
+    checkPaths: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:filesystem:check-paths",
+      tag: WS_METHODS.filesystemGetMetadata,
+      // Remembered @ paths must drop deleted files, so reopening the menu stats them again.
+      // The short TTL only keeps the previous answer on screen while it refreshes.
+      idleTtlMs: BROWSE_IDLE_TTL_MS,
+      staleTimeMs: 0,
+    }),
     browse: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:filesystem:browse",
       tag: WS_METHODS.filesystemBrowse,
