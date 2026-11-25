@@ -51,7 +51,25 @@ library's density table and type scale (`--fa-ctrl-*`, `--fa-row-*`, `.fa-captio
   opacity fade puts the text under the contrast target, and a theme colour on a disabled control
   makes it look enabled.
 - Status is a coloured mark beside neutral text, not a tinted surface. In the chat view, errors
-  and notices sit in the status strip above the composer.
+  and notices sit in the status strip above the composer. Restyling keeps what each colour or icon
+  says: list every place one expresses an error, warning, or success before unifying them.
+- Every "so that" in these rules (16px type so iOS does not zoom, a 44px hit area) needs an
+  assertion that measures the computed value at the width that matters. A claim with no measuring
+  test counts as not done, and so does an interaction the text promises but no test performs.
+- A new element (hover card, row layout) gets a browser test for its position and size
+  (alignment, icon size), not only for its text.
+- Changing a shared colour variable: list every use outside the control you meant to change, and
+  compare the whole set of variables against `main` (not one or two), including contrast of at
+  least 4.5:1 for text on each fill. A cell that is below 4.5:1 today and may not be touched is
+  stated as an exception, not left to a test that quietly skips it.
+- A drawer, popover, scrim, or focus rule is tested rendered inside the app shell on a real
+  route. A dialog nested in the shell's dialog tree draws no scrim in the underlying library, so a
+  component rendered alone misses it.
+- Decide "has a keyboard" or "is a touch device" from pointer and hover media queries, never from
+  viewport width: a narrow desktop window still has a keyboard.
+- An entry that restores, undoes, or confirms puts default focus on the safe control, so Enter
+  does not discard. Say what Enter and Esc do, and keep any promise in its text ("still there next
+  time") true after a reload.
 - Keeping a `size` or `variant` name so callers do not change does not keep the old metrics. The
   painted height and type still fall on the sets above.
 - Check the computed style in a browser, or in a browser test, at 390 and 1280 wide, in light and
@@ -68,6 +86,14 @@ Style with Tailwind classes in the component that renders the element.
 - No `style={{ ... }}` or inline `<style>` for static values a class covers. Values computed at
   runtime are fine.
 - Theme-only rules use `@variant dark` and `@variant light`, not `.dark` selectors.
+- A new `@import` in `index.css` goes beside its component's neighbours, not at the end: every
+  slice that appends there conflicts with the next one.
+
+## Changing a default
+
+Client settings are stored as a full snapshot, so a saved value cannot be told from a choice. A new
+default reaches only new installs; existing users keep the old one unless a one-time migration
+(`migrateClientSettings`) rewrites it. State what an existing user sees after upgrading.
 
 ## Composition
 
