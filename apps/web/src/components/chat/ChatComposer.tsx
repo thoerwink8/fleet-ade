@@ -244,6 +244,7 @@ import {
 } from "./pendingComposerInsertions.logic";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { isInSideChatPane } from "~/lib/sideChatPane";
+import { PendingSendWaitingBar } from "./PendingSendWaitingBar";
 import { ComposerPromptLengthValidation } from "./ComposerPromptLengthValidation";
 import { pendingDraftWork } from "./pendingDraftWork";
 import { importComposerThreadAttachment } from "./composerThreadImport";
@@ -4129,26 +4130,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             ) : null}
 
             {pendingSendReason !== null && !isComposerCollapsedMobile ? (
-              <div
+              <PendingSendWaitingBar
                 id={pendingSendStatusId}
-                role="status"
-                aria-live="polite"
-                data-chat-composer-pending-send="true"
-                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border/60 px-4 py-2 text-xs text-muted-foreground"
-              >
-                <span className="flex min-w-0 items-center gap-1.5 [overflow-wrap:anywhere]">
-                  <Clock3Icon className="size-3.5 shrink-0" aria-hidden="true" />
-                  <span>{pendingSendReason}</span>
-                </span>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  onClick={cancelCurrentPendingSendStable}
-                >
-                  取消
-                </Button>
-              </div>
+                targetKey={composerDraftTargetKey}
+                reason={pendingSendReason}
+              />
             ) : null}
 
             {pendingSendReason === null &&
