@@ -46,6 +46,7 @@ import {
   resolveSidebarThreadState,
   resolveThreadAttention,
   shouldShowSidebarEmptyState,
+  sidebarProjectScopeLabel,
   threadAttentionSubtitleText,
 } from "./Sidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
@@ -2558,6 +2559,16 @@ describe("countArchivedThreadsInScope", () => {
         scopedProjectKeys: new Set(["env-a:p1", "env-b:p1"]),
       }),
     ).toBe(2);
+  });
+});
+
+describe("sidebarProjectScopeLabel", () => {
+  it.each([
+    [[], undefined, "所有项目"],
+    [["app"], "app", "app"],
+    [["app", "api"], undefined, "已选 2 个项目"],
+  ] as const)("names the visible scope", (keys, oneLabel, expected) => {
+    expect(sidebarProjectScopeLabel({ selectedCount: keys.length, oneLabel })).toBe(expected);
   });
 });
 
