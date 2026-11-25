@@ -2653,6 +2653,12 @@ export const OrchestrationV2ProviderThreadJson = OrchestrationV2ProviderThread.m
     ...fields,
     createdAt: Schema.DateTimeUtcFromString,
     updatedAt: Schema.DateTimeUtcFromString,
+    pendingBackgroundTasks: Schema.optional(
+      Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+    ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+    completedBackgroundTasks: Schema.optional(
+      Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+    ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   }),
 );
 export type OrchestrationV2ProviderThreadJson = typeof OrchestrationV2ProviderThreadJson.Type;
@@ -3034,6 +3040,12 @@ export const OrchestrationV2ThreadShellJson = OrchestrationV2ThreadShell.mapFiel
     ),
   ),
   deletedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  pendingBackgroundTasks: Schema.optional(
+    Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  completedBackgroundTasks: Schema.optional(
+    Schema.Array(OrchestrationV2PendingBackgroundTaskJson),
+  ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
 }));
 export type OrchestrationV2ThreadShellJson = typeof OrchestrationV2ThreadShellJson.Type;
 
