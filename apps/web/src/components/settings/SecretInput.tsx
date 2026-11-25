@@ -25,9 +25,10 @@ export function SecretInput({
     return (
       <DraftInput
         {...shared}
+        resetOnCommit
         onCommit={(next) => {
           if (configured && next === "") return;
-          onCommit(next);
+          return onCommit(next);
         }}
       />
     );
