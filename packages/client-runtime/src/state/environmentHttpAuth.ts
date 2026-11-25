@@ -63,16 +63,21 @@ export const executeAuthenticatedEnvironmentHttpRequest = <
   A,
   E,
   R,
+  Pass = never,
 >(
-  input: Parameters<typeof executeEnvironmentRequest<Group, A, E, R>>[0],
+  input: Parameters<typeof executeEnvironmentRequest<Group, A, E, R, Pass>>[0],
 ) => executeEnvironmentRequest(input).pipe(Effect.withSpan(ENVIRONMENT_REQUEST_SPAN));
 
 /** Sends the request with this client's own credentials on the supervised environment. */
 export const executeConnectedEnvironmentHttpRequest = Effect.fn(
   "clientRuntime.state.executeConnectedEnvironmentHttpRequest",
-)(function* <Group extends Parameters<typeof makeEnvironmentHttpApiGroupClient>[1], A, E, R>(
-  input: Omit<Parameters<typeof executeEnvironmentRequest<Group, A, E, R>>[0], "prepared">,
-) {
+)(function* <
+  Group extends Parameters<typeof makeEnvironmentHttpApiGroupClient>[1],
+  A,
+  E,
+  R,
+  Pass = never,
+>(input: Omit<Parameters<typeof executeEnvironmentRequest<Group, A, E, R, Pass>>[0], "prepared">) {
   const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
   const prepared = yield* SubscriptionRef.get(supervisor.prepared);
   if (Option.isNone(prepared)) {
@@ -94,6 +99,7 @@ const executeEnvironmentRequest = Effect.fnUntraced(function* <
   A,
   E,
   R,
+  Pass = never,
 >(input: {
   readonly prepared: Pick<
     PreparedConnection,
@@ -108,6 +114,7 @@ const executeEnvironmentRequest = Effect.fnUntraced(function* <
   readonly timeoutMs: number;
   /** Extra fetch options, such as refusing redirects for credentialed audio uploads. */
   readonly requestInit?: RequestInit;
+  readonly passthrough?: (error: unknown) => error is Pass;
   readonly group: Group;
   readonly request: (input: {
     readonly client: Effect.Success<ReturnType<typeof makeEnvironmentHttpApiGroupClient<Group>>>;
@@ -115,7 +122,7 @@ const executeEnvironmentRequest = Effect.fnUntraced(function* <
   }) => Effect.Effect<A, E, R>;
 }): Effect.fn.Return<
   A,
-  RemoteEnvironmentRequestError,
+  RemoteEnvironmentRequestError | Pass,
   Effect.Services<ReturnType<typeof makeEnvironmentHttpApiGroupClient<Group>>> | R
 > {
   const httpBaseUrl = input.prepared.httpBaseUrl;
@@ -132,10 +139,11 @@ const executeEnvironmentRequest = Effect.fnUntraced(function* <
         input.requestInit,
         input.request({ client, headers }),
       ),
+      { passthrough: input.passthrough },
     ).pipe(Effect.result);
 
     if (Result.isFailure(result)) {
-      return yield* result.failure;
+      return yield* Effect.fail(result.failure);
     }
     return result.success;
   }).pipe(

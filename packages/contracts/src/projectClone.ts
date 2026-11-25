@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { VcsSnapshotFailure } from "./git.ts";
 import {
   SourceControlCloneProtocol,
   SourceControlProviderKind,
@@ -34,6 +35,7 @@ export const ProjectCloneSnapshot = Schema.Struct({
   /** Git has printed nothing for a while; `detail` is no longer current. Older servers omit it. */
   stalled: Schema.optionalKey(Schema.Boolean),
   error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(PROJECT_CLONE_ERROR_MAX_LENGTH))),
+  failure: Schema.optionalKey(VcsSnapshotFailure),
   startedAt: IsoDateTime,
   endedAt: Schema.NullOr(IsoDateTime),
   sequence: NonNegativeInt,

@@ -5,13 +5,13 @@ import type {
   OrchestrationV2TurnItem,
   ProviderInstanceId,
   ServerProvider,
-  ServerProviderModel,
 } from "@t3tools/contracts";
 import {
   getModelSelectionStringOptionValue,
   getProviderOptionCurrentValue,
 } from "@t3tools/shared/model";
 
+import { resolveCanonicalModelId, resolveCatalogModel } from "./modelDisplay.ts";
 import { isReasoningSelect } from "./modelTraits.ts";
 import type { ThreadStructure } from "./state/models.ts";
 import { REASONING_EFFORT_OPTION_IDS } from "./state/threadExecution.ts";
@@ -103,11 +103,23 @@ export function resolveModelSwitchChange(
   { from, to }: OrchestrationV2ModelSwitch,
   providers: ReadonlyArray<ServerProvider>,
 ): ModelSwitchChange | null {
-  const modelsOf = (selection: ModelSelection) =>
-    providers.find((provider) => provider.instanceId === selection.instanceId)?.models;
-  const fromEffort = resolveEffort(from, modelsOf(from));
-  const toEffort = resolveEffort(to, modelsOf(to));
-  const modelChanged = from.model !== to.model;
+  const providerOf = (selection: ModelSelection) =>
+    providers.find((provider) => provider.instanceId === selection.instanceId);
+  const fromProvider = providerOf(from);
+  const toProvider = providerOf(to);
+  const fromEffort = resolveEffort(from, fromProvider);
+  const toEffort = resolveEffort(to, toProvider);
+  const fromCanonicalId = resolveCanonicalModelId({
+    driverKind: fromProvider?.driver,
+    model: from.model,
+    models: fromProvider?.models,
+  });
+  const toCanonicalId = resolveCanonicalModelId({
+    driverKind: toProvider?.driver,
+    model: to.model,
+    models: toProvider?.models,
+  });
+  const modelChanged = fromCanonicalId !== toCanonicalId;
   const effort =
     fromEffort && toEffort && fromEffort.value !== toEffort.value
       ? { from: fromEffort.label, to: toEffort.label }
@@ -118,9 +130,13 @@ export function resolveModelSwitchChange(
 /** The composer's reasoning control for the model; stated values only when the catalog lacks it. */
 function resolveEffort(
   selection: ModelSelection,
-  models: ReadonlyArray<ServerProviderModel> | undefined,
+  provider: ServerProvider | undefined,
 ): { readonly value: string; readonly label: string } | undefined {
-  const model = models?.find((candidate) => candidate.slug === selection.model);
+  const model = resolveCatalogModel({
+    driverKind: provider?.driver,
+    model: selection.model,
+    models: provider?.models,
+  });
   if (model === undefined) {
     // Pi states its effort as `thinking`; the catalog would otherwise mark it a reasoning control.
     const value = [...REASONING_EFFORT_OPTION_IDS, "thinking"]

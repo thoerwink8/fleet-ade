@@ -721,6 +721,94 @@ describe("resolveComposerProviderSelection", () => {
 
     expect(selection.selectedProviderEntry?.instanceId).toBe(authenticatedClaude.instanceId);
   });
+
+  it("prefers Replay for empty new drafts in dev mode without overriding user picks or non-dev defaults", () => {
+    const codex = entry("codex", "codex", {
+      status: "ready",
+      auth: { status: "authenticated" },
+    });
+    const claude = entry("claudeAgent", "claudeAgent", {
+      status: "ready",
+      auth: { status: "authenticated" },
+    });
+    const devReplay = entry("acpRegistry", "devReplay", {
+      displayName: "Replay (dev)",
+      status: "ready",
+      auth: { status: "unknown" },
+    });
+    const disabledReplay = entry("acpRegistry", "devReplay", {
+      displayName: "Replay (dev)",
+      enabled: false,
+      status: "disabled",
+      auth: { status: "unknown" },
+    });
+
+    expect(
+      resolveComposerProviderSelection({
+        entries: [codex, claude, devReplay],
+        candidateInstanceIds: [null, undefined, NO_PROVIDER_MODEL_SELECTION.instanceId, undefined],
+        lockedProvider: null,
+        lockedInstanceId: null,
+        preferDevReplay: true,
+      }).selectedProviderEntry?.instanceId,
+    ).toBe(devReplay.instanceId);
+
+    // User manually chose Claude -> honor Claude even in dev mode.
+    expect(
+      resolveComposerProviderSelection({
+        entries: [codex, claude, devReplay],
+        candidateInstanceIds: [claude.instanceId],
+        lockedProvider: null,
+        lockedInstanceId: null,
+        preferDevReplay: true,
+      }).selectedProviderEntry?.instanceId,
+    ).toBe(claude.instanceId);
+
+    // Non-dev mode keeps Codex even if devReplay is present.
+    expect(
+      resolveComposerProviderSelection({
+        entries: [codex, claude, devReplay],
+        candidateInstanceIds: [null, undefined, NO_PROVIDER_MODEL_SELECTION.instanceId, undefined],
+        lockedProvider: null,
+        lockedInstanceId: null,
+        preferDevReplay: false,
+      }).selectedProviderEntry?.instanceId,
+    ).toBe(codex.instanceId);
+    expect(
+      resolveComposerProviderSelection({
+        entries: [codex, claude, devReplay],
+        candidateInstanceIds: [null, undefined, NO_PROVIDER_MODEL_SELECTION.instanceId, undefined],
+        lockedProvider: null,
+        lockedInstanceId: null,
+      }).selectedProviderEntry?.instanceId,
+    ).toBe(codex.instanceId);
+
+    // Disabled Replay in dev mode falls back to Codex.
+    expect(
+      resolveComposerProviderSelection({
+        entries: [codex, claude, disabledReplay],
+        candidateInstanceIds: [null, undefined, NO_PROVIDER_MODEL_SELECTION.instanceId, undefined],
+        lockedProvider: null,
+        lockedInstanceId: null,
+        preferDevReplay: true,
+      }).selectedProviderEntry?.instanceId,
+    ).toBe(codex.instanceId);
+
+    // Existing locked thread never switches to Replay.
+    expect(
+      resolveComposerProviderSelection({
+        entries: [
+          codex,
+          { ...claude, snapshot: { ...claude.snapshot, enabled: false }, enabled: false },
+          devReplay,
+        ],
+        candidateInstanceIds: [claude.instanceId],
+        lockedProvider: ProviderDriverKind.make("claudeAgent"),
+        lockedInstanceId: claude.instanceId,
+        preferDevReplay: true,
+      }).selectedProviderEntry,
+    ).toBeUndefined();
+  });
 });
 
 describe("checkout Git memory", () => {

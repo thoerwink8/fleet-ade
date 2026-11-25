@@ -1,4 +1,4 @@
-import { GitCommandError } from "@t3tools/contracts";
+import { GitCommandError, type GitCommandFailureReason } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
 import type * as GitVcsDriver from "./GitVcsDriver.ts";
+import { inferGitCommandAction } from "./gitCommandAction.ts";
 
 const INDEX_LIST_MAX_BYTES = 64 * 1024 * 1024;
 
@@ -51,11 +52,14 @@ export const removeLinkedWorktree = Effect.fn("WorktreeRemoval.removeLinkedWorkt
   }
 
   // Git's own refusals, worded the way it prints them.
-  const refuse = (message: string, cause?: unknown) =>
+  const action = inferGitCommandAction(input.operation);
+  const refuse = (message: string, cause?: unknown, reason?: GitCommandFailureReason) =>
     new GitCommandError({
       operation: input.operation,
+      ...(action === undefined ? {} : { action }),
       command: "git worktree remove",
       cwd: input.cwd,
+      ...(reason === undefined ? {} : { reason }),
       detail: `fatal: ${message}`,
       ...(cause === undefined ? {} : { cause }),
     });
@@ -139,6 +143,8 @@ export const removeLinkedWorktree = Effect.fn("WorktreeRemoval.removeLinkedWorkt
     if (status !== "")
       return yield* refuse(
         `'${worktreePath}' contains modified or untracked files, use --force to delete it`,
+        undefined,
+        "working_tree_dirty",
       );
   }
 

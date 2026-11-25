@@ -14,6 +14,7 @@ function provider(input: {
   driver: string;
   enabled?: boolean;
   availability?: ServerProvider["availability"];
+  auth?: ServerProvider["auth"];
   models: ReadonlyArray<string>;
 }): ServerProvider {
   return {
@@ -24,7 +25,7 @@ function provider(input: {
     version: null,
     status: "ready",
     ...(input.availability ? { availability: input.availability } : {}),
-    auth: { status: "authenticated" },
+    auth: input.auth ?? { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
     models: input.models.map((slug, index) => ({
       slug,
@@ -46,6 +47,7 @@ const claudeAndCodex = [
 function present(
   providers: ReadonlyArray<ServerProvider>,
   overrides: Partial<UnifiedSettings> = {},
+  preferDevReplay?: boolean,
 ) {
   const settings = {
     ...DEFAULT_UNIFIED_SETTINGS,
@@ -57,6 +59,7 @@ function present(
     providers,
     settings,
     projectId: null,
+    preferDevReplay,
   });
 }
 
@@ -108,5 +111,45 @@ describe("resolveDefaultModelSettingsPresentation", () => {
     );
     expect(row.providerNote).toBeNull();
     expect(row.selection).toMatchObject({ instanceId: claudeId, model: "claude-sonnet-5" });
+  });
+
+  it("shows Replay as the automatic default in dev mode while honoring non-dev mode and saved defaults", () => {
+    const devReplayId = ProviderInstanceId.make("devReplay");
+    const providers = [
+      ...claudeAndCodex,
+      provider({
+        instanceId: "devReplay",
+        driver: "acpRegistry",
+        auth: { status: "unknown" },
+        models: ["showcase"],
+      }),
+    ];
+    const devReplayConfigured = {
+      providerInstances: {
+        [devReplayId]: {
+          driver: ProviderDriverKind.make("acpRegistry"),
+          displayName: "Replay (dev)",
+        },
+      },
+    };
+
+    expect(
+      present(providers, { ...devReplayConfigured, defaultModelSelection: null }, true),
+    ).toEqual({
+      selection: { instanceId: devReplayId, model: "showcase" },
+      providerNote: null,
+    });
+    expect(
+      present(providers, { ...devReplayConfigured, defaultModelSelection: null }, false),
+    ).toEqual({
+      selection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.6" },
+      providerNote: null,
+    });
+    expect(
+      present(providers, { ...devReplayConfigured, defaultModelSelection: savedClaude }, true),
+    ).toEqual({
+      selection: savedClaude,
+      providerNote: null,
+    });
   });
 });

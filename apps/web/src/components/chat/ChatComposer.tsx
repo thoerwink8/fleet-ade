@@ -101,6 +101,7 @@ import {
 import { ComposerStashBadge } from "./ComposerStashBadge";
 import { ComposerStashMenu } from "./ComposerStashMenu";
 import { useComposerTriggerState } from "./useComposerTriggerState";
+import { rememberRecentComposerPath } from "./composerPathSuggestions.logic";
 import { useComposerMenuItems } from "./useComposerMenuItems";
 import { useComposerMultilinePrompt } from "./useComposerMultilinePrompt";
 import {
@@ -467,6 +468,7 @@ export interface ChatComposerProps {
   supportsProviderSwitchingViaHandoff?: boolean;
   providerStatuses: ServerProvider[];
   providerCatalogKnown: boolean;
+  preferDevReplay?: boolean | undefined;
   activeProjectDefaultModelSelection: ModelSelection | null | undefined;
   activeThreadModelSelection: ModelSelection | null | undefined;
   reportedModelSelection?: ModelSelection | null;
@@ -590,6 +592,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     supportsProviderSwitchingViaHandoff = false,
     providerStatuses,
     providerCatalogKnown,
+    preferDevReplay = false,
     activeProjectDefaultModelSelection,
     activeThreadModelSelection,
     reportedModelSelection,
@@ -937,6 +940,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     lockedProvider,
     lockedInstanceId:
       activeThread?.runtime?.providerInstanceId ?? activeThreadModelSelection?.instanceId,
+    preferDevReplay,
   });
   const noProviderAvailable =
     selectedProviderEntry === undefined && multipleModelSelections === null;
@@ -1158,6 +1162,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const {
     items: composerMenuItems,
     isLoading: isComposerMenuLoading,
+    loadingState: composerMenuLoadingState,
     emptyState: composerMenuEmptyState,
   } = useComposerMenuItems({
     composerTrigger,
@@ -1966,6 +1971,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         expectedText: snapshot.value.slice(trigger.rangeStart, replacementRangeEnd),
       });
       if (applied) {
+        if (item.pathKind === "file") {
+          rememberRecentComposerPath(environmentId, gitCwd, item.path);
+        }
         setComposerHighlightedItemId(null);
       }
       return;
@@ -3929,11 +3937,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               <div role="status" aria-atomic="true" className="sr-only">
                 {composerSuggestionsVisible && composerMenuItems.length === 0
                   ? isComposerMenuLoading
-                    ? composerTriggerKind === "pull-request"
-                      ? "正在查找 PR…"
-                      : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
-                        ? "正在搜索项目技能…"
-                        : "正在搜索项目文件…"
+                    ? (composerMenuLoadingState ??
+                      (composerTriggerKind === "pull-request"
+                        ? "正在查找 PR…"
+                        : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
+                          ? "正在搜索项目技能…"
+                          : "正在搜索项目文件…"))
                     : composerMenuEmptyState
                   : ""}
               </div>
@@ -3945,6 +3954,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     resolvedTheme={resolvedTheme}
                     isLoading={isComposerMenuLoading}
                     triggerKind={composerTriggerKind}
+                    loadingStateText={composerMenuLoadingState}
                     emptyStateText={composerMenuEmptyState}
                     activeItemId={activeComposerMenuItem?.id ?? null}
                     onHighlightedItemChange={onComposerMenuItemHighlightedStable}

@@ -67,6 +67,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
     providers,
     settings,
     projectId: target?.projectId ?? null,
+    preferDevReplay: representative?.serverConfig?.devMode === true,
   });
   const selection = presentation.selection;
   const modelOptions = getCustomModelOptionsByInstance(
@@ -82,6 +83,9 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       projectId: candidate.projectId,
       settings: candidate.settings,
       providers: providersByEnvironment.get(candidate.environmentId) ?? EMPTY_SERVER_PROVIDERS,
+      preferDevReplay:
+        environments.find((environment) => environment.environmentId === candidate.environmentId)
+          ?.serverConfig?.devMode === true,
     })),
   );
   const automaticModel =

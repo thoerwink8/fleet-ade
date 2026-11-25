@@ -17,6 +17,7 @@ import { afterEach, vi } from "vite-plus/test";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
+import { hostShellWord } from "./invocation.ts";
 import { upsertServiceEnv } from "./service.ts";
 import { statusCommand, upCommand } from "./up.ts";
 
@@ -96,7 +97,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
     },
     {
       label: "the local network opens",
-      prints: "Run `t3 pair --base-dir <baseDir>`.",
+      prints: "Run `t3 pair <baseDir>`.",
       installed: true,
       env: "T3CODE_LAN=false\n",
       args: ["--lan"],
@@ -135,7 +136,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
     {
       label: "a failed update keeps service.env matching the old service",
       // The old service still runs, so no foreground server is offered.
-      prints: "Fix that, then run `t3 up --base-dir <baseDir>` again.",
+      prints: "Fix that, then run `t3 up <baseDir>` again.",
       installed: true,
       status: { current: false },
       installFails: true,
@@ -297,7 +298,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
         ),
       );
       if (input.prints !== undefined) {
-        expect(lines.join("\n")).toContain(input.prints.replace("<baseDir>", baseDir));
+        // `<baseDir>` stands for the `--base-dir` pair quoted for the host shell:
+        // PowerShell quotes both on Windows; POSIX shells leave these words bare.
+        const platform = HostProcess.Platform.defaultValue();
+        const baseDirArgs = `${hostShellWord(platform, "--base-dir")} ${hostShellWord(platform, baseDir)}`;
+        expect(lines.join("\n")).toContain(input.prints.replace("<baseDir>", baseDirArgs));
       }
       if (input.omits !== undefined) {
         expect(lines.join("\n")).not.toContain(input.omits);

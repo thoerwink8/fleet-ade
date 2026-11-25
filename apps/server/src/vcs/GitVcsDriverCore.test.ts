@@ -8031,3 +8031,230 @@ it.layer(layerTest)("branch change totals after a failed untracked listing", (it
     }),
   );
 });
+
+it.layer(layerTest)("GitVcsDriverCore stable reason and action classification", (it) => {
+  it.effect("classifies merge_conflict on real git merge conflict and conflicted commit", () =>
+    Effect.gen(function* () {
+      const cwd = yield* makeTmpDir("git-merge-conflict-");
+      const { initialBranch } = yield* initRepoWithCommit(cwd);
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+
+      yield* git(cwd, ["checkout", "-b", "feature"]);
+      yield* writeTextFile(cwd, "README.md", "# feature branch\n");
+      yield* git(cwd, ["commit", "-am", "feature change"]);
+
+      yield* git(cwd, ["checkout", initialBranch]);
+      yield* writeTextFile(cwd, "README.md", "# main branch\n");
+      yield* git(cwd, ["commit", "-am", "main change"]);
+
+      // `git merge` writes CONFLICT (...) + Automatic merge failed to stdout with empty stderr.
+      const mergeError = yield* driver
+        .execute({
+          operation: "GitVcsDriver.pullCurrentBranch.pull",
+          cwd,
+          args: ["merge", "feature"],
+        })
+        .pipe(Effect.flip);
+      assert.equal(mergeError._tag, "GitCommandError");
+      assert.equal(mergeError.action, "pull");
+      assert.equal(mergeError.reason, "merge_conflict");
+
+      const commitError = yield* driver.commit(cwd, "resolve", "").pipe(Effect.flip);
+      assert.equal(commitError._tag, "GitCommandError");
+      assert.equal(commitError.action, "commit");
+      assert.equal(commitError.reason, "merge_conflict");
+    }),
+  );
+
+  it.effect("classifies not_fast_forward when pulling a diverged upstream branch", () =>
+    Effect.gen(function* () {
+      const cwd = yield* makeTmpDir("git-not-ff-local-");
+      const { initialBranch } = yield* initRepoWithCommit(cwd);
+      const remote = yield* makeTmpDir("git-not-ff-remote-");
+      const other = yield* makeTmpDir("git-not-ff-other-");
+      yield* git(remote, ["init", "--bare"]);
+      yield* git(cwd, ["remote", "add", "origin", remote]);
+      yield* git(cwd, ["push", "--set-upstream", "origin", initialBranch]);
+      yield* git(other, ["clone", "--branch", initialBranch, remote, "."]);
+      yield* writeTextFile(other, "remote.txt", "remote commit\n");
+      yield* git(other, ["add", "remote.txt"]);
+      yield* git(other, [
+        "-c",
+        "user.email=t@t",
+        "-c",
+        "user.name=T",
+        "commit",
+        "-m",
+        "remote commit",
+      ]);
+      yield* git(other, ["push", "origin", initialBranch]);
+
+      yield* writeTextFile(cwd, "local.txt", "local commit\n");
+      yield* git(cwd, ["add", "local.txt"]);
+      yield* git(cwd, ["commit", "-m", "local commit"]);
+
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+      const error = yield* driver.pullCurrentBranch(cwd).pipe(Effect.flip);
+      assert.equal(error._tag, "GitCommandError");
+      assert.equal(error.action, "pull");
+      assert.equal(error.reason, "not_fast_forward");
+    }),
+  );
+
+  it.effect(
+    "classifies working_tree_dirty on real switchRef and pullCurrentBranch even under non-English locale",
+    () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir("git-dirty-tree-local-");
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const remote = yield* makeTmpDir("git-dirty-tree-remote-");
+        const other = yield* makeTmpDir("git-dirty-tree-other-");
+        yield* git(remote, ["init", "--bare"]);
+        yield* git(cwd, ["remote", "add", "origin", remote]);
+        yield* git(cwd, ["push", "--set-upstream", "origin", initialBranch]);
+
+        yield* git(cwd, ["checkout", "-b", "other"]);
+        yield* writeTextFile(cwd, "README.md", "# other branch\n");
+        yield* git(cwd, ["commit", "-am", "other update"]);
+        yield* git(cwd, ["checkout", initialBranch]);
+
+        yield* git(other, ["clone", "--branch", initialBranch, remote, "."]);
+        yield* writeTextFile(other, "README.md", "# remote update\n");
+        yield* git(other, ["add", "README.md"]);
+        yield* git(other, [
+          "-c",
+          "user.email=t@t",
+          "-c",
+          "user.name=T",
+          "commit",
+          "-m",
+          "remote update",
+        ]);
+        yield* git(other, ["push", "origin", initialBranch]);
+
+        yield* writeTextFile(cwd, "README.md", "# dirty local edit\n");
+
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        const hostEnv = yield* HostProcess.Environment;
+
+        const switchError = yield* Effect.scoped(driver.switchRef({ cwd, refName: "other" })).pipe(
+          Effect.provideService(HostProcess.Environment, { ...hostEnv, LANGUAGE: "de" }),
+          Effect.flip,
+        );
+        assert.equal(switchError._tag, "GitCommandError");
+        assert.equal(switchError.action, "switch_branch");
+        assert.equal(switchError.reason, "working_tree_dirty");
+
+        const pullError = yield* driver.pullCurrentBranch(cwd).pipe(Effect.flip);
+        assert.equal(pullError._tag, "GitCommandError");
+        assert.equal(pullError.action, "pull");
+        assert.equal(pullError.reason, "working_tree_dirty");
+      }),
+  );
+
+  it.effect("classifies index_locked on statusDetails and git add when index.lock exists", () =>
+    Effect.gen(function* () {
+      const cwd = yield* makeTmpDir("git-index-lock-");
+      yield* initRepoWithCommit(cwd);
+      const fileSystem = yield* FileSystem.FileSystem;
+      const pathService = yield* Path.Path;
+      const lockPath = pathService.join(cwd, ".git", "index.lock");
+      yield* fileSystem.writeFileString(lockPath, "");
+
+      yield* Effect.gen(function* () {
+        yield* writeTextFile(cwd, "new.txt", "hello\n");
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+
+        const statusError = yield* driver.statusDetailsLocal(cwd).pipe(Effect.flip);
+        assert.equal(statusError._tag, "GitCommandError");
+        assert.equal(statusError.action, "read_status");
+        assert.equal(statusError.reason, "index_locked");
+
+        const addError = yield* driver
+          .execute({
+            operation: "GitVcsDriver.commit.addAll",
+            cwd,
+            args: ["add", "new.txt"],
+          })
+          .pipe(Effect.flip);
+        assert.equal(addError._tag, "GitCommandError");
+        assert.equal(addError.action, "commit");
+        assert.equal(addError.reason, "index_locked");
+      }).pipe(Effect.ensuring(fileSystem.remove(lockPath, { force: true }).pipe(Effect.ignore)));
+    }),
+  );
+
+  it.effect("classifies author_identity_unknown when git commit lacks user identity", () =>
+    Effect.gen(function* () {
+      const cwd = yield* makeTmpDir("git-missing-identity-");
+      yield* initRepoWithCommit(cwd);
+      const fileSystem = yield* FileSystem.FileSystem;
+      const pathService = yield* Path.Path;
+      const globalConfig = pathService.join(cwd, "empty.gitconfig");
+      yield* fileSystem.writeFileString(globalConfig, "[user]\n\tuseConfigOnly = true\n");
+      yield* fileSystem.writeFileString(pathService.join(cwd, ".git", "config"), "[core]\n");
+      yield* writeTextFile(cwd, "README.md", "# updated\n");
+
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+      const error = yield* driver
+        .execute({
+          operation: "GitVcsDriver.commit.commit",
+          cwd,
+          args: ["-c", "user.useConfigOnly=true", "commit", "-am", "no identity"],
+          env: {
+            GIT_CONFIG_NOSYSTEM: "1",
+            GIT_CONFIG_GLOBAL: globalConfig,
+            GIT_AUTHOR_NAME: "",
+            GIT_AUTHOR_EMAIL: "",
+            GIT_COMMITTER_NAME: "",
+            GIT_COMMITTER_EMAIL: "",
+          },
+        })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "GitCommandError");
+      assert.equal(error.action, "commit");
+      assert.equal(error.reason, "author_identity_unknown");
+    }),
+  );
+
+  it.effect(
+    "classifies executable_not_found only when git executable is missing, not when cwd is missing",
+    () =>
+      Effect.gen(function* () {
+        const makeWithSpawnPath = (missingPath: string) =>
+          makeGitVcsDriverCore().pipe(
+            Effect.provideService(
+              ChildProcessSpawner.ChildProcessSpawner,
+              ChildProcessSpawner.make(() =>
+                Effect.fail(
+                  PlatformError.systemError({
+                    _tag: "NotFound",
+                    module: "ChildProcess",
+                    method: "spawn",
+                    syscall: "spawn git",
+                    pathOrDescriptor: missingPath,
+                  }),
+                ),
+              ),
+            ),
+            Effect.provide(layerServerConfig),
+          );
+
+        const missingGitDriver = yield* makeWithSpawnPath("git");
+        const missingGitError = yield* missingGitDriver
+          .execute({ operation: "GitVcsDriver.initRepo", cwd: "/existing/repo", args: ["init"] })
+          .pipe(Effect.flip);
+        assert.equal(missingGitError._tag, "GitCommandError");
+        assert.equal(missingGitError.action, "init");
+        assert.equal(missingGitError.reason, "executable_not_found");
+
+        const missingCwdDriver = yield* makeWithSpawnPath("/missing/repo");
+        const missingCwdError = yield* missingCwdDriver
+          .execute({ operation: "GitVcsDriver.initRepo", cwd: "/missing/repo", args: ["init"] })
+          .pipe(Effect.flip);
+        assert.equal(missingCwdError._tag, "GitCommandError");
+        assert.equal(missingCwdError.action, "init");
+        assert.isUndefined(missingCwdError.reason);
+      }),
+  );
+});

@@ -842,3 +842,36 @@ it.effect("publish succeeds with status remote_added when the local repo has no 
     ),
   );
 });
+
+it.effect("classifies destination-exists errors with reason path_already_exists", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const parent = yield* fs.makeTempDirectoryScoped({ prefix: "t3-clone-exists-" });
+    const existingFile = path.join(parent, "file-target");
+    yield* fs.writeFileString(existingFile, "occupied\n");
+    const nonEmptyDir = path.join(parent, "dir-target");
+    yield* fs.makeDirectory(nonEmptyDir);
+    yield* fs.writeFileString(path.join(nonEmptyDir, "notes.txt"), "occupied\n");
+
+    yield* Effect.gen(function* () {
+      const service = yield* SourceControlRepositoryService.SourceControlRepositoryService;
+      const fileError = yield* Effect.flip(
+        service.prepareClone({ remoteUrl: CLONE_URLS.sshUrl, destinationPath: existingFile }),
+      );
+      assert.strictEqual(fileError._tag, "SourceControlRepositoryError");
+      assert.strictEqual(fileError.reason, "path_already_exists");
+      assert.strictEqual(
+        fileError.detail,
+        "Destination path already exists and is not a directory.",
+      );
+
+      const dirError = yield* Effect.flip(
+        service.prepareClone({ remoteUrl: CLONE_URLS.sshUrl, destinationPath: nonEmptyDir }),
+      );
+      assert.strictEqual(dirError._tag, "SourceControlRepositoryError");
+      assert.strictEqual(dirError.reason, "path_already_exists");
+      assert.strictEqual(dirError.detail, "Destination path already exists and is not empty.");
+    }).pipe(Effect.provide(layer({})));
+  }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);

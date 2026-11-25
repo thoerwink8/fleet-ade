@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { VcsSnapshotFailure } from "./git.ts";
 
 /** Producers clamp free text to these before publishing so encoding never fails. */
 export const WORKTREE_SETUP_DETAIL_MAX_LENGTH = 200;
@@ -57,6 +58,7 @@ export const WorktreeSetupSnapshot = Schema.Struct({
   ),
   stages: Schema.Array(WorktreeSetupStage),
   error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(WORKTREE_SETUP_ERROR_MAX_LENGTH))),
+  failure: Schema.optionalKey(VcsSnapshotFailure),
   sequence: NonNegativeInt,
 });
 export type WorktreeSetupSnapshot = typeof WorktreeSetupSnapshot.Type;

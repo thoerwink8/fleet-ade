@@ -13,6 +13,7 @@ import {
   PROJECT_CLONE_DETAIL_MAX_LENGTH,
   PROJECT_CLONE_ERROR_MAX_LENGTH,
   SourceControlRepositoryError,
+  type VcsSnapshotFailure,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -31,6 +32,7 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
 import * as SourceControlRepositoryService from "../sourceControl/SourceControlRepositoryService.ts";
+import { toVcsSnapshotFailure } from "../vcs/vcsSnapshotFailure.ts";
 import type { ProjectConflictError } from "./ProjectService.ts";
 
 export class ProjectCloneTracker extends Context.Service<
@@ -196,20 +198,25 @@ export const make = Effect.gen(function* () {
     projectId: ProjectId,
     phase: "done" | "failed" | "cancelled",
     error: string | null,
+    failure?: VcsSnapshotFailure,
   ) {
     const endedAt = yield* nowIso;
-    yield* modify(projectId, (tracked) => ({
-      ...tracked,
-      fiber: null,
-      snapshot: {
-        ...tracked.snapshot,
-        phase,
-        endedAt,
-        percent: phase === "done" ? 100 : tracked.snapshot.percent,
-        stalled: false,
-        error: error === null ? null : clampText(error, PROJECT_CLONE_ERROR_MAX_LENGTH),
-      },
-    }));
+    yield* modify(projectId, (tracked) => {
+      const { failure: _prevFailure, ...restSnapshot } = tracked.snapshot;
+      return {
+        ...tracked,
+        fiber: null,
+        snapshot: {
+          ...restSnapshot,
+          phase,
+          endedAt,
+          percent: phase === "done" ? 100 : tracked.snapshot.percent,
+          stalled: false,
+          error: error === null ? null : clampText(error, PROJECT_CLONE_ERROR_MAX_LENGTH),
+          ...(phase === "failed" && failure !== undefined ? { failure } : {}),
+        },
+      };
+    });
     if (phase === "done") yield* scheduleRemoval(projectId);
   });
 
@@ -239,13 +246,19 @@ export const make = Effect.gen(function* () {
    */
   const runClone = (projectId: ProjectId, tracked: TrackedClone) =>
     cloneWatchingForStall(projectId, tracked).pipe(
-      Effect.onExit((exit) =>
-        Exit.isSuccess(exit)
-          ? finish(projectId, "done", null)
-          : Cause.hasInterruptsOnly(exit.cause)
-            ? finish(projectId, "cancelled", null)
-            : finish(projectId, "failed", describeCloneFailure(exit.cause)),
-      ),
+      Effect.onExit((exit) => {
+        if (Exit.isSuccess(exit)) {
+          return finish(projectId, "done", null);
+        }
+        if (Cause.hasInterruptsOnly(exit.cause)) {
+          return finish(projectId, "cancelled", null);
+        }
+        const errorOption = Cause.findErrorOption(exit.cause);
+        const failure = Option.isSome(errorOption)
+          ? toVcsSnapshotFailure(errorOption.value, { action: "clone" })
+          : undefined;
+        return finish(projectId, "failed", describeCloneFailure(exit.cause), failure);
+      }),
       Effect.flatMap(() =>
         tracked.hooks
           .onCloned({ projectId, workspaceRoot: tracked.input.destinationPath })
@@ -397,20 +410,23 @@ export const make = Effect.gen(function* () {
       }
       yield* repositories.discardClone(tracked.input.destinationPath);
       const startedAt = yield* nowIso;
-      yield* modify(projectId, (entry) => ({
-        ...entry,
-        snapshot: {
-          ...entry.snapshot,
-          phase: "running",
-          stage: "connecting",
-          percent: null,
-          detail: null,
-          stalled: false,
-          error: null,
-          startedAt,
-          endedAt: null,
-        },
-      }));
+      yield* modify(projectId, (entry) => {
+        const { failure: _prevFailure, ...restSnapshot } = entry.snapshot;
+        return {
+          ...entry,
+          snapshot: {
+            ...restSnapshot,
+            phase: "running",
+            stage: "connecting",
+            percent: null,
+            detail: null,
+            stalled: false,
+            error: null,
+            startedAt,
+            endedAt: null,
+          },
+        };
+      });
       yield* launch(projectId);
       return true;
     },

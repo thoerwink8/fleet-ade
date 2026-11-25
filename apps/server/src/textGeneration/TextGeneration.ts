@@ -56,6 +56,7 @@ const resolveInstance = (
         : Effect.fail(
             new TextGenerationError({
               operation,
+              reason: "unavailable",
               detail: `No provider instance registered for id '${instanceId}'.`,
             }),
           ),
@@ -175,6 +176,7 @@ export const make = Effect.gen(function* () {
             ? Effect.fail(
                 new TextGenerationError({
                   operation: "generatePlainText",
+                  reason: "unavailable",
                   detail: "This provider cannot write a short assist reply.",
                 }),
               )

@@ -11,6 +11,7 @@ import type { GrokSettings } from "../settings.ts";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 
 import * as TextGenerationOperations from "@t3tools/provider-core/server/textGenerationOperations";
+import { classifyTextGenerationCliFailure } from "@t3tools/provider-core/server/textGenerationUtils";
 import {
   applyGrokAcpModelSelection,
   currentGrokModelIdFromSessionSetup,
@@ -22,6 +23,13 @@ import {
 const GROK_TIMEOUT_MS = 180_000;
 
 const isTextGenerationError = Schema.is(TextGenerationError);
+
+const extractGrokErrorText = (cause: unknown): string => {
+  if (typeof cause === "object" && cause !== null && "errorMessage" in cause) {
+    if (typeof cause.errorMessage === "string") return cause.errorMessage;
+  }
+  return cause instanceof Error ? cause.message : "";
+};
 
 export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(function* (
   grokSettings: GrokSettings,
@@ -88,20 +96,27 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
           Option.match({
             onNone: () =>
               Effect.fail(
-                new TextGenerationError({ operation, detail: "Grok ACP request timed out." }),
+                new TextGenerationError({
+                  operation,
+                  reason: "timeout",
+                  detail: "Grok ACP request timed out.",
+                }),
               ),
             onSome: (value) => Effect.succeed(value),
           }),
         ),
-        Effect.mapError((cause: EffectAcpErrors.AcpError | TextGenerationError) =>
-          isTextGenerationError(cause)
-            ? cause
-            : new TextGenerationError({
-                operation,
-                detail: "Grok ACP request failed.",
-                cause,
-              }),
-        ),
+        Effect.mapError((cause: EffectAcpErrors.AcpError | TextGenerationError) => {
+          if (isTextGenerationError(cause)) {
+            return cause;
+          }
+          const reason = classifyTextGenerationCliFailure(extractGrokErrorText(cause));
+          return new TextGenerationError({
+            operation,
+            ...(reason ? { reason } : {}),
+            detail: "Grok ACP request failed.",
+            cause,
+          });
+        }),
       );
 
       const trimmed = (yield* Ref.get(outputRef)).trim();
@@ -120,15 +135,18 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
     (effect, request) => {
       const { operation } = request;
       return effect.pipe(
-        Effect.mapError((cause) =>
-          isTextGenerationError(cause)
-            ? cause
-            : new TextGenerationError({
-                operation,
-                detail: "Grok ACP text generation failed.",
-                cause,
-              }),
-        ),
+        Effect.mapError((cause) => {
+          if (isTextGenerationError(cause)) {
+            return cause;
+          }
+          const reason = classifyTextGenerationCliFailure(extractGrokErrorText(cause));
+          return new TextGenerationError({
+            operation,
+            ...(reason ? { reason } : {}),
+            detail: "Grok ACP text generation failed.",
+            cause,
+          });
+        }),
         Effect.scoped,
       );
     },

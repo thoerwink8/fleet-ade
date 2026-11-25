@@ -73,6 +73,16 @@ export interface AppModelOption {
   isUnavailable?: boolean;
 }
 
+function isDynamicCatalogPlaceholder(
+  provider: ProviderDriverKind,
+  rawModels: ReadonlyArray<ServerProvider["models"][number]>,
+): boolean {
+  if (provider === "antigravity") {
+    return true;
+  }
+  return provider === "acpRegistry" && rawModels.every((model) => model.slug === "default");
+}
+
 function appendUnavailableDynamicModelSelection(
   options: AppModelOption[],
   rawModels: ReadonlyArray<ServerProvider["models"][number]>,
@@ -80,12 +90,13 @@ function appendUnavailableDynamicModelSelection(
   selectedModel: string | null | undefined,
   hiddenModels: ReadonlyArray<string>,
 ): AppModelOption[] {
-  if (provider !== "antigravity") {
+  if (!isDynamicCatalogPlaceholder(provider, rawModels)) {
     return options;
   }
   const slug = normalizeCustomModelSlug(selectedModel);
   if (!slug) return options;
   if (provider === "antigravity" && slug === ANTIGRAVITY_DEFAULT_MODEL) return options;
+  if (provider === "acpRegistry" && slug === "default") return options;
 
   if (resolveSelectableModel(provider, slug, rawModels) !== null) return options;
   if (hiddenModels.includes(slug)) return options;
@@ -282,14 +293,23 @@ export function resolveAppModelSelectionForInstance(
   if (resolvedSelection) {
     return resolvedSelection;
   }
-  if (resolutionOptions?.preserveUnavailableSelection && entry.driverKind === "antigravity") {
+  if (
+    resolutionOptions?.preserveUnavailableSelection &&
+    isDynamicCatalogPlaceholder(entry.driverKind, entry.models)
+  ) {
     const unavailableSelection = normalizeCustomModelSlug(selectedModel);
     const hiddenModels = readInstanceModelPreferences(settings, entry.instanceId).hiddenModels;
+    const placeholderSlug =
+      entry.driverKind === "antigravity"
+        ? ANTIGRAVITY_DEFAULT_MODEL
+        : entry.driverKind === "acpRegistry"
+          ? "default"
+          : null;
     if (
       unavailableSelection &&
       !hiddenModels.includes(unavailableSelection) &&
       resolveSelectableModel(entry.driverKind, selectedModel, entry.models) === null &&
-      unavailableSelection !== ANTIGRAVITY_DEFAULT_MODEL
+      unavailableSelection !== placeholderSlug
     ) {
       return unavailableSelection;
     }
@@ -319,14 +339,17 @@ export function defaultModelSelectionsAreMixed(
     projectId: ProjectId | null;
     settings: ServerSettings;
     providers: ReadonlyArray<ServerProvider>;
+    preferDevReplay?: boolean | undefined;
   }>,
 ): boolean {
-  const selections = targets.map(({ projectId, settings, providers }) => {
+  const selections = targets.map(({ projectId, settings, providers, preferDevReplay }) => {
     const stored = settings.defaultModelSelection;
     const selection =
       stored === null
-        ? resolveProjectDefaultProviderModelSelection(providers, settings, projectId)
-        : resolveDefaultProviderModelSelection(providers, stored);
+        ? resolveProjectDefaultProviderModelSelection(providers, settings, projectId, {
+            preferDevReplay,
+          })
+        : resolveDefaultProviderModelSelection(providers, stored, { preferDevReplay });
     return {
       stored,
       effective: selection
