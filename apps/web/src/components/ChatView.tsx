@@ -1903,12 +1903,14 @@ export default function ChatView(props: ChatViewProps) {
 
     const currentDraft = composer.getSendContext().prompt;
     const prompt = codexArtifactTemplatePromptToAppend(currentDraft, template);
-    if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
-      toastManager.add({
-        type: "error",
-        title: "无法添加到会话",
-        description: "输入框正忙，请在就绪后重试。",
-      });
+    if (
+      prompt !== null &&
+      !composer.insertTextAtEnd(prompt, {
+        ensureLeadingBoundary: true,
+        queueIfBusy: true,
+        failureTitle: "无法添加到会话",
+      })
+    ) {
       return;
     }
     scheduleComposerFocus();

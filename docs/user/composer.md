@@ -166,7 +166,8 @@ memory. The action is available only when the provider supports rewind.
 ## Prompt stash
 
 On web and desktop, press `Cmd+S` on macOS or `Ctrl+S` on Windows and Linux to save
-the current prompt and its attachments for later. Wait for uploads to finish first.
+the current prompt and its attachments for later. If attachments or context are
+still preparing or uploading, stashing waits until they finish.
 With an empty composer, the same shortcut restores a single stash or opens the
 stash menu when there are several.
 

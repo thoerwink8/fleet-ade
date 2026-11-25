@@ -181,6 +181,7 @@ import { encodeComposerContextFragment } from "@t3tools/shared/composerContextCl
 import type {
   ComposerContextRecord,
   OrchestrationV2Run,
+  PullRequestContextMetadata,
   ThreadPullRequestLink,
 } from "@t3tools/contracts";
 import { threadContextAttachment } from "~/lib/threadContextAttachment";
@@ -233,6 +234,10 @@ import {
   resolvePendingSendDispatchMode,
   usePendingComposerSend,
 } from "./pendingComposerSend.logic";
+import {
+  classifyComposerInsertionBlock,
+  PendingComposerInsertionQueue,
+} from "./pendingComposerInsertions.logic";
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { isInSideChatPane } from "~/lib/sideChatPane";
 import { ComposerPromptLengthValidation } from "./ComposerPromptLengthValidation";
@@ -290,6 +295,22 @@ function consumePasteAsTextShortcut(deadline: { current: number }): boolean {
   return armed;
 }
 
+type QueuedComposerInsertion =
+  | { readonly kind: "folders"; readonly folders: ReadonlyArray<File> }
+  | { readonly kind: "mention"; readonly text: string }
+  | { readonly kind: "pull-request"; readonly pullRequest: PullRequestContextMetadata }
+  | {
+      readonly kind: "question-thread-contexts";
+      readonly records: ReadonlyArray<ThreadContextRecord>;
+    }
+  | {
+      readonly kind: "text-at-end";
+      readonly text: string;
+      readonly ensureLeadingBoundary?: boolean | undefined;
+      readonly clipboardData?: DataTransfer | undefined;
+      readonly failureTitle?: string | undefined;
+    };
+
 export interface ChatComposerHandle {
   focusAtEnd: () => void;
   focusAt: (cursor: number) => void;
@@ -298,7 +319,12 @@ export interface ChatComposerHandle {
   hasPendingAttachments: () => boolean;
   insertTextAtEnd: (
     text: string,
-    options?: { ensureLeadingBoundary?: boolean; clipboardData?: DataTransfer },
+    options?: {
+      ensureLeadingBoundary?: boolean | undefined;
+      clipboardData?: DataTransfer | undefined;
+      queueIfBusy?: boolean | undefined;
+      failureTitle?: string | undefined;
+    },
   ) => boolean;
   pasteTextAtEnd: (text: string, options?: { bypassAutoAttachment?: boolean }) => boolean;
   citeAssistantText: (
@@ -2789,15 +2815,116 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     () => resolveActiveComposerTrigger().trigger?.kind === "path",
   );
 
-  const insertComposerTextAtEnd: ChatComposerHandle["insertTextAtEnd"] = (text, options) => {
-    const inserted = insertComposerText(text, "end", options);
+  const pendingInsertionsRef =
+    useRef<PendingComposerInsertionQueue<QueuedComposerInsertion> | null>(null);
+  const getPendingInsertions = () => {
+    if (pendingInsertionsRef.current === null) {
+      pendingInsertionsRef.current = new PendingComposerInsertionQueue();
+    }
+    return pendingInsertionsRef.current;
+  };
+  const composerInsertionBlock = classifyComposerInsertionBlock({
+    projectSelectionRequired,
+    activePendingIsResponding,
+    pendingUserInputCount: pendingUserInputs.length,
+    hasActiveQuestion: Boolean(activePendingProgress?.activeQuestion),
+    choiceOnlyQuestion: isChoiceOnlyPendingQuestion,
+    canOperateThread,
+  });
+  const questionThreadDropBlock = classifyComposerInsertionBlock({
+    projectSelectionRequired,
+    activePendingIsResponding,
+    pendingUserInputCount: pendingUserInputs.length,
+    hasActiveQuestion: Boolean(activePendingProgress?.activeQuestion),
+    choiceOnlyQuestion: isChoiceOnlyPendingQuestion,
+    canOperateThread,
+    requireOperate: true,
+  });
+
+  const insertTextIntoEndImmediate = (
+    text: string,
+    options?: {
+      ensureLeadingBoundary?: boolean | undefined;
+      clipboardData?: DataTransfer | undefined;
+    },
+  ): boolean => {
+    const inserted = insertComposerText(text, "end", {
+      ...(options?.ensureLeadingBoundary !== undefined
+        ? { ensureLeadingBoundary: options.ensureLeadingBoundary }
+        : {}),
+      ...(options?.clipboardData ? { clipboardData: options.clipboardData } : {}),
+    });
     if (inserted && isComposerCollapsedMobile) {
       // Reveal the mobile editor before its focus frame.
       expandMobileComposer();
     }
     return inserted;
   };
+
+  const insertComposerTextAtEnd: ChatComposerHandle["insertTextAtEnd"] = (text, options) => {
+    if (options?.queueIfBusy !== true) {
+      return insertTextIntoEndImmediate(text, options);
+    }
+    if (composerInsertionBlock?.kind === "transient") {
+      getPendingInsertions().enqueue(composerDraftTargetKey, {
+        kind: "text-at-end",
+        text,
+        ...(options.ensureLeadingBoundary !== undefined
+          ? { ensureLeadingBoundary: options.ensureLeadingBoundary }
+          : {}),
+        ...(options.clipboardData ? { clipboardData: options.clipboardData } : {}),
+        ...(options.failureTitle ? { failureTitle: options.failureTitle } : {}),
+      });
+      return true;
+    }
+    if (composerInsertionBlock?.kind === "hard") {
+      toastManager.add({
+        type: "error",
+        title: options.failureTitle ?? "无法添加到会话",
+        description: composerInsertionBlock.reason,
+      });
+      return false;
+    }
+    const inserted = insertTextIntoEndImmediate(text, options);
+    if (!inserted) {
+      toastManager.add({
+        type: "error",
+        title: options.failureTitle ?? "无法添加到会话",
+        description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+      });
+    }
+    return inserted;
+  };
   const insertComposerTextAtEndStable = useStableCallback(insertComposerTextAtEnd);
+
+  const insertFoldersNow = (folders: ReadonlyArray<File>) => {
+    for (const folder of folders) {
+      const path = resolveDroppedFolderPath(folder, window.desktopBridge?.getPathForFile);
+      if (path === null) {
+        toastManager.add({
+          type: "error",
+          title: `无法获取“${folder.name}”的路径`,
+          description: "请改为用 @ 输入文件夹路径。",
+        });
+        continue;
+      }
+      const inserted = insertTextIntoEndImmediate(`${serializeComposerFileLink(path)} `, {
+        ensureLeadingBoundary: true,
+      });
+      if (!inserted) {
+        toastManager.add({
+          type: "error",
+          title: "无法添加文件夹",
+          description:
+            composerInsertionBlock?.kind === "hard"
+              ? composerInsertionBlock.reason
+              : "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+        });
+        break;
+      }
+    }
+    focusComposer();
+  };
 
   const addComposerFolders = (folders: File[]) => {
     const target = folderDropTarget({
@@ -2814,29 +2941,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       });
       return;
     }
-    for (const folder of folders) {
-      const path = resolveDroppedFolderPath(folder, window.desktopBridge?.getPathForFile);
-      if (path === null) {
-        toastManager.add({
-          type: "error",
-          title: `无法获取“${folder.name}”的路径`,
-          description: "请改为用 @ 输入文件夹路径。",
-        });
-        continue;
-      }
-      const inserted = insertComposerTextAtEndStable(`${serializeComposerFileLink(path)} `, {
-        ensureLeadingBoundary: true,
-      });
-      if (!inserted) {
-        toastManager.add({
-          type: "error",
-          title: "无法添加文件夹",
-          description: "输入框正忙，请在就绪后重试。",
-        });
-        break;
-      }
+    if (composerInsertionBlock?.kind === "transient") {
+      getPendingInsertions().enqueue(composerDraftTargetKey, { kind: "folders", folders });
+      return;
     }
-    focusComposer();
+    if (composerInsertionBlock?.kind === "hard") {
+      toastManager.add({
+        type: "error",
+        title: "无法添加文件夹",
+        description: composerInsertionBlock.reason,
+      });
+      return;
+    }
+    insertFoldersNow(folders);
   };
   const addComposerFoldersStable = useStableCallback(addComposerFolders);
 
@@ -2885,29 +3002,52 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return setContextInsertionHandler(composerDraftTarget, insertContextReferencesAtCaretStable);
   }, [composerDraftTarget, insertContextReferencesAtCaretStable, setContextInsertionHandler]);
 
+  const enqueuePendingInsertionStable = useStableCallback((entry: QueuedComposerInsertion) => {
+    getPendingInsertions().enqueue(composerDraftTargetKey, entry);
+  });
   // Capture drops before the editor; mention handlers own native propagation and moves.
-  const composerMentionDragHandlers = makeComposerMentionDragHandlers({
-    insertMentionAtEnd: (text) =>
-      insertComposerTextAtEndStable(text, { ensureLeadingBoundary: true }),
-    insertPullRequestAtEnd: (pullRequest) => {
-      const comment = buildPullRequestReferenceContext(pullRequest);
-      const inserted = insertComposerTextAtEndStable(
-        `${formatInlineContextReference(reviewCommentContextReference(comment))} `,
-        { ensureLeadingBoundary: true },
-      );
-      if (inserted) {
-        addComposerDraftReviewComment(composerDraftTarget, comment, { appendReference: false });
+  const insertPullRequestReferenceNow = (pullRequest: PullRequestContextMetadata): boolean => {
+    const comment = buildPullRequestReferenceContext(pullRequest);
+    const inserted = insertTextIntoEndImmediate(
+      `${formatInlineContextReference(reviewCommentContextReference(comment))} `,
+      { ensureLeadingBoundary: true },
+    );
+    if (inserted) {
+      addComposerDraftReviewComment(composerDraftTarget, comment, { appendReference: false });
+    }
+    return inserted;
+  };
+  const insertMentionOrQueueStable = useStableCallback((text: string) => {
+    if (composerInsertionBlock?.kind === "transient") {
+      enqueuePendingInsertionStable({ kind: "mention", text });
+      return true;
+    }
+    return insertComposerTextAtEndStable(text, { ensureLeadingBoundary: true });
+  });
+  const insertPullRequestOrQueueStable = useStableCallback(
+    (pullRequest: PullRequestContextMetadata) => {
+      if (composerInsertionBlock?.kind === "transient") {
+        enqueuePendingInsertionStable({ kind: "pull-request", pullRequest });
+        return true;
       }
-      return inserted;
+      return insertPullRequestReferenceNow(pullRequest);
     },
+  );
+  const rejectMentionInsertStable = useStableCallback(() => {
+    toastManager.add({
+      type: "error",
+      title: "无法添加到会话",
+      description:
+        composerInsertionBlock?.kind === "hard"
+          ? composerInsertionBlock.reason
+          : "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+    });
+  });
+  const composerMentionDragHandlers = makeComposerMentionDragHandlers({
+    insertMentionAtEnd: insertMentionOrQueueStable,
+    insertPullRequestAtEnd: insertPullRequestOrQueueStable,
     setDragActive: setIsDragOverComposer,
-    onInsertRejected: () => {
-      toastManager.add({
-        type: "error",
-        title: "无法添加到会话",
-        description: "输入框正忙，请在就绪后重试。",
-      });
-    },
+    onInsertRejected: rejectMentionInsertStable,
   });
 
   const attachDroppedThreadFile = useEffectEvent((file: File) =>
@@ -2967,6 +3107,35 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     },
   );
 
+  const insertQuestionThreadContextsNow = (
+    records: ReadonlyArray<ThreadContextRecord>,
+  ): boolean => {
+    if (questionAttachmentTarget === null) return false;
+    const canAnswer =
+      canOperateThread &&
+      !activePendingIsResponding &&
+      activePendingProgress?.activeQuestion?.allowCustomAnswer !== false;
+    const text = `${records
+      .map((record) => formatInlineContextReference(threadContextReference(record)))
+      .join(" ")} `;
+    const snapshot = readComposerSnapshotStable();
+    const cursor = snapshot.expandedCursor;
+    const leadingSpace = cursor > 0 && !/\s/.test(snapshot.value[cursor - 1] ?? "");
+    const inserted =
+      canAnswer &&
+      applyPromptReplacementStable(
+        cursor,
+        extendReplacementRangeForTrailingSpace(snapshot.value, cursor, text),
+        leadingSpace ? ` ${text}` : text,
+      );
+    if (!inserted) return false;
+    addComposerDraftThreadContexts(questionAttachmentTarget, records, {
+      appendReference: false,
+    });
+    if (isComposerCollapsedMobile) expandMobileComposerStable();
+    return true;
+  };
+
   useThreadContextDrop(composerFormRef, environmentId, attachmentTargetKey, (refs, isActive) => {
     const records = refs.flatMap((ref) => {
       // The agent reads a linked machine's thread itself, like the `@` picker's; any other
@@ -2983,40 +3152,102 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     });
     if (records.length === 0) return;
     if (questionAttachmentTarget !== null) {
-      const canAnswer =
-        canOperateThread &&
-        !activePendingIsResponding &&
-        activePendingProgress?.activeQuestion?.allowCustomAnswer !== false;
-      const text = `${records
-        .map((record) => formatInlineContextReference(threadContextReference(record)))
-        .join(" ")} `;
-      const snapshot = readComposerSnapshotStable();
-      const cursor = snapshot.expandedCursor;
-      const leadingSpace = cursor > 0 && !/\s/.test(snapshot.value[cursor - 1] ?? "");
-      const inserted =
-        canAnswer &&
-        applyPromptReplacementStable(
-          cursor,
-          extendReplacementRangeForTrailingSpace(snapshot.value, cursor, text),
-          leadingSpace ? ` ${text}` : text,
-        );
-      if (!inserted) {
-        toastManager.add({
-          type: "error",
-          title: "无法添加会话",
-          description: "输入框正忙，请在就绪后重试。",
+      if (questionThreadDropBlock?.kind === "transient") {
+        getPendingInsertions().enqueue(composerDraftTargetKey, {
+          kind: "question-thread-contexts",
+          records,
         });
         return;
       }
-      addComposerDraftThreadContexts(questionAttachmentTarget, records, {
-        appendReference: false,
-      });
-      if (isComposerCollapsedMobile) expandMobileComposerStable();
+      if (questionThreadDropBlock?.kind === "hard") {
+        toastManager.add({
+          type: "error",
+          title: "无法添加会话",
+          description: questionThreadDropBlock.reason,
+        });
+        return;
+      }
+      if (!insertQuestionThreadContextsNow(records)) {
+        toastManager.add({
+          type: "error",
+          title: "无法添加会话",
+          description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+        });
+      }
     } else {
       cancelCurrentPendingSend();
       addComposerDraftThreadContexts(composerDraftTarget, records);
     }
   });
+
+  const flushPendingInsertions = (entries: ReadonlyArray<QueuedComposerInsertion>) => {
+    for (const entry of entries) {
+      if (entry.kind === "folders") {
+        insertFoldersNow(entry.folders);
+      } else if (entry.kind === "mention") {
+        if (!insertTextIntoEndImmediate(entry.text, { ensureLeadingBoundary: true })) {
+          toastManager.add({
+            type: "error",
+            title: "无法添加到会话",
+            description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+          });
+        }
+      } else if (entry.kind === "pull-request") {
+        if (!insertPullRequestReferenceNow(entry.pullRequest)) {
+          toastManager.add({
+            type: "error",
+            title: "无法添加到会话",
+            description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+          });
+        }
+      } else if (entry.kind === "question-thread-contexts") {
+        if (questionAttachmentTarget !== null) {
+          if (!insertQuestionThreadContextsNow(entry.records)) {
+            toastManager.add({
+              type: "error",
+              title: "无法添加会话",
+              description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+            });
+          }
+        } else {
+          cancelCurrentPendingSend();
+          addComposerDraftThreadContexts(composerDraftTarget, entry.records);
+        }
+      } else if (entry.kind === "text-at-end") {
+        const inserted = insertTextIntoEndImmediate(entry.text, {
+          ensureLeadingBoundary: entry.ensureLeadingBoundary,
+          clipboardData: entry.clipboardData,
+        });
+        if (!inserted) {
+          toastManager.add({
+            type: "error",
+            title: entry.failureTitle ?? "无法添加到会话",
+            description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+          });
+        }
+      }
+    }
+  };
+  const flushPendingInsertionsStable = useStableCallback(flushPendingInsertions);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- flushes or fails queued composer insertions once transient readiness blockers clear or become hard blocks
+  useEffect(() => {
+    const queue = pendingInsertionsRef.current;
+    if (!queue) return;
+    queue.clearExcept(composerDraftTargetKey);
+    if (!queue.hasForTarget(composerDraftTargetKey)) return;
+    if (composerInsertionBlock?.kind === "transient") return;
+    const entries = queue.takeForTarget(composerDraftTargetKey);
+    if (composerInsertionBlock?.kind === "hard") {
+      toastManager.add({
+        type: "error",
+        title: "无法添加到输入框",
+        description: composerInsertionBlock.reason,
+      });
+      return;
+    }
+    flushPendingInsertionsStable(entries);
+  }, [composerDraftTargetKey, composerInsertionBlock, flushPendingInsertionsStable]);
 
   const onComposerMentionDragLeaveCapture = (event: React.DragEvent<HTMLFormElement>) => {
     if (!dataTransferHasComposerMention(event.dataTransfer.types)) return;
