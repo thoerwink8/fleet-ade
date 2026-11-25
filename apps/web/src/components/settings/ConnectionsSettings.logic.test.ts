@@ -1,8 +1,14 @@
+import {
+  BearerConnectionTarget,
+  PrimaryConnectionTarget,
+  SshConnectionTarget,
+} from "@t3tools/client-runtime/connection";
 import { type DesktopWslState, EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   applyWslEnableSelection,
   isServerNetworkAccessible,
+  peerLinkHostSections,
   resolveAccessEnvironmentId,
   resolveTailscaleServeBaseUrl,
   selectQrEndpointOption,
@@ -213,5 +219,123 @@ describe("isServerNetworkAccessible", () => {
     { authPolicy: null, directEndpoints: served, expected: false },
   ] as const)("$authPolicy with $directEndpoints.length endpoints", (row) => {
     expect(isServerNetworkAccessible(row)).toBe(row.expected);
+  });
+});
+
+describe("peerLinkHostSections", () => {
+  const primary = (id: string, label: string, displayUrl = "http://127.0.0.1:3773") => ({
+    environmentId: EnvironmentId.make(id),
+    label,
+    displayUrl,
+    target: new PrimaryConnectionTarget({
+      environmentId: EnvironmentId.make(id),
+      label,
+      httpBaseUrl: displayUrl,
+      wsBaseUrl: "ws://127.0.0.1:3773",
+    }),
+  });
+  const bearer = (
+    id: string,
+    label: string,
+    displayUrl: string,
+    connectionId = `bearer:${id}`,
+  ) => ({
+    environmentId: EnvironmentId.make(id),
+    label,
+    displayUrl,
+    target: new BearerConnectionTarget({
+      environmentId: EnvironmentId.make(id),
+      label,
+      connectionId,
+    }),
+  });
+
+  it("lists one environment once, even when a second path repeats its id", () => {
+    const local = primary("env-local", "bb-1");
+    const repeated = bearer("env-local", "bb-1", "http://127.0.0.1:39721");
+    expect(peerLinkHostSections([local, repeated, local])).toEqual([
+      { environmentId: EnvironmentId.make("env-local"), environmentLabel: null },
+    ]);
+    expect(
+      peerLinkHostSections([
+        local,
+        repeated,
+        bearer("env-vps", "机房", "https://vps.example:8443"),
+      ]).map((section) => [section.environmentId, section.environmentLabel]),
+    ).toEqual([
+      [EnvironmentId.make("env-local"), "bb-1"],
+      [EnvironmentId.make("env-vps"), "机房"],
+    ]);
+  });
+
+  it("keeps two different computers that share a name and tells them apart", () => {
+    expect(
+      peerLinkHostSections([
+        primary("env-local", "bb-1"),
+        bearer("env-serve", "bb-1", "http://127.0.0.1:39721"),
+      ]),
+    ).toEqual([
+      { environmentId: EnvironmentId.make("env-local"), environmentLabel: "bb-1（本机）" },
+      { environmentId: EnvironmentId.make("env-serve"), environmentLabel: "bb-1（远程）" },
+    ]);
+    expect(
+      peerLinkHostSections([
+        bearer("env-a", "bb-1", "http://127.0.0.1:4000"),
+        bearer("env-b", "bb-1", "http://127.0.0.1:4001"),
+      ]).map((section) => section.environmentLabel),
+    ).toEqual(["bb-1（127.0.0.1:4000）", "bb-1（127.0.0.1:4001）"]);
+    expect(
+      peerLinkHostSections([
+        primary("env-local", "bb-1"),
+        bearer("env-wsl", "bb-1", "http://127.0.0.1:39722", "local:wsl"),
+      ]).map((section) => section.environmentLabel),
+    ).toEqual(["bb-1（本机）", "bb-1（WSL）"]);
+    expect(
+      peerLinkHostSections([
+        bearer("env-serve", "bb-1", "http://127.0.0.1:39721"),
+        {
+          environmentId: EnvironmentId.make("env-ssh"),
+          label: "bb-1",
+          displayUrl: "ada@build:22",
+          target: new SshConnectionTarget({
+            environmentId: EnvironmentId.make("env-ssh"),
+            label: "bb-1",
+            connectionId: "ssh-build",
+          }),
+        },
+      ]).map((section) => section.environmentLabel),
+    ).toEqual(["bb-1（127.0.0.1:39721）", "bb-1（ada@build:22）"]);
+    expect(
+      peerLinkHostSections([
+        bearer("env-a", "bb-1", "http://127.0.0.1:4000"),
+        bearer("env-b", "bb-1", "http://127.0.0.1:4000"),
+      ]).map((section) => section.environmentLabel),
+    ).toEqual(["bb-1（127.0.0.1:4000 · env-a）", "bb-1（127.0.0.1:4000 · env-b）"]);
+  });
+
+  it("shows a single computer as one section", () => {
+    const local = primary("env-local", "bb-1");
+    expect(peerLinkHostSections([local])).toEqual([
+      { environmentId: local.environmentId, environmentLabel: null },
+    ]);
+  });
+
+  it("keeps distinct names unchanged", () => {
+    expect(
+      peerLinkHostSections([
+        primary("env-local", "办公室"),
+        bearer("env-vps", "机房", "https://vps.example:8443"),
+        {
+          environmentId: EnvironmentId.make("env-ssh"),
+          label: "构建机",
+          displayUrl: "ada@build:22",
+          target: new SshConnectionTarget({
+            environmentId: EnvironmentId.make("env-ssh"),
+            label: "构建机",
+            connectionId: "ssh-build",
+          }),
+        },
+      ]).map((section) => section.environmentLabel),
+    ).toEqual(["办公室", "机房", "构建机"]);
   });
 });

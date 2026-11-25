@@ -12,10 +12,12 @@ import {
   resolveProviderInstanceEnabled,
   SecretProviderId,
   ServerSettings,
+  ServerSettingsError,
   ServerSettingsPatch,
   UsageLimitSourceId,
 } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { assert, it } from "@effect/vitest";
 import { vi } from "vite-plus/test";
 import * as Deferred from "effect/Deferred";
@@ -62,6 +64,9 @@ vi.mock("./secrets/secretProviderDefinitions.ts", async () => {
 const decodeServerSettings = Schema.decodeUnknownEffect(ServerSettings);
 const decodeServerSettingsJson = Schema.decodeUnknownEffect(Schema.fromJsonString(ServerSettings));
 const decodeServerSettingsPatch = Schema.decodeUnknownEffect(ServerSettingsPatch);
+const serverSettingsErrorJson = Schema.toCodecJson(ServerSettingsError);
+const encodeServerSettingsErrorJson = Schema.encodeEffect(serverSettingsErrorJson);
+const decodeServerSettingsErrorJson = Schema.decodeUnknownEffect(serverSettingsErrorJson);
 
 const layerServerSettings = () =>
   ServerSettingsModule.layer.pipe(
@@ -472,6 +477,68 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         yield* fs.readFileString(linkedSettingsPath),
       );
       assert.equal(persisted.responseStreamingMode, "paragraph");
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+
+  it.effect("writes settings when the target is writable", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+
+      const settings = yield* service.updateSettings({ responseStreamingMode: "paragraph" });
+
+      assert.equal(settings.responseStreamingMode, "paragraph");
+      const persisted = yield* decodeServerSettingsJson(
+        yield* fs.readFileString(config.settingsPath),
+      );
+      assert.equal(persisted.responseStreamingMode, "paragraph");
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+
+  it.effect("classifies a real read-only settings write after RPC codec round-trip", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      const platform = yield* HostProcess.Platform;
+      const targetDirectory = yield* fs.makeTempDirectoryScoped({
+        prefix: "t3-settings-read-only-",
+      });
+      const targetSettingsPath = path.join(targetDirectory, "settings.json");
+      yield* fs.writeFileString(targetSettingsPath, "{}\n");
+      yield* fs.remove(config.settingsPath, { force: true });
+      yield* fs.symlink(targetSettingsPath, config.settingsPath);
+      yield* Effect.acquireRelease(
+        Effect.gen(function* () {
+          yield* fs.chmod(targetSettingsPath, 0o444);
+          if (platform !== "win32") yield* fs.chmod(targetDirectory, 0o555);
+        }),
+        () =>
+          (platform === "win32"
+            ? fs.chmod(targetSettingsPath, 0o644)
+            : fs
+                .chmod(targetDirectory, 0o755)
+                .pipe(Effect.andThen(fs.chmod(targetSettingsPath, 0o644)))
+          ).pipe(Effect.ignore),
+      );
+
+      const error = yield* Effect.flip(
+        service.updateSettings({ responseStreamingMode: "paragraph" }),
+      );
+      const encoded = yield* encodeServerSettingsErrorJson(error);
+      const decoded = yield* decodeServerSettingsErrorJson(encoded);
+      const fields = decoded as unknown as Record<string, unknown>;
+
+      assert.deepInclude(fields, {
+        _tag: "ServerSettingsError",
+        operation: "write-file",
+        reason: "permission_denied",
+        settingsPath: config.settingsPath,
+      });
+      assert.notInclude(decoded.message, config.settingsPath);
+      assert.include(fields.detail, targetSettingsPath);
     }).pipe(Effect.provide(layerServerSettings())),
   );
 

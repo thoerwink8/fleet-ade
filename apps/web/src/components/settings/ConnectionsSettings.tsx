@@ -28,6 +28,7 @@ import {
   applyWslEnableSelection,
   isWslSettingsRowVisible,
   missingTailscaleEndpointDescription,
+  peerLinkHostSections,
   resolveTailscaleServeBaseUrl,
 } from "./ConnectionsSettings.logic";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
@@ -1568,11 +1569,18 @@ function ConnectionsSettingsContent({
           savedEnvironments={savedEnvironments}
         />
       </SettingsSection>
-      {peerLinkHosts.map((environment, index) => (
+      {peerLinkHostSections(
+        peerLinkHosts.map((environment) => ({
+          environmentId: environment.environmentId,
+          label: environment.label,
+          displayUrl: environment.displayUrl,
+          target: environment.entry.target,
+        })),
+      ).map((section, index) => (
         <LinkedEnvironmentsSettings
-          key={environment.environmentId}
-          environmentId={environment.environmentId}
-          environmentLabel={peerLinkHosts.length > 1 ? environment.label : null}
+          key={section.environmentId}
+          environmentId={section.environmentId}
+          environmentLabel={section.environmentLabel}
           isSearchTarget={index === 0}
         />
       ))}
