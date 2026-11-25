@@ -1,3 +1,4 @@
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   type EnvironmentId,
   type ModelSelection,
@@ -227,7 +228,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
       }
     });
     if (sendResult._tag === "Failure") {
-      const error = squashAtomCommandFailure(sendResult);
+      const error = describeRequestFailure(squashAtomCommandFailure(sendResult));
       const reason = error instanceof Error ? error.message : "无法发送消息。";
       failedSelections.push(...selections);
       setThreadError(threadId, reason);

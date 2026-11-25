@@ -1,4 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { ScopedProjectRef } from "@t3tools/contracts";
 
@@ -22,7 +23,7 @@ export function useRemoveClonedProject() {
       input: { projectId: projectRef.projectId },
     });
     if (result._tag === "Failure") {
-      const error = squashAtomCommandFailure(result);
+      const error = describeRequestFailure(squashAtomCommandFailure(result));
       toastManager.add(
         stackedThreadToast({
           type: "error",

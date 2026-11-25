@@ -3,6 +3,7 @@ import {
   runAtomCommand,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { scopedProjectKey } from "@t3tools/client-runtime/environment";
 import type {
   EnvironmentId,
@@ -141,7 +142,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
   );
   if (started._tag === "Failure") {
     setFileCopy(requestedKey, null);
-    const error = squashAtomCommandFailure(started);
+    const error = describeRequestFailure(squashAtomCommandFailure(started));
     throw error instanceof Error ? error : new Error("发生错误。");
   }
   // The server clones for the existing project when one already owns the empty destination.

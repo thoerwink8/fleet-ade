@@ -39,6 +39,7 @@ import {
   getFilesystemBrowsePath,
   getFilesystemBrowseTabCompletion,
 } from "@t3tools/client-runtime/state/filesystem";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   settlePromise,
@@ -1536,7 +1537,8 @@ function OpenCommandPaletteDialog(props: {
             environmentId,
             input: { threadId: thread.id },
           });
-          if (stopped._tag === "Failure") throw squashAtomCommandFailure(stopped);
+          if (stopped._tag === "Failure")
+            throw describeRequestFailure(squashAtomCommandFailure(stopped));
         }
         toastManager.add({
           type: "success",
@@ -1553,7 +1555,8 @@ function OpenCommandPaletteDialog(props: {
             fresh: true,
           },
         });
-        if (refreshed._tag === "Failure") throw squashAtomCommandFailure(refreshed);
+        if (refreshed._tag === "Failure")
+          throw describeRequestFailure(squashAtomCommandFailure(refreshed));
       },
     });
   }
@@ -2090,7 +2093,7 @@ function OpenCommandPaletteDialog(props: {
           handleNewThread(scopeProjectRef(existing.environmentId, existing.id)),
         );
         if (navigationResult._tag === "Failure") {
-          const error = squashAtomCommandFailure(navigationResult);
+          const error = describeRequestFailure(squashAtomCommandFailure(navigationResult));
           toastManager.add(
             stackedThreadToast({
               type: "error",
@@ -2144,7 +2147,7 @@ function OpenCommandPaletteDialog(props: {
       handleNewThread(scopeProjectRef(input.environmentId, projectId)),
     );
     if (navigationResult._tag === "Failure") {
-      const error = squashAtomCommandFailure(navigationResult);
+      const error = describeRequestFailure(squashAtomCommandFailure(navigationResult));
       toastManager.add(
         stackedThreadToast({
           type: "error",
@@ -2412,7 +2415,7 @@ function OpenCommandPaletteDialog(props: {
     await waitForProject(projectRef, 3_000).catch(() => null);
     const navigationResult = await settlePromise(() => handleNewThread(projectRef));
     if (navigationResult._tag === "Failure") {
-      const error = squashAtomCommandFailure(navigationResult);
+      const error = describeRequestFailure(squashAtomCommandFailure(navigationResult));
       toastManager.add(
         stackedThreadToast({
           type: "error",

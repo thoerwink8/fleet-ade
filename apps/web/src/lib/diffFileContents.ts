@@ -3,6 +3,7 @@ import {
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import type {
   EnvironmentId,
   PullRequestDiffFileContentsInput,
@@ -158,7 +159,7 @@ export function createGitDiffFileContentsLoader<E>(
       },
     });
     if (result._tag !== "Success") {
-      throw squashAtomCommandFailure(result);
+      throw describeRequestFailure(squashAtomCommandFailure(result));
     }
     return result.value;
   }, source.cacheKey);
@@ -180,7 +181,7 @@ export function createPullRequestDiffFileContentsLoader<E>(
       },
     });
     if (result._tag !== "Success") {
-      throw squashAtomCommandFailure(result);
+      throw describeRequestFailure(squashAtomCommandFailure(result));
     }
     return result.value;
   }, source.cacheKey);

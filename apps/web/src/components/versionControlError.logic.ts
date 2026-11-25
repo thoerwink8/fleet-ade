@@ -13,6 +13,8 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
+
 const VersionControlError = Schema.Union([
   GitManagerServiceError,
   VcsError,
@@ -318,8 +320,13 @@ export function presentVersionControlError(
       description: joinNextStepAndDetail(presentation.nextStep, presentation.detail),
     };
   }
+  const failure = describeRequestFailure(error);
   const detail =
-    typeof error === "string" ? error : error instanceof Error ? error.message : "发生错误。";
+    typeof failure === "string"
+      ? failure
+      : failure instanceof Error
+        ? failure.message
+        : "发生错误。";
   return { title: `无法${fallbackAction}`, detail, description: detail };
 }
 

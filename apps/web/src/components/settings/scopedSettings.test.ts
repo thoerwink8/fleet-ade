@@ -8,6 +8,8 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
+import * as RpcClientError from "effect/rpc/RpcClientError";
+import * as Socket from "effect/socket/Socket";
 import * as Cause from "effect/Cause";
 import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
 
@@ -324,6 +326,47 @@ describe("scoped settings writes", () => {
       environmentId: server.environmentId,
       input: { patch: { enableProviderUpdateChecks: false } },
     });
+  });
+
+  it("reports a dropped connection instead of the runtime's interrupt text", async () => {
+    const result = await persistScopedSettingsPatch(
+      planScopedSettingsPatch(all, environments, { enableProviderUpdateChecks: false }),
+      async () => ({ _tag: "Failure", cause: Cause.interrupt(1) }),
+      vi.fn(),
+    );
+    expect(result.failedEnvironments.map(({ message }) => message)).toEqual([
+      "连接已断开，内容已保留，恢复后再试。",
+      "连接已断开，内容已保留，恢复后再试。",
+    ]);
+  });
+
+  it("reports a closed socket as a dropped connection", async () => {
+    const close = new RpcClientError.RpcClientError({
+      reason: new Socket.SocketCloseError({ code: 1006 }),
+    });
+    const result = await persistScopedSettingsPatch(
+      planScopedSettingsPatch(named, environments, { enableProviderUpdateChecks: false }),
+      async () => ({ _tag: "Failure", cause: Cause.fail(close) }),
+      vi.fn(),
+    );
+    expect(result.failedEnvironments.map(({ message }) => message)).toEqual([
+      "连接已断开，内容已保留，恢复后再试。",
+    ]);
+  });
+
+  it("keeps a server rejection's own reason", async () => {
+    const rejection = new EnvironmentAuthorizationError({
+      requiredScope: "settings:write",
+      message: "此连接无权修改这些设置。",
+    });
+    const result = await persistScopedSettingsPatch(
+      planScopedSettingsPatch(named, environments, { enableProviderUpdateChecks: false }),
+      async () => ({ _tag: "Failure", cause: Cause.fail(rejection) }),
+      vi.fn(),
+    );
+    expect(result.failedEnvironments.map(({ message }) => message)).toEqual([
+      "此连接无权修改这些设置。",
+    ]);
   });
 
   it("writes project overrides into each member's entry on its environment", () => {

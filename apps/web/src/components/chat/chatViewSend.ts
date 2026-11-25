@@ -1,3 +1,4 @@
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { useSyncExternalStore } from "react";
 import {
   CommandId,
@@ -159,7 +160,7 @@ export async function startFanoutThread(input: {
     requestMayHaveStarted = true;
     const result = await input.start(targetThreadId);
     if (result._tag === "Failure") {
-      const error = squashAtomCommandFailure(result);
+      const error = describeRequestFailure(squashAtomCommandFailure(result));
       if (wasBootstrapThreadDeleted(error) || wasBootstrapThreadNotCreated(error)) {
         requestMayHaveStarted = false;
       }
@@ -297,7 +298,8 @@ export async function rewindToMessage(input: {
               restoreFiles: input.restoreFiles,
             },
           });
-          if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+          if (result._tag === "Failure")
+            throw describeRequestFailure(squashAtomCommandFailure(result));
         },
         {
           signal: stopAndRollback.signal,
@@ -319,7 +321,8 @@ export async function rewindToMessage(input: {
               : { checkpointId: input.checkpoint.id, scopeId: input.checkpoint.scopeId }),
           },
         });
-        if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+        if (result._tag === "Failure")
+          throw describeRequestFailure(squashAtomCommandFailure(result));
       });
     const currentPrompt = store.getComposerDraft(draftTarget)?.prompt ?? "";
     const restoredPrompt = recallableComposerPrompt(message.text);

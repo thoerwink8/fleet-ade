@@ -12,6 +12,7 @@ import {
   sourceControlClients,
   type ChangeRequestTerminology,
 } from "@t3tools/client-runtime/source-control-clients";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import * as Schema from "effect/Schema";
 import {
   GitCommandError,
@@ -1355,12 +1356,13 @@ const TOOL_NOISE = [
 const FAILURE_DETAIL_MAX_LENGTH = 320;
 
 export function readableFailure(failure: unknown, hint: string): string {
-  const raw = isPullRequestOperationError(failure)
-    ? failure.detail
-    : failure instanceof Error
-      ? failure.message
-      : typeof failure === "string"
-        ? failure
+  const reported = describeRequestFailure(failure);
+  const raw = isPullRequestOperationError(reported)
+    ? reported.detail
+    : reported instanceof Error
+      ? reported.message
+      : typeof reported === "string"
+        ? reported
         : "";
   const detail = raw.trim();
   if (detail.length === 0 || TOOL_NOISE.some((pattern) => pattern.test(detail))) return hint;

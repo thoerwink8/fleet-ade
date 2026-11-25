@@ -9,6 +9,7 @@ import {
   type McpAppHost,
   type McpAppHostContext,
 } from "@t3tools/client-runtime/mcp-apps";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import {
   clampMcpAppHeight,
@@ -40,7 +41,7 @@ import { observeResize } from "~/lib/observeResize";
 const commandFailure = (result: {
   readonly cause: Parameters<typeof squashAtomCommandFailure>[0]["cause"];
 }) => {
-  const error = squashAtomCommandFailure(result);
+  const error = describeRequestFailure(squashAtomCommandFailure(result));
   return new McpAppHostRefusal({
     message: error instanceof Error && error.message.trim() !== "" ? error.message : "请求失败。",
   });

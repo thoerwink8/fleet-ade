@@ -24,6 +24,7 @@ import {
 import * as Equal from "effect/Equal";
 import * as Cause from "effect/Cause";
 
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import type { ResolvedSettingsScope } from "./settingsScope";
 
 export type ScopedSettingsPatch = ServerSettingsPatch & ClientSettingsPatch;
@@ -486,12 +487,13 @@ export async function persistScopedSettingsPatch(
         },
       ];
     }
-    const error: unknown =
+    const error = describeRequestFailure(
       result?.status === "rejected"
         ? result.reason
         : result?.status === "fulfilled" && result.value.cause
-          ? Cause.squash(result.value.cause)
-          : undefined;
+          ? result.value.cause
+          : undefined,
+    );
     return [
       {
         ...environment,

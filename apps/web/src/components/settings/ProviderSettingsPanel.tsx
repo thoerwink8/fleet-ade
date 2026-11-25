@@ -8,7 +8,7 @@ import {
 import { useEnvironmentScope, readEnvironmentScope } from "../../state/session";
 import { useAtomValue } from "@effect/atom-react";
 import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
-import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
+import { describeRequestFailure, safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   settlePromise,
@@ -831,7 +831,7 @@ export function EnvironmentProviderSettings({
         instanceId,
       });
       if (updateResult._tag === "Failure") {
-        const error = squashAtomCommandFailure(updateResult);
+        const error = describeRequestFailure(squashAtomCommandFailure(updateResult));
         toastManager.add({
           type: "error",
           title: "无法移除智能体",
