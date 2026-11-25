@@ -84,7 +84,7 @@ export function SidebarBatchBar(props: {
         ) : null}
         <span className="is-overflow ade-batch-danger">
           <Button
-            variant="ghost-destructive"
+            variant="danger-ghost"
             size="sm"
             disabled={!canDelete}
             onClick={() => props.onAction("delete")}
@@ -96,7 +96,7 @@ export function SidebarBatchBar(props: {
           <Menu>
             <MenuTrigger
               render={
-                <Button variant="ghost-muted" size="icon-sm" aria-label="更多批量操作">
+                <Button variant="muted" size="sm" icon aria-label="更多批量操作">
                   <EllipsisIcon aria-hidden="true" />
                 </Button>
               }
@@ -131,8 +131,9 @@ export function SidebarBatchBar(props: {
           <TooltipTrigger
             render={
               <Button
-                variant="ghost-muted"
-                size="icon-sm"
+                variant="muted"
+                size="sm"
+                icon
                 aria-label="退出多选（Esc）"
                 onClick={props.onClearSelection}
               >
