@@ -283,6 +283,7 @@ it.effect(
           getThreadTrash: () => Effect.die("unused getThreadTrash"),
           getThreadTrashCascade: () => Effect.die("unused getThreadTrashCascade"),
           isThreadInTrash: () => Effect.die("unused isThreadInTrash"),
+          listThreadTrashRootsByDueAt: () => Effect.die("unused listThreadTrashRootsByDueAt"),
           getRecentlyDeleted: () => Effect.die("unused getRecentlyDeleted"),
         }),
       );
