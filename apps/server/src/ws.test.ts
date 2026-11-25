@@ -145,6 +145,7 @@ import * as ThreadCommandExecutor from "./orchestration-v2/ThreadCommandExecutor
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { projectIdentitiesDigest } from "./orchestration-v2/ShellStream.ts";
 import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
+import * as CommandAssist from "./orchestration-v2/CommandAssist.ts";
 import * as OrchestrationEventStore from "./persistence/OrchestrationEventStore.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -195,6 +196,23 @@ const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
           rememberDispatch: () => Effect.void,
           markDriftFalsePositive: () => Effect.succeed({}),
           subscribe: () => Stream.empty,
+        }),
+      ),
+    ),
+    Layer.provide(
+      Layer.succeed(
+        CommandAssist.CommandAssist,
+        CommandAssist.CommandAssist.of({
+          run: () => Effect.die("unused"),
+          observe: () => Effect.die("unused"),
+          markDriftFalsePositive: () => Effect.die("unused"),
+          rememberDispatch: () => Effect.die("unused"),
+          handback: () => Effect.die("unused"),
+          tidy: () => Effect.die("unused"),
+          considerPatrol: () => Effect.die("unused"),
+          read: () => Effect.die("unused"),
+          activityOrDriftEnabled: () => Effect.die("unused"),
+          patrolEnabled: () => Effect.die("unused"),
         }),
       ),
     ),

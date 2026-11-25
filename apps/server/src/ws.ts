@@ -138,6 +138,7 @@ import {
 } from "./orchestration-v2/ShellStream.ts";
 import { ORCHESTRATION_V2_PROJECTION_SCHEMA_VERSION } from "./orchestration-v2/ProjectionStore.ts";
 import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
+import * as CommandAssist from "./orchestration-v2/CommandAssist.ts";
 import {
   coalesceLiveUpdatedEvents,
   coalesceThreadLiveStream,
@@ -1338,6 +1339,7 @@ export const layerWsRpc = (
         | DocumentText.DocumentText
       >();
       const childSummaries = yield* ChildSessionSummary;
+      const commandAssist = yield* CommandAssist.CommandAssist;
       const applicationEvents = yield* OrchestrationEventStore.OrchestrationEventStore;
       const projectStore = yield* ProjectStore.ProjectStoreV2;
       const projectService = yield* ProjectService.ProjectService;
@@ -2172,6 +2174,7 @@ export const layerWsRpc = (
           childSummaries.detail({ threadId: input.threadId }),
         [ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive]: (input) =>
           childSummaries.markDriftFalsePositive(input),
+        [ORCHESTRATION_V2_WS_METHODS.commandTidySpeech]: (input) => commandAssist.tidy(input),
         [ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren]: (input) =>
           childSummaries.subscribe(input.threadId),
         [WS_METHODS.scheduledTasksSubscribe]: (_input) =>
