@@ -4,19 +4,27 @@ import { normalizeModelSlug } from "@t3tools/shared/model";
 export interface ModelDisplayCandidate {
   readonly slug: string;
   readonly name?: string | null | undefined;
+  readonly subProvider?: string | null | undefined;
   readonly aliases?: ReadonlyArray<string> | undefined;
   readonly isDefault?: boolean | undefined;
 }
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
 /**
  * Formats a model's display name solely from the provider-supplied name,
  * falling back to the raw model ID without inventing capitalization or short names.
+ * The sub-provider tag is rendered next to the name, so a repeated prefix is dropped.
  */
 export function formatModelDisplayName(
-  model: Pick<ModelDisplayCandidate, "slug" | "name">,
+  model: Pick<ModelDisplayCandidate, "slug" | "name" | "subProvider">,
 ): string {
   const name = model.name?.trim();
-  return name && name.length > 0 ? name : model.slug;
+  const displayName = name && name.length > 0 ? name : model.slug;
+  const subProvider = model.subProvider?.trim();
+  if (!subProvider) return displayName;
+  const prefix = new RegExp(`^${escapeRegExp(subProvider)}(?:\\s*[.:/-]\\s*|\\s+)`, "iu");
+  return displayName.replace(prefix, "").trim() || displayName;
 }
 
 /**

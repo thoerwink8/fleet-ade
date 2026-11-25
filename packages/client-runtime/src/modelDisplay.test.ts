@@ -28,6 +28,44 @@ describe("modelDisplay", () => {
     expect(formatModelDisplayName({ slug: "showcase" })).toBe("showcase");
   });
 
+  it("drops a repeated subProvider prefix from display names without touching ids", () => {
+    expect(
+      formatModelDisplayName({
+        slug: "openrouter/anthropic/claude-opus-4.5",
+        name: "openrouter/Claude Opus 4.5",
+        subProvider: "openrouter",
+      }),
+    ).toBe("Claude Opus 4.5");
+    expect(
+      formatModelDisplayName({
+        slug: "openrouter/anthropic/claude-opus-4.5",
+        name: "OpenRouter: Claude Opus 4.5",
+        subProvider: "openrouter",
+      }),
+    ).toBe("Claude Opus 4.5");
+    expect(
+      formatModelDisplayName({
+        slug: "moonshot/kimi-k2",
+        name: "Moonshot Kimi K2",
+        subProvider: "Moonshot",
+      }),
+    ).toBe("Kimi K2");
+    expect(
+      formatModelDisplayName({
+        slug: "openrouter/anthropic/claude-opus-4.5",
+        name: "anthropic/claude-opus-4.5",
+        subProvider: "openrouter",
+      }),
+    ).toBe("anthropic/claude-opus-4.5");
+    expect(
+      formatModelDisplayName({
+        slug: "openrouter/openrouter",
+        name: "openrouter",
+        subProvider: "openrouter",
+      }),
+    ).toBe("openrouter");
+  });
+
   it("prefers exact slug matches over colliding display names", () => {
     const models = [
       { slug: "model-a", name: "Shared" },

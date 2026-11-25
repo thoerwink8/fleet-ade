@@ -12,6 +12,8 @@ export type ModelEsque = {
   isUnavailable?: boolean | undefined;
 };
 
-export function getDisplayModelName(model: Pick<ModelEsque, "slug" | "name">): string {
+export function getDisplayModelName(
+  model: Pick<ModelEsque, "slug" | "name" | "subProvider">,
+): string {
   return formatModelDisplayName(model);
 }
