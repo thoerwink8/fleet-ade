@@ -1597,7 +1597,9 @@ export default function GitActionsControl({
       {isCleanAndBehind && (
         <p className="px-2 py-1.5 text-xs text-warning">落后于上游。请先拉取或变基。</p>
       )}
-      {gitStatusError && <p className="px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>}
+      {gitStatusError && (
+        <p className="whitespace-pre-line px-2 py-1.5 text-xs text-destructive">{gitStatusError}</p>
+      )}
     </>
   );
 
