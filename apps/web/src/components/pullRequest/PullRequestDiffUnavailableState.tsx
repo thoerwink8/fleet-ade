@@ -10,13 +10,11 @@ import { describePullRequestDiffError } from "./pullRequestDiffError";
 
 export function PullRequestDiffUnavailableState({
   error,
-  failure,
   provider,
   url,
   onRetry,
 }: {
   error: string;
-  failure?: unknown;
   provider: SourceControlProviderKind;
   url: string;
   onRetry: () => void;
@@ -26,7 +24,6 @@ export function PullRequestDiffUnavailableState({
     error,
     providerName,
     terminology.singular,
-    failure,
   );
 
   return (
