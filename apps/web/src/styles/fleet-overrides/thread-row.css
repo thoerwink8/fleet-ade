@@ -106,3 +106,53 @@
     display: inline-flex;
   }
 }
+
+/* Interactive collapsible group headers extend .fa-ghead without altering its 32px density. */
+.fa-ghead.ade-ghead-toggle {
+  width: 100%;
+  border: 0;
+  border-radius: var(--fa-radius-md);
+  background-color: transparent;
+  text-align: left;
+  cursor: pointer;
+  --fa-hv: linear-gradient(var(--fa-hover), var(--fa-hover));
+}
+
+.fa-ghead.ade-ghead-toggle:hover,
+.fa-ghead.ade-ghead-toggle:focus-visible {
+  background-image: var(--fa-hv);
+  color: var(--fa-fg);
+}
+
+.fa-ghead.ade-ghead-toggle[data-drag-state="dragging"] {
+  color: var(--fa-fg);
+}
+
+.fa-ghead.ade-ghead-toggle[data-drag-state="drop-target"] {
+  background-color: var(--fa-selected);
+  color: var(--fa-accent);
+}
+
+/* composer.css is not imported; mirror its default hidden state for .fa-batch__more and wrap
+   overflow/danger buttons so components/ui/button stays un-restyled. */
+.fa-batch .is-overflow {
+  display: inline-flex;
+}
+
+.fa-batch .fa-batch__more {
+  display: none;
+}
+
+@container batch (max-width: 319px) {
+  .fa-batch .is-overflow {
+    display: none;
+  }
+
+  .fa-batch .fa-batch__more {
+    display: inline-flex;
+  }
+}
+
+.fa-batch .ade-batch-danger .fa-btn:not([disabled], [aria-disabled="true"], [data-disabled]) {
+  color: var(--fa-danger);
+}
