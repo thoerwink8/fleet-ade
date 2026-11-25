@@ -1451,13 +1451,59 @@ describe("deleted thread worktrees", () => {
       fixture.setDeletedThreads([owner]);
       fixture.setTrashedThreadIds([owner.id]);
       fixture.setThreads([]);
+      // Null until the first committed sweep lands a report.
+      expect(
+        yield* fixture.service.recentlyDeletedWorktreeBytes([
+          { threadId: owner.id, worktreePath: fixture.worktree },
+        ]),
+      ).toBe(null);
       const report = yield* fixture.service.runNow;
+      const isWindows = yield* HostProcess.isWindows;
+      const bytes = yield* Effect.forEach(
+        yield* fixture.fs.readDirectory(fixture.worktree),
+        (name) => fixture.fs.stat(`${fixture.worktree}/${name}`),
+      ).pipe(
+        Effect.map((stats) =>
+          stats
+            .filter((stat) => stat.type === "File" && Option.getOrElse(stat.nlink, () => 1n) === 1n)
+            .reduce(
+              (total, stat) => total + StorageCleanup.storageCleanupAllocatedBytes(stat, isWindows),
+              0,
+            ),
+        ),
+      );
       expect(report.entries[0]).toMatchObject({
         threadId: owner.id,
         outcome: "kept",
-        reason: "会话在最近删除里，到期后按规则清理",
+        reason: "会话在最近删除里，7 天后自动清理。现在要释放空间，请到最近删除里永久删除它。",
+        bytes,
       });
       expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
+      expect(yield* fixture.service.recentlyDeletedWorktreeBytes([])).toBe(0);
+      expect(
+        yield* fixture.service.recentlyDeletedWorktreeBytes([
+          { threadId: owner.id, worktreePath: null },
+        ]),
+      ).toBe(0);
+      expect(
+        yield* fixture.service.recentlyDeletedWorktreeBytes([
+          { threadId: owner.id, worktreePath: fixture.worktree },
+        ]),
+      ).toBe(bytes);
+      // Two items can share one worktree; the report entry is counted once.
+      expect(
+        yield* fixture.service.recentlyDeletedWorktreeBytes([
+          { threadId: owner.id, worktreePath: fixture.worktree },
+          { threadId: ThreadId.make("other"), worktreePath: fixture.worktree },
+        ]),
+      ).toBe(bytes);
+      // A purged or restored thread has no kept entry left to total.
+      expect(
+        yield* fixture.service.recentlyDeletedWorktreeBytes([
+          { threadId: owner.id, worktreePath: fixture.worktree },
+          { threadId: ThreadId.make("other"), worktreePath: `${fixture.worktree}-gone` },
+        ]),
+      ).toBe(null);
     }).pipe(Effect.provide(cleanupTestLayer)),
   );
 

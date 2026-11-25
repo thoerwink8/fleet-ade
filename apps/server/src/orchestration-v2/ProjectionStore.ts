@@ -501,6 +501,11 @@ export interface OlderSettledThreadsListing {
   readonly counts: ReadonlyArray<OrchestrationV2OlderSettledCount>;
 }
 
+export interface RecentlyDeletedProjection {
+  readonly items: ReadonlyArray<OrchestrationV2RecentlyDeletedThread>;
+  readonly totals: { readonly count: number; readonly attachmentBytes: number };
+}
+
 export interface ProjectionStoreV2Shape {
   readonly searchThreadStream: (
     input: OrchestrationV2SearchThreadInput,
@@ -567,7 +572,7 @@ export interface ProjectionStoreV2Shape {
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadTrash>, ProjectionStoreV2Error>;
   readonly isThreadInTrash: (threadId: ThreadId) => Effect.Effect<boolean, ProjectionStoreV2Error>;
   readonly getRecentlyDeleted: () => Effect.Effect<
-    ReadonlyArray<OrchestrationV2RecentlyDeletedThread>,
+    RecentlyDeletedProjection,
     ProjectionStoreV2Error
   >;
   readonly apply: (
@@ -9162,17 +9167,65 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         WHERE trash.thread_id = trash.cascade_root_id
         ORDER BY trash.deleted_at DESC, trash.thread_id ASC
       `;
-      return rows.map((row): OrchestrationV2RecentlyDeletedThread => ({
-        threadId: ThreadId.make(row.thread_id),
-        projectId: ProjectId.make(row.project_id),
-        projectTitle: row.project_title,
-        title: row.title,
-        deletedAt: DateTime.makeUnsafe(row.deleted_at),
-        purgeAt: DateTime.makeUnsafe(row.purge_due_at),
-        archived: row.archived === 1,
-        sideChatCount: row.side_chat_count,
-        worktreePath: row.worktree_path,
-      }));
+      const totalRows = yield* sql<{
+        readonly attachment_bytes: number;
+      }>`
+        WITH trash_members AS (
+          SELECT thread_id
+          FROM orchestration_v2_projection_thread_trash
+        ),
+        attachment_sizes AS (
+          SELECT
+            json_extract(attachment.value, '$.id') AS attachment_id,
+            CAST(json_extract(attachment.value, '$.sizeBytes') AS INTEGER) AS size_bytes
+          FROM trash_members
+          JOIN orchestration_v2_projection_messages AS message USING (thread_id),
+            json_each(message.payload_json, '$.attachments') AS attachment
+          UNION ALL
+          SELECT
+            json_extract(attachment.value, '$.id') AS attachment_id,
+            CAST(json_extract(attachment.value, '$.sizeBytes') AS INTEGER) AS size_bytes
+          FROM trash_members
+          JOIN orchestration_v2_projection_turn_items AS item USING (thread_id),
+            json_each(item.payload_json, '$.questionAnswer.attachmentsByQuestionId') AS question,
+            json_each(question.value) AS attachment
+          WHERE item.type = 'user_input_request'
+          UNION ALL
+          SELECT
+            json_extract(attachment.value, '$.id') AS attachment_id,
+            CAST(json_extract(attachment.value, '$.sizeBytes') AS INTEGER) AS size_bytes
+          FROM trash_members
+          JOIN orchestration_v2_projection_threads AS thread USING (thread_id),
+            json_each(thread.payload_json, '$.guestShare.messages') AS message,
+            json_each(message.value, '$.attachments') AS attachment
+          WHERE json_extract(message.value, '$.status') = 'pending'
+        ),
+        unique_attachment_sizes AS (
+          SELECT attachment_id, MAX(size_bytes) AS size_bytes
+          FROM attachment_sizes
+          WHERE attachment_id IS NOT NULL AND size_bytes IS NOT NULL
+          GROUP BY attachment_id
+        )
+        SELECT COALESCE(
+          (SELECT SUM(size_bytes) FROM unique_attachment_sizes),
+          0
+        ) AS attachment_bytes
+      `;
+      const totals = totalRows[0] ?? { attachment_bytes: 0 };
+      return {
+        items: rows.map((row): OrchestrationV2RecentlyDeletedThread => ({
+          threadId: ThreadId.make(row.thread_id),
+          projectId: ProjectId.make(row.project_id),
+          projectTitle: row.project_title,
+          title: row.title,
+          deletedAt: DateTime.makeUnsafe(row.deleted_at),
+          purgeAt: DateTime.makeUnsafe(row.purge_due_at),
+          archived: row.archived === 1,
+          sideChatCount: row.side_chat_count,
+          worktreePath: row.worktree_path,
+        })),
+        totals: { count: rows.length, attachmentBytes: totals.attachment_bytes },
+      };
     }, Effect.mapError(shellSnapshotReadError));
 
     const getThreadLinkMetadata = Effect.fn("ProjectionStore.getThreadLinkMetadata")(function* (

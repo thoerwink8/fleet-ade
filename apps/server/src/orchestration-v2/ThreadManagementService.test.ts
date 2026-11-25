@@ -1098,7 +1098,8 @@ it.effect("restoreThread and purgeThread dispatch the command with the client co
             dispatched.push(command);
             return { sequence: 1, storedEvents: [] } as never;
           }),
-        listRecentlyDeleted: () => Effect.succeed([]),
+        listRecentlyDeleted: () =>
+          Effect.succeed({ items: [], totals: { count: 0, attachmentBytes: 0 } }),
       }),
     ),
     Layer.provide(ServerSettings.layerTest({})),
@@ -1112,6 +1113,9 @@ it.effect("restoreThread and purgeThread dispatch the command with the client co
       { type: "thread.restore", commandId, threadId },
       { type: "thread.purge", commandId, threadId },
     ]);
-    expect(yield* service.listRecentlyDeleted()).toEqual([]);
+    expect(yield* service.listRecentlyDeleted()).toEqual({
+      items: [],
+      totals: { count: 0, attachmentBytes: 0 },
+    });
   }).pipe(Effect.provide(layerTest));
 });

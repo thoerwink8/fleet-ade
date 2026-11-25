@@ -354,6 +354,9 @@ export class StorageCleanup extends Context.Service<
     ) => Effect.Effect<StorageCleanupPreview, ServerSettingsError>;
     readonly latestReport: Effect.Effect<StorageCleanupReport | null>;
     readonly reports: Stream.Stream<StorageCleanupReport | null>;
+    readonly recentlyDeletedWorktreeBytes: (
+      items: ReadonlyArray<{ readonly threadId: ThreadId; readonly worktreePath: string | null }>,
+    ) => Effect.Effect<number | null>;
     readonly drain: Effect.Effect<void>;
   }
 >()("t3/storageCleanup") {}
@@ -1178,9 +1181,9 @@ const make = Effect.gen(function* () {
         bytes: null,
         files: null,
       };
-      const keep = (reason: string) => {
+      const keep = (reason: string, bytes: number | null = null) => {
         if (deleted && settings.worktreeOnDelete) kept.push(worktreePath);
-        entries.push({ ...entry, reason: sentence(reason) });
+        entries.push({ ...entry, reason: sentence(reason), bytes });
       };
       // Reasons a provider session stop or finished deletion work can clear.
       const waitForStop = (reason: string) => {
@@ -1199,8 +1202,13 @@ const make = Effect.gen(function* () {
           ),
         );
         if (!exists) return;
-        if (deleted && protectedDeletedIds.has(thread.id))
-          return keep("会话在最近删除里，到期后按规则清理");
+        if (deleted && protectedDeletedIds.has(thread.id)) {
+          const measured = yield* measureWorktree(worktreePath);
+          return keep(
+            "会话在最近删除里，7 天后自动清理。现在要释放空间，请到最近删除里永久删除它。",
+            measured.bytes,
+          );
+        }
         if (deleted && !settings.worktreeOnDelete) return keep("没有适用的规则");
         if (members.length > 1 && worktreeOwner(members) === undefined)
           return keep(`shared by ${members.length} threads`);
@@ -1761,6 +1769,35 @@ const make = Effect.gen(function* () {
     return summarizeStorageCleanupPreview((yield* runSweep(false, patch)).entries);
   });
 
+  // Totals the latest sweep's measured sizes for a caller's recently-deleted
+  // list; never scans the disk. Null while unmeasured or missing an item.
+  const recentlyDeletedWorktreeBytes = Effect.fn("StorageCleanup.recentlyDeletedWorktreeBytes")(
+    function* (
+      items: ReadonlyArray<{ readonly threadId: ThreadId; readonly worktreePath: string | null }>,
+    ) {
+      const report = yield* SubscriptionRef.get(reportRef);
+      if (report === null) return null;
+      const seen = new Set<string>();
+      let total = 0;
+      for (const item of items) {
+        if (item.worktreePath === null) continue;
+        const key = pathKey(item.worktreePath);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const entry = report.entries.find(
+          (entry) =>
+            entry.kind === "worktree" &&
+            entry.outcome === "kept" &&
+            entry.path !== null &&
+            (entry.threadId === item.threadId || pathKey(entry.path) === key),
+        );
+        if (entry === undefined || entry.bytes === null) return null;
+        total += entry.bytes;
+      }
+      return total;
+    },
+  );
+
   const start = Effect.fn("StorageCleanup.start")(function* () {
     const unsubscribe = yield* terminals.subscribeMetadata((event) =>
       Effect.sync(() => {
@@ -1836,6 +1873,7 @@ const make = Effect.gen(function* () {
     previewWithPatch,
     latestReport: SubscriptionRef.get(reportRef),
     reports: SubscriptionRef.changes(reportRef),
+    recentlyDeletedWorktreeBytes,
     drain: worker.drain,
   });
 });

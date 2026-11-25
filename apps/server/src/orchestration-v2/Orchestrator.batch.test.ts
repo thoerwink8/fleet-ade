@@ -4,6 +4,7 @@ import {
   EventId,
   IsoDateTime,
   MessageId,
+  NodeId,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -17,6 +18,7 @@ import * as Schema from "effect/Schema";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
+import * as EventSink from "./EventSink.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -150,6 +152,56 @@ const queueRun = Effect.fn("test.batch.queueRun")(function* (threadId: ThreadId,
   });
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   return (yield* projections.getThreadProjection(threadId)).runs.at(-1)!;
+});
+
+// Subagent children arrive by event write from a provider adapter, not a dispatchable command.
+const subagentThread = Effect.fn("test.batch.subagentThread")(function* (
+  name: string,
+  parent: ThreadId,
+  projectId: ProjectId,
+) {
+  const eventSink = yield* EventSink.EventSinkV2;
+  const threadId = ThreadId.make(name);
+  const now = yield* DateTime.now;
+  yield* eventSink.write({
+    commandId: CommandId.make(`seed-${name}`),
+    events: [
+      {
+        id: EventId.make(`event:${name}`),
+        type: "thread.created",
+        threadId,
+        occurredAt: now,
+        payload: {
+          createdBy: "agent",
+          creationSource: "server",
+          id: threadId,
+          projectId,
+          title: name,
+          providerInstanceId: instanceId,
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          activeProviderThreadId: null,
+          lineage: {
+            parentThreadId: parent,
+            relationshipToParent: "subagent",
+            rootThreadId: parent,
+          },
+          forkedFrom: { type: "node", nodeId: NodeId.make(`node:${name}`) },
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          settledOverride: null,
+          settledAt: null,
+          lastVisitedAt: null,
+          deletedAt: null,
+        },
+      },
+    ],
+  });
+  return threadId;
 });
 
 it.effect("one batch reports each thread and does not fail the rest", () =>
@@ -325,6 +377,7 @@ it.effect("batch delete plans full cleanup for every thread and side chat", () =
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const projectId = yield* makeProject("project:batch");
     const parent = yield* createThread("batch-delete-parent");
     const other = yield* createThread("batch-delete-other");
     const sideChat = ThreadId.make("batch-delete-side-chat");
@@ -338,6 +391,7 @@ it.effect("batch delete plans full cleanup for every thread and side chat", () =
       createdBy: "user",
       creationSource: "web",
     });
+    const subagent = yield* subagentThread("batch-delete-subagent", parent, projectId);
     const commandId = CommandId.make("batch-delete-plan");
     const result = yield* orchestrator.dispatch({
       type: "thread.batch",
@@ -353,6 +407,22 @@ it.effect("batch delete plans full cleanup for every thread and side chat", () =
     assert.isNotNull((yield* projections.getThread(other)).deletedAt);
     // The parent's side chat is deleted with it.
     assert.isNotNull((yield* projections.getThread(sideChat)).deletedAt);
+    assert.isNotNull(yield* projections.getThreadTrash(parent));
+    assert.isNotNull(yield* projections.getThreadTrash(sideChat));
+    assert.isNotNull(yield* projections.getThreadTrash(other));
+    const recentlyDeleted = yield* projections.getRecentlyDeleted();
+    assert.equal(recentlyDeleted.items.length, 2);
+    assert.deepEqual(
+      recentlyDeleted.items.find((item) => item.threadId === parent)?.sideChatCount,
+      1,
+    );
+    assert.deepEqual(
+      recentlyDeleted.items.find((item) => item.threadId === other)?.sideChatCount,
+      0,
+    );
+    assert.isFalse(recentlyDeleted.items.some((item) => item.threadId === sideChat));
+    assert.isNull((yield* projections.getThread(subagent)).deletedAt);
+    assert.isNull(yield* projections.getThreadTrash(subagent));
 
     const effects = yield* outbox.listByCommandId(commandId);
     const kinds = ["terminal.cleanup", "preview.cleanup"] as const;
@@ -488,6 +558,7 @@ it.effect("restores a deleted parent with its side chat and keeps archive state"
       createdBy: "user",
       creationSource: "web",
     });
+    const subagent = yield* subagentThread("restore-subagent", parent, projectId);
     yield* orchestrator.dispatch({
       type: "thread.archive",
       commandId: CommandId.make("restore-archive"),
@@ -501,6 +572,13 @@ it.effect("restores a deleted parent with its side chat and keeps archive state"
     });
     assert.isNotNull(yield* projections.getThreadTrash(parent));
     assert.isNotNull(yield* projections.getThreadTrash(sideChat));
+    const deletedList = yield* projections.getRecentlyDeleted();
+    assert.deepEqual(
+      deletedList.items.map((item) => [item.threadId, item.sideChatCount]),
+      [[parent, 1]],
+    );
+    assert.isNull((yield* projections.getThread(subagent)).deletedAt);
+    assert.isNull(yield* projections.getThreadTrash(subagent));
 
     const restored = yield* orchestrator.dispatch({
       type: "thread.restore",
@@ -522,7 +600,7 @@ it.effect("restores a deleted parent with its side chat and keeps archive state"
     assert.isNull(yield* projections.getThreadTrash(sideChat));
 
     const listed = yield* projections.getRecentlyDeleted();
-    assert.isFalse(listed.some((item) => item.threadId === parent));
+    assert.isFalse(listed.items.some((item) => item.threadId === parent));
 
     // A restored thread is a normal thread again: it shows in the shell and takes new messages.
     assert.isNotNull(yield* projections.getThreadShell(parent));
