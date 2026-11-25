@@ -30,6 +30,7 @@ import type {
 } from "@t3tools/contracts";
 import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
 import { Atom } from "effect/reactivity";
+import { hasCommanderDispatchConfig } from "../components/threadActionMenu.logic";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentProjects } from "./projects";
 import { environmentPresentations } from "./presentation";
@@ -364,6 +365,19 @@ export function readEnvironmentSupportsAutoSettleOptOut(environmentId: Environme
   return (
     appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
       .threadAutoSettleOptOut === true
+  );
+}
+
+export function readEnvironmentHasCommanderConfig(environmentId: EnvironmentId): boolean {
+  return hasCommanderDispatchConfig(
+    appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.settings,
+  );
+}
+
+export function readEnvironmentSupportsVisitedTracking(environmentId: EnvironmentId): boolean {
+  return (
+    appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
+      .threadVisitedTracking === true
   );
 }
 
