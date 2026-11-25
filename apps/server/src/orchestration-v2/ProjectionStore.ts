@@ -571,6 +571,11 @@ export interface ProjectionStoreV2Shape {
     cascadeRootId: ThreadId,
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadTrash>, ProjectionStoreV2Error>;
   readonly isThreadInTrash: (threadId: ThreadId) => Effect.Effect<boolean, ProjectionStoreV2Error>;
+  readonly listDueThreadTrashRoots: (input: {
+    readonly nowMs: number;
+    readonly limit: number;
+  }) => Effect.Effect<ReadonlyArray<ProjectionThreadTrash>, ProjectionStoreV2Error>;
+  readonly getThreadTrashWakeAt: Effect.Effect<number | null, ProjectionStoreV2Error>;
   readonly getRecentlyDeleted: () => Effect.Effect<
     RecentlyDeletedProjection,
     ProjectionStoreV2Error
@@ -9132,6 +9137,31 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       return rows[0]?.present === 1;
     }, Effect.mapError(shellSnapshotReadError));
 
+    const listDueThreadTrashRoots: ProjectionStoreV2Shape["listDueThreadTrashRoots"] = Effect.fn(
+      "ProjectionStore.listDueThreadTrashRoots",
+    )(function* (input) {
+      const rows = yield* sql<ThreadTrashRow>`
+        SELECT thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+        FROM orchestration_v2_projection_thread_trash
+        WHERE purge_due_at <= ${input.nowMs}
+          AND thread_id = cascade_root_id
+        ORDER BY purge_due_at ASC, thread_id ASC
+        LIMIT ${input.limit}
+      `;
+      return rows.map(threadTrashFromRow);
+    }, Effect.mapError(shellSnapshotReadError));
+
+    const getThreadTrashWakeAt: ProjectionStoreV2Shape["getThreadTrashWakeAt"] = Effect.fn(
+      "ProjectionStore.getThreadTrashWakeAt",
+    )(function* () {
+      const rows = yield* sql<{ readonly purge_due_at: number | null }>`
+        SELECT MIN(purge_due_at) AS purge_due_at
+        FROM orchestration_v2_projection_thread_trash
+        WHERE thread_id = cascade_root_id
+      `;
+      return rows[0]?.purge_due_at ?? null;
+    }, Effect.mapError(shellSnapshotReadError));
+
     const getRecentlyDeleted: ProjectionStoreV2Shape["getRecentlyDeleted"] = Effect.fn(
       "ProjectionStore.getRecentlyDeleted",
     )(function* () {
@@ -9437,6 +9467,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getThreadTrash: readOnReader(getThreadTrash),
       getThreadTrashCascade: readOnReader(getThreadTrashCascade),
       isThreadInTrash: readOnReader(isThreadInTrash),
+      listDueThreadTrashRoots: readOnReader(listDueThreadTrashRoots),
+      getThreadTrashWakeAt: getThreadTrashWakeAt().pipe(NodeSqliteClient.readOnly),
       getRecentlyDeleted: readOnReader(getRecentlyDeleted),
       readShellSnapshot: readOnReader(readShellSnapshot),
       listOlderSettledThreads: readOnReader(listOlderSettledThreads),

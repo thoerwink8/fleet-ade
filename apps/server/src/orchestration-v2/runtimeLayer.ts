@@ -3,6 +3,8 @@ import { ChildSessionSummary } from "./ChildSessionSummary.ts";
 import * as CommandAssist from "./CommandAssist.ts";
 import * as WorktreeBranchSync from "./WorktreeBranchSync.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
+import * as ThreadTrashPurgeWorker from "./ThreadTrashPurgeWorker.ts";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as Layer from "effect/Layer";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
@@ -410,6 +412,11 @@ export const layerProduction = Layer.mergeAll(
         layerThreadManagementProvided,
         layerOrchestratorProvided,
       ),
+    ),
+  ),
+  ThreadTrashPurgeWorker.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(NodeCrypto.layer, ProjectionStore.layer, layerOrchestratorProvided),
     ),
   ),
   layerProviderContinuationWorkerProvided,
