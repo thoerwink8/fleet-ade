@@ -38,8 +38,8 @@ describe("derivePendingBackgroundWork", () => {
       ],
     });
     expect(tasks).toEqual([
-      { taskId: "owned-item", kind: "subagent", providerInstanceId: owner },
-      { taskId: "unknown-item", kind: "subagent" },
+      { taskId: "owned-item", kind: "subagent", status: "running", providerInstanceId: owner },
+      { taskId: "unknown-item", kind: "subagent", status: "running" },
     ]);
   });
 
@@ -113,7 +113,9 @@ describe("derivePendingBackgroundWork", () => {
         },
       ],
     });
-    expect(tasks).toEqual([{ taskId: "cmd-1", description: "npm test", kind: "command" }]);
+    expect(tasks).toEqual([
+      { taskId: "cmd-1", description: "npm test", kind: "command", status: "running" },
+    ]);
   });
 
   it("excludes rolled_back items when the latest run is waiting", () => {
@@ -150,6 +152,7 @@ describe("derivePendingBackgroundWork", () => {
         taskId: "cmd-new",
         description: "still pending",
         kind: "command",
+        status: "running",
       },
     ]);
   });
@@ -233,7 +236,12 @@ describe("derivePendingBackgroundWork", () => {
       ],
     });
     expect(tasks).toEqual([
-      { taskId: "mon-2", description: "finite monitor", kind: "background_task" },
+      {
+        taskId: "mon-2",
+        description: "finite monitor",
+        kind: "background_task",
+        status: "running",
+      },
     ]);
   });
 
@@ -312,6 +320,7 @@ describe("derivePendingBackgroundWork", () => {
         taskId: "cmd-null",
         description: "orphan item",
         kind: "command",
+        status: "running",
       },
     ]);
   });
@@ -360,9 +369,10 @@ describe("derivePendingBackgroundWork kinds", () => {
         taskId: "sub",
         description: "Review src/math.ts",
         kind: "subagent",
+        status: "running",
         childThreadId: "thread:child",
       },
-      { taskId: "cmd", description: "npm test", kind: "command" },
+      { taskId: "cmd", description: "npm test", kind: "command", status: "running" },
     ]);
   });
 
