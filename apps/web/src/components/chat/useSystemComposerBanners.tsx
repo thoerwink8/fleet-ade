@@ -12,7 +12,6 @@ import { WifiOffIcon } from "lucide-react";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { environmentCatalog } from "../../connection/catalog";
 import { ConnectionDiagnosisHeadline } from "../settings/ConnectionDiagnosisDetails";
-import { isDesktopLocalConnectionTarget } from "../../connection/desktopLocal";
 import {
   useEnvironmentDisconnectDelay,
   useEnvironmentStateHeldFor,
@@ -23,6 +22,9 @@ import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 import { ENVIRONMENT_RECONNECT_WARNING_GRACE_MS } from "../ChatView.logic";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+import { composerFloatingLayerProps } from "./composerEventScope";
+import { canOfferEnvironmentDisconnect } from "./environmentDisconnectOffer.logic";
 import { ServerUpdateAction, serverUpdateStageLabel } from "../ServerUpdateAction";
 import { useAutoBalanceUpdateBanner } from "./useAutoBalanceUpdateBanner";
 import { ComposerServerUpdateIcon } from "./ComposerServerUpdateStatus";
@@ -104,11 +106,10 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
   const disconnectDelayElapsed = useEnvironmentDisconnectDelay(
     activeEnvironmentUnavailable && activeEnvironment ? activeEnvironment.environmentId : null,
   );
-  const canDisconnectActiveEnvironment =
-    disconnectDelayElapsed &&
-    activeEnvironment !== null &&
-    activeEnvironment.entry.target._tag !== "PrimaryConnectionTarget" &&
-    !isDesktopLocalConnectionTarget(activeEnvironment.entry.target);
+  const canDisconnectActiveEnvironment = canOfferEnvironmentDisconnect({
+    delayElapsed: disconnectDelayElapsed,
+    target: activeEnvironment?.entry.target ?? null,
+  });
   const [disconnectingEnvironment, setDisconnectingEnvironment] = useState(false);
   const handleDisconnectActiveEnvironment = async (environmentId: EnvironmentId) => {
     setDisconnectingEnvironment(true);
@@ -155,19 +156,30 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
     const unavailableConnection = activeEnvironmentUnavailableState?.connection ?? null;
     const disconnectAction =
       canDisconnectActiveEnvironment && activeEnvironmentUnavailableState ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={disconnectingEnvironment}
-          title="隐藏这台电脑的会话。可在“连接”设置中重新开启。"
-          onClick={() =>
-            void handleDisconnectActiveEnvironmentStable(
-              activeEnvironmentUnavailableState.environmentId,
-            )
-          }
-        >
-          断开电脑
-        </Button>
+        <Menu>
+          <MenuTrigger
+            disabled={disconnectingEnvironment}
+            render={<Button size="sm" variant="ghost" aria-label="更多电脑操作" />}
+          >
+            更多
+          </MenuTrigger>
+          <MenuPopup {...composerFloatingLayerProps} side="top" align="end" width="content">
+            <MenuItem
+              variant="destructive"
+              disabled={disconnectingEnvironment}
+              title="隐藏这台电脑的会话。可在“连接”设置中重新开启。"
+              onClick={() =>
+                void handleDisconnectActiveEnvironmentStable(
+                  activeEnvironmentUnavailableState.environmentId,
+                )
+              }
+            >
+              <span className="min-w-0 whitespace-normal wrap-break-word">
+                隐藏 {activeEnvironmentUnavailableState.label} 的会话
+              </span>
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
       ) : undefined;
     const environmentReconnecting =
       unavailableConnection !== null &&

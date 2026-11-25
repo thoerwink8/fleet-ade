@@ -64,7 +64,12 @@ import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
-import { SettingResetButton, SettingsRow, SettingsSection } from "./settingsLayout";
+import {
+  SettingResetButton,
+  SettingsRow,
+  SettingsSearchTarget,
+  SettingsSection,
+} from "./settingsLayout";
 import { AcpSessionManagementSection } from "./AcpSessionManagementSection";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { readCodexSetupMode } from "./CodexSetupSection.logic";
@@ -1263,7 +1268,11 @@ export function ProviderInstanceCard({
   return (
     <>
       <SettingsSection title={displayName} icon={titleIconNode} headerAction={editorHeaderAction}>
-        <SettingsRow title="状态" status={statusContent} />
+        <SettingsRow
+          id={`provider-instance-${instanceId}-status`}
+          title="状态"
+          status={statusContent}
+        />
         <SettingsRow
           title="显示名称"
           control={
@@ -1297,7 +1306,11 @@ export function ProviderInstanceCard({
 
       {setup || environmentFields.length > 0 ? (
         <SettingsSection title="设置">
-          {setup}
+          {setup ? (
+            <SettingsSearchTarget id={`provider-instance-${instanceId}-setup`}>
+              {setup}
+            </SettingsSearchTarget>
+          ) : null}
           {environmentFields.length > 0 ? (
             <div
               inert={readOnly}

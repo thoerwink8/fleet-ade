@@ -115,7 +115,9 @@ it("allows retry after ten seconds and protects a late stop", async () => {
   expect(screen.getByRole("button", { name: "正在停止", exact: true }).element()).toBeDisabled();
   await act(() => vi.advanceTimersByTime(1));
   await act(() =>
-    (screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement).click(),
+    (
+      screen.getByRole("button", { name: "还没停下，可以再点一次" }).element() as HTMLButtonElement
+    ).click(),
   );
   await screen.rerender(
     <ComposerPrimaryActions {...props} isRunning={false} canInterrupt={false} canResume />,
