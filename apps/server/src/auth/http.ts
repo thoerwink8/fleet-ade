@@ -5,6 +5,7 @@ import {
   AuthGrantScope,
   EnvironmentAuthInvalidError,
   type EnvironmentAuthInvalidReason,
+  type EnvironmentAuthCredentialFailureReason,
   EnvironmentHttpApi,
   EnvironmentInternalError,
   type EnvironmentInternalErrorReason,
@@ -95,6 +96,7 @@ export const annotateEnvironmentRequest =
 export function failEnvironmentAuthInvalid(
   reason: EnvironmentAuthInvalidReason,
   dpopFailureReason?: DpopFailureReason,
+  credentialFailureReason?: EnvironmentAuthCredentialFailureReason,
 ) {
   return currentEnvironmentTraceId.pipe(
     Effect.flatMap((traceId) =>
@@ -103,6 +105,7 @@ export function failEnvironmentAuthInvalid(
           code: "auth_invalid",
           reason,
           ...(dpopFailureReason === undefined ? {} : { dpopFailureReason }),
+          ...(credentialFailureReason === undefined ? {} : { credentialFailureReason }),
           traceId,
         }),
       ),
@@ -207,6 +210,7 @@ export const layerAuthenticatedAuth = Layer.effect(
             failEnvironmentAuthInvalid(
               EnvironmentAuth.serverAuthCredentialReason(error),
               EnvironmentAuth.serverAuthDpopFailureReason(error),
+              EnvironmentAuth.serverAuthCredentialFailureReason(error),
             ),
           ),
           Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
@@ -308,6 +312,7 @@ export const layer = HttpApiBuilder.group(
             failEnvironmentAuthInvalid(
               EnvironmentAuth.serverAuthCredentialReason(error),
               EnvironmentAuth.serverAuthDpopFailureReason(error),
+              EnvironmentAuth.serverAuthCredentialFailureReason(error),
             ),
           ),
           Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
@@ -366,6 +371,7 @@ export const layer = HttpApiBuilder.group(
             failEnvironmentAuthInvalid(
               EnvironmentAuth.serverAuthCredentialReason(error),
               EnvironmentAuth.serverAuthDpopFailureReason(error),
+              EnvironmentAuth.serverAuthCredentialFailureReason(error),
             ),
           ),
           Effect.catchIf(EnvironmentAuth.isServerAuthInvalidRequestError, (error) =>

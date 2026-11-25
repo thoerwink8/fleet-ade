@@ -1,14 +1,19 @@
-import { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import * as commandPalette from "../commandPaletteBus";
+import { DraftId, useComposerDraftStore } from "../composerDraftStore";
 import * as storage from "../hooks/useLocalStorage";
 import * as threadActions from "../lib/chatThreadActions";
 import * as entities from "../state/entities";
 import * as projectsState from "../state/projects";
 import { Atom } from "effect/reactivity";
+import { makeThreadFixture } from "../test-fixtures";
 import type { Project } from "../types";
+import { selectProjectGroupingSettings } from "@t3tools/client-runtime/state/project-grouping";
+import { getClientSettings } from "../hooks/useSettings";
+import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
 import { installChatRouteCommands } from "./chatRouteCommands";
 import * as dispatcher from "./dispatcher";
 
@@ -65,5 +70,113 @@ describe("new thread commands", () => {
         projectId: scenario.count === 1 ? "active" : "idle",
       });
     }
+  });
+
+  it("creates directly in the active thread or draft project on Ctrl+N even with two projects", () => {
+    const active = project("active");
+    const idle = project("idle");
+    const thread = makeThreadFixture({
+      environmentId: active.environmentId,
+      projectId: active.id,
+      id: ThreadId.make("thread-1"),
+    });
+    using _projects = vi.spyOn(entities, "readProjects").mockReturnValue([active, idle]);
+    using _thread = vi.spyOn(entities, "readThreadShell").mockReturnValue(thread);
+    using _ready = vi
+      .spyOn(projectsState, "defaultProjectFallbackReadyAtom")
+      .mockReturnValue(Atom.make(true));
+    using _storedProject = vi.spyOn(storage, "getLocalStorageItem").mockReturnValue("local:idle");
+    using openPicker = vi.spyOn(commandPalette, "openCommandPalette").mockImplementation(() => {});
+    using startLocal = vi.spyOn(threadActions, "startNewThreadFromContext").mockResolvedValue(true);
+    using register = vi.spyOn(dispatcher, "registerCommands").mockReturnValue(() => {});
+
+    // 1) Thread route
+    const threadRouter = {
+      state: {
+        location: { pathname: "/local/thread-1", search: {} },
+        matches: [{ params: { environmentId: "local", threadId: "thread-1" } }],
+      },
+    } as unknown as AnyRouter;
+    using stack = new DisposableStack();
+    stack.defer(installChatRouteCommands(threadRouter));
+    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as KeyboardEvent;
+
+    register.mock.calls[0]![0]["chat.new"]!(event);
+    expect(openPicker).not.toHaveBeenCalled();
+    expect(startLocal).toHaveBeenCalledOnce();
+    expect(startLocal.mock.calls[0]![0].currentProjectRef).toEqual({
+      environmentId: "local",
+      projectId: "active",
+    });
+
+    // 2) Draft route
+    startLocal.mockClear();
+    const draftId = DraftId.make("draft-1");
+    useComposerDraftStore
+      .getState()
+      .setProjectDraftThreadId(
+        { environmentId: active.environmentId, projectId: active.id },
+        draftId,
+        { threadId: ThreadId.make("draft-thread-1") },
+      );
+    stack.defer(() => {
+      const store = useComposerDraftStore.getState();
+      store.clearProjectDraftThreadId({
+        environmentId: active.environmentId,
+        projectId: active.id,
+      });
+      store.clearDraftThread(draftId);
+    });
+    const draftRouter = {
+      state: {
+        location: { pathname: "/draft/draft-1", search: {} },
+        matches: [{ params: { draftId } }],
+      },
+    } as unknown as AnyRouter;
+    stack.defer(installChatRouteCommands(draftRouter));
+    register.mock.calls[1]![0]["chat.new"]!(event);
+    expect(openPicker).not.toHaveBeenCalled();
+    expect(startLocal).toHaveBeenCalledOnce();
+    expect(startLocal.mock.calls[0]![0].currentProjectRef).toEqual({
+      environmentId: "local",
+      projectId: "active",
+    });
+  });
+
+  it("uses the project settings page's project for chat.newLocal", () => {
+    const active = project("active");
+    const idle = project("idle");
+    using _projects = vi.spyOn(entities, "readProjects").mockReturnValue([active, idle]);
+    using _ready = vi
+      .spyOn(projectsState, "defaultProjectFallbackReadyAtom")
+      .mockReturnValue(Atom.make(true));
+    using _storedProject = vi.spyOn(storage, "getLocalStorageItem").mockReturnValue("local:active");
+    using openPicker = vi.spyOn(commandPalette, "openCommandPalette").mockImplementation(() => {});
+    using startLocal = vi.spyOn(threadActions, "startNewThreadFromContext").mockResolvedValue(true);
+    using register = vi.spyOn(dispatcher, "registerCommands").mockReturnValue(() => {});
+    const idleKey = buildSidebarProjectSnapshots({
+      projects: [active, idle],
+      groupScratchProjects: true,
+      settings: selectProjectGroupingSettings(getClientSettings()),
+      primaryEnvironmentId: null,
+      resolveEnvironmentLabel: () => null,
+    }).find((group) => group.memberProjects.some((member) => member.id === idle.id))!.projectKey;
+    const router = {
+      state: {
+        location: { pathname: "/settings/projects", search: { project: idleKey } },
+        matches: [],
+      },
+    } as unknown as AnyRouter;
+    using stack = new DisposableStack();
+    stack.defer(installChatRouteCommands(router));
+    const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as KeyboardEvent;
+
+    register.mock.calls[0]![0]["chat.newLocal"]!(event);
+
+    expect(openPicker).not.toHaveBeenCalled();
+    expect(startLocal.mock.calls[0]![0].currentProjectRef).toEqual({
+      environmentId: "local",
+      projectId: "idle",
+    });
   });
 });

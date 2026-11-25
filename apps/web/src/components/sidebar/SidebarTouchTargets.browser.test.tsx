@@ -198,8 +198,6 @@ function SidebarTouchHarness(props?: {
               onNewThread={noop}
               newThreadDisabled={false}
               newThreadShortcutLabel={null}
-              newThreadInProjectShortcutLabel={null}
-              showNewThreadInProjectHint={false}
             />
           }
         />

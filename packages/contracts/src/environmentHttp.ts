@@ -93,6 +93,13 @@ export const EnvironmentAuthInvalidReason = Schema.Literals([
   "invalid_credential",
 ]);
 export type EnvironmentAuthInvalidReason = typeof EnvironmentAuthInvalidReason.Type;
+export const EnvironmentAuthCredentialFailureReason = Schema.Literals([
+  "consumed",
+  "expired",
+  "invalid",
+]);
+export type EnvironmentAuthCredentialFailureReason =
+  typeof EnvironmentAuthCredentialFailureReason.Type;
 
 export const EnvironmentOperationForbiddenReason = Schema.Literals([
   "current_session_revoke_not_allowed",
@@ -144,6 +151,7 @@ export class EnvironmentAuthInvalidError extends Schema.TaggedError<EnvironmentA
     code: Schema.Literal("auth_invalid"),
     reason: EnvironmentAuthInvalidReason,
     dpopFailureReason: Schema.optionalKey(DpopFailureReason),
+    credentialFailureReason: Schema.optionalKey(EnvironmentAuthCredentialFailureReason),
     traceId: TrimmedNonEmptyString,
   },
   { httpApiStatus: 401 },

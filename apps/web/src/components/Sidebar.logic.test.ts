@@ -1583,12 +1583,71 @@ describe("resolveSidebarRouteReveal", () => {
 });
 
 describe("shouldCreateNewThreadInCurrentProject", () => {
-  it("opens the picker when several projects are open, or only archived ones exist", () => {
-    expect(shouldCreateNewThreadInCurrentProject(false, 2, 3)).toBe(false);
-    expect(shouldCreateNewThreadInCurrentProject(false, 0, 2)).toBe(false);
-    expect(shouldCreateNewThreadInCurrentProject(false, 1, 3)).toBe(true);
-    expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
-    expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
+  it("opens the picker unless in a current project or only one open project exists", () => {
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: false,
+        hasCurrentProject: true,
+        openProjectGroupCount: 2,
+        projectGroupCount: 3,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: true,
+        hasCurrentProject: true,
+        openProjectGroupCount: 2,
+        projectGroupCount: 3,
+      }),
+    ).toBe(false);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: true,
+        hasCurrentProject: true,
+        openProjectGroupCount: 1,
+        projectGroupCount: 1,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: false,
+        hasCurrentProject: false,
+        openProjectGroupCount: 2,
+        projectGroupCount: 3,
+      }),
+    ).toBe(false);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: false,
+        hasCurrentProject: false,
+        openProjectGroupCount: 0,
+        projectGroupCount: 2,
+      }),
+    ).toBe(false);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: false,
+        hasCurrentProject: false,
+        openProjectGroupCount: 1,
+        projectGroupCount: 3,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: false,
+        hasCurrentProject: false,
+        openProjectGroupCount: 0,
+        projectGroupCount: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: true,
+        hasCurrentProject: false,
+        openProjectGroupCount: 2,
+        projectGroupCount: 2,
+      }),
+    ).toBe(true);
   });
 });
 

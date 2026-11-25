@@ -68,7 +68,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { type AnyRouter, useRouter } from "@tanstack/react-router";
+import { type AnyRouter, useLocation, useRouter } from "@tanstack/react-router";
 
 import {
   isAtomCommandInterrupted,
@@ -109,7 +109,11 @@ import { useProjectPin } from "../hooks/useProjectGroupUpdate";
 import { useSidebarProjectGroups } from "../hooks/useSidebarProjectGroups";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { registerSidebarSettle } from "../sidebarSettle";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import {
+  resolveCurrentProjectRef,
+  startNewThreadFromContext,
+  type CurrentProjectRouteContext,
+} from "../lib/chatThreadActions";
 import { useClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -959,6 +963,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
+  const locationPathname = useLocation({ select: (location) => location.pathname });
+  const projectSettingsSearch = useLocation({
+    select: (location) =>
+      location.pathname === "/settings/projects" ? location.search : undefined,
+  });
   const { isMobile, setOpenMobile } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
@@ -2673,17 +2682,36 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const showJumpHints = useThreadJumpHintsVisible(keybindings, routeThreadRef);
 
+  const currentProjectRef = resolveCurrentProjectRef({
+    pathname: locationPathname,
+    search: projectSettingsSearch as CurrentProjectRouteContext["search"],
+    activeThread: newThreadContext.activeThread,
+    activeDraftThread: newThreadContext.activeDraftThread,
+    projectGroups,
+  });
+  const currentProjectDisplayName = currentProjectRef
+    ? (projectDisplayNameByKey.get(
+        `${currentProjectRef.environmentId}:${currentProjectRef.projectId}`,
+      ) ?? null)
+    : null;
+  const openNewThreadInPicker = () => {
+    if (isMobile) setOpenMobile(false);
+    openCommandPalette({ open: "new-thread-in" });
+  };
+
   const handleNewThreadClick = (event?: ReactMouseEvent) => {
     if (
-      shouldCreateNewThreadInCurrentProject(
-        event?.shiftKey ?? false,
-        scopeGroups.length,
-        projectGroups.length,
-      )
+      shouldCreateNewThreadInCurrentProject({
+        shiftKey: event?.shiftKey ?? false,
+        hasCurrentProject: currentProjectRef !== null,
+        openProjectGroupCount: scopeGroups.length,
+        projectGroupCount: projectGroups.length,
+      })
     ) {
       if (isMobile) setOpenMobile(false);
       // With no current or open project, such as when every project is archived, pick one.
       void startNewThreadFromContext({
+        currentProjectRef,
         activeDraftThread: newThreadContext.activeDraftThread,
         activeThread: newThreadContext.activeThread ?? undefined,
         defaultProjectRef: newThreadContext.defaultProjectRef,
@@ -2693,16 +2721,32 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       });
       return;
     }
-    if (isMobile) setOpenMobile(false);
-    openCommandPalette({ open: "new-thread-in" });
+    openNewThreadInPicker();
   };
 
+  const createsNewThreadInCurrentProject = shouldCreateNewThreadInCurrentProject({
+    shiftKey: false,
+    hasCurrentProject: currentProjectRef !== null,
+    openProjectGroupCount: scopeGroups.length,
+    projectGroupCount: projectGroups.length,
+  });
   const newThreadShortcutLabel =
     shortcutLabelForCommand(keybindings, "chat.new") ??
-    (shouldCreateNewThreadInCurrentProject(false, scopeGroups.length, projectGroups.length)
+    (createsNewThreadInCurrentProject
       ? shortcutLabelForCommand(keybindings, "chat.newLocal")
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
+  const newThreadTooltipTitle = createsNewThreadInCurrentProject
+    ? currentProjectDisplayName
+      ? `在 ${currentProjectDisplayName} 中新建会话`
+      : undefined
+    : "在以下位置新建会话…";
+  const newThreadSecondaryHint =
+    scopeGroups.length > 1
+      ? currentProjectRef !== null
+        ? "选择其他项目新建：Shift+单击"
+        : `在当前项目中新建会话：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
+      : null;
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader
@@ -2881,16 +2925,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             }
             onNewProject={openAddProjectCommandPalette}
             onNewThread={handleNewThreadClick}
+            onNewThreadIn={scopeGroups.length > 1 ? openNewThreadInPicker : undefined}
             newThreadDisabled={projects.length === 0}
             newThreadShortcutLabel={newThreadShortcutLabel}
-            newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
-            showNewThreadInProjectHint={
-              !shouldCreateNewThreadInCurrentProject(
-                false,
-                scopeGroups.length,
-                projectGroups.length,
-              )
-            }
+            newThreadTooltipTitle={newThreadTooltipTitle}
+            newThreadSecondaryHint={newThreadSecondaryHint}
           />
         }
       />
