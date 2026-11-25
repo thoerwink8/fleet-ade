@@ -8697,6 +8697,11 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         usageStreamFrame({
           type: "message_delta",
           delta: { stop_reason: "end_turn", stop_sequence: null },
+          usage: null,
+        }),
+        usageStreamFrame({
+          type: "message_delta",
+          delta: { stop_reason: "end_turn", stop_sequence: null },
           usage: { input_tokens: 12_600, output_tokens: 40 },
         }),
         usageSnapshotFrame("msg_null_usage", "00000000-0000-4000-8000-000000000676", {}),
