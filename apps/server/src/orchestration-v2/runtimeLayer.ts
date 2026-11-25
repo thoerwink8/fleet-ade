@@ -415,9 +415,8 @@ export const layerProduction = Layer.mergeAll(
     ),
   ),
   ThreadTrashPurgeWorker.layer.pipe(
-    Layer.provide(
-      Layer.mergeAll(NodeCrypto.layer, ProjectionStore.layer, layerOrchestratorProvided),
-    ),
+    Layer.provide(NodeCrypto.layer),
+    Layer.provide(Layer.mergeAll(ProjectionStore.layer, layerOrchestratorProvided)),
   ),
   layerProviderContinuationWorkerProvided,
   layerAgentSessionScannerProvided,

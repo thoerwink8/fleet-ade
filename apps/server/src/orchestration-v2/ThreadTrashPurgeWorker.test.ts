@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 import { assert, it } from "@effect/vitest";
 import {
   CommandId,
