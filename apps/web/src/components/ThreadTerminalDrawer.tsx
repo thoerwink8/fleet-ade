@@ -75,7 +75,6 @@ import {
 } from "../types";
 import { readLocalApi } from "~/localApi";
 import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
-import { useClientSettings } from "../hooks/useSettings";
 import { getFileMetadataQueryAtom } from "../hooks/useFileMetadata";
 import { FileMetadataThreadContext } from "../hooks/FileMetadataThreadProvider";
 import { attachedTerminalSessionAtom, readTerminalCloseTargets } from "../state/terminalSessions";
@@ -94,7 +93,7 @@ import {
   focusTerminalViewport,
   registerTerminalFocusTarget,
 } from "../lib/terminalFocus";
-import { FONT_SCALES } from "../appearanceFonts";
+import { BASE_CODE_FONT_SIZE_PX } from "../appearanceFonts";
 
 const MIN_DRAWER_HEIGHT = 180;
 const MAX_DRAWER_HEIGHT_RATIO = 0.75;
@@ -567,9 +566,6 @@ function TerminalSessionViewport({
   });
   const canAddSelectionToChat = useEffectEvent(() => onAddTerminalContext !== undefined);
   const readTerminalLabel = useEffectEvent(() => terminalLabel);
-  // The terminal uses the code size and its own default monospace face.
-  const terminalFontSize = useClientSettings((settings) => FONT_SCALES[settings.fontScale].code);
-  const terminalFontRef = useRef({ size: terminalFontSize });
   // Keyed by the launch (see TerminalViewport), so the atom is fixed for this surface.
   const terminalSessionAtom = attachedTerminalSessionAtom(environmentId, {
     threadId,
@@ -652,13 +648,6 @@ function TerminalSessionViewport({
     if (visible) consumePendingTerminalFocus(threadRef, terminalId);
   }, [terminalId, threadRef, visible]);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies font size changes to the live Ghostty terminal surface
-  useEffect(() => {
-    if (terminalFontRef.current.size === terminalFontSize) return;
-    terminalFontRef.current = { size: terminalFontSize };
-    void terminalRef.current?.setFont({ size: terminalFontSize });
-  }, [terminalFontSize]);
-
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- creates the Ghostty terminal in the mount node and subscribes it to the terminal session
   useEffect(() => {
     const mount = containerRef.current;
@@ -671,10 +660,9 @@ function TerminalSessionViewport({
     let setupCleanups: Array<() => void> = [];
 
     const setup = async (): Promise<(() => void) | null> => {
-      const setupFont = terminalFontRef.current;
       const terminalOptions = withLiveVisibility(visibleRef, {
         theme: terminalThemeFromApp(mount),
-        font: { size: setupFont.size },
+        font: { size: BASE_CODE_FONT_SIZE_PX },
         onData: (data) => handleData(data),
         onResize: (cols, rows) => void resizeTerminal(cols, rows),
         onSelectionChange: () => {},
@@ -700,11 +688,6 @@ function TerminalSessionViewport({
       terminalRef.current = terminal;
       terminal.input.setAttribute("data-workspace-focus-default", "");
       terminal.input.readOnly = !hasTerminalWriteAccess();
-      // Reapply font settings hydrated during loading, when terminalRef was null.
-      const currentFont = terminalFontRef.current;
-      if (currentFont.size !== setupFont.size) {
-        void terminal.setFont({ size: currentFont.size });
-      }
       const latestSession = readTerminalSession();
       terminal.setSharedGrid(latestSession.grid);
       const initialOutput = readTerminalOutputUpdate(

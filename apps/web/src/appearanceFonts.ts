@@ -3,22 +3,65 @@ import type { FontScale } from "@t3tools/contracts/settings";
 const DEFAULT_SANS_FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Inter Variable", system-ui, sans-serif';
 
-/** Pixel sizes per step. The interface size sets the root; code, terminal and chat prose follow in pixels. */
-export const FONT_SCALES: Readonly<
-  Record<FontScale, { readonly interface: number; readonly code: number; readonly prose: number }>
-> = {
-  standard: { interface: 16, code: 13, prose: 15 },
-  comfortable: { interface: 17, code: 14, prose: 16 },
-  large: { interface: 18, code: 15, prose: 17 },
+export const SHELL_BASE_FONT_SIZE_PX = 16;
+export const BASE_CODE_FONT_SIZE_PX = 14;
+
+export interface ReadingFontScaleSpec {
+  readonly prose: number;
+  readonly proseLineHeight: number;
+  readonly prompt: number;
+  readonly promptLineHeight: number;
+  readonly code: number;
+  readonly codeLineHeight: number;
+}
+
+/** Reading-area typography steps. The shell stays at 16px root; conversation prose, code and composer scale. */
+export const READING_FONT_SCALES: Readonly<Record<FontScale, ReadingFontScaleSpec>> = {
+  standard: {
+    prose: 15,
+    proseLineHeight: 1.6,
+    prompt: 14,
+    promptLineHeight: 1.5,
+    code: 14,
+    codeLineHeight: 1.55,
+  },
+  comfortable: {
+    prose: 16,
+    proseLineHeight: 1.6,
+    prompt: 14.875,
+    promptLineHeight: 1.5,
+    code: 15,
+    codeLineHeight: 1.55,
+  },
+  large: {
+    prose: 17,
+    proseLineHeight: 1.6,
+    prompt: 15.75,
+    promptLineHeight: 1.5,
+    code: 16,
+    codeLineHeight: 1.55,
+  },
 };
 
+export function resolveReadingFontScaleProperties(
+  scale: FontScale,
+): Readonly<Record<string, string>> {
+  const sizes = READING_FONT_SCALES[scale];
+  return {
+    "--reading-font-size-prose": `${sizes.prose}px`,
+    "--reading-line-height-prose": String(sizes.proseLineHeight),
+    "--reading-font-size-prompt": `${sizes.prompt}px`,
+    "--reading-line-height-prompt": String(sizes.promptLineHeight),
+    "--reading-font-size-code": `${sizes.code}px`,
+    "--reading-line-height-code": String(sizes.codeLineHeight),
+  };
+}
+
 export function applyFontScale(root: HTMLElement, scale: FontScale): void {
-  const sizes = FONT_SCALES[scale];
-  root.style.fontSize = `${sizes.interface}px`;
-  root.style.setProperty("--font-size-prose", `${sizes.prose}px`);
-  root.style.setProperty("--font-size-prompt", "var(--text-sm)");
-  root.style.setProperty("--font-size-code", `${sizes.code}px`);
-  root.style.setProperty("--diffs-font-size", `${sizes.code}px`);
+  root.style.removeProperty("font-size");
+  for (const [property, value] of Object.entries(resolveReadingFontScaleProperties(scale))) {
+    root.style.setProperty(property, value);
+  }
 }
 
 /** The widest single-digit `ol` marker in the interface face; CSS cannot measure it to size the list gutter. */

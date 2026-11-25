@@ -95,6 +95,7 @@ describe("searchSettings", () => {
 
   it("matches normalized title substrings", () => {
     expect(searchSettings("  自动换行  ", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
+    expect(searchSettings("阅读字号").map((item) => item.id)).toEqual(["font-size"]);
     expect(searchSettings("字号").map((item) => item.id)).toEqual(["font-size"]);
     expect(searchSettings("主题")[0]?.id).toBe("theme");
     const localeLowerCase = vi.spyOn(String.prototype, "toLocaleLowerCase").mockReturnValue("gıt");
@@ -464,6 +465,7 @@ describe("movedSettingsPath", () => {
 
 describe("settings search keeps the names it used before the vocabulary change", () => {
   const OLD_NAME_CASES: ReadonlyArray<readonly [query: string, id: string]> = [
+    ["字号", "font-size"],
     ["聊天宽度", "chat-width"],
     ["提供方", "providers"],
     ["提供方实例", "providers"],

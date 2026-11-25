@@ -40,7 +40,6 @@ import {
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
-import { useClientSettings } from "../../hooks/useSettings";
 import { issueNumberFromBranch } from "./threadHeaderMeta.logic";
 import { ThreadHeaderChips } from "./ThreadHeaderMeta";
 
@@ -93,7 +92,6 @@ export const ChatHeader = memo(function ChatHeader({
 }: ChatHeaderProps) {
   const activeProjectName = activeProject?.isScratch ? "无项目" : activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
-  const fontScale = useClientSettings((settings) => settings.fontScale);
   const breadcrumbContainerRef = useRef<HTMLDivElement>(null);
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
   const activeThreadRef = scopeThreadRef(activeThreadEnvironmentId, activeThreadId);
@@ -157,11 +155,10 @@ export const ChatHeader = memo(function ChatHeader({
       stopObserving();
     };
   }, [
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Title, font size and rename changes resize the breadcrumb text without resizing the list, so it re-measures.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Title and rename changes resize the breadcrumb text without resizing the list, so it re-measures.
     activeProjectName,
     activeThreadTitle,
     parentThreadLink,
-    fontScale,
     isRenamingTitle,
   ]);
   const renameCommittedRef = useRef(false);

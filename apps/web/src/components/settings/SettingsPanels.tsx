@@ -144,7 +144,7 @@ export function useSettingsRestore(onRestored?: () => void) {
   const changedSettingLabels = [
     ...(theme !== "system" ? ["主题"] : []),
     ...(appearanceMode !== "system" ? ["跟随系统"] : []),
-    ...(settings.fontScale !== DEFAULT_UNIFIED_SETTINGS.fontScale ? ["字号"] : []),
+    ...(settings.fontScale !== DEFAULT_UNIFIED_SETTINGS.fontScale ? ["阅读字号"] : []),
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? ["差异颜色"] : []),
     ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["会话宽度"] : []),
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled

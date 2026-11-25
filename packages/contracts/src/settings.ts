@@ -115,7 +115,7 @@ export const DEFAULT_SNOOZE_PRESETS: ReadonlyArray<SnoozePresetSetting> = [
   { kind: "at", day: "monday", time: "09:00" },
 ];
 
-/** One size step for the interface, prompt, code and terminal together. */
+/** Reading font size step for conversation prose, message code blocks, and the composer. */
 export const FontScale = Schema.Literals(["standard", "comfortable", "large"]);
 export type FontScale = typeof FontScale.Type;
 
