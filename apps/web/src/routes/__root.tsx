@@ -33,6 +33,7 @@ import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { Button } from "../components/ui/button";
 import { StandalonePage, StandalonePageHeader } from "../components/ui/standalone-page";
 import { AnchoredToastProvider, ToastProvider } from "../components/ui/toast";
+import { toastManager } from "../components/ui/toast";
 import { isElectron } from "../env";
 import { useClientSettings } from "../hooks/useSettings";
 import {
@@ -43,6 +44,7 @@ import {
 import { useUiStateStore } from "../uiStateStore";
 import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
+import { takePairingRecoveryNotice } from "../environments/primary";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
 import { useAtomValue } from "@effect/atom-react";
 import { primaryServerConfigAtom, primaryServerWelcomeAtom } from "../state/server";
@@ -126,6 +128,7 @@ function RootRouteBranch() {
   const appHosts = (
     <>
       {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
+      <PairingRecoveryToast />
       {primaryEnvironmentAuthenticated || localEnvironmentDisabled ? (
         <DesktopWebLinkCoordinator />
       ) : null}
@@ -160,6 +163,17 @@ function RootRouteBranch() {
       {/* Above the shell and the router, so drafts survive navigation. */}
     </>
   );
+}
+
+function PairingRecoveryToast() {
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- drains the notice a failed pairing submit left for after the app reloads
+  useEffect(() => {
+    const notice = takePairingRecoveryNotice();
+    if (notice) {
+      toastManager.add({ type: "info", title: notice });
+    }
+  }, []);
+  return null;
 }
 
 function RootRouteErrorView({ error }: ErrorComponentProps) {
