@@ -5,7 +5,7 @@ import { resolvePastedPath } from "@t3tools/shared/path";
 
 import { act, render } from "../../test/render";
 import { parseSessionLimitDraft } from "../components/settings/SettingsPanels.logic";
-import { DraftInput } from "../components/ui/draft-input";
+import { DraftInput, DraftTextarea } from "../components/ui/draft-input";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -225,5 +225,22 @@ describe("settings draft commits", () => {
     outcome.resolve(true);
     await expect.element(input).toHaveValue("/second");
     expect(saved).toBe("/second");
+  });
+
+  it("keeps Enter as a newline in a draft textarea and commits on blur, keeping text on failure", async () => {
+    const outcome = deferred<boolean>();
+    const commit = vi.fn(() => outcome.promise);
+    await using screen = await render(<DraftTextarea value="" onCommit={commit} />);
+    const textarea = screen.getByRole("textbox");
+    await textarea.click();
+    await userEvent.keyboard("first{Enter}second");
+    expect(commit).not.toHaveBeenCalled();
+    await expect.element(textarea).toHaveValue("first\nsecond");
+
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledExactlyOnceWith("first\nsecond");
+    outcome.resolve(false);
+    await expect.element(textarea).toHaveValue("first\nsecond");
+    await expect.element(textarea).toHaveAttribute("aria-invalid", "true");
   });
 });
