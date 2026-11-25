@@ -172,4 +172,29 @@ describe("settings draft commits", () => {
     await userEvent.tab();
     expect(saved).toBe(expected);
   });
+
+  it("keeps a newer edit unsaved when an earlier save settles", async () => {
+    let saved = "~";
+    let outcome = deferred<boolean>();
+    const commit = (next: string) => {
+      saved = next;
+      return outcome.promise;
+    };
+    await using screen = await render(<DraftInput value="~" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await input.fill("/first");
+    await userEvent.tab();
+
+    await input.click();
+    await input.fill("/second");
+    outcome.resolve(true);
+    await expect.element(input).toHaveValue("/second");
+    expect(saved).toBe("/first");
+
+    outcome = deferred<boolean>();
+    await userEvent.tab();
+    outcome.resolve(true);
+    await expect.element(input).toHaveValue("/second");
+    expect(saved).toBe("/second");
+  });
 });

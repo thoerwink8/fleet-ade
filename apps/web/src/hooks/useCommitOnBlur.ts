@@ -30,6 +30,7 @@ export function useCommitOnBlur(
   value: string,
   onCommit: (next: string) => CommitVerdict,
   normalizeDraft?: (previous: string, next: string) => string,
+  resetOnCommit = false,
 ): {
   value: string;
   ref: RefObject<HTMLInputElement | null>;
@@ -38,6 +39,8 @@ export function useCommitOnBlur(
   onFocus: () => void;
   onBlur: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  /** Clears the draft so the input shows the stored value again. */
+  reset: () => void;
 } {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
@@ -47,6 +50,7 @@ export function useCommitOnBlur(
   );
   const valueOnFocus = useRef(value);
   const commitToken = useRef(0);
+  const editEpoch = useRef(0);
 
   const reject = (text: string, kind: "invalid" | "failed") => {
     setRejected({ text, kind });
@@ -57,26 +61,30 @@ export function useCommitOnBlur(
     });
   };
 
-  const settle = (outcome: Promise<boolean>, text: string, token: number) => {
+  const settle = (outcome: Promise<boolean>, text: string, token: number, epoch: number) => {
     void outcome.then(
       (saved) => {
         if (commitToken.current !== token) return;
         setPending(null);
+        // Edits after this commit are unsaved, so only an untouched draft earns the confirmation.
+        const untouched = editEpoch.current === epoch;
         if (saved) {
           setRejected(null);
-          setDraft((current) => (current === text ? null : current));
-          showAnchoredInputToast(inputRef, {
-            timeout: SAVED_TOAST_TIMEOUT_MS,
-            title: "已保存",
-          });
-        } else {
+          setDraft((current) => (resetOnCommit || current === text ? null : current));
+          if (untouched) {
+            showAnchoredInputToast(inputRef, {
+              timeout: SAVED_TOAST_TIMEOUT_MS,
+              title: "已保存",
+            });
+          }
+        } else if (untouched) {
           reject(text, "failed");
         }
       },
       () => {
         if (commitToken.current !== token) return;
         setPending(null);
-        reject(text, "failed");
+        if (editEpoch.current === epoch) reject(text, "failed");
       },
     );
   };
@@ -87,20 +95,29 @@ export function useCommitOnBlur(
       reject(text, "invalid");
       return;
     }
+    if (resetOnCommit) setDraft(null);
     if (verdict instanceof Promise) {
       const token = ++commitToken.current;
       setRejected(null);
       setPending(text);
-      settle(verdict, text, token);
+      settle(verdict, text, token, editEpoch.current);
     }
+  };
+  const reset = () => {
+    commitToken.current += 1;
+    setDraft(null);
+    setPending(null);
+    setRejected(null);
   };
 
   return {
     ref: inputRef,
     value: draft ?? pending ?? value,
     ...(rejected !== null ? { "aria-invalid": true as const } : {}),
+    reset,
     onChange: (event: ChangeEvent<HTMLInputElement>) => {
       const next = event.target.value;
+      editEpoch.current += 1;
       setRejected(null);
       setDraft(normalizeDraft ? normalizeDraft(draft ?? pending ?? value, next) : next);
     },
