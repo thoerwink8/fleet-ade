@@ -184,6 +184,7 @@ import {
   useSnoozeWakeClock,
   threadShortcutContext,
   useThreadJumpHintsVisible,
+  type MultiSelectThreadMenuId,
   type SidebarSection,
   resolveSidebarRowThreadId,
 } from "./Sidebar.logic";
