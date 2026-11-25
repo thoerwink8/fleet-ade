@@ -640,24 +640,14 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     modelCatalog.models.map((entry) => entry.model),
     claudeSettings.customModels,
   );
-  const buildClaudeSnapshot = (
-    input: Parameters<typeof buildServerProvider>[0],
-    options?: { readonly cliMissing?: boolean },
-  ) => {
+  const buildClaudeSnapshot = (input: Parameters<typeof buildServerProvider>[0]) => {
     const draft = buildServerProvider(input);
-    const claudeMissing = options?.cliMissing === true && !draft.installed;
     return {
       ...draft,
-      setup: claudeMissing
-        ? {
-            canAuthenticate: false,
-            canInstall: false,
-            documentationUrl: "https://code.claude.com/docs/en/setup#install-claude-code",
-          }
-        : {
-            canAuthenticate: draft.installed && draft.auth.status === "unauthenticated",
-            canInstall: false,
-          },
+      setup: {
+        canAuthenticate: draft.installed && draft.auth.status === "unauthenticated",
+        canInstall: false,
+      },
     };
   };
 
@@ -709,24 +699,21 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
     yield* Effect.logWarning("Claude Agent CLI health check failed.", {
       errorTag: error._tag,
     });
-    return buildClaudeSnapshot(
-      {
-        presentation: CLAUDE_PRESENTATION,
-        enabled: claudeSettings.enabled,
-        checkedAt,
-        models: allModels,
-        probe: {
-          installed: !isCommandMissingCause(error),
-          version: null,
-          status: "error",
-          auth: { status: "unknown" },
-          message: isCommandMissingCause(error)
-            ? "还没装 Claude Code，装好后会自动识别。"
-            : "执行 Claude Agent CLI 健康检查失败。",
-        },
+    return buildClaudeSnapshot({
+      presentation: CLAUDE_PRESENTATION,
+      enabled: claudeSettings.enabled,
+      checkedAt,
+      models: allModels,
+      probe: {
+        installed: !isCommandMissingCause(error),
+        version: null,
+        status: "error",
+        auth: { status: "unknown" },
+        message: isCommandMissingCause(error)
+          ? "还没装 Claude Code，装好后会自动识别。"
+          : "执行 Claude Agent CLI 健康检查失败。",
       },
-      { cliMissing: isCommandMissingCause(error) },
-    );
+    });
   }
 
   if (Option.isNone(versionProbe.success)) {

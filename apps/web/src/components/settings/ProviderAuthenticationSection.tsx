@@ -272,15 +272,7 @@ export function ProviderAuthenticationSection({
             </>
           ) : null}
           <>
-            {needsExternalSetup && guidance.action?.kind === "documentation" ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                render={<a href={guidance.action.url} target="_blank" rel="noreferrer" />}
-              >
-                {guidance.action.label}
-              </Button>
-            ) : needsExternalSetup && provider.setup?.documentationUrl ? (
+            {needsExternalSetup && provider.setup?.documentationUrl ? (
               <Button
                 size="sm"
                 variant="secondary"

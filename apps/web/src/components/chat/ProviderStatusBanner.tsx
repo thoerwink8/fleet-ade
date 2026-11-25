@@ -218,19 +218,13 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     switch (action.kind) {
       case "sign_in":
       case "install_help":
-        return guidance.action?.kind === "documentation"
+        return onOpenProviderSetup
           ? {
-              label: guidance.action.label,
+              label: action.label,
               disabled: false,
-              href: guidance.action.url,
+              onClick: () => onOpenProviderSetup(status.instanceId),
             }
-          : onOpenProviderSetup
-            ? {
-                label: action.label,
-                disabled: false,
-                onClick: () => onOpenProviderSetup(status.instanceId),
-              }
-            : null;
+          : null;
       case "switch_agent":
         return onSwitchAgent
           ? {
@@ -265,14 +259,9 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         {primaryAction ? (
           <Button
             disabled={primaryAction.disabled}
-            onClick={"onClick" in primaryAction ? primaryAction.onClick : undefined}
+            onClick={primaryAction.onClick}
             size="sm"
             variant="secondary"
-            {...("href" in primaryAction
-              ? {
-                  render: <a href={primaryAction.href} target="_blank" rel="noreferrer" />,
-                }
-              : {})}
           >
             {primaryAction.label}
           </Button>

@@ -1,42 +1,18 @@
 import type { ServerProvider } from "@t3tools/contracts";
 
-const CLAUDE_INSTALL_DOCUMENTATION_URL =
-  "https://code.claude.com/docs/en/setup#install-claude-code";
-
 export interface ProviderSetupGuidance {
   readonly message: string;
-  readonly action:
-    | { readonly kind: "documentation"; readonly label: string; readonly url: string }
-    | { readonly kind: "authenticate"; readonly label: string }
-    | null;
+  readonly action: { readonly kind: "authenticate"; readonly label: string } | null;
 }
 
+/**
+ * Names the machine the sign-in runs on. It only reads the structured status the server sends
+ * (`auth.status` and `setup.canAuthenticate`), never the status message text.
+ */
 export function providerSetupGuidance(input: {
-  readonly provider: Pick<
-    ServerProvider,
-    "driver" | "installed" | "auth" | "message" | "setup" | "displayName"
-  >;
+  readonly provider: Pick<ServerProvider, "driver" | "auth" | "message" | "setup">;
   readonly environmentLabel: string;
 }): ProviderSetupGuidance {
-  const message = input.provider.message ?? "";
-  const documentationUrl = input.provider.setup?.documentationUrl;
-  const claudeMissing =
-    message === "还没装 Claude Code，装好后会自动识别。" ||
-    message === "在 PATH 上找不到 Claude Agent CLI（`claude`）。";
-  if (
-    input.provider.driver === "claudeAgent" &&
-    !input.provider.installed &&
-    (documentationUrl !== undefined || claudeMissing)
-  ) {
-    return {
-      message,
-      action: {
-        kind: "documentation",
-        label: "查看安装方法",
-        url: documentationUrl ?? CLAUDE_INSTALL_DOCUMENTATION_URL,
-      },
-    };
-  }
   if (
     input.provider.driver === "claudeAgent" &&
     input.provider.auth.status === "unauthenticated" &&
@@ -47,5 +23,5 @@ export function providerSetupGuidance(input: {
       action: { kind: "authenticate", label: "登录" },
     };
   }
-  return { message, action: null };
+  return { message: input.provider.message ?? "", action: null };
 }

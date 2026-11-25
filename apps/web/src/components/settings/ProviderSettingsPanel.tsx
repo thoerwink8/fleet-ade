@@ -101,7 +101,6 @@ import { PipelineModelsSettings } from "./PipelineModelsSettings";
 import { UsageProviderSettings } from "./UsageProviderSettings";
 import { ProviderSetupSection, readAntigravityAuthMethod } from "./ProviderSetupSection";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
-import { providerSetupGuidance } from "./providerSetupGuidance.logic";
 import { CodexSetupSection, CodexManagedRuntimeFields } from "./CodexSetupSection";
 import { readCodexSetupMode } from "./CodexSetupSection.logic";
 import { providerClients } from "./providerDriverMeta";
@@ -1354,8 +1353,6 @@ function ProviderInstanceRow({
           !readOnly &&
           liveProvider &&
           (liveProvider.setup?.canAuthenticate ||
-            providerSetupGuidance({ provider: liveProvider, environmentLabel }).action?.kind ===
-              "documentation" ||
             (liveProvider.driver === "acpRegistry" && liveProvider.installed)) ? (
           <ProviderAuthenticationSection
             key={`${environmentId}:${instanceId}`}

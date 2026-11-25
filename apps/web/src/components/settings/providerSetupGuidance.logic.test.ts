@@ -7,54 +7,68 @@ const provider = {
   driver: ProviderDriverKind.make("claudeAgent"),
   displayName: "Claude",
   enabled: true,
-  installed: false,
-  version: null,
+  installed: true,
+  version: "2.1.0",
   status: "error",
-  auth: { status: "unknown" },
+  auth: { status: "unauthenticated" },
   checkedAt: "2026-11-25T00:00:00.000Z",
   models: [],
   skills: [],
   slashCommands: [],
-  message: "还没装 Claude Code，装好后会自动识别。",
-  setup: {
-    canAuthenticate: false,
-    canInstall: false,
-    documentationUrl: "https://code.claude.com/docs/en/setup#install-claude-code",
-  },
+  message: "any copy at all",
+  setup: { canAuthenticate: true, canInstall: false },
 } satisfies ServerProvider;
 
 describe("provider setup guidance", () => {
-  it("links official installation help when Claude is not installed", () => {
-    expect(
-      providerSetupGuidance({
-        provider,
-        environmentLabel: "办公室电脑",
-      }),
-    ).toEqual({
-      message: "还没装 Claude Code，装好后会自动识别。",
-      action: {
-        kind: "documentation",
-        label: "查看安装方法",
-        url: "https://code.claude.com/docs/en/setup#install-claude-code",
-      },
-    });
+  it("names the server computer for an installed but signed-out Claude, whatever the message says", () => {
+    for (const message of ["Claude Code 未登录。", "reworded copy", undefined]) {
+      expect(
+        providerSetupGuidance({
+          provider: { ...provider, message },
+          environmentLabel: "办公室电脑",
+        }),
+      ).toEqual({
+        message: "在 办公室电脑 上登录 Claude。",
+        action: { kind: "authenticate", label: "登录" },
+      });
+    }
   });
 
-  it("names the server computer for an installed but signed-out Claude", () => {
+  it("offers no sign-in when the server does not open it", () => {
+    expect(
+      providerSetupGuidance({
+        provider: { ...provider, setup: { canAuthenticate: false, canInstall: false } },
+        environmentLabel: "办公室电脑",
+      }).action,
+    ).toBeNull();
+    expect(
+      providerSetupGuidance({
+        provider: { ...provider, auth: { status: "authenticated" } },
+        environmentLabel: "办公室电脑",
+      }).action,
+    ).toBeNull();
+  });
+
+  it("keeps the server message and no action for a missing reclaude", () => {
     expect(
       providerSetupGuidance({
         provider: {
           ...provider,
-          installed: true,
-          auth: { status: "unauthenticated" },
-          setup: { canAuthenticate: true, canInstall: false },
-          message: "Claude Code 未登录。请运行 `claude auth login` 后重试。",
+          auth: { status: "unknown" },
+          message: "未找到 reclaude，Claude 渠道未启用。",
+          setup: { canAuthenticate: false, canInstall: false },
         },
         environmentLabel: "办公室电脑",
       }),
-    ).toEqual({
-      message: "在 办公室电脑 上登录 Claude。",
-      action: { kind: "authenticate", label: "登录" },
-    });
+    ).toEqual({ message: "未找到 reclaude，Claude 渠道未启用。", action: null });
+  });
+
+  it("leaves other providers alone", () => {
+    expect(
+      providerSetupGuidance({
+        provider: { ...provider, driver: ProviderDriverKind.make("codex") },
+        environmentLabel: "办公室电脑",
+      }).action,
+    ).toBeNull();
   });
 });

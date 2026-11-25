@@ -3508,16 +3508,12 @@ it.layer(
       ),
     );
 
-    it.effect("offers documentation instead of in-app login when Claude is missing", () =>
+    it.effect("offers neither login nor an install link when the Claude command is missing", () =>
       Effect.gen(function* () {
         const status = yield* checkClaudeProviderStatus(defaultClaudeSettings);
         assert.strictEqual(status.installed, false);
         assert.strictEqual(status.message, "还没装 Claude Code，装好后会自动识别。");
-        assert.deepStrictEqual(status.setup, {
-          canAuthenticate: false,
-          canInstall: false,
-          documentationUrl: "https://code.claude.com/docs/en/setup#install-claude-code",
-        });
+        assert.deepStrictEqual(status.setup, { canAuthenticate: false, canInstall: false });
       }).pipe(
         Effect.provide(
           Layer.succeed(
