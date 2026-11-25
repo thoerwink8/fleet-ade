@@ -35,7 +35,7 @@ type SignInState =
     };
 
 const failureOf = (cause: Cause.Cause<unknown>): VersionControlErrorToastPresentation =>
-  presentVersionControlError(Cause.squash(cause), "登录");
+  presentVersionControlError(cause, "登录");
 
 const expiryTime = (expiresAt: number) =>
   new Date(expiresAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

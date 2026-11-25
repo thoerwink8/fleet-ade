@@ -5,7 +5,7 @@ import type {
   ResourceTelemetryHistoryInput,
   ResourceTelemetrySnapshot,
 } from "@t3tools/contracts";
-import * as Cause from "effect/Cause";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 
 import { usePrimaryEnvironment } from "../state/environments";
 import { useEnvironmentQuery } from "../state/query";
@@ -50,7 +50,7 @@ export function useResourceTelemetry(
     }
     const result = await retryCommand({ environmentId, input: {} });
     if (result._tag === "Failure") {
-      throw Cause.squash(result.cause);
+      throw describeRequestFailure(result.cause);
     }
     query.refresh();
     return result.value.snapshot;

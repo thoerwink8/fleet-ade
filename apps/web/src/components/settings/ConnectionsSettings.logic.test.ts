@@ -5,9 +5,13 @@ import {
 } from "@t3tools/client-runtime/connection";
 import { type DesktopWslState, EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
+import * as Cause from "effect/Cause";
+import * as RpcClientError from "effect/rpc/RpcClientError";
+import * as Socket from "effect/socket/Socket";
 import {
   applyWslEnableSelection,
   isServerNetworkAccessible,
+  mutationFailureMessage,
   peerLinkHostSections,
   resolveAccessEnvironmentId,
   resolveTailscaleServeBaseUrl,
@@ -337,5 +341,32 @@ describe("peerLinkHostSections", () => {
         },
       ]).map((section) => section.environmentLabel),
     ).toEqual(["办公室", "机房", "构建机"]);
+  });
+});
+
+describe("mutationFailureMessage", () => {
+  it("replaces an interrupted or dropped connection with the shared sentence", () => {
+    expect(mutationFailureMessage(Cause.interrupt(1), "无法配置 Tailscale HTTPS。")).toBe(
+      "连接已断开，内容已保留，恢复后再试。",
+    );
+
+    const dropped = Cause.fail(
+      new RpcClientError.RpcClientError({ reason: new Socket.SocketCloseError({ code: 1006 }) }),
+    );
+    expect(mutationFailureMessage(dropped, "无法配置 Tailscale HTTPS。")).toBe(
+      "连接已断开，内容已保留，恢复后再试。",
+    );
+  });
+
+  it("keeps the server's own rejection and the fallback for non-error defects", () => {
+    expect(
+      mutationFailureMessage(
+        Cause.fail(new Error("此连接无权更改网络访问。")),
+        "无法配置 Tailscale HTTPS。",
+      ),
+    ).toBe("此连接无权更改网络访问。");
+    expect(mutationFailureMessage(Cause.die("boom"), "无法配置 Tailscale HTTPS。")).toBe(
+      "无法配置 Tailscale HTTPS。",
+    );
   });
 });

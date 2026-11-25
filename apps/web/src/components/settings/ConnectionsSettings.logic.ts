@@ -3,6 +3,7 @@ import * as DateTime from "effect/DateTime";
 import { resolveDesktopPairingUrl } from "./pairingUrls";
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "@t3tools/shared/remote";
 import type { ConnectionTarget } from "@t3tools/client-runtime/connection";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import {
@@ -498,4 +499,10 @@ function peerLinkHostSectionLabel(
     return `${host.label}（${host.address} · ${host.environmentId}）`;
   }
   return `${host.label}（${role} · ${host.environmentId}）`;
+}
+
+/** The toast description for a failed desktop bridge mutation; transport loss uses the shared sentence. */
+export function mutationFailureMessage(cause: unknown, fallback: string): string {
+  const failure = describeRequestFailure(cause);
+  return failure instanceof Error ? failure.message : fallback;
 }
