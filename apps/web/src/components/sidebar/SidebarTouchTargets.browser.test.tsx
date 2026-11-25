@@ -10,6 +10,7 @@ import { DraftId, useComposerDraftStore } from "../../composerDraftStore";
 import { makeThreadFixture } from "../../test-fixtures";
 import { ProjectPinButton } from "../ProjectPinButton";
 import { SidebarProvider } from "../ui/sidebar";
+import { SidebarArchivedEntry } from "./SidebarArchivedEntry";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./SidebarChrome";
 import { SidebarDraftBlock } from "./SidebarDraftBlock";
 import { SidebarHeaderActions, SidebarThreadHeader } from "./SidebarThreadHeader";
@@ -29,6 +30,32 @@ vi.mock("../../state/session", async (importOriginal) => ({
 vi.mock("../../state/entities", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../state/entities")>()),
   useThreadShell: () => null,
+}));
+
+vi.mock("../../lib/archivedThreadsState", () => ({
+  useArchivedThreadSnapshots: () => ({
+    snapshots: [
+      {
+        environmentId: EnvironmentId.make("local"),
+        snapshot: {
+          schemaVersion: 1,
+          snapshotSequence: 1,
+          projects: [],
+          threads: [
+            {
+              id: ThreadId.make("archived-thread-1"),
+              projectId: ProjectId.make("project-1"),
+              archivedAt: "2026-03-10T12:00:00.000Z",
+              deletedAt: null,
+            },
+          ],
+        },
+      },
+    ],
+    error: null,
+    isLoading: false,
+    refresh: noop,
+  }),
 }));
 
 const noop = () => {};
@@ -285,6 +312,10 @@ function SidebarTouchHarness(props?: {
         <div className="flex items-center px-3 py-1">
           <ProjectPinButton name="fleet-ade" pinned onToggle={noop} />
         </div>
+        <SidebarArchivedEntry
+          connectedEnvironmentIds={[EnvironmentId.make("local")]}
+          scopedProjectKeys={null}
+        />
         <SidebarChromeFooter />
       </div>
     </SidebarProvider>
@@ -579,6 +610,20 @@ describe("sidebar mobile touch targets", () => {
     cardSettle.click();
     expect(onCardSettle).toHaveBeenCalledTimes(1);
     expect(onCardThreadClick).not.toHaveBeenCalled();
+
+    const archivedEntry = screen.container.querySelector<HTMLButtonElement>(
+      '[data-testid="sidebar-archived-entry"]',
+    )!;
+    expect(archivedEntry).not.toBeNull();
+    archivedEntry.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const archivedRect = archivedEntry.getBoundingClientRect();
+    expect(Math.round(archivedRect.height)).toBe(28);
+    expect(parseFloat(getComputedStyle(archivedEntry, "::after").height)).toBeGreaterThanOrEqual(
+      44,
+    );
+    const archivedCx = archivedRect.left + archivedRect.width / 2;
+    expect(document.elementFromPoint(archivedCx, archivedRect.top - 4)).toBe(archivedEntry);
+    expect(document.elementFromPoint(archivedCx, archivedRect.bottom + 4)).toBe(archivedEntry);
   });
 
   it("keeps compact desktop button sizes and hover-only row actions at 1280x800", async () => {
@@ -632,6 +677,9 @@ describe("sidebar mobile touch targets", () => {
     const settingsButton = screen.container.querySelector<HTMLButtonElement>(
       'button[aria-label="设置"]',
     )!;
+    const archivedEntry = screen.container.querySelector<HTMLButtonElement>(
+      '[data-testid="sidebar-archived-entry"]',
+    )!;
 
     for (const button of [
       draftDiscard,
@@ -665,6 +713,8 @@ describe("sidebar mobile touch targets", () => {
     expect(Math.round(projectPin.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(settingsButton.getBoundingClientRect().width)).toBe(28);
     expect(Math.round(settingsButton.getBoundingClientRect().height)).toBe(28);
+    expect(Math.round(archivedEntry.getBoundingClientRect().height)).toBe(28);
+    expect(getComputedStyle(archivedEntry, "::after").content).toBe("none");
 
     // Without hover on desktop, hover-revealed row actions remain hidden and non-clickable.
     await userEvent.unhover(cardRow);
