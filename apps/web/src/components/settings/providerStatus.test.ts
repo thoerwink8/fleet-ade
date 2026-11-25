@@ -22,6 +22,20 @@ const provider: ServerProvider = {
 };
 
 describe("getProviderSummary", () => {
+  it("does not repeat the CLI sign-in command next to Claude's in-app sign-in button", () => {
+    const claude = {
+      ...provider,
+      driver: ProviderDriverKind.make("claudeAgent"),
+      status: "error",
+      auth: { status: "unauthenticated" },
+      message: "Claude Code 未登录。请运行 `claude auth login` 后重试。",
+    } satisfies ServerProvider;
+    expect(
+      getProviderSummary({ ...claude, setup: { canAuthenticate: true, canInstall: false } }),
+    ).toEqual({ headline: "未登录", detail: "登录后即可开始使用。", rawDetail: null });
+    expect(getProviderSummary(claude).detail).toBe(claude.message);
+  });
+
   it("does not hide a provider error behind a previous authenticated state", () => {
     expect(
       getProviderSummary({

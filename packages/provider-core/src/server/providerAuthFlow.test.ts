@@ -532,3 +532,104 @@ it.effect("profile import stops owned sessions and gates access until credential
     );
   }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
+
+const makeTerminalHarness = Effect.gen(function* () {
+  const started = yield* Deferred.make<void>();
+  const finish = yield* Deferred.make<"fail" | "succeed">();
+  const written: ProviderAuthResponse[] = [];
+  const controller = yield* ProviderAuthFlow.make({
+    instanceId,
+    credentialBinding: { owner: "provider", key: "shared-agent" },
+    methods: Effect.succeed([method]),
+    authenticate: (_, context) =>
+      Effect.gen(function* () {
+        yield* context.setInteraction(
+          { type: "terminal", id: "terminal", output: "", outputOffset: 0 },
+          (response) => Effect.sync(() => void written.push(response)),
+        );
+        yield* Deferred.succeed(started, undefined);
+        const outcome = yield* Deferred.await(finish);
+        if (outcome === "fail")
+          return yield* new ProviderSetupError({
+            instanceId,
+            operation: "start",
+            detail: "登录命令没有成功结束。",
+          });
+        yield* context.verifying;
+      }),
+    logout: Effect.void,
+  });
+  const phase = (value: ProviderAuthState["phase"], owner = "owner") =>
+    controller.subscribe(owner).pipe(
+      Stream.filter((state) => state.phase === value),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    );
+  const terminal = (flowId: string, owner = "owner") =>
+    controller.respond!(owner, {
+      instanceId,
+      flowId,
+      interactionId: "terminal",
+      response: { type: "terminal", data: "", size: { cols: 80, rows: 24 } },
+    });
+  return { controller, started, finish, written, phase, terminal };
+});
+const terminalLayer = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer);
+
+it.effect("terminal traffic trailing a failed login is dropped, not reported", () =>
+  Effect.gen(function* () {
+    const h = yield* makeTerminalHarness;
+    const state = yield* h.controller.start("owner");
+    yield* Deferred.await(h.started);
+    yield* Deferred.succeed(h.finish, "fail");
+    yield* h.phase("failed");
+    yield* h.terminal(state.flowId!);
+    assert.deepEqual(h.written, []);
+  }).pipe(Effect.scoped, Effect.provide(terminalLayer)),
+);
+
+it.effect("terminal traffic trailing a cancelled or finished login is dropped", () =>
+  Effect.gen(function* () {
+    const h = yield* makeTerminalHarness;
+    const cancelled = yield* h.controller.start("owner");
+    yield* Deferred.await(h.started);
+    yield* h.controller.cancel("owner", cancelled.flowId!);
+    yield* h.terminal(cancelled.flowId!);
+
+    const h2 = yield* makeTerminalHarness;
+    const state = yield* h2.controller.start("owner");
+    yield* Deferred.await(h2.started);
+    yield* Deferred.succeed(h2.finish, "succeed");
+    yield* h2.phase("verifying");
+    yield* h2.phase("verifying");
+    assert.deepEqual(h.written.concat(h2.written), []);
+    assert.isDefined(state.flowId);
+  }).pipe(Effect.scoped, Effect.provide(terminalLayer)),
+);
+
+it.effect("a finished login still rejects other interactions, other flows and other owners", () =>
+  Effect.gen(function* () {
+    const h = yield* makeTerminalHarness;
+    const state = yield* h.controller.start("owner");
+    yield* Deferred.await(h.started);
+    yield* Deferred.succeed(h.finish, "fail");
+    yield* h.phase("failed");
+    const failed = (effect: Effect.Effect<unknown, ProviderSetupError>) =>
+      effect.pipe(
+        Effect.result,
+        Effect.map((result) => result._tag === "Failure"),
+      );
+    assert.isTrue(
+      yield* failed(
+        h.controller.respond!("owner", {
+          instanceId,
+          flowId: state.flowId!,
+          interactionId: "consent",
+          response: { type: "browser", action: "accept" },
+        }),
+      ),
+    );
+    assert.isTrue(yield* failed(h.terminal("never-existed")));
+    assert.isTrue(yield* failed(h.terminal(state.flowId!, "other")));
+  }).pipe(Effect.scoped, Effect.provide(terminalLayer)),
+);
