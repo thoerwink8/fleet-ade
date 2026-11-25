@@ -6,6 +6,7 @@ import {
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
+import { toVcsSnapshotFailure } from "../vcs/vcsSnapshotFailure.ts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   CommandId,
@@ -25,6 +26,7 @@ import {
   type RuntimeMode,
   type ScheduledTaskId,
   ThreadId,
+  type VcsSnapshotFailure,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -242,6 +244,43 @@ function failureDetail(error: unknown): string {
     return `工作区准备在 ${error.operation.replaceAll("-", " ")} 时失败：${detail}`;
   }
   return `工作区准备失败：${error instanceof Error ? error.message : String(error)}`;
+}
+
+/** A synchronous setup script ended before the thread's agent could start. */
+class WorktreeSetupScriptExitError extends Schema.TaggedError<WorktreeSetupScriptExitError>()(
+  "WorktreeSetupScriptExitError",
+  {
+    exitCode: Schema.NullOr(Schema.Number),
+    detail: Schema.String,
+  },
+) {
+  override get message(): string {
+    return this.detail;
+  }
+}
+
+const scriptExitFailure = (error: WorktreeSetupScriptExitError): VcsSnapshotFailure => ({
+  _tag: "WorktreeSetupScriptExitError",
+  reason: "script_exited_nonzero",
+  detail: error.detail,
+});
+
+const isWorktreeSetupScriptExitError = Schema.is(WorktreeSetupScriptExitError);
+
+function setupFailure(error: unknown): VcsSnapshotFailure | undefined {
+  if (isWorktreeSetupScriptExitError(error)) {
+    return scriptExitFailure(error);
+  }
+  if (isThreadLaunchError(error)) {
+    return (
+      setupFailure(error.cause) ??
+      toVcsSnapshotFailure(
+        error.cause,
+        error.operation === "provision-worktree" ? { action: "create_worktree" } : {},
+      )
+    );
+  }
+  return undefined;
 }
 
 const make = Effect.gen(function* () {
@@ -826,7 +865,15 @@ const make = Effect.gen(function* () {
                 input,
                 "run-setup-script",
                 threadId,
-              )(`Setup script exited with ${completion.exitCode ?? "no exit code"}.`);
+              )(
+                new WorktreeSetupScriptExitError({
+                  exitCode: completion.exitCode,
+                  detail:
+                    completion.exitCode === null
+                      ? "准备脚本没有返回退出码。"
+                      : `准备脚本以退出码 ${completion.exitCode} 结束。`,
+                }),
+              );
           });
           if (setup.async) {
             awaitAsyncSetup = awaitCompletion.pipe(
@@ -875,10 +922,12 @@ const make = Effect.gen(function* () {
       Effect.onError((cause) =>
         Effect.gen(function* () {
           const cancelled = Cause.hasInterruptsOnly(cause);
+          const error = Cause.squash(cause);
           yield* setupTracker.finish(
             threadId,
             cancelled ? "cancelled" : "failed",
-            cancelled ? null : failureDetail(Cause.squash(cause)),
+            cancelled ? null : failureDetail(error),
+            cancelled ? null : (setupFailure(error) ?? null),
           );
           if (cancelled && setupTerminalId)
             yield* terminals
