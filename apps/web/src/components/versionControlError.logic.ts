@@ -322,29 +322,30 @@ export function presentVersionControlError(
     typeof error === "string" ? error : error instanceof Error ? error.message : "发生错误。";
   return { title: `无法${fallbackAction}`, detail, description: detail };
 }
+
+/** Snapshot reasons are free strings from the server, so only own keys count as known. */
+function knownStep(table: Readonly<Record<string, string>>, reason: string | undefined) {
+  return reason !== undefined && Object.hasOwn(table, reason) ? table[reason] : undefined;
+}
+
 function snapshotNextStep(failure: VcsSnapshotFailure, action: string): string {
   switch (failure._tag) {
     case "GitCommandError":
-      return (
-        (failure.reason === undefined
-          ? undefined
-          : GIT_REASON_NEXT_STEPS[failure.reason as GitCommandFailureReason]) ??
-        actionNextStep(action)
-      );
+      return knownStep(GIT_REASON_NEXT_STEPS, failure.reason) ?? actionNextStep(action);
     case "GitManagerError":
       return failure.reason === "working_tree_dirty"
         ? GIT_REASON_NEXT_STEPS.working_tree_dirty
         : actionNextStep(action);
     case "TextGenerationError":
-      return failure.reason === undefined
-        ? "请检查智能体的登录状态和可用性，然后重试。"
-        : (TEXT_REASON_NEXT_STEPS[failure.reason as TextGenerationFailureReason] ??
-            "请检查智能体的登录状态和可用性，然后重试。");
+      return (
+        knownStep(TEXT_REASON_NEXT_STEPS, failure.reason) ??
+        "请检查智能体的登录状态和可用性，然后重试。"
+      );
     case "VcsProcessSpawnError":
-      return failure.reason === undefined
-        ? "请确认版本控制工具已安装且可以运行，然后重试。"
-        : (SPAWN_REASON_NEXT_STEPS[failure.reason as VcsProcessSpawnFailureReason] ??
-            "请确认版本控制工具已安装且可以运行，然后重试。");
+      return (
+        knownStep(SPAWN_REASON_NEXT_STEPS, failure.reason) ??
+        "请确认版本控制工具已安装且可以运行，然后重试。"
+      );
     case "VcsProcessExitError":
       return failure.reason === "index_locked"
         ? GIT_REASON_NEXT_STEPS.index_locked
@@ -354,10 +355,7 @@ function snapshotNextStep(failure: VcsSnapshotFailure, action: string): string {
         ? GIT_REASON_NEXT_STEPS.path_already_exists
         : providerNextStep(action);
     default:
-      return failure.reason === undefined
-        ? actionNextStep(action)
-        : (GIT_REASON_NEXT_STEPS[failure.reason as GitCommandFailureReason] ??
-            actionNextStep(action));
+      return knownStep(GIT_REASON_NEXT_STEPS, failure.reason) ?? actionNextStep(action);
   }
 }
 

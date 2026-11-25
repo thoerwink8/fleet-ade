@@ -463,6 +463,18 @@ describe("describeVersionControlError", () => {
     });
   });
 
+  it.each(["not_a_known_reason", "toString", "constructor"])(
+    "falls back to the action guidance for the unknown snapshot reason %s",
+    (reason) => {
+      for (const _tag of ["GitCommandError", "TextGenerationError", "VcsProcessSpawnError"]) {
+        const result = presentVcsSnapshotFailure(snapshotFailure({ _tag, reason }), "克隆仓库");
+        expect(typeof result.nextStep).toBe("string");
+        expect(result.nextStep).not.toBe("");
+        expect(result.description).toContain(rawDetail);
+      }
+    },
+  );
+
   it("keeps the caller's action when an older snapshot has no typed action", () => {
     expect(
       presentVcsSnapshotFailure(snapshotFailure({ action: undefined }), "克隆仓库").title,
