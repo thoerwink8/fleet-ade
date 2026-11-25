@@ -59,7 +59,6 @@ import {
 } from "../../composer-logic";
 import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { newMessageId, newThreadId } from "~/lib/utils";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { buildThreadRouteParams } from "../../threadRoutes";
@@ -127,8 +126,8 @@ import {
   prepareTurnAttachments,
   recordDraftSendFailure,
   resolveMultipleModelTargets,
-  restoreComposerDraft,
 } from "./chatViewSend";
+import { recoverFailedComposerSend } from "./failedSendRecovery";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -1369,48 +1368,31 @@ export function useComposerSend(input: ComposerSendInput) {
       });
       // A restored draft clones its images, so the sent copies are no longer used.
       optimisticBlobPreviews.release(optimisticMessage);
-      if (
-        composerDraftHasUserContent(
-          useComposerDraftStore.getState().getComposerDraft(composerDraftTarget),
-        )
-      ) {
-        // A draft typed meanwhile keeps the composer, so the failed text stays reachable here.
-        const failedText = sendSnapshot.draftText;
-        if (failedText.trim().length > 0) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: isAtomCommandInterrupted(failure) ? "消息可能尚未发送" : "消息未发送",
-              description: "新草稿已保留。复制失败的那条消息即可再次发送。",
-              // The toast holds the only copy of the failed text, so it stays until dismissed.
-              timeout: 0,
-              data: { hideCopyButton: true },
-              actionProps: {
-                children: "复制消息",
-                onClick: () => {
-                  void writeTextToClipboard(failedText, "failed message").catch(() => undefined);
-                },
-              },
-            }),
-          );
-        }
-      } else {
-        const retryComposerImages = restoreComposerDraft(composerDraftTarget, sendSnapshot);
-        if (currentRouteThreadKeyRef.current === routeThreadKey) {
-          promptRef.current = sendSnapshot.draftText;
-          composerImagesRef.current = retryComposerImages;
-          composerFilesRef.current = composerFilesSnapshot;
-          composerTerminalContextsRef.current = composerTerminalContextsSnapshot;
-          composerRef.current?.resetCursorState({
-            cursor: collapseExpandedComposerCursor(
-              sendSnapshot.draftText,
-              sendSnapshot.draftText.length,
-            ),
-            prompt: sendSnapshot.draftText,
-            detectTrigger: true,
-          });
-        }
-      }
+      await recoverFailedComposerSend({
+        environmentId,
+        routeThreadKey,
+        composerDraftTarget,
+        messageId: messageIdForSend,
+        sendSnapshot,
+        interrupted: isAtomCommandInterrupted(failure),
+        onRestoredToComposer: (retryComposerImages) => {
+          if (currentRouteThreadKeyRef.current === routeThreadKey) {
+            promptRef.current = sendSnapshot.draftText;
+            composerImagesRef.current = retryComposerImages;
+            composerFilesRef.current = composerFilesSnapshot;
+            composerTerminalContextsRef.current = composerTerminalContextsSnapshot;
+            composerRef.current?.resetCursorState({
+              cursor: collapseExpandedComposerCursor(
+                sendSnapshot.draftText,
+                sendSnapshot.draftText.length,
+              ),
+              prompt: sendSnapshot.draftText,
+              detectTrigger: true,
+            });
+          }
+        },
+        onRestoreStashEntry: (entryId) => composerRef.current?.restoreStashEntry(entryId),
+      });
       const failureReason = isAtomCommandInterrupted(failure)
         ? "上一条消息的发送已中断。"
         : (() => {
