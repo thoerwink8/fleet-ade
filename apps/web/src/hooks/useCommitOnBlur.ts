@@ -2,8 +2,8 @@ import { useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject 
 
 import { anchoredToastManager } from "../components/ui/toast";
 
-/** `false` rejects the commit and keeps the typed text; a promise reports an asynchronous save. */
-export type CommitVerdict = void | false | Promise<boolean>;
+/** `false` rejects the commit and keeps the typed text; a string rejects it with that reason; a promise reports an asynchronous save. */
+export type CommitVerdict = void | false | string | Promise<boolean>;
 
 const SAVED_TOAST_TIMEOUT_MS = 1500;
 const REJECTED_TOAST_TIMEOUT_MS = 2500;
@@ -52,12 +52,12 @@ export function useCommitOnBlur(
   const commitToken = useRef(0);
   const editEpoch = useRef(0);
 
-  const reject = (text: string, kind: "invalid" | "failed") => {
+  const reject = (text: string, kind: "invalid" | "failed", reason?: string) => {
     setRejected({ text, kind });
     showAnchoredInputToast(inputRef, {
       type: "error",
       timeout: REJECTED_TOAST_TIMEOUT_MS,
-      title: kind === "invalid" ? "无效的值，未保存" : "保存失败，内容已保留",
+      title: reason ?? (kind === "invalid" ? "无效的值，未保存" : "保存失败，内容已保留"),
     });
   };
 
@@ -91,8 +91,8 @@ export function useCommitOnBlur(
 
   const commit = (text: string) => {
     const verdict = onCommit(text);
-    if (verdict === false) {
-      reject(text, "invalid");
+    if (verdict === false || typeof verdict === "string") {
+      reject(text, "invalid", typeof verdict === "string" ? verdict : undefined);
       return;
     }
     if (resetOnCommit) setDraft(null);
