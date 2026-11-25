@@ -444,7 +444,7 @@ describe("resolveInitialServerAuthGateState", () => {
       _tag: "PrimaryEnvironmentPairingCredentialRejectedError",
       credentialFailureReason: "expired",
       message:
-        "这个配对码已过期。在这台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在这台电脑上运行 t3 pair。",
+        "这个配对码已过期。在这台电脑的 设置 → 连接 里点「创建链接」，或在这台电脑上运行 t3 pair。",
     });
     expect(takePairingRecoveryNotice()).toBeNull();
   });

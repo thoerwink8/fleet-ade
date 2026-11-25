@@ -10,13 +10,13 @@ import {
 describe("pairing rejection copy", () => {
   it("names each failure reason and where to get a new code", () => {
     expect(pairingRejectionMessage("consumed", "this")).toBe(
-      "这个配对码已经用过了。在这台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在这台电脑上运行 t3 pair。",
+      "这个配对码已经用过了。在这台电脑的 设置 → 连接 里点「创建链接」，或在这台电脑上运行 t3 pair。",
     );
     expect(pairingRejectionMessage("expired", "this")).toBe(
-      "这个配对码已过期。在这台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在这台电脑上运行 t3 pair。",
+      "这个配对码已过期。在这台电脑的 设置 → 连接 里点「创建链接」，或在这台电脑上运行 t3 pair。",
     );
     expect(pairingRejectionMessage("invalid", "this")).toBe(
-      "配对码无效。在这台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在这台电脑上运行 t3 pair。",
+      "配对码无效。在这台电脑的 设置 → 连接 里点「创建链接」，或在这台电脑上运行 t3 pair。",
     );
   });
 

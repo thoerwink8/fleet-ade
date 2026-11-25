@@ -72,8 +72,8 @@ export const RemotePairingTargetError = Schema.Union([
 ]);
 export const pairingRejectionHint = (computer: "this" | "that"): string =>
   computer === "this"
-    ? "在这台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在这台电脑上运行 t3 pair。"
-    : "在那台电脑的 设置 → 连接 里生成新的配对链接或配对码，或在那台电脑上运行 t3 pair。";
+    ? "在这台电脑的 设置 → 连接 里点「创建链接」，或在这台电脑上运行 t3 pair。"
+    : "在那台电脑的 设置 → 连接 里点「创建链接」，或在那台电脑上运行 t3 pair。";
 
 export const pairingRejectionMessage = (
   reason: EnvironmentAuthCredentialFailureReason | undefined,

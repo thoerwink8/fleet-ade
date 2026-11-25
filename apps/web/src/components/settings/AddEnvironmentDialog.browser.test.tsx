@@ -5,11 +5,15 @@ import { useState } from "react";
 import { page, userEvent } from "vite-plus/test/browser";
 import { describe, expect, it, vi } from "vite-plus/test";
 
+import { ConnectionBlockedError } from "@t3tools/client-runtime/connection";
 import { render, stubGlobal } from "../../../test/render";
 import { AppAtomRegistryProvider } from "../../rpc/atomRegistry";
 
 const mocks = vi.hoisted(() => ({
   connectSshEnvironment: vi.fn<() => Promise<AtomCommandResult<void, Error>>>(async () =>
+    AsyncResult.success(undefined),
+  ),
+  connectPairing: vi.fn<() => Promise<AtomCommandResult<void, Error>>>(async () =>
     AsyncResult.success(undefined),
   ),
   refresh: () => {},
@@ -22,6 +26,7 @@ vi.mock(import("../../state/use-atom-command"), async (original) => ({
 vi.mock(import("~/connection/onboarding"), async (original) => ({
   ...(await original()),
   connectSshEnvironment: mocks.connectSshEnvironment as never,
+  connectPairing: mocks.connectPairing as never,
 }));
 vi.mock(import("~/state/query"), async (original) => ({
   ...(await original()),
@@ -131,5 +136,36 @@ describe("AddEnvironmentDialog", () => {
       .element(page.getByRole("dialog").getByRole("button", { name: "添加电脑" }))
       .toBeEnabled();
     await expect.element(page.getByText(/dismissed SSH attempt/)).not.toBeInTheDocument();
+  });
+
+  it("explains a rejected pairing code and clears it, but keeps it on a connectivity failure", async () => {
+    using _bridge = setup();
+    await using _screen = await render(<Owner />);
+    await userEvent.click(page.getByRole("button", { name: "添加电脑" }));
+    await userEvent.fill(page.getByPlaceholder("my-computer.example.com"), "devbox.example.com");
+    await userEvent.fill(page.getByPlaceholder("PAIRCODE"), "OLDCODE");
+
+    mocks.connectPairing.mockResolvedValueOnce(
+      AsyncResult.failure(
+        Cause.fail(
+          new ConnectionBlockedError({
+            reason: "authentication",
+            detail: "这个配对码已经用过了。",
+            hop: "server",
+          }),
+        ),
+      ),
+    );
+    await userEvent.click(page.getByRole("dialog").getByRole("button", { name: "添加电脑" }));
+    await expect.element(page.getByPlaceholder("PAIRCODE")).toHaveValue("");
+    await expect.element(page.getByRole("dialog").getByText(/已经用过了/)).toBeVisible();
+
+    await userEvent.fill(page.getByPlaceholder("PAIRCODE"), "KEEPCODE");
+    mocks.connectPairing.mockResolvedValueOnce(
+      AsyncResult.failure(Cause.fail(new Error("连不上那台电脑。"))),
+    );
+    await userEvent.click(page.getByRole("dialog").getByRole("button", { name: "添加电脑" }));
+    await expect.element(page.getByRole("dialog").getByText(/连不上那台电脑/)).toBeVisible();
+    await expect.element(page.getByPlaceholder("PAIRCODE")).toHaveValue("KEEPCODE");
   });
 });
