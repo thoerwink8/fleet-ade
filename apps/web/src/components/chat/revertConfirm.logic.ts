@@ -8,6 +8,8 @@ import {
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
+
 export type RevertRestoreAvailability =
   | { readonly status: "ready" }
   | {
@@ -219,7 +221,8 @@ export function formatRollbackFailureMessage(error: unknown): string {
   if (Predicate.isObject(error) && error._tag === "EnvironmentRpcUnavailableError") {
     return "此电脑暂时未连接。请重新连接后再回退。";
   }
-  return error instanceof Error ? error.message : "无法回退会话。";
+  const failure = describeRequestFailure(error);
+  return failure instanceof Error ? failure.message : "无法回退会话。";
 }
 
 export function revertButtonLabel(input: {
