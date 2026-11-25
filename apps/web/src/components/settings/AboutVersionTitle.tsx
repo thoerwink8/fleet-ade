@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { APP_VERSION } from "../../branding";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { showAnchoredCopySuccessToast } from "../ui/anchoredCopyToast";
-import { InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -24,25 +24,24 @@ export function AboutVersionTitle() {
   });
 
   return (
-    <span className="inline-flex items-baseline gap-2">
+    <span className="inline-flex items-center gap-2">
       <span>版本</span>
-      <code className="text-2xs font-medium">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <InlineButton
-                ref={copyButtonRef}
-                tone="muted"
-                aria-label={`复制版本 ${APP_VERSION}`}
-                onClick={() => copyToClipboard(APP_VERSION, undefined)}
-              >
-                {APP_VERSION}
-              </InlineButton>
-            }
-          />
-          <TooltipPopup>复制版本</TooltipPopup>
-        </Tooltip>
-      </code>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              ref={copyButtonRef}
+              variant="muted"
+              size="xs"
+              aria-label={`复制版本 ${APP_VERSION}`}
+              onClick={() => copyToClipboard(APP_VERSION, undefined)}
+            >
+              <code className="font-mono font-normal">{APP_VERSION}</code>
+            </Button>
+          }
+        />
+        <TooltipPopup>复制版本</TooltipPopup>
+      </Tooltip>
     </span>
   );
 }
