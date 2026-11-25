@@ -439,6 +439,37 @@ export function spawnClaudeProcessGroup(
   return child as ClaudeSpawnedProcess & Pick<NodeChildProcess.ChildProcess, "pid">;
 }
 
+/**
+ * Windows has no process groups, and `taskkill` ends a tree only while its root is running, so
+ * ending the CLI goes through taskkill instead of Node's leader-only kill. The SDK forwards its
+ * abort signal after the graceful shutdown window; letting Node spawn consume it would end the
+ * leader alone before taskkill could see the tree.
+ */
+export const ClaudeWindowsProcessTreeTerminator = Context.Reference<(pid: number) => void>(
+  "t3/claude-adapter-v2/ClaudeWindowsProcessTreeTerminator",
+  { defaultValue: () => killWindowsProcessTree },
+);
+
+function killWindowsProcessTree(pid: number): void {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return;
+  NodeChildProcess.execFile("taskkill", ["/PID", String(pid), "/T", "/F"], {
+    windowsHide: true,
+  }).unref();
+}
+
+function patchClaudeWindowsKill(
+  child: ClaudeSpawnedProcess,
+  terminateTree: (pid: number) => void,
+): void {
+  child.kill = () => {
+    if (child.exitCode === null && child.signalCode == null) {
+      const pid = "pid" in child && typeof child.pid === "number" ? child.pid : undefined;
+      if (pid !== undefined) terminateTree(pid);
+    }
+    return true;
+  };
+}
+
 interface ClaudeProcessRow {
   readonly pid: number;
   readonly ppid: number;
@@ -1285,6 +1316,7 @@ export const layerQueryRunner: Layer.Layer<
     const agentScope = yield* AgentScope;
     const providerProcesses = yield* ProviderProcesses.ProviderProcesses;
     const platform = yield* HostProcess.Platform;
+    const terminateWindowsProcessTree = yield* ClaudeWindowsProcessTreeTerminator;
     const hostEnvironment = yield* HostProcess.Environment;
     const runFork = Effect.runForkWith(yield* Effect.context<never>());
     const processRunner = yield* ProcessRunner.make();
@@ -1413,7 +1445,6 @@ export const layerQueryRunner: Layer.Layer<
               const child = NodeChildProcess.spawn(spawnOptions.command, spawnOptions.args, {
                 cwd: spawnOptions.cwd,
                 env: spawnOptions.env,
-                signal: spawnOptions.signal,
                 windowsHide: true,
                 stdio: ["pipe", "pipe", "pipe"],
               });
@@ -1427,6 +1458,15 @@ export const layerQueryRunner: Layer.Layer<
           let processExit: Promise<void> | undefined;
           const spawnClaudeCodeProcess = (spawnOptions: ClaudeSpawnOptions) => {
             const child = spawnProcess(spawnOptions);
+            if (platform === "win32") {
+              patchClaudeWindowsKill(child, terminateWindowsProcessTree);
+              // The forwarded signal aborts once the CLI's graceful window ends; kill() then ends
+              // the tree, where Node's own spawn abort handling would end the leader alone first.
+              const endTree = () => child.kill("SIGKILL");
+              spawnOptions.signal.addEventListener("abort", endTree, { once: true });
+              child.once("exit", () => spawnOptions.signal.removeEventListener("abort", endTree));
+              if (spawnOptions.signal.aborted) child.kill("SIGKILL");
+            }
             spawnedProcess = child;
             // A spawn that fails emits only "error".
             processExited = child.exitCode !== null || child.signalCode != null;
