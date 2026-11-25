@@ -16,12 +16,17 @@ import {
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as SqlError from "effect/sql/SqlError";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
 import { SHARED_WORKSPACE_RESTORE_MESSAGE } from "./CheckpointRestoreSafety.ts";
@@ -481,6 +486,114 @@ it.effect("requeues a claim when a pre-execution worker check fails", () =>
     assert.include(retry.error, "simulated cancellation-state read failure");
   }),
 );
+
+// busy_timeout already waited; these are the extra settlement attempts after that.
+const LOCK_SETTLEMENT_RETRY_LIMIT = 2;
+const LOCK_SETTLEMENT_RETRY_DELAY = Duration.millis(100);
+
+const lockTimeout = (operation: string, effectId: string) =>
+  new EffectOutbox.EffectOutboxError({
+    operation,
+    effectId,
+    cause: new SqlError.SqlError({
+      reason: new SqlError.LockTimeoutError({ cause: null }),
+    }),
+  });
+
+it.effect.each([
+  {
+    name: "retries a locked outbox requeue once the lock clears",
+    lockFailures: 1,
+    attempts: 2,
+    settled: true,
+  },
+  {
+    name: "reports a locked outbox requeue that stays locked past the retry limit",
+    lockFailures: Number.POSITIVE_INFINITY,
+    attempts: LOCK_SETTLEMENT_RETRY_LIMIT + 1,
+    settled: false,
+  },
+] as const)("$name", ({ lockFailures, attempts, settled }) => {
+  const logged: Array<string> = [];
+  const logger = Logger.make(({ logLevel, message }) => {
+    if (logLevel === "Error") logged.push(JSON.stringify(message));
+  });
+  return Effect.gen(function* () {
+    const now = DateTime.formatIso(yield* DateTime.now);
+    const effectId = "effect:worker-requeue-lock-timeout";
+    const workerId = "worker-requeue-lock-timeout";
+    const claimedEffect: EffectOutbox.OrchestrationEffectV2 = {
+      id: effectId,
+      commandId: CommandId.make("command:worker-requeue-lock-timeout"),
+      threadId: ThreadId.make("thread:worker-requeue-lock-timeout"),
+      request: { type: "terminal.cleanup" },
+      status: "running",
+      attemptCount: 1,
+      availableAt: now,
+      leaseOwner: workerId,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      lastError: null,
+    };
+    const seen = yield* Ref.make(0);
+    const didSettle = yield* Ref.make(false);
+    const firstLock = yield* Deferred.make<void>();
+    const layerOutbox = Layer.mock(EffectOutbox.EffectOutboxV2)({
+      claimNext: () => Effect.succeedSome(claimedEffect),
+      get: () =>
+        Effect.fail(
+          new EffectOutbox.EffectOutboxError({
+            operation: "get",
+            effectId,
+            cause: "simulated cancellation-state read failure",
+          }),
+        ),
+      retry: () =>
+        Effect.gen(function* () {
+          const attempt = yield* Ref.updateAndGet(seen, (count) => count + 1);
+          if (attempt === 1) yield* Deferred.succeed(firstLock, undefined);
+          if (attempt <= lockFailures) return yield* lockTimeout("retry", effectId);
+          yield* Ref.set(didSettle, true);
+          return true;
+        }),
+    });
+    const layerExecutor = Layer.succeed(
+      EffectWorker.OrchestrationEffectExecutorV2,
+      EffectWorker.OrchestrationEffectExecutorV2.of({
+        execute: () => Effect.void,
+      }),
+    );
+    const layerWorker = EffectWorker.layerWithOptions({ workerId }).pipe(
+      Layer.provide(Layer.mergeAll(layerOutbox, layerExecutor, layerEventSinkMock)),
+    );
+
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2.pipe(
+      Effect.flatMap((service) => service.runOnce()),
+      Effect.provide(layerWorker),
+      Effect.forkChild,
+    );
+    yield* Deferred.await(firstLock);
+    yield* TestClock.adjust(Duration.millis(99));
+    assert.equal(yield* Ref.get(seen), 1);
+    assert.isFalse(yield* Ref.get(didSettle));
+    yield* TestClock.adjust(
+      Duration.times(LOCK_SETTLEMENT_RETRY_DELAY, LOCK_SETTLEMENT_RETRY_LIMIT),
+    );
+    const exit = yield* Effect.exit(Fiber.join(worker));
+
+    assert.isTrue(Exit.isFailure(exit));
+    assert.equal(yield* Ref.get(seen), attempts);
+    assert.equal(yield* Ref.get(didSettle), settled);
+    const reported = logged.join("\n");
+    if (settled) {
+      assert.equal(reported, "");
+    } else {
+      assert.include(reported, "Failed to requeue effect after unexpected worker failure");
+      assert.include(reported, "LockTimeoutError");
+    }
+  }).pipe(Effect.provide(Logger.layer([logger], { mergeWithExisting: false })));
+});
 
 it.effect("arms cancellation before the durable pre-execution check", () =>
   Effect.gen(function* () {

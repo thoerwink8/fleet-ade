@@ -1,7 +1,9 @@
 import { it } from "@effect/vitest";
 import { describe, expect } from "vite-plus/test";
+import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Logger from "effect/Logger";
 
 import { makeKeyedCoalescingWorker } from "./KeyedCoalescingWorker.ts";
 
@@ -179,4 +181,36 @@ describe("makeKeyedCoalescingWorker", () => {
       expect(processed).toEqual(["terminal-1:first", "terminal-2:quiet", "terminal-1:second"]);
     }),
   );
+
+  it.effect("keeps processing later keys when a processor throws", () => {
+    const logged: Array<unknown> = [];
+    const logger = Logger.make(({ logLevel, cause }) => {
+      if (logLevel === "Error") logged.push(Cause.squash(cause));
+    });
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const processed: string[] = [];
+        const worker = yield* makeKeyedCoalescingWorker<string, string, never, never>({
+          merge: (_current, next) => next,
+          process: (key, value) => {
+            if (value === "broken") throw new Error("processor construction failed");
+            return Effect.sync(() => {
+              processed.push(`${key}:${value}`);
+            });
+          },
+        });
+
+        yield* worker.enqueue("first", "broken");
+        yield* worker.enqueue("second", "healthy");
+        yield* worker.drainKey("second");
+        yield* worker.enqueue("first", "recovered");
+        yield* worker.drainKey("first");
+
+        expect(processed).toEqual(["second:healthy", "first:recovered"]);
+        expect(
+          logged.map((error) => (error instanceof Error ? error.message : String(error))),
+        ).toEqual(["processor construction failed"]);
+      }),
+    ).pipe(Effect.provide(Logger.layer([logger], { mergeWithExisting: false })));
+  });
 });

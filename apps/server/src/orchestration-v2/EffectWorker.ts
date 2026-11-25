@@ -9,7 +9,9 @@ import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Metric from "effect/Metric";
 import * as Option from "effect/Option";
+import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
+import * as SqlError from "effect/sql/SqlError";
 
 import {
   increment,
@@ -694,6 +696,21 @@ export class OrchestrationEffectWorkerError extends Schema.TaggedError<Orchestra
 
 const isOrchestrationEffectWorkerError = Schema.is(OrchestrationEffectWorkerError);
 
+// busy_timeout already waited. A few more tries cover a lock that clears just after that.
+// onError masks interruption, so the wait has to be interruptible or shutdown sits out the budget.
+const LOCK_SETTLEMENT_RETRY_LIMIT = 2;
+const LOCK_SETTLEMENT_RETRY_DELAY = Duration.millis(100);
+const isLockTimeout = (error: EffectOutbox.EffectOutboxError) =>
+  SqlError.isSqlError(error.cause) && error.cause.reason._tag === "LockTimeoutError";
+const retryWhileLocked = <A, R>(settlement: Effect.Effect<A, EffectOutbox.EffectOutboxError, R>) =>
+  Effect.interruptible(
+    Effect.retry(settlement, {
+      schedule: Schedule.spaced(LOCK_SETTLEMENT_RETRY_DELAY),
+      while: isLockTimeout,
+      times: LOCK_SETTLEMENT_RETRY_LIMIT,
+    }),
+  );
+
 type ClaimFilter = Omit<Parameters<EffectOutbox.EffectOutboxV2Shape["claimNext"]>[0], "workerId">;
 
 export interface OrchestrationEffectWorkerV2Shape {
@@ -778,6 +795,7 @@ export const layerWithOptions = (
                 delayMs: 0,
               })
               .pipe(
+                retryWhileLocked,
                 Effect.flatMap((requeued) =>
                   requeued
                     ? Effect.logWarning("Requeued effect after unexpected worker failure", {
@@ -790,11 +808,13 @@ export const layerWithOptions = (
                       }),
                 ),
                 Effect.catchCause((requeueCause) =>
-                  Effect.logError("Failed to requeue effect after unexpected worker failure", {
-                    effectId: effect.id,
-                    effectType: effect.request.type,
-                    error: Cause.pretty(requeueCause),
-                  }),
+                  Cause.hasInterruptsOnly(requeueCause)
+                    ? Effect.void
+                    : Effect.logError("Failed to requeue effect after unexpected worker failure", {
+                        effectId: effect.id,
+                        effectType: effect.request.type,
+                        error: Cause.pretty(requeueCause),
+                      }),
                 ),
               );
       const terminalizeClaim = (
@@ -809,6 +829,7 @@ export const layerWithOptions = (
             error: `Worker failed to settle a process-bound effect after execution started: ${Cause.pretty(cause)}`,
           })
           .pipe(
+            retryWhileLocked,
             Effect.flatMap((failed) =>
               failed
                 ? Effect.logError("Terminalized process-bound effect after settlement failure", {
@@ -824,14 +845,16 @@ export const layerWithOptions = (
                   ),
             ),
             Effect.catchCause((failCause) =>
-              Effect.logError(
-                "Failed to terminalize process-bound effect after settlement failure",
-                {
-                  effectId: effect.id,
-                  effectType: effect.request.type,
-                  error: Cause.pretty(failCause),
-                },
-              ),
+              Cause.hasInterruptsOnly(failCause)
+                ? Effect.void
+                : Effect.logError(
+                    "Failed to terminalize process-bound effect after settlement failure",
+                    {
+                      effectId: effect.id,
+                      effectType: effect.request.type,
+                      error: Cause.pretty(failCause),
+                    },
+                  ),
             ),
           );
       };
