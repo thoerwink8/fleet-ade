@@ -188,6 +188,7 @@ import {
   useSnoozeWakeClock,
   threadShortcutContext,
   useThreadJumpHintsVisible,
+  type MultiSelectThreadMenuId,
   type SidebarSection,
   resolveSidebarRowThreadId,
 } from "./Sidebar.logic";
@@ -246,6 +247,7 @@ import {
 } from "./sidebar/SidebarThreadRow";
 import { resolveDuplicateEmptyThreadTitleSuffixes } from "./sidebar/SidebarThreadRow.logic";
 import { SidebarArchivedEntry } from "./sidebar/SidebarArchivedEntry";
+import { SidebarBatchBar } from "./sidebar/SidebarBatchBar";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarDragBoundary,
@@ -2230,6 +2232,235 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
+  const executeMultiSelectAction = useStableCallback(
+    async (
+      action: MultiSelectThreadMenuId,
+      snoozeContext?: {
+        readonly snoozePresets: ReadonlyArray<SnoozePreset>;
+        readonly snoozePresetThread: EnvironmentThreadShell;
+      },
+    ) => {
+      const selectedThreadKeys = [...useThreadSelectionStore.getState().selectedThreadKeys];
+      const threadKeys = selectedThreadKeys.filter((threadKey) =>
+        threadByKeyRef.current.has(threadKey),
+      );
+      if (threadKeys.length === 0) return;
+      const count = threadKeys.length;
+      const selectionNow = new Date();
+      const selectedThreads = threadKeys.flatMap((threadKey) => {
+        const thread = threadByKeyRef.current.get(threadKey);
+        return thread ? [thread] : [];
+      });
+      const settlingThreads = selectedThreads.filter(
+        (thread) => serverConfigs.has(thread.environmentId) && thread.settledOverride !== "settled",
+      );
+      const snoozeableThreads = selectedThreads.filter(
+        (thread) =>
+          serverConfigs.has(thread.environmentId) &&
+          canSnooze(thread, { now: selectionNow.toISOString() }),
+      );
+      const titleRegenerationThreads = selectedThreads.filter((thread) =>
+        serverConfigs.has(thread.environmentId),
+      );
+      const regeneratableTitleThreads = titleRegenerationThreads.filter(
+        (thread) => thread.titleRegeneration == null,
+      );
+      const pinnedSelectedThreads = selectedThreads.filter(
+        (thread) => serverConfigs.has(thread.environmentId) && thread.pinnedAt != null,
+      );
+      const archiveableThreads = selectedThreads.filter((thread) =>
+        threadRuntimeCanArchive(thread.runtime),
+      );
+      const actionTargets =
+        action === "unpin"
+          ? pinnedSelectedThreads
+          : action === "regenerate-title"
+            ? regeneratableTitleThreads
+            : action === "archive"
+              ? archiveableThreads
+              : action.startsWith("snooze:")
+                ? snoozeableThreads
+                : action === "settle"
+                  ? settlingThreads.flatMap((thread) => {
+                      const current = threadByKeyRef.current.get(
+                        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+                      );
+                      return current && current.settledOverride !== "settled" ? [current] : [];
+                    })
+                  : selectedThreads;
+      if (action === "settle" && actionTargets.length === 0) return;
+      if (action === "archive" && actionTargets.length === 0) return;
+      if (action !== "mark-unread" && !checkThreadOperations(actionTargets)) return;
+      if (action.startsWith("snooze:")) {
+        if (snoozeableThreads.length === 0) return;
+        const snoozePresetThread =
+          snoozeContext?.snoozePresetThread ?? snoozeableThreads[0] ?? selectedThreads[0]!;
+        const snoozePresets =
+          snoozeContext?.snoozePresets ??
+          resolveSnoozePresets(new Date(), timestampFormat, snoozePresetThread.environmentId);
+        const preset =
+          action === "snooze:custom"
+            ? await requestCustomSnooze()
+            : pickSnoozePreset(
+                snoozePresets,
+                action.slice("snooze:".length),
+                timestampFormat,
+                snoozePresetThread.environmentId,
+              );
+        if (preset) {
+          const coSnoozingKeys = new Set(
+            snoozeableThreads.map((thread) =>
+              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+            ),
+          );
+          clearSelection();
+          const outcomes = await Promise.all(
+            snoozeableThreads.map(async (thread) => {
+              const threadRef = scopeThreadRef(thread.environmentId, thread.id);
+              const outcome = await performSnooze(threadRef, preset, { coSnoozingKeys });
+              return { outcome, threadRef };
+            }),
+          );
+          const snoozedThreadRefs = outcomes.flatMap(({ outcome, threadRef }) =>
+            outcome.status === "success" ? [threadRef] : [],
+          );
+          const failures = outcomes.flatMap(({ outcome }) =>
+            outcome.status === "failure" ? [outcome.error] : [],
+          );
+
+          if (failures.length > 0) {
+            const firstError = failures[0];
+            toastManager.add(
+              stackedThreadToast({
+                type: "error",
+                title:
+                  snoozedThreadRefs.length > 0
+                    ? `无法暂缓 ${failures.length} 个会话`
+                    : "无法暂缓会话",
+                description: firstError instanceof Error ? firstError.message : "发生错误。",
+              }),
+            );
+          }
+        }
+        return;
+      }
+      if (action === "unpin") {
+        for (const thread of pinnedSelectedThreads) {
+          attemptUnpin(scopeThreadRef(thread.environmentId, thread.id));
+        }
+        clearSelection();
+        return;
+      }
+      if (action === "regenerate-title") {
+        clearSelection();
+        const toast = titleRegenerationToast(
+          await Promise.all(
+            regeneratableTitleThreads.map((thread) =>
+              regenerateThreadTitle({
+                environmentId: thread.environmentId,
+                input: { threadId: thread.id },
+              }),
+            ),
+          ),
+        );
+        if (toast) toastManager.add(toast);
+        return;
+      }
+      if (action === "settle") {
+        settleThreads(
+          actionTargets.map((thread) =>
+            scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+          ),
+        );
+        clearSelection();
+        return;
+      }
+      if (action === "select-all") {
+        useThreadSelectionStore.getState().replaceSelection(orderedThreadKeysRef.current);
+        return;
+      }
+      const batchTargets = threadKeys.flatMap((threadKey) => {
+        const thread = threadByKeyRef.current.get(threadKey);
+        return thread
+          ? [
+              {
+                environmentId: thread.environmentId,
+                id: thread.id,
+                title: thread.title,
+                key: threadKey,
+              },
+            ]
+          : [];
+      });
+      if (action === "mark-unread") {
+        const failures = await markThreadsUnread(batchTargets);
+        if (failures.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "无法将部分会话标为未读",
+              description: failures.join("\n"),
+            }),
+          );
+        }
+        clearSelection();
+        return;
+      }
+      if (action === "archive") {
+        const archiveTargets = actionTargets.map((thread) => ({
+          environmentId: thread.environmentId,
+          id: thread.id,
+          title: thread.title,
+          key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+        }));
+        const { archivedKeys, prunedKeys, failures } = await archiveThreads(archiveTargets);
+        if (failures.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: archivedKeys.size > 0 ? "无法归档部分会话" : "无法归档会话",
+              description: failures.join("\n"),
+            }),
+          );
+        }
+        removeFromSelection([...prunedKeys]);
+        return;
+      }
+      if (action !== "delete") return;
+      if (confirmThreadDelete) {
+        const api = readLocalApi();
+        if (!api) return;
+        const copy = batchDeleteConfirmCopy(count);
+        const confirmed = await settlePromise(() =>
+          api.dialogs.confirm(copy.message, copy.options),
+        );
+        if (confirmed._tag === "Failure" || !confirmed.value) return;
+      }
+      if (
+        !checkThreadOperations(
+          threadKeys.flatMap((threadKey) => {
+            const thread = threadByKeyRef.current.get(threadKey);
+            return thread ? [thread] : [];
+          }),
+        )
+      )
+        return;
+      const { deletedKeys, failures } = await deleteThreads(batchTargets);
+      if (failures.length > 0) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "无法删除部分会话",
+            description: failures.join("\n"),
+          }),
+        );
+      }
+      removeFromSelection([...deletedKeys]);
+    },
+  );
+  const handleBatchBarAction = useStableCallback((action: MultiSelectThreadMenuId) => {
+    void executeMultiSelectAction(action);
+  });
   const handleMultiSelectContextMenu = useStableCallback(
     async (position: { x: number; y: number }) => {
       const api = readLocalApi();
@@ -2297,184 +2528,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         ),
       );
       if (clicked._tag === "Failure" || clicked.value === null) return;
-      const actionTargets =
-        clicked.value === "unpin"
-          ? pinnedSelectedThreads
-          : clicked.value === "regenerate-title"
-            ? regeneratableTitleThreads
-            : clicked.value === "archive"
-              ? archiveableThreads
-              : clicked.value.startsWith("snooze:")
-                ? snoozeableThreads
-                : clicked.value === "settle"
-                  ? settlingThreads.flatMap((thread) => {
-                      const current = threadByKeyRef.current.get(
-                        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-                      );
-                      return current && current.settledOverride !== "settled" ? [current] : [];
-                    })
-                  : selectedThreads;
-      if (clicked.value === "settle" && actionTargets.length === 0) return;
-      if (clicked.value === "archive" && actionTargets.length === 0) return;
-      if (clicked.value !== "mark-unread" && !checkThreadOperations(actionTargets)) return;
-      if (clicked.value?.startsWith("snooze:")) {
-        if (snoozeableThreads.length === 0) return;
-        const preset =
-          clicked.value === "snooze:custom"
-            ? await requestCustomSnooze()
-            : pickSnoozePreset(
-                snoozePresets,
-                clicked.value.slice("snooze:".length),
-                timestampFormat,
-                snoozePresetThread.environmentId,
-              );
-        if (preset) {
-          const coSnoozingKeys = new Set(
-            snoozeableThreads.map((thread) =>
-              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-            ),
-          );
-          clearSelection();
-          const outcomes = await Promise.all(
-            snoozeableThreads.map(async (thread) => {
-              const threadRef = scopeThreadRef(thread.environmentId, thread.id);
-              const outcome = await performSnooze(threadRef, preset, { coSnoozingKeys });
-              return { outcome, threadRef };
-            }),
-          );
-          const snoozedThreadRefs = outcomes.flatMap(({ outcome, threadRef }) =>
-            outcome.status === "success" ? [threadRef] : [],
-          );
-          const failures = outcomes.flatMap(({ outcome }) =>
-            outcome.status === "failure" ? [outcome.error] : [],
-          );
-
-          if (failures.length > 0) {
-            const firstError = failures[0];
-            toastManager.add(
-              stackedThreadToast({
-                type: "error",
-                title:
-                  snoozedThreadRefs.length > 0
-                    ? `无法暂缓 ${failures.length} 个会话`
-                    : "无法暂缓会话",
-                description: firstError instanceof Error ? firstError.message : "发生错误。",
-              }),
-            );
-          }
-        }
-        return;
-      }
-      if (clicked.value === "unpin") {
-        for (const thread of pinnedSelectedThreads) {
-          attemptUnpin(scopeThreadRef(thread.environmentId, thread.id));
-        }
-        clearSelection();
-        return;
-      }
-      if (clicked.value === "regenerate-title") {
-        clearSelection();
-        const toast = titleRegenerationToast(
-          await Promise.all(
-            regeneratableTitleThreads.map((thread) =>
-              regenerateThreadTitle({
-                environmentId: thread.environmentId,
-                input: { threadId: thread.id },
-              }),
-            ),
-          ),
-        );
-        if (toast) toastManager.add(toast);
-        return;
-      }
-      if (clicked.value === "settle") {
-        settleThreads(
-          actionTargets.map((thread) =>
-            scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-          ),
-        );
-        clearSelection();
-        return;
-      }
-      if (clicked.value === "select-all") {
-        useThreadSelectionStore.getState().replaceSelection(orderedThreadKeysRef.current);
-        return;
-      }
-      const batchTargets = threadKeys.flatMap((threadKey) => {
-        const thread = threadByKeyRef.current.get(threadKey);
-        return thread
-          ? [
-              {
-                environmentId: thread.environmentId,
-                id: thread.id,
-                title: thread.title,
-                key: threadKey,
-              },
-            ]
-          : [];
+      await executeMultiSelectAction(clicked.value, {
+        snoozePresets,
+        snoozePresetThread,
       });
-      if (clicked.value === "mark-unread") {
-        const failures = await markThreadsUnread(batchTargets);
-        if (failures.length > 0) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "无法将部分会话标为未读",
-              description: failures.join("\n"),
-            }),
-          );
-        }
-        clearSelection();
-        return;
-      }
-      if (clicked.value === "archive") {
-        const archiveTargets = actionTargets.map((thread) => ({
-          environmentId: thread.environmentId,
-          id: thread.id,
-          title: thread.title,
-          key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-        }));
-        const { archivedKeys, prunedKeys, failures } = await archiveThreads(archiveTargets);
-        if (failures.length > 0) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: archivedKeys.size > 0 ? "无法归档部分会话" : "无法归档会话",
-              description: failures.join("\n"),
-            }),
-          );
-        }
-        removeFromSelection([...prunedKeys]);
-        return;
-      }
-      if (clicked.value !== "delete") return;
-      if (confirmThreadDelete) {
-        const copy = batchDeleteConfirmCopy(count);
-        const confirmed = await settlePromise(() =>
-          api.dialogs.confirm(copy.message, copy.options),
-        );
-        if (confirmed._tag === "Failure" || !confirmed.value) return;
-      }
-      if (
-        !checkThreadOperations(
-          threadKeys.flatMap((threadKey) => {
-            const thread = threadByKeyRef.current.get(threadKey);
-            return thread ? [thread] : [];
-          }),
-        )
-      )
-        return;
-      const { deletedKeys, failures } = await deleteThreads(batchTargets);
-      if (failures.length > 0) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "无法删除部分会话",
-            description: failures.join("\n"),
-          }),
-        );
-      }
-      removeFromSelection([...deletedKeys]);
     },
   );
   const handleDraftContextMenu = useStableCallback(
@@ -2938,39 +2995,50 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         ref={sidebarContentRef}
         className="min-h-full"
         fixedHeader={
-          <SidebarGroup size="header" className="z-[1]">
-            <SidebarThreadHeader
-              searchInputRef={threadSearchInputRef}
-              searchShortcutLabel={shortcutLabelForCommand(keybindings, "commandPalette.toggle")}
-              searchQuery={threadSearchQuery}
-              onSearchQueryChange={(value) => {
-                setThreadSearchQuery(value);
-                setSearchHighlightKey(null);
-              }}
-              onSearchKeyDown={handleThreadSearchKeyDown}
-              isSearching={isSearchingThreads}
-              searchResultCount={threadSearchResults.length}
-              activeSearchResultIndex={activeSearchResultIndex}
-              onClearSearch={clearThreadSearch}
-            />
-            {/* Fixed header, not the scrolling list: offline is global and must stay in view. */}
-            {(() => {
-              const offlineBanner = isSearchingThreads
-                ? null
-                : resolveSidebarOfflineBanner({
-                    visibleThreads: searchableThreads,
-                    connectedEnvironmentIds,
-                    environmentLabelById,
-                  });
-              return offlineBanner !== null ? (
-                <div className="mt-1.5" data-testid="sidebar-offline-banner">
-                  <Alert variant="warning">
-                    <AlertDescription>{offlineBanner.message}</AlertDescription>
-                  </Alert>
-                </div>
-              ) : null;
-            })()}
-          </SidebarGroup>
+          <>
+            <SidebarGroup size="header" className="z-[1]">
+              <SidebarThreadHeader
+                searchInputRef={threadSearchInputRef}
+                searchShortcutLabel={shortcutLabelForCommand(keybindings, "commandPalette.toggle")}
+                searchQuery={threadSearchQuery}
+                onSearchQueryChange={(value) => {
+                  setThreadSearchQuery(value);
+                  setSearchHighlightKey(null);
+                }}
+                onSearchKeyDown={handleThreadSearchKeyDown}
+                isSearching={isSearchingThreads}
+                searchResultCount={threadSearchResults.length}
+                activeSearchResultIndex={activeSearchResultIndex}
+                onClearSearch={clearThreadSearch}
+              />
+              {/* Fixed header, not the scrolling list: offline is global and must stay in view. */}
+              {(() => {
+                const offlineBanner = isSearchingThreads
+                  ? null
+                  : resolveSidebarOfflineBanner({
+                      visibleThreads: searchableThreads,
+                      connectedEnvironmentIds,
+                      environmentLabelById,
+                    });
+                return offlineBanner !== null ? (
+                  <div className="mt-1.5" data-testid="sidebar-offline-banner">
+                    <Alert variant="warning">
+                      <AlertDescription>{offlineBanner.message}</AlertDescription>
+                    </Alert>
+                  </div>
+                ) : null;
+              })()}
+            </SidebarGroup>
+            {!isSearchingThreads ? (
+              <SidebarBatchBar
+                threadByKey={threadByKey}
+                orderedThreadCount={orderedThreadKeys.length}
+                serverConfigs={serverConfigs}
+                onAction={handleBatchBarAction}
+                onClearSelection={clearSelection}
+              />
+            ) : null}
+          </>
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
