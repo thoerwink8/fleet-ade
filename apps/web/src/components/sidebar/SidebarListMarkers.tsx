@@ -1,5 +1,4 @@
-import { FolderIcon, InboxIcon } from "lucide-react";
-import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
+import { ChevronRightIcon } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type ReactNode, useLayoutEffect } from "react";
@@ -129,37 +128,37 @@ export function SidebarSectionHeader(props: {
         : props.marker === "attention-header"
           ? "attention"
           : "settled";
-  const tone = props.isDropTarget ? "accent" : props.dragging ? "emphasized" : "section";
-  const count = <span className="font-normal tabular-nums">{props.count}</span>;
+  const dragState = props.isDropTarget ? "drop-target" : props.dragging ? "dragging" : undefined;
+  const count = <span className="fa-count fa-count--quiet">{props.count}</span>;
   return (
     <SortableSidebarMarker
       marker={props.marker}
       data-testid={`sidebar-${props.marker}`}
-      className={cn("relative mx-0.5 h-6", props.className)}
+      className={cn("relative h-8", props.className)}
     >
       {props.toggle ? (
-        <CollapsibleSectionHeader
+        <button
+          type="button"
           data-sidebar-row={`shelf:${shelf}`}
           onClick={props.toggle.onToggle}
-          expanded={props.toggle.expanded}
-          tone={tone}
-          compact
-          icon={<FolderIcon className="size-3.5 text-muted-foreground" />}
+          aria-expanded={props.toggle.expanded}
+          data-drag-state={dragState}
           data-testid={`sidebar-${shelf}-shelf-toggle`}
-          accessory={count}
+          className="fa-ghead ade-ghead-toggle ade-touch-target ade-touch-target--y"
         >
-          {props.label}
-        </CollapsibleSectionHeader>
-      ) : (
-        <div
-          data-sidebar-row={`shelf:${shelf}`}
-          className="flex h-6 w-full items-center gap-2 rounded-md px-2 text-left text-meta font-medium text-secondary-label"
-        >
-          <span aria-hidden className="flex shrink-0">
-            <InboxIcon className="size-3.5 text-muted-foreground" />
-          </span>
+          <ChevronRightIcon
+            aria-hidden="true"
+            className={cn(
+              "size-3.5 shrink-0 transition-transform duration-150",
+              props.toggle.expanded && "rotate-90",
+            )}
+          />
           <span className="min-w-0 truncate">{props.label}</span>
-          <span aria-hidden className="invisible h-px min-w-2 flex-1" />
+          {count}
+        </button>
+      ) : (
+        <div data-sidebar-row={`shelf:${shelf}`} className="fa-ghead">
+          <span className="min-w-0 truncate">{props.label}</span>
           {count}
         </div>
       )}

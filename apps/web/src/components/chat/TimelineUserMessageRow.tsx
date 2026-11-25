@@ -136,7 +136,7 @@ function UserFileCard({
   return (
     <div
       data-markdown-copy={copyMarkdown}
-      className="flex w-64 max-w-full items-center gap-1 rounded-2xl bg-message py-2 ps-2 pe-1 text-message-foreground"
+      className="flex w-64 max-w-full items-center gap-1 rounded-xl bg-message py-2 ps-2 pe-1 text-message-foreground"
     >
       {file.downloadable === false ? (
         <>
@@ -151,7 +151,7 @@ function UserFileCard({
             type="button"
             aria-label={`预览 ${label}`}
             onClick={() => ctx.onFileOpen(file)}
-            className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+            className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
           >
             {identity}
           </button>
@@ -206,7 +206,7 @@ function UserVideoAttachment({
         className={cn(
           "flex aspect-[4/3] w-full items-center justify-center bg-black px-2 py-3 text-center text-2xs text-white/70",
           standalone
-            ? cn(MEDIA_EDGE_CLASS_NAME, "rounded-2xl", cornerClassName)
+            ? cn(MEDIA_EDGE_CLASS_NAME, "rounded-xl", cornerClassName)
             : "rounded-lg border border-border/80",
         )}
       >
@@ -241,7 +241,7 @@ function UserVideoAttachment({
     />
   );
   return standalone ? (
-    <div className={cn(MEDIA_EDGE_CLASS_NAME, "overflow-hidden rounded-2xl", cornerClassName)}>
+    <div className={cn(MEDIA_EDGE_CLASS_NAME, "overflow-hidden rounded-xl", cornerClassName)}>
       {player}
     </div>
   ) : (
@@ -306,7 +306,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
       ) : null}
       <div
         className={cn(
-          "min-w-0 max-w-[80%] rounded-2xl bg-message text-message-foreground",
+          "min-w-0 max-w-[80%] rounded-xl bg-message text-message-foreground",
           BUBBLE_CHIP_CLASS_NAME,
           expanded && "w-full",
         )}
@@ -394,7 +394,7 @@ function FoldedMessageHeader(props: {
       aria-expanded={props.expanded}
       data-scroll-anchor-ignore
       onClick={props.onToggle}
-      className="flex w-full min-w-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
+      className="flex w-full min-w-0 items-center gap-1.5 rounded-xl px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
     >
       <Icon className="size-4 shrink-0 stroke-2 text-muted-foreground" />
       <span className="max-w-1/2 shrink-0 truncate text-muted-foreground">{props.label}</span>
@@ -513,8 +513,8 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   const collage = standaloneMedia && userVideos.length === 0 && regularImages.length > 1;
   // Corners that touch the bubble or a neighbouring message tighten, like the bubble's.
   const mediaCornerClassName = cn(
-    row.groupedWithPrevious && "rounded-tr-md",
-    (mediaAboveText || row.groupedWithNext) && "rounded-br-md",
+    row.groupedWithPrevious && "rounded-tr-sm",
+    (mediaAboveText || row.groupedWithNext) && "rounded-br-sm",
   );
   // Files sent without words show as cards, not as a bubble around a name chip.
   const fileCardsOnly =
@@ -671,7 +671,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
               : collage
                 ? cn(
                     MEDIA_EDGE_CLASS_NAME,
-                    "w-80 max-w-full gap-px overflow-hidden rounded-2xl bg-black/9 dark:bg-white/12",
+                    "w-80 max-w-full gap-px overflow-hidden rounded-xl bg-black/9 dark:bg-white/12",
                     mediaCornerClassName,
                     regularImages.length === 2
                       ? "auto-rows-[12rem] grid-cols-2"
@@ -690,7 +690,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             className={cn(
               "bg-background/70",
               loneImage
-                ? cn(MEDIA_EDGE_CLASS_NAME, "overflow-hidden rounded-2xl", mediaCornerClassName)
+                ? cn(MEDIA_EDGE_CLASS_NAME, "overflow-hidden rounded-xl", mediaCornerClassName)
                 : collage
                   ? cn(
                       "overflow-hidden bg-background",
@@ -701,7 +701,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                         "col-span-2",
                     )
                   : standaloneMedia
-                    ? cn(MEDIA_EDGE_CLASS_NAME, "aspect-[4/3] overflow-hidden rounded-2xl")
+                    ? cn(MEDIA_EDGE_CLASS_NAME, "aspect-[4/3] overflow-hidden rounded-xl")
                     : "aspect-[4/3] overflow-hidden rounded-lg border border-border/80",
             )}
           >
@@ -847,9 +847,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
       ) : null}
       <div
         className={cn(
-          "relative min-w-0 max-w-[78%] rounded-2xl text-(length:--font-size-prose) leading-(--line-height-prose) text-message-foreground",
-          (mediaAboveText || row.groupedWithPrevious) && "rounded-tr-md",
-          row.groupedWithNext && "rounded-br-md",
+          "relative min-w-0 max-w-[78%] rounded-xl text-(length:--font-size-prose) leading-(--line-height-prose) text-message-foreground",
+          (mediaAboveText || row.groupedWithPrevious) && "rounded-tr-sm",
+          row.groupedWithNext && "rounded-br-sm",
           BUBBLE_CHIP_CLASS_NAME,
           !mediaOnly && !fileCardsOnly && !audioOnly && "border border-foreground/5 bg-message",
           !folded && !mediaOnly && !fileCardsOnly && !audioOnly && "px-4 py-3",
