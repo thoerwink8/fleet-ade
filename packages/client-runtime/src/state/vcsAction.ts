@@ -18,6 +18,7 @@ import * as Stream from "effect/Stream";
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity";
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
+import { describeRequestFailure } from "../errors/transport.ts";
 import * as Persistence from "../platform/persistence.ts";
 import { runStreamGuarded, RpcPermissionGuard } from "../rpc/client.ts";
 import {
@@ -579,7 +580,11 @@ export function createVcsActionManager<R, E>(
         if (registry.get(stateAtom).actionId === next.actionId) {
           registry.set(
             stateAtom,
-            failVcsActionState(input.operation, next.actionId, Cause.squash(result.cause)),
+            failVcsActionState(
+              input.operation,
+              next.actionId,
+              describeRequestFailure(result.cause),
+            ),
           );
         }
       }
