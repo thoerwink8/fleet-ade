@@ -1088,7 +1088,7 @@ export default function GitActionsControl({
   });
   const { data: gitStatus, error: gitStatusQueryError, failure: gitStatusFailure } = gitStatusQuery;
   const gitStatusErrorPresentation = gitStatusQueryError
-    ? presentVersionControlError(gitStatusFailure, "读取 Git 状态")
+    ? presentVersionControlError(gitStatusFailure ?? gitStatusQueryError, "读取 Git 状态")
     : null;
   const gitStatusError = gitStatusErrorPresentation
     ? `${gitStatusErrorPresentation.title}\n${gitStatusErrorPresentation.description}`

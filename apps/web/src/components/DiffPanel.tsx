@@ -421,7 +421,10 @@ export default function DiffPanel({
       : null,
   );
   const branchCommitsErrorPresentation = branchCommitsQuery.error
-    ? presentVersionControlError(branchCommitsQuery.failure, "加载分支提交")
+    ? presentVersionControlError(
+        branchCommitsQuery.failure ?? branchCommitsQuery.error,
+        "加载分支提交",
+      )
     : null;
   const branchCommits = openCommitMenu ?? branchCommitsQuery.data;
   const activeThreadRefreshKey = routeThreadRef
@@ -505,13 +508,8 @@ export default function DiffPanel({
     selectedPatchQuery.isPending &&
     (selectedPatchQuery.data === null ||
       (isGitSelection && preview?.incomplete === true && selectedGitSource?.files?.length === 0));
-  const selectedPatchFailure = toolCallSelection
-    ? toolCallDetail.failure
-    : selectedTurn
-      ? activeCheckpointDiff.failure
-      : branchDiffPreview.failure;
-  const selectedPatchErrorPresentation = selectedPatchFailure
-    ? presentVersionControlError(selectedPatchFailure, "加载差异")
+  const selectedPatchErrorPresentation = selectedPatchQuery.error
+    ? presentVersionControlError(selectedPatchQuery.failure ?? selectedPatchQuery.error, "加载差异")
     : null;
   const selectedPatchError = selectedPatchErrorPresentation?.description ?? null;
   const hasResolvedPatch = typeof selectedPatch === "string";

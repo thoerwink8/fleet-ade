@@ -195,6 +195,17 @@ describe("describeVersionControlError", () => {
     });
   });
 
+  it("keeps the original text when the failure is not a typed version control error", () => {
+    expect(presentVersionControlError("Defect: index out of range", "加载差异")).toEqual({
+      title: "无法加载差异",
+      description: "Defect: index out of range",
+    });
+    expect(presentVersionControlError(null, "加载差异")).toEqual({
+      title: "无法加载差异",
+      description: "发生错误。",
+    });
+  });
+
   it("keeps unrelated failures on the caller's existing fallback", () => {
     expect(presentVersionControlError(new Error("unrelated"), "打开文件")).toEqual({
       title: "无法打开文件",
