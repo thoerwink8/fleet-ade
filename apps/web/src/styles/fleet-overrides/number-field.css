@@ -4,6 +4,8 @@
   gap: 0;
   padding: 0;
   height: auto;
+  /* The frame holds the step; the steppers and input sit inside it, so its height comes from here. */
+  min-height: var(--fa-ctrl);
   overflow: visible;
 }
 
@@ -84,6 +86,6 @@
 
   [data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-step,
   [data-slot="number-field"]:not([data-size="sm"]) .ade-number-field-input {
-    height: var(--fa-ctrl);
+    height: calc(var(--fa-ctrl) - 2 * var(--fa-bw-1));
   }
 }
