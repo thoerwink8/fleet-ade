@@ -85,6 +85,9 @@ export function composerCommandKeyHandler(input: {
   /** Predicted next prompt that Tab fills into an empty composer; Escape dismisses it. */
   readonly promptSuggestion: string | null;
   readonly dismissPromptSuggestion: () => void;
+  readonly hasPendingSend?: boolean | undefined;
+  readonly cancelPendingSend?: (() => void) | undefined;
+  readonly onUserPromptEdited?: (() => void) | undefined;
 }) {
   const {
     keybindings,
@@ -122,6 +125,9 @@ export function composerCommandKeyHandler(input: {
     submitComposer,
     promptSuggestion,
     dismissPromptSuggestion,
+    hasPendingSend = false,
+    cancelPendingSend,
+    onUserPromptEdited,
   } = input;
 
   // The composer persists across threads. A recall from thread A must not
@@ -130,6 +136,7 @@ export function composerCommandKeyHandler(input: {
   const promptHistoryTargetKey = composerTargetKey(composerDraftTarget);
 
   const replacePromptFromHistory = (nextPrompt: string) => {
+    onUserPromptEdited?.();
     promptRef.current = nextPrompt;
     setComposerDraftPrompt(composerDraftTarget, nextPrompt);
     setComposerCursor(collapseExpandedComposerCursor(nextPrompt, nextPrompt.length));
@@ -217,6 +224,10 @@ export function composerCommandKeyHandler(input: {
       !isLiteralPendingAnswer && (composerMenuOpenRef.current || trigger !== null);
     if (key === "Escape") {
       if (event.isComposing || event.keyCode === 229) return false;
+      if (!menuIsActive && hasPendingSend) {
+        cancelPendingSend?.();
+        return true;
+      }
       if (!menuIsActive && promptSuggestion !== null && promptRef.current.length === 0) {
         dismissPromptSuggestion();
         return true;

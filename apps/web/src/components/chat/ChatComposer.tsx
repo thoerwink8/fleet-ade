@@ -181,6 +181,7 @@ import { encodeComposerContextFragment } from "@t3tools/shared/composerContextCl
 import type {
   ComposerContextRecord,
   OrchestrationV2Run,
+  PullRequestContextMetadata,
   ThreadPullRequestLink,
 } from "@t3tools/contracts";
 import { threadContextAttachment } from "~/lib/threadContextAttachment";
@@ -217,6 +218,33 @@ import {
   isComposerSubmissionBlocked,
   submitComposerDraft,
 } from "./composerSubmission";
+import {
+  getPreparingComposerImageFailure,
+  usePreparingComposerImageFailure,
+} from "./preparingComposerImages";
+import { useHasPendingDraftWork, usePendingDraftWorkFailure } from "./pendingDraftWork";
+import { type DraftSendFailure } from "./chatViewSend";
+import {
+  armPendingComposerSend,
+  cancelPendingComposerSend,
+  claimPendingComposerSend,
+  collectPendingSendBlockers,
+  dismissPendingSendCancelNotice,
+  PENDING_SEND_EDITED_NOTICE,
+  PENDING_SEND_LEFT_NOTICE,
+  usePendingSendCancelNotice,
+  evaluatePendingComposerSend,
+  pendingSendWaitingMessage,
+  resolvePendingSendDispatchMode,
+  usePendingComposerSend,
+} from "./pendingComposerSend.logic";
+import {
+  classifyComposerInsertionBlock,
+  PendingComposerInsertionQueue,
+} from "./pendingComposerInsertions.logic";
+import { isCommandPaletteOpen } from "../../commandPaletteBus";
+import { isInSideChatPane } from "~/lib/sideChatPane";
+import { PendingSendWaitingBar } from "./PendingSendWaitingBar";
 import { ComposerPromptLengthValidation } from "./ComposerPromptLengthValidation";
 import { pendingDraftWork } from "./pendingDraftWork";
 import { importComposerThreadAttachment } from "./composerThreadImport";
@@ -225,7 +253,7 @@ import { observeResize } from "~/lib/observeResize";
 const isEnvironmentRequestInvalidError = Schema.is(EnvironmentRequestInvalidError);
 import { toastManager } from "../ui/toast";
 import { Button } from "../ui/button";
-import { PlayIcon, ReplyIcon } from "lucide-react";
+import { Clock3Icon, PlayIcon, ReplyIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { assistantCitationLabel } from "@t3tools/shared/assistantCitations";
 import { assistantCitationNavigation } from "../../lib/assistantCitationNavigation";
@@ -272,6 +300,22 @@ function consumePasteAsTextShortcut(deadline: { current: number }): boolean {
   return armed;
 }
 
+type QueuedComposerInsertion =
+  | { readonly kind: "folders"; readonly folders: ReadonlyArray<File> }
+  | { readonly kind: "mention"; readonly text: string }
+  | { readonly kind: "pull-request"; readonly pullRequest: PullRequestContextMetadata }
+  | {
+      readonly kind: "question-thread-contexts";
+      readonly records: ReadonlyArray<ThreadContextRecord>;
+    }
+  | {
+      readonly kind: "text-at-end";
+      readonly text: string;
+      readonly ensureLeadingBoundary?: boolean | undefined;
+      readonly clipboardData?: DataTransfer | undefined;
+      readonly failureTitle?: string | undefined;
+    };
+
 export interface ChatComposerHandle {
   focusAtEnd: () => void;
   focusAt: (cursor: number) => void;
@@ -280,7 +324,12 @@ export interface ChatComposerHandle {
   hasPendingAttachments: () => boolean;
   insertTextAtEnd: (
     text: string,
-    options?: { ensureLeadingBoundary?: boolean; clipboardData?: DataTransfer },
+    options?: {
+      ensureLeadingBoundary?: boolean | undefined;
+      clipboardData?: DataTransfer | undefined;
+      queueIfBusy?: boolean | undefined;
+      failureTitle?: string | undefined;
+    },
   ) => boolean;
   pasteTextAtEnd: (text: string, options?: { bypassAutoAttachment?: boolean }) => boolean;
   citeAssistantText: (
@@ -328,6 +377,16 @@ export interface ChatComposerHandle {
   };
   validateProviderInput: (providerInput: string) => boolean;
   setMultipleModelSelections: (selections: ReadonlyArray<ModelSelection>) => void;
+  submit: (options?: {
+    dispatchMode?: ComposerDispatchMode | undefined;
+    submissionIntent?: ComposerSubmissionIntent | undefined;
+    directAnnotation?:
+      | {
+          readonly annotation: PreviewAnnotationPayload;
+          readonly image: ComposerImageAttachment | null;
+        }
+      | undefined;
+  }) => boolean;
 }
 
 export interface ChatComposerProps {
@@ -357,6 +416,7 @@ export interface ChatComposerProps {
   phase: SessionPhase;
   canInterrupt: boolean;
   isSendBusy: boolean;
+  previousSendFailure?: DraftSendFailure | null;
   canResume: boolean;
   isRevertingCheckpoint?: boolean;
   sendDisabledReason: string | null;
@@ -445,6 +505,10 @@ export interface ChatComposerProps {
     e?: { preventDefault: () => void },
     dispatchMode?: ComposerDispatchMode,
     submissionIntent?: ComposerSubmissionIntent,
+    directAnnotation?: {
+      readonly annotation: PreviewAnnotationPayload;
+      readonly image: ComposerImageAttachment | null;
+    },
   ) => void;
   onResume: () => void;
   onInterrupt: () => void;
@@ -572,6 +636,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const hideKeyboardHints = useHideKeyboardShortcutHints();
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
+  // Drops the armed send because the draft changed under it, and says so.
+  const cancelCurrentPendingSend = () => {
+    cancelPendingComposerSend(composerDraftTargetKey, PENDING_SEND_EDITED_NOTICE);
+  };
+  // The user's own Cancel button or Escape: they know, so nothing is announced.
+  const cancelPendingSendByUser = () => {
+    cancelPendingComposerSend(composerDraftTargetKey);
+  };
   const {
     heldRequestIds,
     onDraftChange: onTypingGuardDraftChange,
@@ -656,9 +728,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const standaloneComposerImages = composerImages.filter(
     (image) => !previewAnnotationIds.has(image.id),
   );
-  const preparingComposerImages = usePreparingComposerImages(attachmentTargetKey).filter(
-    (image) => !image.hidden,
-  );
+  const allPreparingComposerImages = usePreparingComposerImages(attachmentTargetKey);
+  const preparingComposerImages = allPreparingComposerImages.filter((image) => !image.hidden);
+  const hasPreparingComposerImages = allPreparingComposerImages.length > 0;
+  const preparingImageFailure = usePreparingComposerImageFailure(attachmentTargetKey);
+  const hasPendingDraftWork = useHasPendingDraftWork(attachmentTargetKey);
+  const pendingDraftWorkFailure = usePendingDraftWorkFailure(attachmentTargetKey);
+  const pendingSend = usePendingComposerSend(composerDraftTargetKey);
+  const pendingSendCancelNotice = usePendingSendCancelNotice(composerDraftTargetKey);
+  const previousSendFailure = props.previousSendFailure ?? null;
+  const pendingSendStatusId = useId();
   const nonPersistedComposerImageIds = attachmentDraft.nonPersistedImageIds;
   const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   const openPrLink = useOpenPrLink(routeThreadRef);
@@ -714,12 +793,31 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     supportsAttachmentUploads,
     maxFileAttachmentBytes,
   });
-  const fileCapabilityBlockReason = fileAttachmentCapabilityBlockReason({
-    files: composerFiles,
-    attachmentUploadsCapabilityKnown,
-    supportsAttachmentUploads,
-    maxFileAttachmentBytes,
-  });
+  const waitingForAttachmentCapabilities =
+    !attachmentUploadsCapabilityKnown &&
+    composerFiles.length > 0 &&
+    environmentUnavailable !== null;
+  const fileCapabilityBlockReason = waitingForAttachmentCapabilities
+    ? null
+    : fileAttachmentCapabilityBlockReason({
+        files: composerFiles,
+        attachmentUploadsCapabilityKnown,
+        supportsAttachmentUploads,
+        maxFileAttachmentBytes,
+      });
+  // Answers and approval redirects need their uploads first. A pending send waits for them
+  // instead of failing, because they finish on their own.
+  const needsUploadsBeforeSend =
+    questionAttachmentTarget ||
+    pendingApprovals.some((approval) => !heldRequestIds.has(approval.requestId));
+  const attachmentUploadWaitReason =
+    supportsAttachmentUploads && needsReattachFileCount === 0 && needsUploadsBeforeSend
+      ? attachmentUploadBlockReason({
+          imageIds: [...composerImages, ...composerFiles].map((attachment) => attachment.id),
+          uploadsByImageId,
+          environmentId,
+        })
+      : null;
   const attachmentBlockReason =
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
@@ -732,15 +830,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         ? needsReattachFileCount === 1
           ? "请重新添加中断的文件，或将其移除"
           : "请重新添加中断的文件，或将它们移除"
-        : // A plain send waits for its uploads. Answers and approval redirects need them first.
-          questionAttachmentTarget ||
-            pendingApprovals.some((approval) => !heldRequestIds.has(approval.requestId))
-          ? attachmentUploadBlockReason({
-              imageIds: [...composerImages, ...composerFiles].map((attachment) => attachment.id),
-              uploadsByImageId,
-              environmentId,
-            })
-          : null
+        : attachmentUploadWaitReason
       : null);
   const setComposerDraftPrompt = useComposerDraftStore((store) => store.setPrompt);
   const addComposerDraftImages = useComposerDraftStore((store) => store.addImages);
@@ -971,7 +1061,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     !forceExpandedOnMobile &&
     !isComposerFocused &&
     !hasMultilinePrompt &&
-    pendingUserInputs.length === 0;
+    pendingUserInputs.length === 0 &&
+    pendingSend === null;
 
   const composerEditorRef = useRef<ComposerPromptEditorHandle>(null);
   const pasteAsTextShortcutUntilRef = useRef(0);
@@ -1049,6 +1140,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     terminalContexts: composerTerminalContexts,
     elementContextCount: composerPreviewAnnotations.length + composerReviewComments.length,
   });
+  const hasPreparingContent = hasPreparingComposerImages || hasPendingDraftWork;
+  const hasSendableOrPreparingContent = composerSendState.hasSendableContent || hasPreparingContent;
   const composerTriggerKind = composerTrigger?.kind ?? null;
   const compactSlashCommandAvailable =
     composerTrigger?.kind === "slash-command" &&
@@ -1134,6 +1227,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     const currentPrompt = getComposerDraft(composerDraftTarget)?.prompt ?? "";
     const nextPrompt = edit(currentPrompt);
     if (nextPrompt === currentPrompt) return;
+    cancelCurrentPendingSend();
     if (nextPrompt === promptRef.current) {
       scheduleComposerFocus();
       return;
@@ -1175,15 +1269,28 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       }
     : null;
   const showResumeAction =
-    canResume && !composerDraftHasUserContent(composerDraft) && !isEditingQueuedMessage;
+    canResume &&
+    !composerDraftHasUserContent(composerDraft) &&
+    !hasPreparingContent &&
+    !isEditingQueuedMessage;
+  const canQueueCollapsedPendingSend =
+    (environmentUnavailable !== null || (isSendBusy && !isEditingQueuedMessage)) &&
+    hasSendableOrPreparingContent &&
+    !showResumeAction &&
+    !isSendDisabled &&
+    canOperateThread &&
+    !showProviderUnavailable &&
+    !(noProviderAvailable && environmentUnavailable === null) &&
+    !projectSelectionRequired;
   const collapsedComposerPrimaryActionDisabled =
     phase === "running" ||
-    isSendBusy ||
-    isSendDisabled ||
-    noProviderAvailable ||
-    projectSelectionRequired ||
-    environmentUnavailable !== null ||
-    (!composerSendState.hasSendableContent && !showResumeAction);
+    (!canQueueCollapsedPendingSend &&
+      (isSendBusy ||
+        isSendDisabled ||
+        noProviderAvailable ||
+        projectSelectionRequired ||
+        environmentUnavailable !== null ||
+        (!hasSendableOrPreparingContent && !showResumeAction)));
   const collapsedComposerPrimaryActionLabel = showResumeAction
     ? "继续会话"
     : props.resumeCompactionTokens !== null && !props.keepFullHistory
@@ -1215,6 +1322,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   const removeComposerFileFromDraft = (fileId: string) => {
     if (questionAttachmentTarget && activePendingIsResponding) return;
+    cancelCurrentPendingSend();
     // Hydrated uploads use persisted attachment ids, not queue keys.
     const file = composerFilesRef.current.find((candidate) => candidate.id === fileId);
     if (file) {
@@ -1522,6 +1630,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     refreshWorkspaceSnapshotOnTyping();
     if (activePendingProgress?.activeQuestion && pendingUserInputs.length > 0) {
       if (activePendingProgress.activeQuestion.allowCustomAnswer === false) return;
+      cancelCurrentPendingSend();
       setComposerCursor(nextCursor);
       setComposerTrigger(
         cursorAdjacentToMention ? null : detectComposerTrigger(nextPrompt, expandedCursor),
@@ -1535,6 +1644,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       );
       return;
     }
+    cancelCurrentPendingSend();
     onTypingGuardDraftChange();
     promptRef.current = nextPrompt;
     setPrompt(nextPrompt);
@@ -1660,6 +1770,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       expectedText?: string;
       expandedCursorAfterReplace?: number;
       focusEditorAfterReplace?: boolean;
+      systemAttachmentCompletion?: boolean;
       citationComment?: {
         start: number;
         sourceAnchor: AssistantCitationSourceAnchor;
@@ -1681,6 +1792,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       currentText.slice(safeStart, safeEnd) !== options.expectedText
     ) {
       return false;
+    }
+    if (options?.systemAttachmentCompletion !== true) {
+      cancelCurrentPendingSend();
     }
     const next = replaceTextRange(promptRef.current, rangeStart, rangeEnd, replacement);
     const nextCursor = collapseExpandedComposerCursor(
@@ -1754,22 +1868,69 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const readComposerSnapshotStable = useStableCallback(readComposerSnapshot);
 
   const submissionTarget = activePendingProgress ? "pending-user-input" : "provider-turn";
-  const submissionBlocked = isComposerSubmissionBlocked({
+  const hardProviderOrProjectBlockReason =
+    !activePendingProgress && projectSelectionRequired
+      ? "请先在上方选择项目以开始会话"
+      : !activePendingProgress && showProviderUnavailable
+        ? "请在设置中启用一个智能体后再发送消息"
+        : !activePendingProgress && noProviderAvailable && environmentUnavailable === null
+          ? "正在加载智能体…"
+          : null;
+  const hardSendDisabledReason = sendDisabledReason ?? hardProviderOrProjectBlockReason;
+  const hardSubmissionBlocked = isComposerSubmissionBlocked({
     submissionTarget,
-    noProviderAvailable,
-    sendDisabledReason,
+    noProviderAvailable: noProviderAvailable && environmentUnavailable === null,
+    sendDisabledReason: hardSendDisabledReason,
     attachmentBlockReason,
-    environmentUnavailable: environmentUnavailable !== null,
+    environmentUnavailable: false,
   });
   // The pending Submit button follows the answer's own blockers, matching submitComposer.
   const primaryActionSendDisabledReason = activePendingProgress
     ? activePendingIsEnded
       ? "这一轮已经结束，无法继续回答。"
       : attachmentBlockReason
-    : sendDisabledReason;
-  const primaryActionEnvironmentUnavailable =
-    environmentUnavailable !== null ||
-    (!activePendingProgress && (noProviderAvailable || projectSelectionRequired));
+    : hardSendDisabledReason;
+  const primaryActionEnvironmentUnavailable = environmentUnavailable !== null;
+  const canWaitForReconnecting =
+    environmentUnavailable !== null &&
+    (!activePendingProgress || activePendingProgress.isLastQuestion);
+  const pendingSendBlockers = collectPendingSendBlockers({
+    preparingImages: hasPreparingComposerImages,
+    loadingContext: hasPendingDraftWork,
+    reconnecting: canWaitForReconnecting,
+    previousSendBusy: isSendBusy && !isEditingQueuedMessage && !activePendingProgress,
+    waitingForAttachmentCapabilities,
+    uploadingAttachments: attachmentUploadWaitReason !== null,
+  });
+  const hardBlockedReasonForPending = !canOperateThread
+    ? "此连接无法修改会话。"
+    : activePendingProgress
+      ? activePendingIsEnded
+        ? "这一轮已经结束，无法继续回答。"
+        : attachmentBlockReason === attachmentUploadWaitReason
+          ? null
+          : attachmentBlockReason
+      : hardSendDisabledReason;
+  const pendingSendEvaluation = pendingSend
+    ? evaluatePendingComposerSend({
+        pending: pendingSend,
+        blockers: pendingSendBlockers,
+        failures: {
+          imageFailure: preparingImageFailure,
+          contextFailure: pendingDraftWorkFailure,
+          previousSendFailure,
+        },
+        hardBlockedReason: hardBlockedReasonForPending,
+        currentSubmissionTarget: submissionTarget,
+        editingQueuedMessage: isEditingQueuedMessage,
+      })
+    : null;
+  const pendingSendReason =
+    pendingSendEvaluation?.status === "waiting"
+      ? pendingSendEvaluation.message
+      : pendingSend !== null
+        ? pendingSendWaitingMessage(pendingSendBlockers[0] ?? "reconnecting")
+        : null;
   const resolveActiveComposerTrigger = (): {
     snapshot: { value: string; cursor: number; expandedCursor: number };
     trigger: ComposerTrigger | null;
@@ -2006,7 +2167,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   const shouldBlurMobileComposerOnSubmit = () => {
     if (!isSoftwareKeyboardOpen) return false;
-    if (isSendBusy || submissionBlocked || environmentUnavailable !== null || phase === "running") {
+    if (
+      isSendBusy ||
+      hardSubmissionBlocked ||
+      environmentUnavailable !== null ||
+      phase === "running"
+    ) {
       return false;
     }
     if (activePendingProgress) {
@@ -2019,56 +2185,97 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     event?: { preventDefault: () => void },
     dispatchMode?: ComposerDispatchMode,
     submissionIntent?: ComposerSubmissionIntent,
+    directAnnotation?: {
+      readonly annotation: PreviewAnnotationPayload;
+      readonly image: ComposerImageAttachment | null;
+    },
   ) => {
-    if (submissionBlocked || !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
+    if (
+      hardSubmissionBlocked ||
+      (!activePendingProgress && projectSelectionRequired) ||
+      !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)
+    ) {
       event?.preventDefault();
-      return false;
-    }
-    // A send while a pasted image is still compressing would strand that image:
-    // the turn snapshot wouldn't include it, and it would surface in the *next*
-    // draft instead.
-    if (activeThreadId && countPreparingComposerImages(attachmentTargetKey) > 0) {
-      event?.preventDefault();
-      toastManager.add({
-        type: "info",
-        title: "粘贴的图片仍在压缩。",
-        description: "缩略图出现后请再次发送。",
-      });
-      return false;
-    }
-    if (pendingDraftWork.has(attachmentTargetKey)) {
-      event?.preventDefault();
-      toastManager.add({
-        type: "info",
-        title: "仍在把附加的上下文放入这条消息。",
-        description: "标签加载完成后请再次发送。",
-      });
       return false;
     }
     // An empty draft has nothing to send; Enter does what the Resume thread button does.
-    if (showResumeAction && !activePendingProgress) {
+    if (showResumeAction && !activePendingProgress && !directAnnotation) {
       event?.preventDefault();
       if (isSendBusy || environmentUnavailable !== null) return false;
       onResume();
       return true;
     }
+    const requestedDispatchMode =
+      dispatchMode ??
+      resolveComposerDispatchMode({
+        running: phase === "running" || phase === "connecting",
+        alternateModifier: false,
+        activeTurnDefault: followUpBehavior,
+        canSteer,
+      });
+    const resolvedSubmissionIntent = submissionIntent ?? "foreground";
+    const livePreparingImages =
+      Boolean(activeThreadId) && countPreparingComposerImages(attachmentTargetKey) > 0;
+    const liveLoadingContext = pendingDraftWork.has(attachmentTargetKey);
+    const liveBlockers = collectPendingSendBlockers({
+      preparingImages: livePreparingImages,
+      loadingContext: liveLoadingContext,
+      reconnecting: canWaitForReconnecting,
+      previousSendBusy: isSendBusy && !isEditingQueuedMessage && !activePendingProgress,
+      waitingForAttachmentCapabilities,
+      uploadingAttachments: attachmentUploadWaitReason !== null,
+    });
+    const lengthValidationError = getComposerSubmissionValidationMessage({
+      prompt: promptRef.current,
+      submissionTarget,
+    });
+    if (lengthValidationError) {
+      event?.preventDefault();
+      setComposerSubmissionError(lengthValidationError);
+      return false;
+    }
+    const questionCanSubmitNow = activePendingProgress
+      ? activePendingProgress.isLastQuestion
+        ? Boolean(activePendingResolvedAnswers)
+        : activePendingProgress.canAdvance
+      : false;
+    const hasContentToQueue = activePendingProgress
+      ? questionCanSubmitNow
+      : directAnnotation !== undefined ||
+        hasSendableOrPreparingContent ||
+        livePreparingImages ||
+        liveLoadingContext ||
+        promptRef.current.trim().length > 0;
+    if (liveBlockers.length > 0 && !isEditingQueuedMessage && hasContentToQueue) {
+      event?.preventDefault();
+      if (directAnnotation) {
+        if (directAnnotation.image) {
+          addComposerImagesToDraft([directAnnotation.image]);
+        }
+        addComposerDraftPreviewAnnotation(composerDraftTarget, directAnnotation.annotation);
+      }
+      armPendingComposerSend({
+        targetKey: composerDraftTargetKey,
+        dispatchMode: requestedDispatchMode,
+        submissionIntent: resolvedSubmissionIntent,
+        submissionTarget,
+        waitedForPreviousSend: liveBlockers.includes("previous-send-busy"),
+        baseline: {
+          imageFailureSeq: getPreparingComposerImageFailure(attachmentTargetKey)?.sequence ?? 0,
+          contextFailureSeq: pendingDraftWork.lastFailure(attachmentTargetKey)?.sequence ?? 0,
+          previousSendFailureSeq: previousSendFailure?.sequence ?? 0,
+        },
+      });
+      return true;
+    }
+    cancelCurrentPendingSend();
     const submission = submitComposerDraft({
       prompt: promptRef.current,
       submissionTarget,
       event,
       onSend: (sendEvent) => {
         providerInputRejectedRef.current = false;
-        onSend(
-          sendEvent,
-          dispatchMode ??
-            resolveComposerDispatchMode({
-              running: phase === "running" || phase === "connecting",
-              alternateModifier: false,
-              activeTurnDefault: followUpBehavior,
-              canSteer,
-            }),
-          submissionIntent,
-        );
+        onSend(sendEvent, requestedDispatchMode, resolvedSubmissionIntent, directAnnotation);
         return !providerInputRejectedRef.current;
       },
     });
@@ -2081,6 +2288,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return true;
   };
   const submitComposerStable = useStableCallback(submitComposer);
+  const cancelCurrentPendingSendStable = useStableCallback(cancelCurrentPendingSend);
+  const cancelPendingSendByUserStable = useStableCallback(cancelPendingSendByUser);
+  const dismissPendingSendCancelNoticeStable = useStableCallback(() => {
+    dismissPendingSendCancelNotice(composerDraftTargetKey);
+  });
+  const handleMultipleModelSelectionsChange = useStableCallback(
+    (selections: Parameters<typeof setMultipleModelSelections>[0]) => {
+      cancelCurrentPendingSend();
+      setMultipleModelSelections(selections);
+    },
+  );
   const handleSubmitMessage = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     submitComposer(
@@ -2163,6 +2381,78 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // After /clear the next message starts a fresh session that cannot see what the suggestion refers to.
   const freshSessionArmed = useFreshSessionArmed(scopedThreadKey(routeThreadRef));
   const isTurnRunning = phase === "running" || phase === "connecting";
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- dispatches or reports an armed pending composer send once readiness blockers clear or a preparation step fails
+  useEffect(() => {
+    if (!pendingSend || !pendingSendEvaluation || pendingSendEvaluation.status === "waiting") {
+      return;
+    }
+    const claimed = claimPendingComposerSend(composerDraftTargetKey, pendingSend.id);
+    if (!claimed) return;
+    if (pendingSendEvaluation.status === "failed") {
+      const canRetryDirect =
+        pendingSendEvaluation.canRetryDirect &&
+        (claimed.submissionTarget === "pending-user-input"
+          ? activePendingProgress !== null
+          : composerSendState.hasSendableContent);
+      const retryMode = resolvePendingSendDispatchMode({
+        requestedMode: claimed.dispatchMode,
+        isRunning: isTurnRunning,
+        followUpBehavior,
+        canSteer,
+      });
+      toastManager.add({
+        type: "error",
+        title: pendingSendEvaluation.title,
+        description: pendingSendEvaluation.description,
+        timeout: 0,
+        ...(canRetryDirect
+          ? {
+              actionProps: {
+                children: "直接发送",
+                onClick: () => {
+                  submitComposerStable(undefined, retryMode, claimed.submissionIntent);
+                },
+              },
+            }
+          : {}),
+      });
+      return;
+    }
+    if (!isLiteralPendingAnswer) {
+      promptRef.current = prompt;
+    }
+    composerImagesRef.current = composerImages;
+    composerFilesRef.current = composerFiles;
+    composerTerminalContextsRef.current = composerTerminalContexts;
+    const effectiveMode = resolvePendingSendDispatchMode({
+      requestedMode: claimed.dispatchMode,
+      isRunning: isTurnRunning,
+      followUpBehavior,
+      canSteer,
+    });
+    submitComposerStable(undefined, effectiveMode, claimed.submissionIntent);
+  }, [
+    activePendingProgress,
+    canSteer,
+    composerDraftTargetKey,
+    composerFiles,
+    composerFilesRef,
+    composerImages,
+    composerImagesRef,
+    composerSendState.hasSendableContent,
+    composerTerminalContexts,
+    composerTerminalContextsRef,
+    followUpBehavior,
+    isLiteralPendingAnswer,
+    isTurnRunning,
+    pendingSend,
+    pendingSendEvaluation,
+    prompt,
+    promptRef,
+    submitComposerStable,
+  ]);
+
   // Offered only where the default placeholder would show, so it never hides a pending question.
   const offeredPromptSuggestion =
     !isTurnRunning &&
@@ -2221,6 +2511,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       submitComposer,
       promptSuggestion: offeredPromptSuggestion,
       dismissPromptSuggestion,
+      hasPendingSend: pendingSend !== null,
+      cancelPendingSend: cancelPendingSendByUser,
+      onUserPromptEdited: cancelCurrentPendingSend,
     })(key, event, isTaskItem);
 
   const {
@@ -2260,6 +2553,46 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     importContextRecords,
     expandMobileComposer: expandMobileComposerStable,
   });
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the pending-send store outlives this component, so leaving a draft target must drop its armed send instead of auto-sending it whenever the user comes back
+  useEffect(
+    () => () => {
+      cancelPendingComposerSend(composerDraftTargetKey, PENDING_SEND_LEFT_NOTICE);
+    },
+    [composerDraftTargetKey],
+  );
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- listens for Escape while a pending send is waiting so clicking the waiting button or leaving the editor can still cancel it
+  useEffect(() => {
+    if (pendingSend === null || backgroundThread) return;
+    const onWindowKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229 ||
+        isCommandPaletteOpen() ||
+        isStashMenuOpen ||
+        isComposerModelPickerOpen ||
+        composerMenuOpenRef.current ||
+        isInSideChatPane(event.target) ||
+        document.querySelector('[role="dialog"], [role="alertdialog"]') !== null
+      ) {
+        return;
+      }
+      event.preventDefault();
+      cancelPendingComposerSend(composerDraftTargetKey);
+    };
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
+  }, [
+    backgroundThread,
+    composerDraftTargetKey,
+    isComposerModelPickerOpen,
+    isStashMenuOpen,
+    pendingSend,
+  ]);
+
   const hasBlockingComposerTopDrawer = pendingUserInputs.length > 0;
   const composerControlsCollapsed = isComposerCollapsedMobile;
   // The collapsed mobile web composer keeps a second controls row inside the card.
@@ -2329,7 +2662,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       isSendBusy={isSendBusy}
       multipleModelsEnabled={routeKind === "draft" && supportsMultipleModels}
       multipleModelSelections={multipleModelSelections}
-      onMultipleModelSelectionsChange={setMultipleModelSelections}
+      onMultipleModelSelectionsChange={handleMultipleModelSelectionsChange}
       selectedModelSelection={selectedModelSelection}
       onProviderModelSelect={onProviderModelSelect}
       activeThreadModelSelection={activeThreadModelSelection}
@@ -2374,7 +2707,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             </button>
           ),
           dismissLabel: "取消回复",
-          onDismiss: () => setComposerDraftReplyTo(composerDraftTarget, null),
+          onDismiss: () => {
+            cancelCurrentPendingSend();
+            setComposerDraftReplyTo(composerDraftTarget, null);
+          },
         },
       ]
     : [];
@@ -2396,6 +2732,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       ensureLeadingBoundary?: boolean;
       citationCommentAnchor?: AssistantCitationSourceAnchor;
       clipboardData?: DataTransfer;
+      systemAttachmentCompletion?: boolean | undefined;
     },
   ): boolean => {
     if (
@@ -2429,8 +2766,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               insertedSpaces: { before: needsLeadingSpace, after: rangeEnd === cursor },
             },
             focusEditorAfterReplace: false,
+            ...(options.systemAttachmentCompletion !== undefined
+              ? { systemAttachmentCompletion: options.systemAttachmentCompletion }
+              : {}),
           }
-        : undefined,
+        : options?.systemAttachmentCompletion !== undefined
+          ? { systemAttachmentCompletion: options.systemAttachmentCompletion }
+          : undefined,
     );
   };
   const insertComposerTextStable = useStableCallback(insertComposerText);
@@ -2438,6 +2780,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const insertAttachmentReferences = (
     references: ReadonlyArray<ComposerContextReference>,
     selection?: { start: number; end: number },
+    options?: { readonly systemAttachmentCompletion?: boolean | undefined },
   ): boolean => {
     if (references.length === 0) return false;
     // Question answers carry attachments beside the answer, never as chips. Falling back to
@@ -2450,11 +2793,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       insertReferences: () => {
         if (selection) {
           const edit = inlineContextReferenceReplacement(promptRef.current, selection, references);
-          return applyPromptReplacementStable(edit.start, edit.end, edit.text);
+          return applyPromptReplacementStable(
+            edit.start,
+            edit.end,
+            edit.text,
+            options?.systemAttachmentCompletion !== undefined
+              ? { systemAttachmentCompletion: options.systemAttachmentCompletion }
+              : undefined,
+          );
         }
         const text = references.map(formatInlineContextReference).join(" ");
         const inserted = insertComposerTextStable(`${text} `, "cursor", {
           ensureLeadingBoundary: true,
+          ...(options?.systemAttachmentCompletion !== undefined
+            ? { systemAttachmentCompletion: options.systemAttachmentCompletion }
+            : {}),
         });
         if (!inserted) {
           setPrompt(ensureInlineContextReferences(promptRef.current, references));
@@ -2488,6 +2841,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       addComposerFilesToDraft,
       removeComposerImageFromDraft,
       insertAttachmentReferences,
+      onUserAttachmentsMutated: cancelCurrentPendingSendStable,
     });
 
   const onComposerCommandKeyStable = useStableCallback(onComposerCommandKey);
@@ -2495,15 +2849,116 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     () => resolveActiveComposerTrigger().trigger?.kind === "path",
   );
 
-  const insertComposerTextAtEnd: ChatComposerHandle["insertTextAtEnd"] = (text, options) => {
-    const inserted = insertComposerText(text, "end", options);
+  const pendingInsertionsRef =
+    useRef<PendingComposerInsertionQueue<QueuedComposerInsertion> | null>(null);
+  const getPendingInsertions = () => {
+    if (pendingInsertionsRef.current === null) {
+      pendingInsertionsRef.current = new PendingComposerInsertionQueue();
+    }
+    return pendingInsertionsRef.current;
+  };
+  const composerInsertionBlock = classifyComposerInsertionBlock({
+    projectSelectionRequired,
+    activePendingIsResponding,
+    pendingUserInputCount: pendingUserInputs.length,
+    hasActiveQuestion: Boolean(activePendingProgress?.activeQuestion),
+    choiceOnlyQuestion: isChoiceOnlyPendingQuestion,
+    canOperateThread,
+  });
+  const questionThreadDropBlock = classifyComposerInsertionBlock({
+    projectSelectionRequired,
+    activePendingIsResponding,
+    pendingUserInputCount: pendingUserInputs.length,
+    hasActiveQuestion: Boolean(activePendingProgress?.activeQuestion),
+    choiceOnlyQuestion: isChoiceOnlyPendingQuestion,
+    canOperateThread,
+    requireOperate: true,
+  });
+
+  const insertTextIntoEndImmediate = (
+    text: string,
+    options?: {
+      ensureLeadingBoundary?: boolean | undefined;
+      clipboardData?: DataTransfer | undefined;
+    },
+  ): boolean => {
+    const inserted = insertComposerText(text, "end", {
+      ...(options?.ensureLeadingBoundary !== undefined
+        ? { ensureLeadingBoundary: options.ensureLeadingBoundary }
+        : {}),
+      ...(options?.clipboardData ? { clipboardData: options.clipboardData } : {}),
+    });
     if (inserted && isComposerCollapsedMobile) {
       // Reveal the mobile editor before its focus frame.
       expandMobileComposer();
     }
     return inserted;
   };
+
+  const insertComposerTextAtEnd: ChatComposerHandle["insertTextAtEnd"] = (text, options) => {
+    if (options?.queueIfBusy !== true) {
+      return insertTextIntoEndImmediate(text, options);
+    }
+    if (composerInsertionBlock?.kind === "transient") {
+      getPendingInsertions().enqueue(composerDraftTargetKey, {
+        kind: "text-at-end",
+        text,
+        ...(options.ensureLeadingBoundary !== undefined
+          ? { ensureLeadingBoundary: options.ensureLeadingBoundary }
+          : {}),
+        ...(options.clipboardData ? { clipboardData: options.clipboardData } : {}),
+        ...(options.failureTitle ? { failureTitle: options.failureTitle } : {}),
+      });
+      return true;
+    }
+    if (composerInsertionBlock?.kind === "hard") {
+      toastManager.add({
+        type: "error",
+        title: options.failureTitle ?? "无法添加到会话",
+        description: composerInsertionBlock.reason,
+      });
+      return false;
+    }
+    const inserted = insertTextIntoEndImmediate(text, options);
+    if (!inserted) {
+      toastManager.add({
+        type: "error",
+        title: options.failureTitle ?? "无法添加到会话",
+        description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+      });
+    }
+    return inserted;
+  };
   const insertComposerTextAtEndStable = useStableCallback(insertComposerTextAtEnd);
+
+  const insertFoldersNow = (folders: ReadonlyArray<File>) => {
+    for (const folder of folders) {
+      const path = resolveDroppedFolderPath(folder, window.desktopBridge?.getPathForFile);
+      if (path === null) {
+        toastManager.add({
+          type: "error",
+          title: `无法获取“${folder.name}”的路径`,
+          description: "请改为用 @ 输入文件夹路径。",
+        });
+        continue;
+      }
+      const inserted = insertTextIntoEndImmediate(`${serializeComposerFileLink(path)} `, {
+        ensureLeadingBoundary: true,
+      });
+      if (!inserted) {
+        toastManager.add({
+          type: "error",
+          title: "无法添加文件夹",
+          description:
+            composerInsertionBlock?.kind === "hard"
+              ? composerInsertionBlock.reason
+              : "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+        });
+        break;
+      }
+    }
+    focusComposer();
+  };
 
   const addComposerFolders = (folders: File[]) => {
     const target = folderDropTarget({
@@ -2520,29 +2975,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       });
       return;
     }
-    for (const folder of folders) {
-      const path = resolveDroppedFolderPath(folder, window.desktopBridge?.getPathForFile);
-      if (path === null) {
-        toastManager.add({
-          type: "error",
-          title: `无法获取“${folder.name}”的路径`,
-          description: "请改为用 @ 输入文件夹路径。",
-        });
-        continue;
-      }
-      const inserted = insertComposerTextAtEndStable(`${serializeComposerFileLink(path)} `, {
-        ensureLeadingBoundary: true,
-      });
-      if (!inserted) {
-        toastManager.add({
-          type: "error",
-          title: "无法添加文件夹",
-          description: "输入框正忙，请在就绪后重试。",
-        });
-        break;
-      }
+    if (composerInsertionBlock?.kind === "transient") {
+      getPendingInsertions().enqueue(composerDraftTargetKey, { kind: "folders", folders });
+      return;
     }
-    focusComposer();
+    if (composerInsertionBlock?.kind === "hard") {
+      toastManager.add({
+        type: "error",
+        title: "无法添加文件夹",
+        description: composerInsertionBlock.reason,
+      });
+      return;
+    }
+    insertFoldersNow(folders);
   };
   const addComposerFoldersStable = useStableCallback(addComposerFolders);
 
@@ -2591,32 +3036,57 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return setContextInsertionHandler(composerDraftTarget, insertContextReferencesAtCaretStable);
   }, [composerDraftTarget, insertContextReferencesAtCaretStable, setContextInsertionHandler]);
 
+  const enqueuePendingInsertionStable = useStableCallback((entry: QueuedComposerInsertion) => {
+    getPendingInsertions().enqueue(composerDraftTargetKey, entry);
+  });
   // Capture drops before the editor; mention handlers own native propagation and moves.
-  const composerMentionDragHandlers = makeComposerMentionDragHandlers({
-    insertMentionAtEnd: (text) =>
-      insertComposerTextAtEndStable(text, { ensureLeadingBoundary: true }),
-    insertPullRequestAtEnd: (pullRequest) => {
-      const comment = buildPullRequestReferenceContext(pullRequest);
-      const inserted = insertComposerTextAtEndStable(
-        `${formatInlineContextReference(reviewCommentContextReference(comment))} `,
-        { ensureLeadingBoundary: true },
-      );
-      if (inserted) {
-        addComposerDraftReviewComment(composerDraftTarget, comment, { appendReference: false });
+  const insertPullRequestReferenceNow = (pullRequest: PullRequestContextMetadata): boolean => {
+    const comment = buildPullRequestReferenceContext(pullRequest);
+    const inserted = insertTextIntoEndImmediate(
+      `${formatInlineContextReference(reviewCommentContextReference(comment))} `,
+      { ensureLeadingBoundary: true },
+    );
+    if (inserted) {
+      addComposerDraftReviewComment(composerDraftTarget, comment, { appendReference: false });
+    }
+    return inserted;
+  };
+  const insertMentionOrQueueStable = useStableCallback((text: string) => {
+    if (composerInsertionBlock?.kind === "transient") {
+      enqueuePendingInsertionStable({ kind: "mention", text });
+      return true;
+    }
+    return insertComposerTextAtEndStable(text, { ensureLeadingBoundary: true });
+  });
+  const insertPullRequestOrQueueStable = useStableCallback(
+    (pullRequest: PullRequestContextMetadata) => {
+      if (composerInsertionBlock?.kind === "transient") {
+        enqueuePendingInsertionStable({ kind: "pull-request", pullRequest });
+        return true;
       }
-      return inserted;
+      return insertPullRequestReferenceNow(pullRequest);
     },
+  );
+  const rejectMentionInsertStable = useStableCallback(() => {
+    toastManager.add({
+      type: "error",
+      title: "无法添加到会话",
+      description:
+        composerInsertionBlock?.kind === "hard"
+          ? composerInsertionBlock.reason
+          : "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+    });
+  });
+  const composerMentionDragHandlers = makeComposerMentionDragHandlers({
+    insertMentionAtEnd: insertMentionOrQueueStable,
+    insertPullRequestAtEnd: insertPullRequestOrQueueStable,
     setDragActive: setIsDragOverComposer,
-    onInsertRejected: () => {
-      toastManager.add({
-        type: "error",
-        title: "无法添加到会话",
-        description: "输入框正忙，请在就绪后重试。",
-      });
-    },
+    onInsertRejected: rejectMentionInsertStable,
   });
 
-  const attachDroppedThreadFile = useEffectEvent((file: File) => addComposerAttachments([file]));
+  const attachDroppedThreadFile = useEffectEvent((file: File) =>
+    addComposerAttachments([file], { fromPendingWork: true }),
+  );
   const importDroppedThread = useEffectEvent(
     async (ref: ScopedThreadRef, isActive: () => boolean) => {
       const targetKey = attachmentTargetKey;
@@ -2645,31 +3115,60 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           isActive,
           attach: attachDroppedThreadFile,
           onLimitReached: () => {
+            const message = `每条消息最多可添加 ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} 个文件。`;
+            pendingDraftWork.fail(targetKey, message);
             if (activeThreadId) {
-              setThreadError(
-                activeThreadId,
-                `每条消息最多可添加 ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} 个文件。`,
-              );
+              setThreadError(activeThreadId, message);
             }
           },
         }),
       );
       if (importResult._tag === "Failure" && isActive()) {
         const error = squashAtomCommandFailure(importResult);
+        const failureReason =
+          isEnvironmentRequestInvalidError(error) && error.reason === "thread_transcript_too_large"
+            ? "这个会话超出了附件大小限制，请换一个较短的会话。"
+            : "请确认它所在的电脑已连接且为最新版本，然后重试。";
+        pendingDraftWork.fail(targetKey, `无法读取拖入的会话：${failureReason}`);
         toastManager.add({
           type: "error",
           title: "无法读取拖入的会话",
-          description:
-            isEnvironmentRequestInvalidError(error) &&
-            error.reason === "thread_transcript_too_large"
-              ? "这个会话超出了附件大小限制，请换一个较短的会话。"
-              : "请确认它所在的电脑已连接且为最新版本，然后重试。",
+          description: failureReason,
         });
       }
       toastManager.close(loadingToast);
       pendingDraftWork.end(targetKey);
     },
   );
+
+  const insertQuestionThreadContextsNow = (
+    records: ReadonlyArray<ThreadContextRecord>,
+  ): boolean => {
+    if (questionAttachmentTarget === null) return false;
+    const canAnswer =
+      canOperateThread &&
+      !activePendingIsResponding &&
+      activePendingProgress?.activeQuestion?.allowCustomAnswer !== false;
+    const text = `${records
+      .map((record) => formatInlineContextReference(threadContextReference(record)))
+      .join(" ")} `;
+    const snapshot = readComposerSnapshotStable();
+    const cursor = snapshot.expandedCursor;
+    const leadingSpace = cursor > 0 && !/\s/.test(snapshot.value[cursor - 1] ?? "");
+    const inserted =
+      canAnswer &&
+      applyPromptReplacementStable(
+        cursor,
+        extendReplacementRangeForTrailingSpace(snapshot.value, cursor, text),
+        leadingSpace ? ` ${text}` : text,
+      );
+    if (!inserted) return false;
+    addComposerDraftThreadContexts(questionAttachmentTarget, records, {
+      appendReference: false,
+    });
+    if (isComposerCollapsedMobile) expandMobileComposerStable();
+    return true;
+  };
 
   useThreadContextDrop(composerFormRef, environmentId, attachmentTargetKey, (refs, isActive) => {
     const records = refs.flatMap((ref) => {
@@ -2687,39 +3186,102 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     });
     if (records.length === 0) return;
     if (questionAttachmentTarget !== null) {
-      const canAnswer =
-        canOperateThread &&
-        !activePendingIsResponding &&
-        activePendingProgress?.activeQuestion?.allowCustomAnswer !== false;
-      const text = `${records
-        .map((record) => formatInlineContextReference(threadContextReference(record)))
-        .join(" ")} `;
-      const snapshot = readComposerSnapshotStable();
-      const cursor = snapshot.expandedCursor;
-      const leadingSpace = cursor > 0 && !/\s/.test(snapshot.value[cursor - 1] ?? "");
-      const inserted =
-        canAnswer &&
-        applyPromptReplacementStable(
-          cursor,
-          extendReplacementRangeForTrailingSpace(snapshot.value, cursor, text),
-          leadingSpace ? ` ${text}` : text,
-        );
-      if (!inserted) {
-        toastManager.add({
-          type: "error",
-          title: "无法添加会话",
-          description: "输入框正忙，请在就绪后重试。",
+      if (questionThreadDropBlock?.kind === "transient") {
+        getPendingInsertions().enqueue(composerDraftTargetKey, {
+          kind: "question-thread-contexts",
+          records,
         });
         return;
       }
-      addComposerDraftThreadContexts(questionAttachmentTarget, records, {
-        appendReference: false,
-      });
-      if (isComposerCollapsedMobile) expandMobileComposerStable();
+      if (questionThreadDropBlock?.kind === "hard") {
+        toastManager.add({
+          type: "error",
+          title: "无法添加会话",
+          description: questionThreadDropBlock.reason,
+        });
+        return;
+      }
+      if (!insertQuestionThreadContextsNow(records)) {
+        toastManager.add({
+          type: "error",
+          title: "无法添加会话",
+          description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+        });
+      }
     } else {
+      cancelCurrentPendingSend();
       addComposerDraftThreadContexts(composerDraftTarget, records);
     }
   });
+
+  const flushPendingInsertions = (entries: ReadonlyArray<QueuedComposerInsertion>) => {
+    for (const entry of entries) {
+      if (entry.kind === "folders") {
+        insertFoldersNow(entry.folders);
+      } else if (entry.kind === "mention") {
+        if (!insertTextIntoEndImmediate(entry.text, { ensureLeadingBoundary: true })) {
+          toastManager.add({
+            type: "error",
+            title: "无法添加到会话",
+            description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+          });
+        }
+      } else if (entry.kind === "pull-request") {
+        if (!insertPullRequestReferenceNow(entry.pullRequest)) {
+          toastManager.add({
+            type: "error",
+            title: "无法添加到会话",
+            description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+          });
+        }
+      } else if (entry.kind === "question-thread-contexts") {
+        if (questionAttachmentTarget !== null) {
+          if (!insertQuestionThreadContextsNow(entry.records)) {
+            toastManager.add({
+              type: "error",
+              title: "无法添加会话",
+              description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+            });
+          }
+        } else {
+          cancelCurrentPendingSend();
+          addComposerDraftThreadContexts(composerDraftTarget, entry.records);
+        }
+      } else if (entry.kind === "text-at-end") {
+        const inserted = insertTextIntoEndImmediate(entry.text, {
+          ensureLeadingBoundary: entry.ensureLeadingBoundary,
+          clipboardData: entry.clipboardData,
+        });
+        if (!inserted) {
+          toastManager.add({
+            type: "error",
+            title: entry.failureTitle ?? "无法添加到会话",
+            description: "当前无法向输入框写入内容，请确认输入框可编辑后再试。",
+          });
+        }
+      }
+    }
+  };
+  const flushPendingInsertionsStable = useStableCallback(flushPendingInsertions);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- flushes or fails queued composer insertions once transient readiness blockers clear or become hard blocks
+  useEffect(() => {
+    const queue = pendingInsertionsRef.current;
+    if (!queue) return;
+    queue.clearExcept(composerDraftTargetKey);
+    if (!queue.hasForTarget(composerDraftTargetKey)) return;
+    if (composerInsertionBlock?.kind === "transient") return;
+    const entries = queue.takeForTarget(composerDraftTargetKey);
+    if (composerInsertionBlock?.kind === "hard") {
+      toastManager.add({
+        type: "error",
+        title: "无法添加到输入框",
+        description: composerInsertionBlock.reason,
+      });
+      return;
+    }
+    flushPendingInsertionsStable(entries);
+  }, [composerDraftTargetKey, composerInsertionBlock, flushPendingInsertionsStable]);
 
   const onComposerMentionDragLeaveCapture = (event: React.DragEvent<HTMLFormElement>) => {
     if (!dataTransferHasComposerMention(event.dataTransfer.types)) return;
@@ -2851,6 +3413,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       replyToResponse: (response) => {
         // An open question owns the composer, and its answer would not carry the reply.
         if (pendingUserInputs.length > 0 || projectSelectionRequired) return false;
+        cancelCurrentPendingSendStable();
         setComposerDraftReplyTo(composerDraftTarget, response);
         focusComposer();
         return true;
@@ -2980,6 +3543,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           composerTerminalContexts.length,
         );
         if (!inserted) return;
+        cancelCurrentPendingSendStable();
         promptRef.current = insertion.prompt;
         setComposerCursor(nextCollapsedCursor);
         setComposerTrigger(detectComposerTrigger(insertion.prompt, insertion.cursor));
@@ -3018,7 +3582,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         selectedModel,
         selectedProviderModels,
       }),
-      setMultipleModelSelections,
+      setMultipleModelSelections: handleMultipleModelSelectionsChange,
+      submit: (options) =>
+        submitComposerStable(
+          undefined,
+          options?.dispatchMode,
+          options?.submissionIntent,
+          options?.directAnnotation,
+        ),
       validateProviderInput: (providerInput: string) => {
         const validationMessage = getComposerSubmissionValidationMessage({
           prompt: promptRef.current,
@@ -3072,7 +3643,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       reportedModelSelection,
       selectedModelSelection,
       multipleModelSelections,
-      setMultipleModelSelections,
+      handleMultipleModelSelectionsChange,
+      cancelCurrentPendingSendStable,
+      submitComposerStable,
       routeKind,
       noProviderAvailable,
       providerSendBlockReason,
@@ -3081,6 +3654,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       selectedProviderModels,
       compactThreadContextStable,
     ],
+  );
+
+  const handleSelectPendingOptionStable = useStableCallback(
+    (questionId: string, optionValue: string) => {
+      cancelCurrentPendingSend();
+      onSelectActivePendingUserInputOption(questionId, optionValue);
+    },
   );
 
   // Built outside the form's JSX so typing, which rebuilds that JSX, leaves them cached.
@@ -3199,7 +3779,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     }
                     answers={activePendingDraftAnswers}
                     questionIndex={activePendingQuestionIndex}
-                    onToggleOption={onSelectActivePendingUserInputOption}
+                    onToggleOption={handleSelectPendingOptionStable}
                     onAdvance={onAdvanceActivePendingUserInput}
                     onDismiss={onDismissActivePendingUserInput}
                     onResendLastUserMessage={onResendLastUserMessage}
@@ -3262,7 +3842,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   canOperateThread={canOperateThread}
                   canInterrupt={canInterrupt}
                   runId={activeThread?.runtime?.activeRunId ?? null}
-                  hasSendableContent={composerSendState.hasSendableContent}
+                  hasSendableContent={hasSendableOrPreparingContent}
                   isEditingQueuedMessage={isEditingQueuedMessage}
                   onInterrupt={handleInterruptPrimaryActionStable}
                 >
@@ -3395,7 +3975,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     draftKey={composerDraftTargetKey}
                     // Switching threads lands focus here, so the label names the thread.
                     ariaLabel={activeThread ? `给 ${activeThread.title} 发消息` : "消息"}
-                    ariaDescribedBy={showInlineReadinessBar ? composerReadinessId : undefined}
+                    ariaDescribedBy={
+                      showInlineReadinessBar && pendingSendReason !== null
+                        ? `${composerReadinessId} ${pendingSendStatusId}`
+                        : showInlineReadinessBar
+                          ? composerReadinessId
+                          : pendingSendReason !== null
+                            ? pendingSendStatusId
+                            : undefined
+                    }
                     suggestionListId={composerSuggestionListId}
                     activeSuggestionId={
                       composerSuggestionListVisible && activeComposerMenuItem
@@ -3478,11 +4066,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       isRunning={false}
                       canInterrupt={false}
                       isSendBusy={isSendBusy}
+                      pendingSendReason={pendingSendReason}
+                      pendingSendStatusId={
+                        pendingSendReason !== null ? pendingSendStatusId : undefined
+                      }
                       sendDisabledReason={primaryActionSendDisabledReason}
                       isEnvironmentUnavailable={primaryActionEnvironmentUnavailable}
                       isPreparingWorktree={false}
                       hasSendableContent={false}
                       preserveComposerFocusOnPointerDown
+                      onCancelPendingSend={cancelPendingSendByUserStable}
                       onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                       onInterrupt={handleInterruptPrimaryActionStable}
                     />
@@ -3536,6 +4129,38 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               </div>
             ) : null}
 
+            {pendingSendReason !== null && !isComposerCollapsedMobile ? (
+              <PendingSendWaitingBar
+                id={pendingSendStatusId}
+                targetKey={composerDraftTargetKey}
+                reason={pendingSendReason}
+              />
+            ) : null}
+
+            {pendingSendReason === null &&
+            pendingSendCancelNotice !== null &&
+            !isComposerCollapsedMobile ? (
+              <div
+                role="status"
+                aria-live="polite"
+                data-chat-composer-pending-send-cancelled="true"
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-border/60 px-4 py-2 text-xs text-muted-foreground"
+              >
+                <span className="flex min-w-0 items-center gap-1.5 [overflow-wrap:anywhere]">
+                  <Clock3Icon className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span>{pendingSendCancelNotice}</span>
+                </span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={dismissPendingSendCancelNoticeStable}
+                >
+                  知道了
+                </Button>
+              </div>
+            ) : null}
+
             {isComposerCollapsedMobile ? null : (
               <div
                 data-chat-composer-footer="true"
@@ -3577,15 +4202,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     canSteer={canSteer}
                     alternateShortcutLabel={alternateShortcutLabel}
                     isSendBusy={isSendBusy}
+                    pendingSendReason={pendingSendReason}
+                    pendingSendStatusId={
+                      pendingSendReason !== null ? pendingSendStatusId : undefined
+                    }
                     sendDisabledReason={primaryActionSendDisabledReason}
                     {...(showInlineReadinessBar ? { sendBlockReasonId: composerReadinessId } : {})}
                     isEnvironmentUnavailable={primaryActionEnvironmentUnavailable}
                     isPreparingWorktree={isPreparingWorktree}
-                    hasSendableContent={composerSendState.hasSendableContent}
+                    hasSendableContent={hasSendableOrPreparingContent}
                     canResume={showResumeAction}
                     preserveComposerFocusOnPointerDown={isMobileViewport}
                     isEditingQueuedMessage={isEditingQueuedMessage}
                     onSubmitMessage={handleSubmitMessageStable}
+                    onCancelPendingSend={cancelPendingSendByUserStable}
                     onResume={onResume}
                     onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                     onInterrupt={handleInterruptPrimaryActionStable}

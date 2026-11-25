@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import {
   CommandId,
   type EnvironmentId,
@@ -54,20 +55,84 @@ import { formatRollbackFailureMessage } from "./revertConfirm.logic";
 export const draftFanoutSelectionsAtom = Atom.family((_routeKey: string) =>
   Atom.make<ReadonlyArray<ModelSelection> | null>(null).pipe(Atom.keepAlive),
 );
-const draftSendStateByRouteKey = new Map<
-  string,
-  {
-    readonly sendInFlight: { current: boolean };
-    readonly uncertainSubmissions: { current: Map<string, ThreadId> };
+export interface DraftSendFailure {
+  readonly sequence: number;
+  readonly reason: string;
+}
+
+interface DraftSendEntry {
+  readonly sendInFlight: { current: boolean };
+  readonly uncertainSubmissions: { current: Map<string, ThreadId> };
+  readonly listeners: Set<() => void>;
+  inFlight: boolean;
+  lastFailure: DraftSendFailure | null;
+}
+
+const draftSendStateByRouteKey = new Map<string, DraftSendEntry>();
+let nextDraftSendFailureSequence = 0;
+
+function getOrCreateDraftSendEntry(routeKey: string): DraftSendEntry {
+  let entry = draftSendStateByRouteKey.get(routeKey);
+  if (!entry) {
+    const created: DraftSendEntry = {
+      inFlight: false,
+      lastFailure: null,
+      listeners: new Set(),
+      uncertainSubmissions: { current: new Map() },
+      sendInFlight: {
+        get current() {
+          return created.inFlight;
+        },
+        set current(next: boolean) {
+          if (created.inFlight === next) return;
+          created.inFlight = next;
+          for (const listener of created.listeners) listener();
+        },
+      },
+    };
+    draftSendStateByRouteKey.set(routeKey, created);
+    entry = created;
   }
->();
-export function draftSendState(routeKey: string) {
-  let state = draftSendStateByRouteKey.get(routeKey);
-  if (!state) {
-    state = { sendInFlight: { current: false }, uncertainSubmissions: { current: new Map() } };
-    draftSendStateByRouteKey.set(routeKey, state);
-  }
-  return state;
+  return entry;
+}
+
+export function draftSendState(routeKey: string): {
+  readonly sendInFlight: { current: boolean };
+  readonly uncertainSubmissions: { current: Map<string, ThreadId> };
+} {
+  return getOrCreateDraftSendEntry(routeKey);
+}
+
+export function recordDraftSendFailure(routeKey: string, reason: string): void {
+  const entry = getOrCreateDraftSendEntry(routeKey);
+  entry.lastFailure = { sequence: ++nextDraftSendFailureSequence, reason };
+  for (const listener of entry.listeners) listener();
+}
+
+export function useDraftSendInFlight(routeKey: string): boolean {
+  const entry = getOrCreateDraftSendEntry(routeKey);
+  return useSyncExternalStore(
+    (listener) => {
+      entry.listeners.add(listener);
+      return () => {
+        entry.listeners.delete(listener);
+      };
+    },
+    () => entry.inFlight,
+  );
+}
+
+export function useDraftSendFailure(routeKey: string): DraftSendFailure | null {
+  const entry = getOrCreateDraftSendEntry(routeKey);
+  return useSyncExternalStore(
+    (listener) => {
+      entry.listeners.add(listener);
+      return () => {
+        entry.listeners.delete(listener);
+      };
+    },
+    () => entry.lastFailure,
+  );
 }
 
 /**
