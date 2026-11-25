@@ -404,9 +404,10 @@ export function QueuedRunsControl({
         })}
       </ol>
       {collapsible ? (
-        <div className="self-end pe-1 text-xs pointer-coarse:[&_[data-slot=inline-button]]:relative pointer-coarse:[&_[data-slot=inline-button]]:after:absolute pointer-coarse:[&_[data-slot=inline-button]]:after:-inset-x-1.5 pointer-coarse:[&_[data-slot=inline-button]]:after:-inset-y-3.5">
+        <div className="self-end pe-1 text-xs pointer-coarse:pt-4">
           <InlineButton
             tone="muted"
+            touchTarget="expand"
             aria-expanded={showAll}
             aria-controls={queueListId}
             // Keep the composer focused; keyboard activation still works.
@@ -500,13 +501,14 @@ function QueuedMessage(props: {
         ) : null}
       </Tooltip>
       {props.heldLabel ? <span className="shrink-0">{props.heldLabel}</span> : null}
-      <span className="ade-touch-row ade-touch-row--gap-2 flex shrink-0 items-center gap-0.5 pointer-coarse:gap-2">
+      <span className="ade-touch-row ade-touch-row--gap-5 flex shrink-0 items-center gap-0.5 pointer-coarse:gap-5">
         {attribution === "agent" &&
         senderRef &&
         // Only an environment this client is connected to can open the sender's thread there.
         (props.message?.linkedSender === undefined || linkedSenderEnvironment !== null) ? (
           <InlineButton
             tone="muted"
+            touchTarget="expand"
             onClick={() => props.onOpenThread(senderRef.threadId, senderRef.environmentId)}
           >
             打开会话
@@ -515,6 +517,7 @@ function QueuedMessage(props: {
         {scheduledTaskId ? (
           <InlineButton
             tone="muted"
+            touchTarget="expand"
             render={
               <Link
                 to="/settings/scheduled-tasks"
