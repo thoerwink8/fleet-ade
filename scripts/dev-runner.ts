@@ -759,8 +759,8 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     port: input.port,
     devUrl: input.devUrl,
   });
-  // The server resolves its own data directory and, inside a worktree, ignores an
-  // ambient T3CODE_HOME. This marks `--home-dir` as a deliberate choice it must honor.
+  // Not `--base-dir`: vp hands extra args to every package and web rejects it.
+  // The server ignores an ambient T3CODE_HOME in a worktree, so mark this one.
   if (input.t3Home?.trim()) {
     env.T3CODE_HOME_EXPLICIT = "1";
   } else {
