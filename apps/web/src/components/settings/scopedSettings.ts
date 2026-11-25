@@ -449,7 +449,7 @@ function droppedSettingKeys(write: ScopedServerWrite, saved: ServerSettings | un
   );
 }
 
-const INTERRUPTED_SAVE_MESSAGE = "连接已断开，内容已保留，恢复后重新保存";
+const INTERRUPTED_SAVE_MESSAGE = "连接已断开，内容已保留，恢复后再试。";
 // The toast already opens with "无法在 <电脑> 上保存：", so this half must not say "保存" again.
 const UNKNOWN_SAVE_MESSAGE = "请稍后再试。";
 

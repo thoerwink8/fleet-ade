@@ -558,7 +558,7 @@ describe("scoped settings mixed values", () => {
 });
 
 describe("scopedSettingsFailureMessage", () => {
-  const interrupted = "连接已断开，内容已保留，恢复后重新保存";
+  const interrupted = "连接已断开，内容已保留，恢复后再试。";
 
   it.each([
     [new Error("All fibers interrupted without error")],
@@ -587,6 +587,11 @@ describe("scopedSettingsFailureMessage", () => {
     const sentence = `无法在 Build workstation 上保存：${scopedSettingsFailureMessage(undefined)}`;
     expect(sentence).toBe("无法在 Build workstation 上保存：请稍后再试。");
     expect(sentence.match(/保存/g)).toHaveLength(1);
+    const interruptedSentence = `无法在 Build workstation 上保存：${scopedSettingsFailureMessage(new Error("interrupted"))}`;
+    expect(interruptedSentence).toBe(
+      "无法在 Build workstation 上保存：连接已断开，内容已保留，恢复后再试。",
+    );
+    expect(interruptedSentence.match(/保存/g)).toHaveLength(1);
   });
 });
 
