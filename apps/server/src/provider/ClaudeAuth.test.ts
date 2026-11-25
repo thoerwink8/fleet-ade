@@ -146,6 +146,26 @@ it.layer(NodeCrypto.layer)("ClaudeAuth", (it) => {
     }),
   );
 
+  it.effect("ignores terminal input that arrives after the command has exited", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness();
+      const state = yield* harness.auth.start(owner);
+      yield* Deferred.await(harness.spawnedProcess);
+      yield* phase(harness, "waiting");
+      harness.exit(1);
+      // The flow may not have moved on yet; typing into the dead terminal must not fail.
+      yield* harness.auth.respond!(owner, {
+        instanceId,
+        flowId: state.flowId!,
+        interactionId: "terminal",
+        response: { type: "terminal", data: "x" },
+      }).pipe(Effect.exit);
+      assert.deepEqual(harness.written, []);
+      const failed = yield* phase(harness, "failed");
+      assert.equal(failed.message, "Claude 登录命令没有成功结束。");
+    }),
+  );
+
   it.effect("fails without verifying when the login command exits with an error", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness();

@@ -153,6 +153,10 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
     label: "刷新智能体状态",
   });
+  const startProviderAuth = useAtomCommand(serverEnvironment.startProviderAuth, {
+    reportFailure: false,
+    reportDefect: false,
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const environmentLabel = useEnvironment(environmentId)?.label ?? "这台电脑";
 
@@ -219,11 +223,23 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
       case "sign_in":
       case "install_help":
         return onOpenProviderSetup
-          ? {
-              label: action.label,
-              disabled: false,
-              onClick: () => onOpenProviderSetup(status.instanceId),
-            }
+          ? guidance.action?.kind === "authenticate"
+            ? {
+                // Starts the login on the server, then opens settings where its terminal is shown.
+                label: guidance.action.label,
+                disabled: false,
+                onClick: () => {
+                  void startProviderAuth({
+                    environmentId,
+                    input: { instanceId: status.instanceId },
+                  }).finally(() => onOpenProviderSetup(status.instanceId));
+                },
+              }
+            : {
+                label: action.label,
+                disabled: false,
+                onClick: () => onOpenProviderSetup(status.instanceId),
+              }
           : null;
       case "switch_agent":
         return onSwitchAgent

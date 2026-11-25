@@ -26,6 +26,7 @@ import { SettingsRow } from "./settingsLayout";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 import { providerSetupGuidance } from "./providerSetupGuidance.logic";
+import { providerAuthAccountDescription } from "./providerAuthAccountDescription.logic";
 
 const ProviderAuthTerminal = lazy(() => import("./ProviderAuthTerminal"));
 
@@ -80,29 +81,17 @@ export function ProviderAuthenticationSection({
   const usesCredentials =
     provider.driver === "antigravity" &&
     (provider.auth.type === "gemini-api-key" || provider.auth.type === "agent-platform");
-  const accountDescription = active
-    ? auth?.phase === "starting"
-      ? (auth.message ?? (usesCredentials ? "正在连接…" : "正在启动登录…"))
-      : auth?.phase === "verifying"
-        ? usesCredentials
-          ? "正在检查凭据并加载模型…"
-          : "正在检查你的账户…"
-        : interaction?.type === "terminal"
-          ? "在下方终端中完成登录。"
-          : interaction?.type === "credentials"
-            ? "在下方输入凭据。"
-            : "在浏览器中完成登录。"
-    : signedIn
-      ? "已登录"
-      : isDiscovering
-        ? "正在查找登录方式…"
-        : guidance.action
-          ? guidance.message
-          : needsExternalSetup
-            ? "智能体未提供应用内登录。请按智能体文档完成设置。"
-            : usesCredentials
-              ? `在 ${environmentLabel} 上连接以加载模型。`
-              : `在 ${environmentLabel} 上登录。`;
+  const accountDescription = providerAuthAccountDescription({
+    phase: auth?.phase,
+    message: auth?.message,
+    interactionType: interaction?.type,
+    signedIn,
+    isDiscovering,
+    guidanceMessage: guidance.action ? guidance.message : null,
+    needsExternalSetup,
+    usesCredentials,
+    environmentLabel,
+  });
   const rawStatusMessage = auth?.phase === "failed" ? auth.message : null;
   const statusMessage =
     rawStatusMessage && !/\p{Script=Han}/u.test(rawStatusMessage)

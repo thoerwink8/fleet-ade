@@ -37,6 +37,8 @@ export const makeClaudeAuth = Effect.fn("makeClaudeAuth")(function* (options: {
     const executable = yield* options.resolveExecutable;
     if (Option.isNone(pty)) return yield* failure("start", "此环境不支持交互式提供方登录。");
     const exited = yield* Deferred.make<number>();
+    // Input typed while the command is finishing must not turn into a second error.
+    let hasExited = false;
     const output = yield* Queue.sliding<string>(64);
     const process = yield* pty.value
       .spawn({
@@ -50,6 +52,7 @@ export const makeClaudeAuth = Effect.fn("makeClaudeAuth")(function* (options: {
       .pipe(Effect.mapError((cause) => failure("start", "无法打开 Claude 登录终端。", cause)));
     const detachData = process.onData((data) => Queue.offerUnsafe(output, data.slice(-16_384)));
     const detachExit = process.onExit(({ exitCode }) => {
+      hasExited = true;
       Deferred.doneUnsafe(exited, Effect.succeed(exitCode));
     });
     yield* Effect.addFinalizer(() =>
@@ -69,7 +72,7 @@ export const makeClaudeAuth = Effect.fn("makeClaudeAuth")(function* (options: {
         context.setInteraction(
           { type: "terminal", id: "terminal", output: transcript, outputOffset },
           (response) =>
-            response.type === "terminal"
+            response.type === "terminal" && !hasExited
               ? Effect.try({
                   try: () => {
                     if (response.size) process.resize(response.size.cols, response.size.rows);
