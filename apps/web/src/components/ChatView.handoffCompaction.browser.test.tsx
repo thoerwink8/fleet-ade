@@ -37,12 +37,6 @@ vi.mock("../../../../packages/client-runtime/src/connection/driver.ts", async (i
   ]);
   return { ...actual, layer: Layer.succeed(actual.ConnectionDriver, fakeDriver) };
 });
-
-vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
-  ...(await original()),
-  trackRpcRequestSent: () => {},
-}));
-
 const CLAUDE = ProviderInstanceId.make("claudeAgent");
 const CLAUDE_DRIVER = ProviderDriverKind.make("claudeAgent");
 

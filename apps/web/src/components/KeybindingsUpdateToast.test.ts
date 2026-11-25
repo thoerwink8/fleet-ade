@@ -44,7 +44,7 @@ function keybindingsUpdated(issues: ReadonlyArray<unknown>): ServerConfigStreamE
 }
 
 describe("startKeybindingsUpdateToasts", () => {
-  it("toasts reloads the server reports after start", () => {
+  it("warns only when a reload carries an invalid configuration", () => {
     const stop = startKeybindingsUpdateToasts();
     try {
       appAtomRegistry.set(mocks.state, { latestEvent: keybindingsUpdated([]) });
@@ -54,10 +54,7 @@ describe("startKeybindingsUpdateToasts", () => {
         ]),
       });
 
-      expect(mocks.addToast.mock.calls.map(([toast]) => toast.title)).toEqual([
-        "快捷键已更新",
-        "快捷键配置无效",
-      ]);
+      expect(mocks.addToast.mock.calls.map(([toast]) => toast.title)).toEqual(["快捷键配置无效"]);
     } finally {
       stop();
     }

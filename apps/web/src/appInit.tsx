@@ -18,7 +18,6 @@ import { startLegacyThreadMigrationToast } from "./components/LegacyThreadMigrat
 import { startPermissionUpdateNotices } from "./components/PermissionUpdateNotice";
 import { startMainAppLocationTracking } from "./components/sidebar/mainAppLocation";
 import { restoreUpdateRunOnLaunch } from "./components/sidebar/updateEverythingRun";
-import { startSlowRpcRequestToasts } from "./components/SlowRpcRequestToastCoordinator";
 import { startThreadNotifications } from "./components/ThreadNotificationCoordinator";
 import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL } from "./branding";
 import { resolveServerBackedAppDisplayName, resolveWindowTitle } from "./branding.logic";
@@ -231,7 +230,6 @@ export function startAppServices(): AppRouter {
   startSshPasswordPromptQueue();
 
   startKeybindingsUpdateToasts();
-  startSlowRpcRequestToasts();
   startHostFreezeToasts();
   startLegacyThreadMigrationToast();
   startPermissionUpdateNotices(router);
