@@ -77,6 +77,8 @@ import {
 import { getComposerPlaceholder } from "../../composerPlaceholder";
 import { deriveComposerSendState } from "../ChatView.logic";
 import { evaluateComposerProviderReadiness } from "./composerProviderReadiness";
+import { AgentSetupCard } from "../agentSetup/AgentSetupCard";
+import { useAgentSetupCard } from "../agentSetup/useAgentSetupCard";
 import {
   dataTransferHasComposerMention,
   makeComposerMentionDragHandlers,
@@ -946,6 +948,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     selectedProviderEntry === undefined && multipleModelSelections === null;
   const providerCatalogPending = noProviderAvailable && !providerCatalogKnown;
   const showProviderUnavailable = noProviderAvailable && !providerCatalogPending;
+  const agentSetupModel = useAgentSetupCard({
+    environmentId,
+    providers: providerStatuses,
+    catalogKnown: providerCatalogKnown,
+  });
+  const agentSetupCard = routeKind === "draft" ? agentSetupModel : null;
   const providerSetupInstanceId = noProviderAvailable
     ? (unavailableProviderInstanceId ??
       (lockedProvider === null
@@ -3774,6 +3782,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
+      {agentSetupCard ? (
+        <div className="mb-3 flex justify-center">
+          <AgentSetupCard model={agentSetupCard} environmentId={environmentId} inset />
+        </div>
+      ) : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />
