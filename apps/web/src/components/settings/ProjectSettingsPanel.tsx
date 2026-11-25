@@ -34,7 +34,7 @@ import { projectEnvironment } from "../../state/projects";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
+import { DraftInput } from "../ui/draft-input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
@@ -273,7 +273,6 @@ function ProjectDetail({
   const deleteProject = useOrchestrationCommand(projectEnvironment.delete, {
     reportFailure: false,
   });
-  const projectNameEditedRef = useRef(false);
 
   const faviconPath = group.faviconPath ?? null;
   const projectIcon = group.projectIcon ?? null;
@@ -302,14 +301,16 @@ function ProjectDetail({
     setIsOrganizing(false);
   };
 
-  const renameGroup = async (nextTitle: string, wasEdited: boolean) => {
+  const renameGroup = (nextTitle: string) => {
     const title = nextTitle.trim();
     if (!title) {
       toastManager.add({ type: "warning", title: "项目名称不能为空" });
-      return;
+      return false;
     }
-    if (!projectGroupTitleNeedsUpdate(group.memberProjects, title, wasEdited)) return;
-    await updateAllMembers({ title }, "无法重命名项目");
+    if (!projectGroupTitleNeedsUpdate(group.memberProjects, title, true)) return;
+    return updateAllMembers({ title }, "无法重命名项目").then(
+      (result) => result._tag === "Success",
+    );
   };
 
   const [faviconPickerOpen, setFaviconPickerOpen] = useComposerMenuState(!canEditGroup);
@@ -534,25 +535,14 @@ function ProjectDetail({
               ) : null
             }
             control={
-              <Input
-                key={`${group.projectKey}:${group.displayName}`}
+              <DraftInput
+                key={group.projectKey}
                 size="sm"
                 className="w-full sm:w-64"
                 aria-label="项目名称"
                 disabled={!canEditGroup}
-                defaultValue={group.displayName}
-                onChange={() => {
-                  projectNameEditedRef.current = true;
-                }}
-                onBlur={(event) => {
-                  const wasEdited = projectNameEditedRef.current;
-                  projectNameEditedRef.current = false;
-                  void renameGroup(event.currentTarget.value, wasEdited);
-                }}
-                onKeyDown={(event) => {
-                  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-                  if (event.key === "Enter") event.currentTarget.blur();
-                }}
+                value={group.displayName}
+                onCommit={renameGroup}
               />
             }
           />

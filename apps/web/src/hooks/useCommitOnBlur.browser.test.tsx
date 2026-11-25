@@ -3,7 +3,7 @@ import { userEvent } from "vite-plus/test/browser";
 
 import { resolvePastedPath } from "@t3tools/shared/path";
 
-import { render } from "../../test/render";
+import { act, render } from "../../test/render";
 import { parseSessionLimitDraft } from "../components/settings/SettingsPanels.logic";
 import { DraftInput } from "../components/ui/draft-input";
 
@@ -148,6 +148,35 @@ describe("settings draft commits", () => {
     outcome.resolve(true);
     await expect.element(input).not.toHaveAttribute("aria-invalid", "true");
     expect(saves).toEqual(["/projects", "/fixed"]);
+  });
+
+  it("ignores duplicate blurs of one edit, retrying only after a refocus", async () => {
+    const outcome = deferred<boolean>();
+    const commit = vi.fn(() => outcome.promise);
+    await using screen = await render(<DraftInput value="~" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    const blurAgain = () =>
+      act(async () => {
+        screen.container
+          .querySelector("input")!
+          .dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      });
+    await input.fill("/projects");
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    // Disabling a focused input can deliver a second focusout for the same edit.
+    await blurAgain();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    outcome.resolve(false);
+    await expect.element(input).toHaveAttribute("aria-invalid", "true");
+    await blurAgain();
+    expect(commit).toHaveBeenCalledTimes(1);
+
+    await input.click();
+    await userEvent.tab();
+    expect(commit).toHaveBeenCalledTimes(2);
   });
 
   it.each([

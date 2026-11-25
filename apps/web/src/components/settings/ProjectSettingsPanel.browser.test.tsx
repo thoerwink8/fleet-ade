@@ -1,4 +1,4 @@
-import { RegistryContext } from "@effect/atom-react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type {
   DeleteProjectInput,
   UpdateProjectInput,
@@ -76,7 +76,11 @@ vi.mock(import("~/state/environments"), async (original) => ({
 }));
 vi.mock(import("~/state/entities"), async (original) => ({
   ...(await original()),
-  useProjects: (() => state.projects) as never,
+  useProjects: (() => {
+    // The real projects list is an atom; subscribe so writes re-render like production.
+    useAtomValue(projectsVersion);
+    return state.projects;
+  }) as never,
   useThreadShells: () => [],
   useServerConfigs: (() =>
     new Map(
@@ -168,6 +172,7 @@ const session = (scopes: ReadonlyArray<AuthEnvironmentScope>): AuthSessionState 
 });
 const writable = () => AsyncResult.success(session([AuthOrchestrationOperateScope]));
 const missingProjectFile = Atom.make(AsyncResult.initial<never, never>());
+const projectsVersion = Atom.make(0);
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -210,6 +215,7 @@ function setup() {
         ? { ...project, ...patch }
         : project,
     );
+    appAtomRegistry.set(projectsVersion, appAtomRegistry.get(projectsVersion) + 1);
     return AsyncResult.success(undefined);
   });
   state.delete.mockResolvedValue(AsyncResult.success(undefined));
