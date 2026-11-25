@@ -1496,8 +1496,7 @@ code {
 :is(.chat-markdown, .composer-tiptap) h5,
 :is(.chat-markdown, .composer-tiptap) h6 {
   margin: 1.25em 0 0.45em;
-  /* font-weight-allow: user and agent Markdown headings */
-  font-weight: 600;
+  font-weight: 500;
   color: var(--contrast-foreground);
 }
 
@@ -1749,8 +1748,7 @@ code {
   border-radius: 0.25rem;
   text-decoration: none;
   font-size: 0.75rem;
-  /* font-weight-allow: user and agent Markdown footnote references */
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-markdown :not(pre) > code {
@@ -1780,8 +1778,7 @@ code {
 }
 
 .chat-markdown strong {
-  /* font-weight-allow: user and agent Markdown bold emphasis */
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-markdown pre {
@@ -1912,8 +1909,7 @@ code {
 .chat-markdown thead th {
   border-bottom: 1px solid color-mix(in srgb, var(--contrast-border) 60%, transparent);
   padding-block: 0.55rem;
-  /* font-weight-allow: user and agent Markdown table headers */
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-markdown tbody td {
