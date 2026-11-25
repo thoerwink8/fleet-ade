@@ -1039,6 +1039,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
   const toggleThreadSelection = useThreadSelectionStore((s) => s.toggleThread);
   const rangeSelectTo = useThreadSelectionStore((s) => s.rangeSelectTo);
+  const batchSelectionAt = useThreadSelectionStore((s) => s.selectedAt);
   const acknowledgeWoke = useAcknowledgeThreadWoke();
   // A Settings or Usage modal keeps the thread behind it current.
   const routeTarget = useShownThreadRouteTarget().shownTarget;
@@ -2805,7 +2806,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopeGroups.length > 1
       ? currentProjectRef !== null
         ? "选择其他项目新建：Shift+单击"
-        : `在当前项目中新建会话：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
+        : `跳过项目选择直接新建：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
       : null;
   return (
     <SidebarFolderDrop>
@@ -3038,6 +3039,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 orderedThreadCount={orderedThreadKeys.length}
                 serverConfigs={serverConfigs}
                 onAction={handleBatchBarAction}
+                snoozePresets={
+                  primaryEnvironmentId === null || batchSelectionAt === null
+                    ? []
+                    : resolveSnoozePresets(
+                        new Date(batchSelectionAt),
+                        timestampFormat,
+                        primaryEnvironmentId,
+                      )
+                }
+                nowIso={batchSelectionAt ?? ""}
                 onClearSelection={clearSelection}
               />
             ) : null}
