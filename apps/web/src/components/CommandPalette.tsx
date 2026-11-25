@@ -420,10 +420,11 @@ function OpenCommandPaletteDialog(props: {
   readonly initialContext: CommandPaletteReturnContext | undefined;
 }) {
   const navigate = useNavigate();
-  const locationState = useLocation({
-    select: (location) => ({ pathname: location.pathname, search: location.search }),
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const projectSettingsSearch = useLocation({
+    select: (location) =>
+      location.pathname === "/settings/projects" ? location.search : undefined,
   });
-  const pathname = locationState.pathname;
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const {
@@ -558,8 +559,8 @@ function OpenCommandPaletteDialog(props: {
   const { environmentLabelById, projectEnvironmentLocationById } = useEnvironmentLookups();
   const projectGroups = useSortedProjectGroups(environmentLabelById);
   const currentProjectRef = resolveCurrentProjectRef({
-    pathname: locationState.pathname,
-    search: locationState.search as CurrentProjectRouteContext["search"],
+    pathname,
+    search: projectSettingsSearch as CurrentProjectRouteContext["search"],
     activeThread,
     activeDraftThread,
     projectGroups,

@@ -963,8 +963,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
-  const locationState = useLocation({
-    select: (location) => ({ pathname: location.pathname, search: location.search }),
+  const locationPathname = useLocation({ select: (location) => location.pathname });
+  const projectSettingsSearch = useLocation({
+    select: (location) =>
+      location.pathname === "/settings/projects" ? location.search : undefined,
   });
   const { isMobile, setOpenMobile } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -2681,8 +2683,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const showJumpHints = useThreadJumpHintsVisible(keybindings, routeThreadRef);
 
   const currentProjectRef = resolveCurrentProjectRef({
-    pathname: locationState.pathname,
-    search: locationState.search as CurrentProjectRouteContext["search"],
+    pathname: locationPathname,
+    search: projectSettingsSearch as CurrentProjectRouteContext["search"],
     activeThread: newThreadContext.activeThread,
     activeDraftThread: newThreadContext.activeDraftThread,
     projectGroups,
