@@ -57,15 +57,20 @@ export function derivePinnedPlanView(input: {
   readonly isWorking: boolean;
   readonly activeRunId: RunId | null;
 }): PinnedPlanView | null {
-  if (!input.plans.some((plan) => plan.kind === "todo_list" && plan.status !== "superseded")) {
+  const runById = new Map<RunId, PinnedPlanRunSummary>(input.runs.map((run) => [run.id, run]));
+  // A rewound turn no longer exists for the user, so its plan is not shown, not even as an earlier one.
+  const isShown = (plan: OrchestrationV2PlanArtifact): plan is TodoListPlanArtifact =>
+    plan.kind === "todo_list" &&
+    plan.status !== "superseded" &&
+    (plan.runId === null || runById.get(plan.runId)?.status !== "rolled_back");
+  if (!input.plans.some(isShown)) {
     return null;
   }
-  const runById = new Map<RunId, PinnedPlanRunSummary>(input.runs.map((run) => [run.id, run]));
 
   let selected: TodoListPlanArtifact | null = null;
   let selectedOrdinal = -1;
   for (const plan of input.plans) {
-    if (plan.kind !== "todo_list" || plan.status === "superseded") {
+    if (!isShown(plan)) {
       continue;
     }
     const ordinal = plan.runId === null ? -1 : (runById.get(plan.runId)?.ordinal ?? -1);
