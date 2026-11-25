@@ -68,10 +68,18 @@ export const runDoctor = Effect.fn("runDoctor")(function* (
   yield* Console.log(
     `Database: ${formatBytes(status.databaseBytes)}, ${formatBytes(status.reclaimableBytes)} reclaimable.`,
   );
+  const legacyRecords = status.legacyOnlyRecords;
   if (status.legacyDatabaseBytes !== null) {
     yield* Console.log(
       `Database from before 0.1.0: ${formatBytes(status.legacyDatabaseBytes)}, kept for rolling back.`,
     );
+    if (legacyRecords === null) {
+      yield* Console.log("  无法核对项目和会话是否已经迁完。请保留旧数据库。");
+    } else if (legacyRecords.projects > 0 || legacyRecords.threads > 0) {
+      yield* Console.log(
+        `  当前数据库缺少记录：${legacyRecords.projects} 个项目、${legacyRecords.threads} 个会话。请保留旧数据库用于恢复。`,
+      );
+    }
   }
   const repairs = [
     ...(status.incrementalVacuumEnabled && status.reclaimableBytes === 0
@@ -90,7 +98,10 @@ export const runDoctor = Effect.fn("runDoctor")(function* (
               status.reclaimableBytes >= DATABASE_COMPACTION_RECOMMENDED_BYTES,
           },
         ]),
-    ...(status.legacyDatabaseBytes === null
+    ...(status.legacyDatabaseBytes === null ||
+    legacyRecords === null ||
+    legacyRecords.projects > 0 ||
+    legacyRecords.threads > 0
       ? []
       : [
           {
