@@ -593,18 +593,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ghq clone destination host owner repository root layout"],
   },
   {
-    id: "unpin-confirmation",
-    title: "取消置顶确认",
-    to: "/settings/general",
-    searchTerms: ["ask before thread pinned section"],
-  },
-  {
-    id: "archive-confirmation",
-    title: "归档确认",
-    to: "/settings/general",
-    searchTerms: ["ask before thread second click inline action"],
-  },
-  {
     id: "delete-confirmation",
     title: "删除确认",
     to: "/settings/general",

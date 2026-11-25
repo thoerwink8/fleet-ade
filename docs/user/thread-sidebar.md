@@ -55,12 +55,16 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 Pin a thread from its menu to keep it above your active work.
 Mark or unmark a commander from the thread menu, the command palette, or with `Ctrl+Alt+P` (`Cmd+Alt+P` on macOS).
 
-On web and desktop, unpinning, settling, snoozing, and archiving a thread each show
-a notification with **Undo** for five seconds. Undo restores the thread's previous
-state, including its pinned position, and reopens an archived thread you were
-viewing. Discarding an unsent draft from the sidebar works the same way: Undo brings
-back its text and attachments. `mod+z` triggers the most recent Undo, even from the composer; see
-[Keybindings](./keybindings.md#commands-with-special-behavior).
+On web and desktop, unpinning, marking a thread as done, snoozing, archiving one or
+more selected threads, or dismissing a thread from attention each show a toast
+notification with **Undo** for eight seconds. Archiving the thread you are currently
+viewing opens the next thread in the sidebar (or the previous one when it was last, or
+a new draft when no threads remain). Undo restores each thread's previous state,
+including its pinned position, and reopens an archived thread you were viewing; if part
+of a batch archive could not run, Undo restores only the threads that were archived.
+Discarding an unsent draft from the sidebar works the same way: Undo brings back its
+text and attachments. `mod+z` triggers the most recent Undo, even from the composer;
+see [Keybindings](./keybindings.md#commands-with-special-behavior).
 
 On web and desktop, you can also drag files from your computer onto any thread row:
 the thread opens and the files are attached in its composer, ready for
@@ -77,7 +81,7 @@ the pinned section to pin it at the spot you drop it; drag a pinned thread down 
 list to unpin it. Dragging a thread onto the **Completed** header marks it complete, and dragging a completed
 thread into the active list unmarks it. A snoozed thread can be dragged out of the snoozed
 shelf, which wakes it, but threads cannot be dragged into the shelf because snoozing needs a wake
-time. Dragging a pinned thread out of the pinned section does not ask for unpin confirmation.
+time.
 Pinned and active boundary labels appear only while dragging, without moving the rows. The
 other rows slide aside to show where the thread will land. When you cross into another section,
 the dragged thread shows the action the drop performs, with its icon: **Pin**, **Unpin**,

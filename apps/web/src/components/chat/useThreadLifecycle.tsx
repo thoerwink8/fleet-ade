@@ -181,13 +181,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   } = input;
   const navigate = useNavigate();
   const router = useRouter();
-  const {
-    settleThread,
-    pinThread,
-    confirmAndUnpinThread,
-    markCommanderThread,
-    unmarkCommanderThread,
-  } = useThreadActions();
+  const { settleThread, pinThread, unpinThread, markCommanderThread, unmarkCommanderThread } =
+    useThreadActions();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const switchGitRef = useAtomCommand(vcsEnvironment.switchRef, { reportFailure: false });
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -691,9 +686,9 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       }
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
       if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
-      void (
-        activeThreadPinned ? confirmAndUnpinThread(activeThreadRef) : pinThread(activeThreadRef)
-      ).then(toastThreadActionFailure(activeThreadPinned ? "无法取消置顶会话" : "无法置顶会话"));
+      void (activeThreadPinned ? unpinThread(activeThreadRef) : pinThread(activeThreadRef)).then(
+        toastThreadActionFailure(activeThreadPinned ? "无法取消置顶会话" : "无法置顶会话"),
+      );
     },
     "thread.commander": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
