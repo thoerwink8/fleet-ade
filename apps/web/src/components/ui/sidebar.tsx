@@ -964,6 +964,8 @@ const sidebarMenuButtonVariants = cva(
         icon: "ade-touch-target relative size-8 justify-center overflow-visible rounded-[var(--control-radius)] p-0",
         "icon-sm":
           "ade-touch-target relative size-7 justify-center overflow-visible rounded-[var(--control-radius)] p-0 max-md:size-8 pointer-coarse:size-8",
+        scope:
+          "ade-touch-target ade-touch-target--y h-8 max-w-40 min-w-0 shrink overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-row",
         lg: "h-12 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-row group-data-[collapsible=icon]:p-0!",
         sm: "h-7 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-meta",
       },
