@@ -869,7 +869,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const handleDiscardDraftClick = (event: ReactMouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    discardComposerDraft(threadRef);
+    discardComposerDraft(threadRef, { title: thread.title });
   };
 
   const linkedPullRequestStatus = useLinkedThreadPullRequest(
