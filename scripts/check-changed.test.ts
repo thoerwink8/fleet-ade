@@ -21,6 +21,7 @@ import {
   gitLines,
   judgeFilteredVitestStep,
   runSteps,
+  shouldRunCssFontWeightTest,
   shouldRunDocsLinks,
   splitTests,
   type Step,
@@ -53,6 +54,13 @@ describe("check:changed", () => {
     assert.isTrue(shouldRunDocsLinks(["packages/shared/src/markdownLinks.ts"]));
     assert.isTrue(shouldRunDocsLinks(["scripts/docs-links.ts"]));
     assert.isFalse(shouldRunDocsLinks(["apps/server/src/ws.ts", "package.json"]));
+  });
+
+  it("runs cssFontWeight test when web stylesheets change", () => {
+    assert.isTrue(shouldRunCssFontWeightTest(["apps/web/src/index.css"]));
+    assert.isTrue(shouldRunCssFontWeightTest(["apps/web/src/styles/fleet-overrides/menu.css"]));
+    assert.isFalse(shouldRunCssFontWeightTest(["apps/web/src/App.tsx"]));
+    assert.isFalse(shouldRunCssFontWeightTest(["apps/desktop/src/main.css"]));
   });
 
   it.effect(

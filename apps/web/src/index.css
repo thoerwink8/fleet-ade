@@ -102,8 +102,8 @@
   /* Page header title, and dialog or sheet title. */
   --font-size-title: 0.9375rem;
   --line-height-title: 1.375rem;
-  --font-size-dialog-title: 1rem;
-  --line-height-dialog-title: 1.5rem;
+  --font-size-dialog-title: 1.125rem;
+  --line-height-dialog-title: 1.75rem;
   --thread-details-panel-width: 17.5rem;
   /* Below 640px the composer is at least 16px: iOS zooms on focus under that. */
   --font-size-prompt-touch: max(var(--font-size-prompt, 1rem), 16px);
@@ -1496,8 +1496,7 @@ code {
 :is(.chat-markdown, .composer-tiptap) h5,
 :is(.chat-markdown, .composer-tiptap) h6 {
   margin: 1.25em 0 0.45em;
-  /* font-weight-allow: user and agent Markdown headings */
-  font-weight: 600;
+  font-weight: 500;
   color: var(--contrast-foreground);
 }
 
@@ -1749,8 +1748,7 @@ code {
   border-radius: 0.25rem;
   text-decoration: none;
   font-size: 0.75rem;
-  /* font-weight-allow: user and agent Markdown footnote references */
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-markdown :not(pre) > code {
@@ -1780,8 +1778,7 @@ code {
 }
 
 .chat-markdown strong {
-  /* font-weight-allow: user and agent Markdown bold emphasis */
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-markdown pre {
@@ -1912,8 +1909,7 @@ code {
 .chat-markdown thead th {
   border-bottom: 1px solid color-mix(in srgb, var(--contrast-border) 60%, transparent);
   padding-block: 0.55rem;
-  /* font-weight-allow: user and agent Markdown table headers */
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-markdown tbody td {

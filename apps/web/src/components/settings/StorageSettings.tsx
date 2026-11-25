@@ -264,7 +264,6 @@ function RetentionControl({
           min={minimum}
           max={3650}
           step={1}
-          size="sm"
           disabled={disabled}
           className="w-auto"
           onValueChange={(next) => {

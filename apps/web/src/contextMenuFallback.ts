@@ -196,7 +196,7 @@ const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<stri
   ],
 };
 
-function createIconElement(name: string, tone: "neutral" | "destructive"): SVGSVGElement | null {
+function createIconElement(name: string): SVGSVGElement | null {
   const paths = ICON_PATHS[name];
   if (!paths || typeof document.createElementNS !== "function") {
     return null;
@@ -210,12 +210,7 @@ function createIconElement(name: string, tone: "neutral" | "destructive"): SVGSV
   svg.setAttribute("stroke-width", "2");
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
-  svg.setAttribute(
-    "class",
-    tone === "destructive"
-      ? "size-4.5 shrink-0 sm:size-4"
-      : "size-4.5 shrink-0 text-muted-foreground sm:size-4",
-  );
+  svg.setAttribute("class", "fa-ic");
   for (const node of paths) {
     const child = document.createElementNS(SVG_NS, node.tag);
     for (const [key, value] of Object.entries(node.attrs)) {
@@ -417,9 +412,8 @@ export function showContextMenuFallback<T extends string>(
 
       const menu = document.createElement("div");
       menu.className =
-        "dropdown-surface fixed z-[10000] min-w-32 max-w-sm overflow-hidden rounded-lg bg-clip-padding text-popover-foreground outline-none";
-      menu.style.cssText =
-        "position:fixed;z-index:10000;min-width:8rem;max-width:24rem;overflow:hidden;border-radius:var(--radius-lg);background-clip:padding-box;color:var(--contrast-popover-foreground);outline:none;pointer-events:auto;";
+        "fa-pop fixed z-[10000] flex min-w-[min(10rem,calc(100vw-2rem))] max-w-sm flex-col outline-none";
+      menu.style.cssText = "position:fixed;z-index:10000;pointer-events:auto;";
       menu.style.left = `${preferredLeft}px`;
       menu.style.top = `${preferredTop}px`;
       menu.dataset.level = String(level);
@@ -429,17 +423,12 @@ export function showContextMenuFallback<T extends string>(
       menu.tabIndex = -1;
 
       const inner = document.createElement("div");
-      inner.className =
-        "max-h-[calc(100vh-0.5rem)] min-w-0 max-w-sm overflow-y-auto overflow-x-hidden p-1";
-      inner.style.cssText =
-        "max-height:calc(100vh - 0.5rem);min-width:0;max-width:24rem;overflow-x:hidden;overflow-y:auto;padding:0.25rem;";
+      inner.className = "max-h-[calc(100vh-1rem)] w-full min-w-0 overflow-x-clip overflow-y-auto";
 
       for (const item of entries) {
         if (item.separatorBefore === true && inner.children.length > 0) {
           const separator = document.createElement("div");
-          separator.className = "mx-2 my-1 h-px bg-border";
-          separator.style.cssText =
-            "height:1px;margin:0.25rem 0.5rem;background:var(--contrast-border);";
+          separator.className = "fa-sep";
           separator.dataset.contextMenuSeparator = "true";
           separator.setAttribute("role", "separator");
           inner.appendChild(separator);
@@ -447,7 +436,7 @@ export function showContextMenuFallback<T extends string>(
 
         if (item.header === true) {
           const header = document.createElement("div");
-          header.className = "px-2 py-1.5 font-medium text-muted-foreground text-meta";
+          header.className = "fa-glabel";
           header.textContent = item.label;
           inner.appendChild(header);
           continue;
@@ -462,51 +451,36 @@ export function showContextMenuFallback<T extends string>(
         const isDisabled = item.disabled === true;
         button.disabled = isDisabled;
         button.tabIndex = -1;
+        button.dataset.slot = "menu-item";
         button.setAttribute("role", "menuitem");
         button.setAttribute("aria-disabled", String(isDisabled));
-        const rowBase =
-          "flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-left outline-none transition-colors sm:min-h-7 sm:text-sm min-h-8 text-base";
-        button.className = isDisabled
-          ? `${rowBase} cursor-not-allowed text-muted-foreground opacity-64`
-          : isLeafDestructive
-            ? `${rowBase} text-destructive-foreground hover:bg-destructive/10 hover:text-destructive-foreground`
-            : `${rowBase} text-foreground hover:bg-accent hover:text-accent-foreground`;
-        button.style.cssText =
-          "display:flex;width:100%;min-height:1.75rem;align-items:center;gap:0.5rem;border:0;border-radius:var(--radius-sm);background:transparent;padding:0.25rem 0.5rem;color:var(--contrast-foreground);font-family:var(--font-sans,system-ui,sans-serif);font-size:0.875rem;line-height:1.25rem;text-align:left;cursor:default;";
-        if (isLeafDestructive) {
-          button.style.color = "var(--destructive-foreground)";
-        }
-        if (isDisabled) {
-          button.style.color = "var(--contrast-muted-foreground)";
-          button.style.opacity = "0.64";
-          button.style.cursor = "not-allowed";
-          if (item.detail) {
-            button.setAttribute("title", item.detail);
-          }
+        button.className = isLeafDestructive ? "fa-item fa-item--danger" : "fa-item";
+        if (isDisabled && item.detail) {
+          button.setAttribute("title", item.detail);
         }
 
         if (typeof item.checked === "boolean") {
           button.setAttribute("role", "menuitemradio");
           button.setAttribute("aria-checked", item.checked ? "true" : "false");
-          const check = item.checked ? createIconElement("check", "neutral") : null;
+          const check = item.checked ? createIconElement("check") : null;
           if (check) {
+            check.setAttribute("class", "fa-ic tick");
             button.appendChild(check);
           } else {
             const spacer = document.createElement("span");
-            spacer.className = "size-4.5 shrink-0 sm:size-4";
-            spacer.style.cssText = "display:inline-block;width:1rem;height:1rem;flex-shrink:0;";
+            spacer.className = "fa-ic shrink-0";
             spacer.setAttribute("aria-hidden", "true");
             button.appendChild(spacer);
           }
         } else if (typeof item.icon === "string") {
-          const icon = createIconElement(item.icon, isLeafDestructive ? "destructive" : "neutral");
+          const icon = createIconElement(item.icon);
           if (icon) {
             button.appendChild(icon);
           }
         }
 
         const label = document.createElement("span");
-        label.className = "min-w-0 flex-1 truncate";
+        label.className = "grow";
         label.textContent = item.label;
         button.appendChild(label);
 
@@ -514,9 +488,7 @@ export function showContextMenuFallback<T extends string>(
           // The comma gives screen readers a pause between label and detail.
           button.setAttribute("aria-label", `${item.label}, ${item.detail}`);
           const detail = document.createElement("span");
-          detail.className = "ms-auto shrink-0 ps-4 text-muted-foreground text-xs";
-          detail.style.cssText =
-            "margin-inline-start:auto;flex-shrink:0;padding-inline-start:1rem;color:var(--contrast-muted-foreground);font-size:0.75rem;";
+          detail.className = "end";
           detail.textContent = item.detail;
           button.appendChild(detail);
         }
@@ -524,12 +496,9 @@ export function showContextMenuFallback<T extends string>(
         if (hasChildren) {
           button.setAttribute("aria-haspopup", "menu");
           button.setAttribute("aria-expanded", "false");
-          const chevron = createIconElement("chevron-right", "neutral");
+          const chevron = createIconElement("chevron-right");
           if (chevron) {
-            chevron.setAttribute(
-              "class",
-              "-me-0.5 ms-auto size-4.5 shrink-0 text-muted-foreground opacity-80 sm:size-4",
-            );
+            chevron.setAttribute("class", "end fa-ic");
             chevron.setAttribute("aria-hidden", "true");
             chevron.dataset.contextMenuChevron = "true";
             button.appendChild(chevron);
@@ -540,19 +509,11 @@ export function showContextMenuFallback<T extends string>(
           let isHovered = false;
           let isFocused = false;
           const updateHighlight = () => {
-            const isHighlighted = isHovered || isFocused;
-            button.style.background = isHighlighted
-              ? isLeafDestructive
-                ? "color-mix(in srgb, var(--destructive) 10%, transparent)"
-                : "var(--accent)"
-              : "transparent";
-            button.style.color = isHighlighted
-              ? isLeafDestructive
-                ? "var(--destructive-foreground)"
-                : "var(--contrast-accent-foreground)"
-              : isLeafDestructive
-                ? "var(--destructive-foreground)"
-                : "var(--contrast-foreground)";
+            if (isHovered || isFocused) {
+              button.dataset.highlighted = "";
+            } else {
+              delete button.dataset.highlighted;
+            }
           };
           button.addEventListener("mouseenter", () => {
             button.focus({ preventScroll: true });
