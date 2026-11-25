@@ -160,11 +160,13 @@ export function ReopenClosedViewShortcut() {
       if (!event.repeat) enqueueReopen();
     };
     window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("t3:reopen-closed-view", enqueueReopen);
     const unsubscribe = window.desktopBridge?.onMenuAction((action) => {
       if (action === "view.reopenClosed" && !isCommandPaletteOpen()) enqueueReopen();
     });
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("t3:reopen-closed-view", enqueueReopen);
       unsubscribe?.();
     };
   }, [keybindings, terminalOpen]);
