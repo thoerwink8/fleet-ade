@@ -4,17 +4,35 @@ import { MessageSquareDashedIcon, PlusIcon } from "lucide-react";
 import { openCommandPalette } from "../commandPaletteBus";
 import { isElectron } from "../env";
 import { useScratchProject } from "../hooks/useScratchProject";
-import { usePrimaryEnvironmentId } from "../state/environments";
+import {
+  useEnvironment,
+  useEnvironmentProviders,
+  usePrimaryEnvironmentId,
+} from "../state/environments";
 import { Button } from "./ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 import { SidebarInset } from "./ui/sidebar";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
+import { AgentSetupCard } from "./agentSetup/AgentSetupCard";
+import { resolveAgentSetupCard, toAgentSetupProvider } from "./agentSetup/agentSetupCard.logic";
 
 export function NoProjectsHero() {
   const contentArea = workspaceAreaProps("home", 1, "Home");
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
   const scratchTargetEnvironmentId = scratchEnvironmentId(primaryEnvironmentId);
+  const primaryEnvironment = useEnvironment(primaryEnvironmentId);
+  const providersByEnvironment = useEnvironmentProviders();
+  const providerSnapshots =
+    primaryEnvironmentId === null ? undefined : providersByEnvironment.get(primaryEnvironmentId);
+  const agentSetupCard = resolveAgentSetupCard({
+    providers: (providerSnapshots ?? []).map(toAgentSetupProvider),
+    catalogKnown: providerSnapshots !== undefined,
+    computerName:
+      primaryEnvironment?.entry.target._tag === "PrimaryConnectionTarget"
+        ? null
+        : (primaryEnvironment?.label ?? null),
+  });
 
   return (
     <SidebarInset
@@ -49,6 +67,11 @@ export function NoProjectsHero() {
                 </Button>
               )}
             </div>
+            {agentSetupCard && primaryEnvironmentId !== null ? (
+              <div className="mt-6 flex w-full justify-center">
+                <AgentSetupCard model={agentSetupCard} environmentId={primaryEnvironmentId} />
+              </div>
+            ) : null}
           </EmptyHeader>
         </Empty>
       </div>

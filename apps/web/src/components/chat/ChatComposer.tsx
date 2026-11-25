@@ -4,7 +4,7 @@ import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
 import { BackgroundThreadContext } from "./backgroundThread";
 import { resolveCompatibleRuntimeMode, resolveRuntimeModeOptions } from "./runtimeModeConfig";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
-import { usePrimaryEnvironmentId } from "../../state/environments";
+import { useEnvironment, usePrimaryEnvironmentId } from "../../state/environments";
 import { useRightPanelStore } from "~/rightPanelStore";
 import { importPastedComposerText, readPastedComposerContext } from "../composerInlineTokenPaste";
 import {
@@ -77,6 +77,8 @@ import {
 import { getComposerPlaceholder } from "../../composerPlaceholder";
 import { deriveComposerSendState } from "../ChatView.logic";
 import { evaluateComposerProviderReadiness } from "./composerProviderReadiness";
+import { AgentSetupCard } from "../agentSetup/AgentSetupCard";
+import { resolveAgentSetupCard, toAgentSetupProvider } from "../agentSetup/agentSetupCard.logic";
 import {
   dataTransferHasComposerMention,
   makeComposerMentionDragHandlers,
@@ -638,6 +640,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onRemoveEditingQueuedAttachment,
   } = props;
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const agentSetupEnvironment = useEnvironment(environmentId);
   const hideKeyboardHints = useHideKeyboardShortcutHints();
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
   // Drops the armed send because the draft changed under it, and says so.
@@ -946,6 +949,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     selectedProviderEntry === undefined && multipleModelSelections === null;
   const providerCatalogPending = noProviderAvailable && !providerCatalogKnown;
   const showProviderUnavailable = noProviderAvailable && !providerCatalogPending;
+  const agentSetupCard =
+    routeKind === "draft"
+      ? resolveAgentSetupCard({
+          providers: providerStatuses.map(toAgentSetupProvider),
+          catalogKnown: providerCatalogKnown,
+          computerName:
+            agentSetupEnvironment?.entry.target._tag === "PrimaryConnectionTarget"
+              ? null
+              : (agentSetupEnvironment?.label ?? null),
+        })
+      : null;
   const providerSetupInstanceId = noProviderAvailable
     ? (unavailableProviderInstanceId ??
       (lockedProvider === null
@@ -3773,6 +3787,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
+      {agentSetupCard ? (
+        <div className="mb-3 flex justify-center">
+          <AgentSetupCard model={agentSetupCard} environmentId={environmentId} />
+        </div>
+      ) : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />
