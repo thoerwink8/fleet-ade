@@ -274,7 +274,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "chat-width",
     title: "会话宽度",
     to: "/settings/appearance",
-    searchTerms: ["wide full width column layout messages composer monitor 聊天宽度 聊天 对话"],
+    searchTerms: ["wide full width column layout messages composer monitor", "聊天宽度 聊天 对话"],
   },
   {
     id: "thread-details-items",
@@ -664,7 +664,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "智能体",
     to: "/settings/providers",
     searchTerms: [
-      "agents cli codex claude grok antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume 账号 提供方 提供方实例 提供商 实例",
+      "agents cli codex claude grok antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
+      "账号 提供方 提供方实例 提供商 实例",
     ],
   },
   {
@@ -672,7 +673,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "用量来源",
     to: "/settings/providers",
     searchTerms: [
-      "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove 用量数据提供方 提供方 提供商",
+      "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
+      "用量数据提供方 提供方 提供商",
     ],
     providerSettingsOnly: true,
   },
@@ -795,7 +797,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: [
-      "machine glyph sidebar mac mini studio laptop desktop server cloud vm 环境图标 环境 机器",
+      "machine glyph sidebar mac mini studio laptop desktop server cloud vm",
+      "环境图标 环境 机器",
     ],
   },
   {
@@ -803,7 +806,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "本机后台服务",
     to: "/settings/connections",
     searchTerms: [
-      "turn off on disable enable local server agents remote only restart 本地环境 环境 后端 服务器",
+      "turn off on disable enable local server agents remote only restart",
+      "本地环境 环境 后端 服务器",
     ],
     desktopOnly: true,
   },
@@ -829,7 +833,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "WSL 后台服务",
     to: "/settings/connections",
     searchTerms: [
-      "windows subsystem linux distro second server projects stop windows backend restart wsl only WSL 后端 后端 服务器",
+      "windows subsystem linux distro second server projects stop windows backend restart wsl only",
+      "后端 服务器",
     ],
     desktopOnly: true,
     windowsOnly: true,
@@ -841,7 +846,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "本机",
     to: "/settings/connections",
     searchTerms: [
-      "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint 配对 配对码 配对链接 已授权的客户端 令牌 引导凭据",
+      "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
+      "配对 配对码 配对链接 已授权的客户端 令牌 引导凭据",
     ],
   },
   {
@@ -851,7 +857,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/connections",
     targetId: "linked-environments",
     searchTerms: [
-      "link peer another machine vps agents work there handoff pairing code 关联环境 环境 配对 配对码 电脑",
+      "link peer another machine vps agents work there handoff pairing code",
+      "关联环境 环境 配对 配对码 电脑",
     ],
   },
   {
@@ -859,7 +866,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "电脑",
     to: "/settings/connections",
     searchTerms: [
-      "add pair backend host code ssh config agent tunnel saved 环境 机器 主机 服务器 设备 关联电脑 配对 配对码",
+      "add pair backend host code ssh config agent tunnel saved",
+      "环境 机器 主机 服务器 设备 关联电脑 配对 配对码",
     ],
   },
   {
@@ -882,7 +890,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "secret-providers",
     title: "密钥来源",
     to: "/settings/connections",
-    searchTerms: ["vault credentials api key 凭据提供方 提供方 凭据"],
+    searchTerms: ["vault credentials api key", "凭据提供方 提供方 凭据"],
     secretsFeatureOnly: true,
   },
   {
