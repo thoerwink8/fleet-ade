@@ -2313,6 +2313,7 @@ function OpenCommandPaletteDialog(props: {
               type: "error",
               title: presentation.title,
               description: presentation.description,
+              data: { copyText: presentation.detail },
             }),
           );
         }
@@ -2409,6 +2410,7 @@ function OpenCommandPaletteDialog(props: {
             type: "error",
             title: presentation.title,
             description: presentation.description,
+            data: { copyText: presentation.detail },
           }),
         );
       }

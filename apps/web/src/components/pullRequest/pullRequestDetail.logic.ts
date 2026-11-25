@@ -49,7 +49,10 @@ import {
   visibleThreadPullRequests,
 } from "@t3tools/client-runtime/thread-pull-requests";
 
-import { describeVersionControlError, joinNextStepAndDetail } from "../versionControlError.logic";
+import {
+  describeVersionControlError,
+  versionControlErrorDescription,
+} from "../versionControlError.logic";
 import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/reviewCommentContext";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
@@ -1381,8 +1384,8 @@ export function checkoutFailureDescription(failure: unknown): string {
   // Filter and cut the diagnostic on its own; the next step must not make noise look like content.
   const detail = readableFailure(failure.detail, "");
   if (detail.length === 0) return hint;
-  const { nextStep } = describeVersionControlError(failure);
-  return joinNextStepAndDetail(nextStep, detail);
+  const presentation = describeVersionControlError(failure);
+  return versionControlErrorDescription({ ...presentation, detail });
 }
 
 export function resolveBaseFreshness(detail: {

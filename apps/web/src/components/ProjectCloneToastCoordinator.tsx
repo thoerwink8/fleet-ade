@@ -64,6 +64,7 @@ async function runCloneAction(
         type: "error",
         title: presentation.title,
         description: presentation.description,
+        data: { copyText: presentation.detail },
       }),
     );
   }

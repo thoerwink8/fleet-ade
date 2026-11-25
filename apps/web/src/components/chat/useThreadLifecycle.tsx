@@ -378,6 +378,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
             type: "error",
             title: presentation.title,
             description: presentation.description,
+            data: { copyText: presentation.detail },
           }),
         );
       }

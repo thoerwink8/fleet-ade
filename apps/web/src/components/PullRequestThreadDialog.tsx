@@ -9,6 +9,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { presentVersionControlError } from "./versionControlError.logic";
+import { VersionControlErrorDetail } from "./VersionControlErrorDetail";
 import { useRef, useState } from "react";
 
 import {
@@ -67,11 +68,15 @@ interface DialogError {
   readonly title?: string;
   readonly nextStep?: string;
   readonly detail: string;
+  readonly collapseDetail: boolean;
 }
 
 function dialogError(error: unknown, fallbackAction: string): DialogError {
-  const { title, nextStep, detail } = presentVersionControlError(error, fallbackAction);
-  return { title, ...(nextStep === undefined ? {} : { nextStep }), detail };
+  const { title, nextStep, detail, collapseDetail } = presentVersionControlError(
+    error,
+    fallbackAction,
+  );
+  return { title, ...(nextStep === undefined ? {} : { nextStep }), detail, collapseDetail };
 }
 
 export function PullRequestThreadDialog({
@@ -187,7 +192,7 @@ export function PullRequestThreadDialog({
         ? `请使用 ${terminology.singular} URL、检出命令、123 或 #123。`
         : null;
   const errorMessage: DialogError | null =
-    (validationMessage === null ? null : { detail: validationMessage }) ??
+    (validationMessage === null ? null : { detail: validationMessage, collapseDetail: false }) ??
     prepareErrorMessage ??
     (resolvedPullRequest === null && pullRequestResolution.error
       ? dialogError(pullRequestResolution.failure ?? pullRequestResolution.error, "加载 PR")
@@ -278,7 +283,7 @@ export function PullRequestThreadDialog({
             <div className="space-y-0.5 text-destructive text-xs">
               {errorMessage.title ? <p className="font-medium">{errorMessage.title}</p> : null}
               {errorMessage.nextStep ? <p>{errorMessage.nextStep}</p> : null}
-              <p className="whitespace-pre-wrap">{errorMessage.detail}</p>
+              <VersionControlErrorDetail error={errorMessage} />
             </div>
           ) : null}
         </DialogPanel>
