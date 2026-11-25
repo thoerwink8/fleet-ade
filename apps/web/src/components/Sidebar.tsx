@@ -2472,14 +2472,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           return thread ? [thread] : [];
         },
       );
-      const snoozePresetThread = selected[0];
-      if (!snoozePresetThread) return;
-      await executeMultiSelectAction("snooze:custom", {
-        snoozePresets: [
-          { id: "custom", label: "自定义", whenLabel: "", snoozedUntil: choice.snoozedUntil },
-        ],
-        snoozePresetThread,
-      });
+      if (selected.length === 0) return;
+      await executeMultiSelectAction(`snooze:until:${choice.snoozedUntil}`);
     })();
   });
   const handleMultiSelectContextMenu = useStableCallback(
