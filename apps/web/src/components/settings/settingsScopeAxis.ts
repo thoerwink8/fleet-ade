@@ -160,3 +160,11 @@ export function selectSingleEnvironmentScope(
     candidates[0];
   return selected ? { ...search, machine: selected.environmentId } : search;
 }
+
+/** The pickers only choose between alternatives; with one computer and one project there is nothing to choose. */
+export function settingsScopeControlsVisible(
+  environmentCount: number,
+  projectCount: number,
+): boolean {
+  return environmentCount > 1 || projectCount > 1;
+}

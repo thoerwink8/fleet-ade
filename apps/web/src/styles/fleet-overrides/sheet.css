@@ -177,6 +177,10 @@
   color: color-mix(in oklab, var(--fa-fg-muted) 65%, var(--fa-fg));
 }
 
+.fa-drawer.ade-sheet-popup[data-mobile="true"] {
+  touch-action: pan-y pinch-zoom;
+}
+
 /* Closed keepMounted popups stay in the DOM behind [hidden]; the shadow would
    still paint if display ever changed, so clear it like fleet's closed drawer. */
 .fa-drawer.ade-sheet-popup[hidden] {

@@ -40,7 +40,7 @@ describe("keybindings update toast", () => {
       message: "bad shortcut",
     });
     currentTime = 5_100;
-    expect(controller.handle(keybindingsUpdated([]))).toEqual({ _tag: "Success" });
+    expect(controller.handle(keybindingsUpdated([]))).toBeNull();
     currentTime = 5_200;
     expect(controller.handle(keybindingsUpdated([]))).toBeNull();
   });

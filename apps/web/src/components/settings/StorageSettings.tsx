@@ -33,8 +33,7 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
-
-import { Input } from "../ui/input";
+import { DraftInput } from "../ui/draft-input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import {
@@ -85,8 +84,6 @@ export function WorktreesDirectoryRow() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const mixed = useScopedSettingsMixed(["worktreesDirectory"]);
-  const edited = useRef(false);
-  const draft = useRef("");
   if (
     connectedEnvironments.some(
       (environment) =>
@@ -113,27 +110,15 @@ export function WorktreesDirectoryRow() {
         ) : null
       }
       control={
-        <Input
-          key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
+        <DraftInput
+          key={`${scopeKey}:${mixed}`}
           aria-label="工作树位置"
           autoCapitalize="none"
           spellCheck={false}
           placeholder={mixed ? "多项不同" : "默认"}
-          defaultValue={mixed ? "" : settings.worktreesDirectory}
-          onFocus={(event) => {
-            draft.current = event.target.value;
-          }}
-          onChange={(event) => {
-            edited.current = true;
-            draft.current = resolvePastedPath(draft.current, event.target.value);
-            event.target.value = draft.current;
-          }}
-          onBlur={(event) => {
-            const value = event.target.value.trim();
-            if (edited.current && (mixed || value !== settings.worktreesDirectory))
-              updateSettings({ worktreesDirectory: value });
-            edited.current = false;
-          }}
+          value={mixed ? "" : settings.worktreesDirectory}
+          normalizeDraft={resolvePastedPath}
+          onCommit={(next) => updateSettings({ worktreesDirectory: next.trim() })}
         />
       }
     />
@@ -279,7 +264,6 @@ function RetentionControl({
           min={minimum}
           max={3650}
           step={1}
-          size="sm"
           disabled={disabled}
           className="w-auto"
           onValueChange={(next) => {

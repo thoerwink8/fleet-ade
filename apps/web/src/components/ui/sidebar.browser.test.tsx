@@ -314,3 +314,169 @@ it("opens the mobile sheet without a transition while panel animations are off",
   expect(popup).not.toBeNull();
   expect(getComputedStyle(popup!).transitionDuration).toBe("0s");
 });
+
+function dispatchSwipePointer(
+  target: EventTarget,
+  type: "pointerdown" | "pointermove" | "pointerup",
+  init: {
+    readonly pointerId: number;
+    readonly pointerType: "touch" | "mouse";
+    readonly clientX: number;
+    readonly clientY: number;
+  },
+) {
+  target.dispatchEvent(
+    new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      isPrimary: true,
+      button: 0,
+      buttons: type === "pointerup" ? 0 : 1,
+      ...init,
+    }),
+  );
+}
+
+it("closes the mobile sheet on horizontal left touch swipe without breaking scroll, mouse drag, or desktop sidebar", async () => {
+  const prev = { width: window.innerWidth, height: window.innerHeight };
+  await page.viewport(390, 844);
+  await using _viewport = {
+    [Symbol.asyncDispose]: () => page.viewport(prev.width, prev.height),
+  };
+  const onActionClick = vi.fn();
+
+  await using screen = await render(
+    <SidebarProvider defaultOpen>
+      <Sidebar>
+        <div style={{ height: "900px" }}>
+          <button type="button" onClick={onActionClick}>
+            Drawer action
+          </button>
+        </div>
+      </Sidebar>
+      <SidebarInset>
+        <SidebarTrigger />
+        <MobileSheetMountedProbe />
+      </SidebarInset>
+    </SidebarProvider>,
+    { router: false /* no routes involved */ },
+  );
+
+  const trigger = screen.container.querySelector<HTMLButtonElement>(
+    '[data-slot="sidebar-trigger"]',
+  )!;
+  const sheetMounted = screen.getByLabelText("Sheet mounted");
+
+  await userEvent.click(trigger);
+  await expect.element(sheetMounted).toHaveTextContent("true");
+
+  const popup = document.querySelector<HTMLElement>(
+    '[data-mobile="true"][data-sidebar="sidebar"]',
+  )!;
+  expect(popup).not.toBeNull();
+  const actionButton = popup.querySelector<HTMLButtonElement>("button")!;
+  expect(actionButton).not.toBeNull();
+  expect(getComputedStyle(popup).touchAction).toContain("pan-y");
+
+  // Short touch swipe (< 32px flick / < 56..96px threshold): keeps drawer open, resets transform, suppresses accidental tap.
+  dispatchSwipePointer(actionButton, "pointerdown", {
+    pointerId: 1,
+    pointerType: "touch",
+    clientX: 240,
+    clientY: 200,
+  });
+  dispatchSwipePointer(popup, "pointermove", {
+    pointerId: 1,
+    pointerType: "touch",
+    clientX: 216,
+    clientY: 202,
+  });
+  expect(popup.style.transform).toBe("translate3d(-24px, 0px, 0px)");
+  dispatchSwipePointer(popup, "pointerup", {
+    pointerId: 1,
+    pointerType: "touch",
+    clientX: 216,
+    clientY: 202,
+  });
+  expect(popup.style.transform).toBe("");
+  await expect.element(sheetMounted).toHaveTextContent("true");
+  actionButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  expect(onActionClick).not.toHaveBeenCalled();
+
+  // Vertical touch scroll stays ignored and keeps the drawer open without translating.
+  dispatchSwipePointer(popup, "pointerdown", {
+    pointerId: 2,
+    pointerType: "touch",
+    clientX: 200,
+    clientY: 200,
+  });
+  dispatchSwipePointer(popup, "pointermove", {
+    pointerId: 2,
+    pointerType: "touch",
+    clientX: 196,
+    clientY: 240,
+  });
+  expect(popup.style.transform).toBe("");
+  dispatchSwipePointer(popup, "pointerup", {
+    pointerId: 2,
+    pointerType: "touch",
+    clientX: 196,
+    clientY: 240,
+  });
+  await expect.element(sheetMounted).toHaveTextContent("true");
+
+  // Mouse drag does not trigger touch swipe close.
+  dispatchSwipePointer(popup, "pointerdown", {
+    pointerId: 3,
+    pointerType: "mouse",
+    clientX: 260,
+    clientY: 200,
+  });
+  dispatchSwipePointer(popup, "pointermove", {
+    pointerId: 3,
+    pointerType: "mouse",
+    clientX: 100,
+    clientY: 200,
+  });
+  expect(popup.style.transform).toBe("");
+  dispatchSwipePointer(popup, "pointerup", {
+    pointerId: 3,
+    pointerType: "mouse",
+    clientX: 100,
+    clientY: 200,
+  });
+  await expect.element(sheetMounted).toHaveTextContent("true");
+
+  // Leftward touch swipe past threshold closes the drawer, clears transform, and returns focus to the trigger.
+  dispatchSwipePointer(popup, "pointerdown", {
+    pointerId: 4,
+    pointerType: "touch",
+    clientX: 260,
+    clientY: 200,
+  });
+  dispatchSwipePointer(popup, "pointermove", {
+    pointerId: 4,
+    pointerType: "touch",
+    clientX: 120,
+    clientY: 202,
+  });
+  expect(popup.style.transform).toBe("translate3d(-140px, 0px, 0px)");
+  dispatchSwipePointer(popup, "pointerup", {
+    pointerId: 4,
+    pointerType: "touch",
+    clientX: 120,
+    clientY: 202,
+  });
+  expect(popup.style.transform).toBe("");
+  await expect.element(sheetMounted).toHaveTextContent("false");
+  await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+
+  // Resizing back to desktop renders the persistent expanded sidebar without a mobile sheet.
+  await page.viewport(1280, 800);
+  await vi.waitFor(() => {
+    expect(document.querySelector('[data-mobile="true"][data-sidebar="sidebar"]')).toBeNull();
+    expect(
+      screen.container.querySelector('[data-slot="sidebar"][data-state="expanded"]'),
+    ).not.toBeNull();
+  });
+});

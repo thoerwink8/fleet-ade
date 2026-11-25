@@ -41,6 +41,7 @@ import {
   selectProjectAxis,
   settingsScopeCheckoutChoices,
   settingsScopeCheckoutLabel,
+  settingsScopeControlsVisible,
   settingsScopeEnvironmentAddress,
   settingsScopeEnvironmentLabel,
   settingsScopeEnvironmentLabels,
@@ -65,6 +66,11 @@ export function SettingsScopeSentence() {
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
   if (scope === null || SETTINGS_DEVICE_ONLY_PATHS.has(pathname)) return null;
+  const projectCount = scope.groups.reduce(
+    (count, group) => count + group.memberProjects.length,
+    0,
+  );
+  if (!settingsScopeControlsVisible(environments.length, projectCount)) return null;
   const props: SettingsScopeMenuProps = {
     value: scope.search,
     singleEnvironment: scope.singleEnvironment,
@@ -73,7 +79,7 @@ export function SettingsScopeSentence() {
     onChange: scope.selectScope,
   };
   return (
-    <p className="-mb-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-ui text-muted-foreground sm:-mb-2">
+    <p className="-mb-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-row text-muted-foreground sm:-mb-2">
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="shrink-0">正在为</span>
         <ProjectScopeMenu {...props} />

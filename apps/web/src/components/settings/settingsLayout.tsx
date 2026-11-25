@@ -518,9 +518,7 @@ export function SettingsRow({
             </span>
           </div>
           {description ? (
-            <p className="max-w-2xl text-pretty text-ui leading-relaxed text-muted-foreground">
-              {description}
-            </p>
+            <p className="max-w-2xl text-pretty text-meta text-muted-foreground">{description}</p>
           ) : null}
           {renderedStatus ? (
             <div className="pt-0.5 text-meta text-muted-foreground">{renderedStatus}</div>
@@ -599,6 +597,7 @@ export function SettingsPageContainer({
   const clearTargetHash = () => {
     void navigate({
       hash: "",
+      search: true,
       replace: true,
       resetScroll: false,
       hashScrollIntoView: false,

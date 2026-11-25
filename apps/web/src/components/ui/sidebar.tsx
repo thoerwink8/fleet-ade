@@ -23,6 +23,15 @@ import {
   writeLocalStorageValue,
 } from "~/hooks/useLocalStorage";
 import { resolveSidebarState, type ResponsiveSidebarState } from "./sidebarState";
+import {
+  finishMobileSidebarSwipe,
+  releaseElementPointerCapture,
+  setElementPointerCapture,
+  shouldIgnoreMobileSidebarSwipeTarget,
+  startMobileSidebarSwipe,
+  updateMobileSidebarSwipe,
+  type MobileSidebarSwipeSession,
+} from "./sidebarMobileSwipe.logic";
 import * as Schema from "effect/Schema";
 import { announceSidebarVisibility } from "~/lib/accessibilityAnnouncements";
 
@@ -105,6 +114,17 @@ function useSidebarVisibility() {
 function useMobileSidebarSheetMounted() {
   const context = React.use(SidebarContext);
   return context !== null && context.isMobile && context.mobileSheetMounted;
+}
+
+const noopCloseMobileSidebar = () => {};
+
+/** Safe mobile-only close callback; no-ops on desktop or outside a SidebarProvider. */
+function useCloseMobileSidebar(): () => void {
+  const context = React.use(SidebarContext);
+  if (context === null || !context.isMobile) {
+    return noopCloseMobileSidebar;
+  }
+  return () => context.setOpenMobile(false);
 }
 
 // The `max-md` breakpoint, also read when a shortcut fires.
@@ -315,6 +335,20 @@ function resolveSidebarResizable({
   };
 }
 
+const SWIPE_CLICK_SUPPRESSION_WINDOW_MS = 150;
+
+function resetMobileSwipeRefs(input: {
+  readonly popup: HTMLElement | null;
+  readonly swipeSessionRef: React.RefObject<MobileSidebarSwipeSession | null>;
+  readonly suppressClickUntilMsRef: React.RefObject<number>;
+}) {
+  input.swipeSessionRef.current = null;
+  input.suppressClickUntilMsRef.current = -1;
+  if (input.popup) {
+    input.popup.style.transform = "";
+  }
+}
+
 function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -338,7 +372,20 @@ function Sidebar({
     resolveMobileReturnFocusTarget,
   } = useSidebar();
   const mobilePopupRef = React.useRef<HTMLDivElement>(null);
+  const swipeSessionRef = React.useRef<MobileSidebarSwipeSession | null>(null);
+  const suppressClickUntilMsRef = React.useRef(-1);
   const offcanvasCollapsed = !isMobile && collapsible === "offcanvas" && state === "collapsed";
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears imperative drag transform on the keepMounted sheet DOM node when closing or switching to desktop
+  React.useEffect(() => {
+    if (!isMobile || !openMobile) {
+      resetMobileSwipeRefs({
+        popup: mobilePopupRef.current,
+        swipeSessionRef,
+        suppressClickUntilMsRef,
+      });
+    }
+  }, [isMobile, openMobile]);
 
   const resolvedResizable = resolveSidebarResizable({ collapsible, isMobile, resizable });
   const instanceContextValue: SidebarInstanceContextProps = { side, resizable: resolvedResizable };
@@ -364,7 +411,16 @@ function Sidebar({
     return (
       <SidebarInstanceContext value={instanceContextValue}>
         <Sheet
-          onOpenChange={setOpenMobile}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              resetMobileSwipeRefs({
+                popup: mobilePopupRef.current,
+                swipeSessionRef,
+                suppressClickUntilMsRef,
+              });
+            }
+            setOpenMobile(nextOpen);
+          }}
           onOpenChangeComplete={(open) => {
             if (!open) setMobileSheetMounted(false);
           }}
@@ -382,6 +438,77 @@ function Sidebar({
             data-slot="sidebar"
             showCloseButton={false}
             side={side}
+            onPointerDown={(event: React.PointerEvent<HTMLDivElement>) => {
+              suppressClickUntilMsRef.current = -1;
+              if (!openMobile || event.pointerType !== "touch" || !event.isPrimary) return;
+              if (swipeSessionRef.current !== null) return;
+              if (shouldIgnoreMobileSidebarSwipeTarget(event.target, event.currentTarget)) return;
+              const drawerWidth = event.currentTarget.getBoundingClientRect().width;
+              if (drawerWidth <= 0) return;
+              swipeSessionRef.current = startMobileSidebarSwipe({
+                side,
+                pointerId: event.pointerId,
+                drawerWidth,
+                x: event.clientX,
+                y: event.clientY,
+                timeMs: event.timeStamp,
+              });
+            }}
+            onPointerMove={(event: React.PointerEvent<HTMLDivElement>) => {
+              const current = swipeSessionRef.current;
+              if (!current || current.pointerId !== event.pointerId) return;
+              const wasDragging = current.phase === "dragging";
+              const next = updateMobileSidebarSwipe(current, {
+                x: event.clientX,
+                y: event.clientY,
+                timeMs: event.timeStamp,
+              });
+              swipeSessionRef.current = next.session;
+              if (!wasDragging && next.session.phase === "dragging") {
+                setElementPointerCapture(event.currentTarget, event.pointerId);
+              }
+              if (next.session.phase === "dragging") {
+                event.currentTarget.style.transform = `translate3d(${next.offsetPx}px, 0px, 0px)`;
+              }
+            }}
+            onPointerUp={(event: React.PointerEvent<HTMLDivElement>) => {
+              const current = swipeSessionRef.current;
+              if (!current || current.pointerId !== event.pointerId) return;
+              swipeSessionRef.current = null;
+              releaseElementPointerCapture(event.currentTarget, event.pointerId);
+              const result = finishMobileSidebarSwipe(current, {
+                x: event.clientX,
+                timeMs: event.timeStamp,
+              });
+              event.currentTarget.style.transform = "";
+              if (result.suppressClick) {
+                suppressClickUntilMsRef.current =
+                  event.timeStamp + SWIPE_CLICK_SUPPRESSION_WINDOW_MS;
+              }
+              if (result.shouldClose) {
+                setOpenMobile(false);
+              }
+            }}
+            onPointerCancel={(event: React.PointerEvent<HTMLDivElement>) => {
+              const current = swipeSessionRef.current;
+              if (!current || current.pointerId !== event.pointerId) return;
+              swipeSessionRef.current = null;
+              releaseElementPointerCapture(event.currentTarget, event.pointerId);
+              event.currentTarget.style.transform = "";
+              if (current.phase === "dragging") {
+                suppressClickUntilMsRef.current =
+                  event.timeStamp + SWIPE_CLICK_SUPPRESSION_WINDOW_MS;
+              }
+            }}
+            onClickCapture={(event: React.MouseEvent<HTMLDivElement>) => {
+              const suppressUntilMs = suppressClickUntilMsRef.current;
+              if (suppressUntilMs < 0) return;
+              suppressClickUntilMsRef.current = -1;
+              if (event.timeStamp <= suppressUntilMs) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -677,7 +804,7 @@ function SidebarInput({ className, ...props }: Omit<InputProps, "unstyled" | "va
   return (
     <Input
       className={cn(
-        "[&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:font-normal [&_[data-slot=input]]:text-sidebar-foreground sm:[&_[data-slot=input]]:text-ui [&_[data-slot=input]]:leading-5 [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground",
+        "[&_[data-slot=input]]:h-7 [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:font-normal [&_[data-slot=input]]:text-sidebar-foreground sm:[&_[data-slot=input]]:text-row [&_[data-slot=input]]:leading-7 [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground",
         className,
       )}
       unstyled
@@ -976,6 +1103,7 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  useCloseMobileSidebar,
   useMobileSidebarSheetMounted,
   useSidebar,
   useSidebarVisibility,

@@ -69,7 +69,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
 
   return (
     <Toolbar.Root
-      className="w-11 shrink-0 overflow-hidden bg-muted/30"
+      className="w-10 shrink-0 overflow-hidden bg-muted/30"
       data-model-picker-sidebar="true"
       aria-label="智能体"
       orientation="vertical"
@@ -83,7 +83,10 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
       }}
     >
       <div className="h-full overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div ref={sidebarContentRef} className="relative flex min-h-full flex-col gap-1 p-1">
+        <div
+          ref={sidebarContentRef}
+          className="relative flex min-h-full flex-col items-center gap-1 p-1"
+        >
           {selectedIndicatorTop !== null ? (
             <div
               data-model-picker-selected-indicator="true"
@@ -93,13 +96,16 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
           ) : null}
           {showFavorites ? (
             <>
-              <div className="relative w-full" data-model-picker-provider="favorites">
+              <div
+                className="relative flex w-full justify-center"
+                data-model-picker-provider="favorites"
+              >
                 <Tooltip>
                   <TooltipTrigger
                     render={
                       <Toolbar.Button
                         className={cn(
-                          "relative isolate flex w-full cursor-pointer aspect-square items-center justify-center rounded-md transition-colors hover:bg-foreground/10 focus-visible:bg-foreground/10 focus-visible:outline-none",
+                          "relative isolate flex size-8 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-foreground/10 focus-visible:bg-foreground/10 focus-visible:outline-none",
                         )}
                         onClick={() => handleSelect("favorites")}
                         type="button"
@@ -143,7 +149,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
             const button = (
               <Toolbar.Button
                 className={cn(
-                  "relative isolate flex w-full cursor-pointer aspect-square items-center justify-center rounded-md transition-colors hover:bg-foreground/10 focus-visible:bg-foreground/10 focus-visible:outline-none",
+                  "relative isolate flex size-8 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-foreground/10 focus-visible:bg-foreground/10 focus-visible:outline-none",
                   isDisabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
                 )}
                 data-provider-accent-color={entry.accentColor}
@@ -192,7 +198,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
             return (
               <div
                 key={entry.instanceId}
-                className="relative w-full"
+                className="relative flex w-full justify-center"
                 data-model-picker-provider={entry.instanceId}
               >
                 <Tooltip>

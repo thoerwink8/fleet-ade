@@ -77,6 +77,8 @@ import {
 import { getComposerPlaceholder } from "../../composerPlaceholder";
 import { deriveComposerSendState } from "../ChatView.logic";
 import { evaluateComposerProviderReadiness } from "./composerProviderReadiness";
+import { AgentSetupCard } from "../agentSetup/AgentSetupCard";
+import { useAgentSetupCard } from "../agentSetup/useAgentSetupCard";
 import {
   dataTransferHasComposerMention,
   makeComposerMentionDragHandlers,
@@ -202,6 +204,7 @@ import {
 import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
+import { EMPTY_TAKEOVER_DRAFT, takeoverDraftSnapshot } from "./questionTakeoverNotice.logic";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
 import { buildPullRequestReferenceContext } from "../pullRequest/pullRequestDetail.logic";
 import { getComposerPromptInjectionState, getComposerReasoningStep } from "./composerProviderState";
@@ -678,6 +681,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const applyThreadModelPick = useApplyThreadModelPick();
   const composerDraft = useComposerThreadDraft(composerDraftTarget);
   const composerDraftTargetKeyRef = useRef("");
+  const [takeoverDraft, setTakeoverDraft] = useState(EMPTY_TAKEOVER_DRAFT);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes the committed draft target key to a ref read by async handlers
   useLayoutEffect(() => {
     composerDraftTargetKeyRef.current = composerDraftTargetKey;
@@ -702,6 +706,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   const questionPreparations = useQuestionAttachmentPreparation((state) => state.counts);
   const prompt = composerDraft.prompt;
+  const nextTakeoverDraft = takeoverDraftSnapshot(
+    takeoverDraft,
+    activePendingProgress ? (pendingUserInputs[0]?.requestId ?? "") : "",
+    prompt,
+  );
+  if (nextTakeoverDraft !== takeoverDraft) setTakeoverDraft(nextTakeoverDraft);
   const composerImages = attachmentDraft.images;
   const composerFiles = attachmentDraft.files;
   const inlineFileIdSet = (() => {
@@ -946,6 +956,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     selectedProviderEntry === undefined && multipleModelSelections === null;
   const providerCatalogPending = noProviderAvailable && !providerCatalogKnown;
   const showProviderUnavailable = noProviderAvailable && !providerCatalogPending;
+  const agentSetupModel = useAgentSetupCard({
+    environmentId,
+    providers: providerStatuses,
+    catalogKnown: providerCatalogKnown,
+  });
+  const agentSetupCard = routeKind === "draft" ? agentSetupModel : null;
   const providerSetupInstanceId = noProviderAvailable
     ? (unavailableProviderInstanceId ??
       (lockedProvider === null
@@ -1164,6 +1180,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     isLoading: isComposerMenuLoading,
     loadingState: composerMenuLoadingState,
     emptyState: composerMenuEmptyState,
+    emptyStateError: composerMenuEmptyStateError,
   } = useComposerMenuItems({
     composerTrigger,
     environmentId,
@@ -3773,6 +3790,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       data-chat-composer-form="true"
       {...threadContextDropTargetProps()}
     >
+      {agentSetupCard ? (
+        <div className="mb-3 flex justify-center">
+          <AgentSetupCard model={agentSetupCard} environmentId={environmentId} inset />
+        </div>
+      ) : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
           <ComposerBannerStack items={shelfItems} />
@@ -3796,6 +3818,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onAdvance={onAdvanceActivePendingUserInput}
                     onDismiss={onDismissActivePendingUserInput}
                     onResendLastUserMessage={onResendLastUserMessage}
+                    setAsideDraft={activePendingProgress ? nextTakeoverDraft.draft : null}
                   />
                 ) : null}
               </ComposerBanner.Root>
@@ -3829,25 +3852,27 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   type="button"
                   data-chat-composer-transition-prompt="true"
                   className={cn(
-                    "min-w-0 flex-1 truncate bg-transparent p-0 text-left text-sm focus:outline-none",
+                    "ade-touch-target ade-touch-target--y min-w-0 flex-1 bg-transparent p-0 text-left text-sm focus:outline-none",
                     prompt.trim() ? "text-foreground" : "text-placeholder",
                   )}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={expandMobileComposerStable}
                   aria-label="展开输入框"
                 >
-                  {prompt.trim() ? (
-                    <CollapsedComposerPromptPreview
-                      prompt={prompt}
-                      skills={selectedProviderSkills}
-                      contextRecords={composerContextRecords}
-                      theme={resolvedTheme}
-                    />
-                  ) : showProviderUnavailable ? (
-                    "请在设置中启用一个智能体"
-                  ) : (
-                    "随便问点什么…"
-                  )}
+                  <span className="block truncate">
+                    {prompt.trim() ? (
+                      <CollapsedComposerPromptPreview
+                        prompt={prompt}
+                        skills={selectedProviderSkills}
+                        contextRecords={composerContextRecords}
+                        theme={resolvedTheme}
+                      />
+                    ) : showProviderUnavailable ? (
+                      "请在设置中启用一个智能体"
+                    ) : (
+                      "随便问点什么…"
+                    )}
+                  </span>
                 </button>
                 {collapsedComposerImagePreviews}
                 <CollapsedComposerStopAction
@@ -3956,6 +3981,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     triggerKind={composerTriggerKind}
                     loadingStateText={composerMenuLoadingState}
                     emptyStateText={composerMenuEmptyState}
+                    emptyStateError={composerMenuEmptyStateError}
                     activeItemId={activeComposerMenuItem?.id ?? null}
                     onHighlightedItemChange={onComposerMenuItemHighlightedStable}
                     onSelect={onSelectComposerItemStable}
@@ -4253,7 +4279,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     aria-hidden={restingControlsVisible ? undefined : true}
                     inert={restingControlsVisible ? undefined : true}
                     className={cn(
-                      "relative flex w-max min-w-0 max-w-full items-center gap-1 text-muted-foreground/70 [&_button]:text-xs!",
+                      "ade-touch-row ade-touch-row--gap-1 relative flex w-max min-w-0 max-w-full items-center gap-1 text-muted-foreground/70 [&_button]:text-xs!",
                       !restingControlsVisible && "invisible",
                     )}
                   >

@@ -40,7 +40,7 @@ export const ComposerStashBadge = memo(function ComposerStashBadge(props: {
         aria-label={`暂存的提示词：${props.count} 条。打开暂存。`}
         aria-expanded={props.menuOpen}
         className={cn(
-          "transition-colors duration-200",
+          "ade-touch-target ade-touch-target--y transition-colors duration-200",
           props.menuOpen && "pointer-events-none",
           props.menuOpen ? "text-foreground" : "text-muted-foreground hover:text-foreground",
           // The button keeps its identity (focus, hover) across stashes. Swapping between two

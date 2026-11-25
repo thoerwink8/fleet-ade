@@ -1039,6 +1039,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
   const toggleThreadSelection = useThreadSelectionStore((s) => s.toggleThread);
   const rangeSelectTo = useThreadSelectionStore((s) => s.rangeSelectTo);
+  const batchSelectionAt = useThreadSelectionStore((s) => s.selectedAt);
   const acknowledgeWoke = useAcknowledgeThreadWoke();
   // A Settings or Usage modal keeps the thread behind it current.
   const routeTarget = useShownThreadRouteTarget().shownTarget;
@@ -1109,7 +1110,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } | null>(null);
   const snoozingThreadKeysRef = useRef(new Set<string>());
   const removeFromSelection = useThreadSelectionStore((s) => s.removeFromSelection);
-  const openAddProjectCommandPalette = () => openCommandPalette({ open: "add-project" });
+  const openAddProjectCommandPalette = () => {
+    if (isMobile) setOpenMobile(false);
+    openCommandPalette({ open: "add-project" });
+  };
   const routeThreadRef = resolveActiveThreadRouteRef(
     routeTarget,
     routeDraftThread,
@@ -2802,7 +2806,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopeGroups.length > 1
       ? currentProjectRef !== null
         ? "选择其他项目新建：Shift+单击"
-        : `在当前项目中新建会话：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
+        : `跳过项目选择直接新建：Shift+单击${newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}`
       : null;
   return (
     <SidebarFolderDrop>
@@ -3035,6 +3039,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 orderedThreadCount={orderedThreadKeys.length}
                 serverConfigs={serverConfigs}
                 onAction={handleBatchBarAction}
+                snoozePresets={
+                  primaryEnvironmentId === null || batchSelectionAt === null
+                    ? []
+                    : resolveSnoozePresets(
+                        new Date(batchSelectionAt),
+                        timestampFormat,
+                        primaryEnvironmentId,
+                      )
+                }
+                nowIso={batchSelectionAt ?? ""}
                 onClearSelection={clearSelection}
               />
             ) : null}
@@ -3139,14 +3153,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               {projects.length === 0 ? (
                 <>
                   <span>暂无项目</span>
-                  <button
-                    type="button"
-                    onClick={openAddProjectCommandPalette}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
-                    <PlusIcon className="-mx-0.5 size-3" />
+                  <Button type="button" variant="secondary" onClick={openAddProjectCommandPalette}>
+                    <PlusIcon />
                     添加项目
-                  </button>
+                  </Button>
                 </>
               ) : scopedProjectGroups.length > 0 ? (
                 <>
@@ -3157,25 +3167,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         : scopedProjectGroups[0]!.displayName
                     }中暂无${settledCount > 0 ? "进行中的会话" : "会话"}`}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setProjectScopeKeys([])}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
+                  <Button type="button" variant="secondary" onClick={() => setProjectScopeKeys([])}>
                     显示所有项目
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <>
                   <span>暂无会话</span>
-                  <button
-                    type="button"
-                    onClick={handleNewThreadClick}
-                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
-                    <PlusIcon className="-mx-0.5 size-3" />
+                  <Button type="button" variant="secondary" onClick={handleNewThreadClick}>
+                    <PlusIcon />
                     开始新会话
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
