@@ -972,13 +972,68 @@ export type ThreadAttentionInput = ThreadStatusInput & {
     OrchestrationV2PendingRuntimeRequestSummary,
     "kind" | "blocking"
   > | null;
+  readonly source?: {
+    readonly pendingRuntimeRequest?: Pick<
+      OrchestrationV2PendingRuntimeRequestSummary,
+      "kind" | "blocking"
+    > | null;
+  };
 };
+
+function resolvePendingRuntimeRequest(
+  thread: Pick<ThreadAttentionInput, "pendingRuntimeRequest" | "source">,
+) {
+  return thread.pendingRuntimeRequest !== undefined
+    ? thread.pendingRuntimeRequest
+    : thread.source?.pendingRuntimeRequest;
+}
+
+function isLiveWorkingStatus(
+  status: SidebarThreadStatus,
+  thread: Pick<
+    SidebarThreadSummary,
+    "interactionMode" | "hasActionableProposedPlan" | "latestRun" | "runtime"
+  >,
+): boolean {
+  if (
+    status !== "preparing" &&
+    status !== "queued" &&
+    status !== "working" &&
+    status !== "waiting"
+  ) {
+    return false;
+  }
+  const run = thread.latestRun;
+  const runSettled =
+    run !== null &&
+    run.status !== "preparing" &&
+    run.status !== "queued" &&
+    run.status !== "starting" &&
+    run.status !== "running" &&
+    run.status !== "waiting" &&
+    thread.runtime?.activeRunId !== run.runId;
+  return !(
+    thread.interactionMode === "plan" &&
+    thread.hasActionableProposedPlan === true &&
+    runSettled
+  );
+}
+
+export function isSidebarLiveWorking(
+  thread: SidebarThreadStatusInput &
+    Pick<
+      SidebarThreadSummary,
+      "interactionMode" | "hasActionableProposedPlan" | "latestRun" | "runtime"
+    >,
+): boolean {
+  return isLiveWorkingStatus(resolveSidebarThreadStatus(thread), thread);
+}
 
 export function resolveThreadAttention(
   thread: ThreadAttentionInput,
   lastVisitedAt: string | null | undefined = thread.lastVisitedAt,
 ): ThreadAttention | null {
-  const request = thread.pendingRuntimeRequest;
+  const request = resolvePendingRuntimeRequest(thread);
   const statusThread = { ...thread, lastVisitedAt };
   if (
     (request !== null && request !== undefined
@@ -1000,6 +1055,15 @@ export function resolveThreadAttention(
     ...thread,
     blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
   });
+  // Active work or awaited background work supersedes any stale completion/failure from an earlier run.
+  if (
+    status === "preparing" ||
+    status === "queued" ||
+    status === "working" ||
+    status === "waiting"
+  ) {
+    return null;
+  }
   if (status === "failed" || status === "limited" || thread.latestRun?.status === "failed") {
     const category = status === "limited" ? "limited" : "failed";
     if (thread.latestRun?.status === "failed") {
@@ -1038,12 +1102,16 @@ export function isThreadAttentionDismissible(input: {
   );
 }
 
-function threadAttentionActionText(category: ThreadAttentionCategory): string {
-  switch (category) {
+export function threadAttentionSubtitleText(input: {
+  readonly attention: ThreadAttention;
+  readonly attentionOffline?: boolean | undefined;
+  readonly isRoute?: boolean | undefined;
+}): string {
+  switch (input.attention.category) {
     case "approval":
-      return "等你批准，点开处理";
+      return input.isRoute ? "等你批准" : "等你批准，点开处理";
     case "input":
-      return "等你回答，点开处理";
+      return input.isRoute ? "等你回答" : "等你回答，点开处理";
     case "failed":
       return "上一轮出错了，点开处理";
     case "limited":
@@ -1053,12 +1121,265 @@ function threadAttentionActionText(category: ThreadAttentionCategory): string {
   }
 }
 
-export function threadAttentionSubtitleText(input: {
-  readonly attention: ThreadAttention;
-  readonly attentionOffline: boolean | undefined;
-}): string {
-  if (isThreadAttentionRowDisabled(input)) return "电脑已断线，连上后处理";
-  return threadAttentionActionText(input.attention.category);
+export interface SidebarThreadRowMark {
+  readonly dot: string;
+  readonly label: string;
+}
+
+export interface SidebarThreadHoverDot {
+  readonly variant: "dot-attention" | "dot-active" | "dot-blocked" | "dot-waiting" | "dot-done";
+  readonly label: string;
+}
+
+export interface SidebarRowPresentation {
+  readonly status: SidebarThreadStatus;
+  readonly isUnread: boolean;
+  readonly subtitle: string | null;
+  readonly rowMark: SidebarThreadRowMark | null;
+  readonly statusLabel: string | null;
+  readonly hoverDot: SidebarThreadHoverDot;
+}
+
+export type SidebarRowPresentationThread = ThreadAttentionInput &
+  Pick<SidebarThreadSummary, "latestRun" | "runtime"> & {
+    readonly goal?: SidebarThreadSummary["goal"];
+    readonly turnCount?: number | undefined;
+    readonly visibleItemCount?: number | undefined;
+  };
+
+/** Derive row dot, unread highlight, subtitle, accessibility label, and hover status from one judgment. */
+export function resolveSidebarRowPresentation(input: {
+  readonly section: SidebarSection;
+  readonly thread: SidebarRowPresentationThread;
+  readonly attention: ThreadAttention | null;
+  readonly lastVisitedAt: string | null | undefined;
+  readonly isRoute: boolean;
+  readonly isWoke: boolean;
+}): SidebarRowPresentation {
+  const { section, thread, attention, lastVisitedAt, isRoute, isWoke } = input;
+  const rawStatus = resolveSidebarThreadStatus({
+    ...thread,
+    blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
+  });
+  let status: SidebarThreadStatus =
+    rawStatus === "ready" && thread.latestRun?.status === "failed" ? "failed" : rawStatus;
+  // Hold the row visually running during the inbox 2s exit grace so section and row never disagree.
+  if (section === "working" && status === "ready") {
+    status = "working";
+  }
+  if (section === "attention" && attention !== null) {
+    if (attention.category === "approval") status = "approval";
+    else if (attention.category === "input") status = "input";
+    else if (attention.category === "limited") status = "limited";
+    else if (attention.category === "failed") status = "failed";
+  }
+
+  const isUnread =
+    !isRoute &&
+    section !== "settled" &&
+    section !== "snoozed" &&
+    section !== "working" &&
+    status === "ready" &&
+    (attention?.category === "completed" || hasUnseenCompletion({ ...thread, lastVisitedAt }));
+
+  const subtitle =
+    section === "attention" &&
+    attention !== null &&
+    (!isRoute || attention.blocking) &&
+    !(isRoute && attention.category === "completed")
+      ? threadAttentionSubtitleText({ attention, isRoute })
+      : null;
+
+  const hasRun =
+    thread.latestRun != null || (thread.turnCount ?? 0) > 0 || (thread.visibleItemCount ?? 0) > 0;
+
+  let rowMark: SidebarThreadRowMark | null = null;
+  let statusLabel: string | null = null;
+  let hoverDot: SidebarThreadHoverDot;
+
+  switch (status) {
+    case "approval":
+      rowMark = { dot: "fa-dot--needs", label: "等你批准" };
+      statusLabel = "等你批准";
+      hoverDot = { variant: "dot-attention", label: "等你批准" };
+      break;
+    case "input":
+      rowMark = { dot: "fa-dot--needs", label: "等你回答" };
+      statusLabel = "等你回答";
+      hoverDot = { variant: "dot-attention", label: "等你回答" };
+      break;
+    case "preparing":
+      rowMark = { dot: "fa-dot--running", label: "正在设置" };
+      statusLabel = "正在设置";
+      hoverDot = { variant: "dot-active", label: "正在设置" };
+      break;
+    case "working": {
+      const label = thread.goal?.status === "active" ? "目标" : "运行中";
+      rowMark = { dot: "fa-dot--running", label: "运行中" };
+      statusLabel = label;
+      hoverDot = { variant: "dot-active", label: "运行中" };
+      break;
+    }
+    case "queued":
+      rowMark = { dot: "fa-dot--ring", label: "等空位" };
+      statusLabel = "等空位";
+      hoverDot = { variant: "dot-waiting", label: "等空位" };
+      break;
+    case "waiting":
+      rowMark =
+        section === "working" || (thread.runtime !== null && thread.runtime.status !== "idle")
+          ? { dot: "fa-dot--ring", label: "等待中" }
+          : null;
+      statusLabel = "等待中";
+      hoverDot = { variant: "dot-waiting", label: "等待中" };
+      break;
+    case "limited":
+      rowMark = { dot: "fa-dot--error", label: "用量受限" };
+      statusLabel = "用量受限";
+      hoverDot = { variant: "dot-blocked", label: "用量受限" };
+      break;
+    case "failed":
+      rowMark = { dot: "fa-dot--error", label: "出错了" };
+      statusLabel = "出错了";
+      hoverDot = { variant: "dot-blocked", label: "出错了" };
+      break;
+    case "ready":
+      if (isUnread) {
+        rowMark = { dot: "fa-dot--new", label: "有新结果" };
+        statusLabel = "有新结果";
+        hoverDot = { variant: "dot-done", label: "有新结果" };
+      } else if (isWoke) {
+        rowMark = null;
+        statusLabel = "暂缓结束";
+        hoverDot = { variant: "dot-done", label: "暂缓结束" };
+      } else {
+        rowMark = null;
+        statusLabel = null;
+        hoverDot = { variant: "dot-done", label: hasRun ? "空闲" : "新会话" };
+      }
+      break;
+  }
+
+  return { status, isUnread, subtitle, rowMark, statusLabel, hoverDot };
+}
+
+export interface SidebarResolvedThreadState extends SidebarRowPresentation {
+  readonly section: SidebarSection;
+  readonly attention: (ThreadAttention & { readonly demoted: boolean }) | null;
+}
+
+export type SidebarThreadStateInput = SidebarRowPresentationThread &
+  ThreadSnoozeShell &
+  Pick<SidebarThreadSummary, "commander" | "pinnedAt" | "settledOverride" | "settledAt">;
+
+/** Compute sidebar section, attention membership, and row presentation from a single judgment. */
+export function resolveSidebarThreadState(input: {
+  readonly thread: SidebarThreadStateInput;
+  readonly lastVisitedAt: string | null | undefined;
+  readonly isRoute: boolean;
+  readonly configLoaded: boolean;
+  readonly workingShelfEnabled: boolean;
+  readonly isWorkingGrace: boolean;
+  readonly now: string;
+  readonly isWoke?: boolean;
+}): SidebarResolvedThreadState {
+  const {
+    thread,
+    lastVisitedAt,
+    isRoute,
+    configLoaded,
+    workingShelfEnabled,
+    isWorkingGrace,
+    now,
+    isWoke = false,
+  } = input;
+  const snoozedNow = configLoaded && effectiveSnoozed(thread, { now });
+  const settledNow = configLoaded && thread.settledOverride === "settled";
+  const rawStatus = resolveSidebarThreadStatus({
+    ...thread,
+    blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
+  });
+
+  let section: SidebarSection;
+  let attention: (ThreadAttention & { readonly demoted: boolean }) | null = null;
+
+  if (thread.commander === true) {
+    section = "commander";
+  } else {
+    const rawAttention = resolveThreadAttention(thread, lastVisitedAt);
+    const holdInWorkingGrace =
+      workingShelfEnabled &&
+      isWorkingGrace &&
+      !snoozedNow &&
+      !settledNow &&
+      thread.pinnedAt == null &&
+      rawAttention?.blocking !== true;
+    // Open non-blocking threads drop back to their base section instead of lingering with click-to-open copy.
+    if (
+      !holdInWorkingGrace &&
+      rawAttention !== null &&
+      (rawAttention.blocking || (!snoozedNow && !settledNow && !isRoute && rawAttention.unseen))
+    ) {
+      section = "attention";
+      attention = { ...rawAttention, demoted: isRoute };
+    } else {
+      const baseSection = resolveSidebarThreadSection({
+        commander: false,
+        snoozed: snoozedNow,
+        settled: settledNow,
+        pinned: thread.pinnedAt != null,
+      });
+      if (baseSection !== "active") {
+        section = baseSection;
+      } else {
+        const liveWorking = isLiveWorkingStatus(rawStatus, thread);
+        section = workingShelfEnabled && (liveWorking || isWorkingGrace) ? "working" : "active";
+      }
+    }
+  }
+
+  const presentation = resolveSidebarRowPresentation({
+    section,
+    thread,
+    attention,
+    lastVisitedAt,
+    isRoute,
+    isWoke,
+  });
+
+  return { section, attention, ...presentation };
+}
+
+export function resolveSidebarOfflineBanner(input: {
+  readonly visibleThreads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId">>;
+  readonly connectedEnvironmentIds: ReadonlyArray<EnvironmentId>;
+  readonly environmentLabelById: ReadonlyMap<EnvironmentId, string>;
+}): {
+  readonly offlineEnvironmentIds: ReadonlyArray<EnvironmentId>;
+  readonly message: string;
+} | null {
+  const connected = new Set(input.connectedEnvironmentIds);
+  const offlineEnvironmentIds: EnvironmentId[] = [];
+  const seen = new Set<EnvironmentId>();
+  for (const thread of input.visibleThreads) {
+    if (connected.has(thread.environmentId) || seen.has(thread.environmentId)) continue;
+    seen.add(thread.environmentId);
+    offlineEnvironmentIds.push(thread.environmentId);
+  }
+  if (offlineEnvironmentIds.length === 0) return null;
+  if (offlineEnvironmentIds.length === 1) {
+    const onlyId = offlineEnvironmentIds[0]!;
+    const label = input.environmentLabelById.get(onlyId);
+    const message =
+      input.environmentLabelById.size > 1 && label
+        ? `${label} 已断线，连上后处理`
+        : "电脑已断线，连上后处理";
+    return { offlineEnvironmentIds, message };
+  }
+  return {
+    offlineEnvironmentIds,
+    message: `${offlineEnvironmentIds.length} 台电脑已断线，连上后处理`,
+  };
 }
 
 // Suppress trailing double-click navigation; keyboard and synthetic clicks use detail 0.
@@ -1200,10 +1521,16 @@ type SidebarThreadStatusInput = Pick<
     OrchestrationV2PendingRuntimeRequestSummary,
     "kind" | "blocking"
   > | null;
+  readonly source?: {
+    readonly pendingRuntimeRequest?: Pick<
+      OrchestrationV2PendingRuntimeRequestSummary,
+      "kind" | "blocking"
+    > | null;
+  };
 };
 
 export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
-  const request = thread.pendingRuntimeRequest;
+  const request = resolvePendingRuntimeRequest(thread);
   const hasApprovals =
     request !== null && request !== undefined
       ? isBlockingApproval(request.kind, request.blocking)

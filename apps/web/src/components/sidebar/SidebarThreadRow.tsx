@@ -71,14 +71,14 @@ import { textDirection } from "~/textDirection";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import {
   animateSidebarLayoutChanges,
-  hasUnseenCompletion,
   resolveSidebarRowAccessibility,
+  resolveSidebarRowPresentation,
   type SidebarDropVerb,
-  resolveSidebarThreadStatus,
+  type SidebarSection,
+  type SidebarThreadHoverDot,
   type SidebarThreadStatus,
   resolveThreadLastVisitedAt,
   isThreadAttentionRowDisabled,
-  threadAttentionSubtitleText,
   type ThreadAttention,
   resolveWorkingStartedAt,
   useRetainedValue,
@@ -182,32 +182,7 @@ function extractReasoningEffortLabel(
   return null;
 }
 
-type RowStatusDot = {
-  variant: "dot-attention" | "dot-active" | "dot-blocked" | "dot-waiting" | "dot-done";
-  label: string;
-};
-
-// The row names its state. The mark is the library dot: running, needs, error, ring, or muted.
-function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowStatusDot {
-  switch (status) {
-    case "preparing":
-    case "working":
-      return { variant: "dot-active", label: "运行中" };
-    case "queued":
-      return { variant: "dot-waiting", label: "等空位" };
-    case "waiting":
-      return { variant: "dot-waiting", label: "等待中" };
-    case "approval":
-      return { variant: "dot-attention", label: "等你批准" };
-    case "input":
-      return { variant: "dot-attention", label: "等你回答" };
-    case "limited":
-    case "failed":
-      return { variant: "dot-blocked", label: "出错了" };
-    case "ready":
-      return { variant: "dot-done", label: hasRun ? "空闲" : "新会话" };
-  }
-}
+// Empty placeholder kept minimal; dot helpers moved into resolveSidebarRowPresentation.
 
 function SidebarThreadTooltip({
   thread,
@@ -363,46 +338,6 @@ function agentMarkLetter(name: string | null): string {
   return [...trimmed][0] ?? "·";
 }
 
-type RowMark = { readonly dot: string; readonly label: string };
-
-// Colored marks only. Queued and waiting use the library's hollow ring; idle rows have none.
-function resolveRowMark(
-  status: SidebarThreadStatus,
-  isUnread: boolean,
-  runtimeStatus: string | null,
-  attention: ThreadAttention["category"] | null,
-): RowMark | null {
-  if (attention === "approval") return { dot: "fa-dot--needs", label: "等你批准" };
-  if (attention === "input") return { dot: "fa-dot--needs", label: "等你回答" };
-  if (attention === "failed") return { dot: "fa-dot--error", label: "出错了" };
-  if (attention === "limited") return { dot: "fa-dot--error", label: "用量受限" };
-  if (attention === "completed") return { dot: "fa-dot--new", label: "有新结果" };
-  switch (status) {
-    case "failed":
-      return { dot: "fa-dot--error", label: "出错了" };
-    case "limited":
-      return { dot: "fa-dot--error", label: "用量受限" };
-    case "approval":
-      return { dot: "fa-dot--needs", label: "等你批准" };
-    case "input":
-      return { dot: "fa-dot--needs", label: "等你回答" };
-    case "preparing":
-      return { dot: "fa-dot--running", label: "正在设置" };
-    case "working":
-      return { dot: "fa-dot--running", label: "运行中" };
-    case "queued":
-      return { dot: "fa-dot--ring", label: "等空位" };
-    case "waiting":
-      if (isUnread) return { dot: "fa-dot--new", label: "有新结果" };
-      // Idle runtime is a finished session. The hollow ring is only for a live wait.
-      return runtimeStatus !== null && runtimeStatus !== "idle"
-        ? { dot: "fa-dot--ring", label: "等待中" }
-        : null;
-    case "ready":
-      return isUnread ? { dot: "fa-dot--new", label: "有新结果" } : null;
-  }
-}
-
 // Mounted only while the details surface is open, so its queries stay off the closed row.
 function SidebarThreadDetails(props: {
   thread: SidebarThreadSummary;
@@ -414,6 +349,7 @@ function SidebarThreadDetails(props: {
   providerEntryByInstanceId: ReadonlyMap<string, SidebarProviderEntry>;
   workspaceRoot: string | null;
   status: SidebarThreadStatus;
+  hoverDot: SidebarThreadHoverDot;
   attentionReason: string | null;
   pinned: boolean;
   hasUnsentDraft: boolean;
@@ -476,10 +412,7 @@ function SidebarThreadDetails(props: {
     turnCount: thread.turnCount,
     pendingTaskCount: thread.pendingBackgroundTasks.length,
   });
-  const statusDot = resolveRowStatusDot(
-    props.status,
-    thread.latestRun != null || (thread.visibleItemCount ?? 0) > 0,
-  );
+  const { hoverDot } = props;
   const duration =
     props.status === "preparing" || props.status === "working" ? (
       <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />
@@ -499,7 +432,7 @@ function SidebarThreadDetails(props: {
         </div>
       ) : null}
       <div className="fa-cap">
-        {statusDot.label}
+        {hoverDot.label}
         {duration}
       </div>
       {driverKind ? (
@@ -724,6 +657,7 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
 
 type SidebarThreadRowProps = {
   thread: SidebarThreadSummary;
+  section?: SidebarSection | undefined;
   titleSuffix?: string | null | undefined;
   variant: "card" | "slim";
   navigationParent?: string | undefined;
@@ -885,75 +819,25 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     ? resolveThreadCurrentPullRequestLink(thread.pullRequests)
     : null;
 
-  const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  const status = resolveSidebarThreadStatus({
-    ...thread,
-    pendingRuntimeRequest: thread.source.pendingRuntimeRequest,
-  });
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);
   const wokeAtDate = props.wokeAt === null ? null : parseTimestampDate(props.wokeAt);
   const isWoke =
     wokeAtDate !== null &&
     (lastVisitedDate === null || lastVisitedDate < wokeAtDate) &&
     thread.settledOverride !== "settled";
-  const topStatus =
-    status === "queued"
-      ? { label: "等空位", icon: "waiting" as const, className: "text-muted-foreground" }
-      : status === "preparing" || status === "working"
-        ? {
-            label:
-              status === "preparing"
-                ? "正在设置"
-                : thread.goal?.status === "active"
-                  ? "目标"
-                  : "运行中",
-            icon: "working" as const,
-            className: "text-info-foreground",
-          }
-        : status === "waiting"
-          ? {
-              label: "等待中",
-              icon: "waiting" as const,
-              className: "text-muted-foreground",
-            }
-          : status === "approval"
-            ? {
-                label: "等你批准",
-                icon: "approval" as const,
-                className: "text-warning-foreground",
-              }
-            : status === "input"
-              ? {
-                  label: "等你回答",
-                  icon: "input" as const,
-                  className: "text-indigo-600 dark:text-indigo-300",
-                }
-              : status === "limited"
-                ? {
-                    label: "用量受限",
-                    icon: "failed" as const,
-                    className: "text-warning-foreground",
-                  }
-                : status === "failed"
-                  ? {
-                      label: "出错了",
-                      icon: "failed" as const,
-                      className: "text-error-foreground",
-                    }
-                  : isWoke
-                    ? {
-                        label: "暂缓结束",
-                        icon: "woke" as const,
-                        className: "text-warning-foreground",
-                      }
-                    : isUnread
-                      ? {
-                          label: "有新结果",
-                          icon: "done" as const,
-                          className: "text-success-foreground",
-                        }
-                      : null;
-  const isWokeStatus = topStatus?.icon === "woke";
+  const resolvedSection: SidebarSection =
+    props.section ?? (props.attention !== undefined ? "attention" : "active");
+  const presentation = resolveSidebarRowPresentation({
+    section: resolvedSection,
+    thread,
+    attention: props.attention ?? null,
+    lastVisitedAt,
+    isRoute: props.isActive,
+    isWoke,
+  });
+  const { status, isUnread, rowMark, hoverDot } = presentation;
+  const attentionReason = presentation.subtitle;
+  const isWokeStatus = status === "ready" && !isUnread && isWoke;
   const prStatus = prStatusIndicator(pr, linkedPullRequestStatus?.sourceControlProvider);
   const modelInstanceId = thread.runtime?.providerInstanceId ?? thread.modelSelection.instanceId;
   const providerEntry = props.providerEntryByInstanceId.get(modelInstanceId) ?? null;
@@ -1121,24 +1005,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     ) : null;
 
   const isCommander = thread.commander === true;
-  const attentionReason =
-    props.attention === undefined
-      ? null
-      : threadAttentionSubtitleText({
-          attention: props.attention,
-          attentionOffline: props.attentionOffline,
-        });
   const needsYou = attentionReason !== null;
-  const rowMark = resolveRowMark(
-    status,
-    isUnread,
-    thread.runtime?.status ?? null,
-    props.attention?.category ?? null,
-  );
   const selected = props.isActive || isSelected || props.sweepAction !== null;
   const accessibility = resolveSidebarRowAccessibility({
     title: displayTitle,
-    statusLabel: topStatus?.label ?? null,
+    statusLabel: presentation.statusLabel,
     projectDisplayName: props.projectDisplayName,
     isActive: props.isActive,
     isCommander,
@@ -1181,6 +1052,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     providerEntryByInstanceId: props.providerEntryByInstanceId,
     workspaceRoot: props.project?.workspaceRoot ?? null,
     status,
+    hoverDot,
     attentionReason,
     pinned: props.isPinned,
     hasUnsentDraft,

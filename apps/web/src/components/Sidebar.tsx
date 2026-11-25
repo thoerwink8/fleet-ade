@@ -35,7 +35,6 @@ import {
 import {
   asLaunchingThread,
   createInboxReturnTracker,
-  isThreadWorking,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
@@ -179,9 +178,10 @@ import {
   resolveSidebarSweepKeys,
   resolveSidebarDropTarget,
   isThreadAttentionDismissible,
+  isSidebarLiveWorking,
   resolveSidebarDropVerb,
-  resolveSidebarThreadSection,
-  resolveThreadAttention,
+  resolveSidebarOfflineBanner,
+  resolveSidebarThreadState,
   resolveThreadLastVisitedAt,
   type ThreadAttention,
   resolveSidebarReorderableThreadKeys,
@@ -229,6 +229,7 @@ import { stackedThreadToast, toastManager } from "./ui/toast";
 import { titleRegenerationToast } from "./threadTitleRegenerationToast";
 import { copyThreadReference } from "../lib/copyThreadReference";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
+import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { isProjectPinShortcut, ProjectPinButton } from "./ProjectPinButton";
 import {
@@ -650,7 +651,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const working: EnvironmentThreadShell[] = [];
   const inbox = (thread: EnvironmentThreadShell, manuallyMoved = false) =>
     workingShelfEnabled &&
-    (manuallyMoved ? isThreadWorking(thread) : inboxObservation.isWorking(thread))
+    (manuallyMoved ? isSidebarLiveWorking(thread) : inboxObservation.isWorking(thread))
       ? working
       : active;
   const snoozed: EnvironmentThreadShell[] = [];
@@ -683,40 +684,36 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
           : { ...projected, snoozedAt: thread.snoozedAt, snoozedUntil: thread.snoozedUntil },
       );
     } else {
-      const snoozedNow = configLoaded && effectiveSnoozed(thread, { now: preciseNow });
-      const settledNow = configLoaded && thread.settledOverride === "settled";
-      if (thread.commander !== true) {
-        const entry = resolveThreadAttention(
-          { ...thread, pendingRuntimeRequest: thread.source.pendingRuntimeRequest },
-          resolveThreadLastVisitedAt(thread.lastVisitedAt, lastVisitedAtById[threadKey]),
-        );
-        const isRoute = routeRowThreadKey === threadKey;
-        if (
-          entry !== null &&
-          (entry.blocking || (!snoozedNow && !settledNow && (entry.unseen || isRoute)))
-        ) {
-          attention.push(thread);
-          attentionByKey.set(threadKey, { ...entry, demoted: isRoute });
-          draggableThreadKeys.delete(threadKey);
-          activeReorderableThreadKeys.delete(threadKey);
-          continue;
-        }
-      }
-      const section = resolveSidebarThreadSection({
-        commander: thread.commander === true,
-        snoozed: snoozedNow,
-        settled: settledNow,
-        pinned: thread.pinnedAt != null,
+      const state = resolveSidebarThreadState({
+        thread,
+        lastVisitedAt: resolveThreadLastVisitedAt(
+          thread.lastVisitedAt,
+          lastVisitedAtById[threadKey],
+        ),
+        isRoute: routeRowThreadKey === threadKey,
+        configLoaded,
+        workingShelfEnabled,
+        isWorkingGrace: workingShelfEnabled && inboxObservation.isWorking(thread),
+        now: preciseNow,
       });
-      (section === "commander"
+      if (state.section === "attention" && state.attention !== null) {
+        attention.push(thread);
+        attentionByKey.set(threadKey, state.attention);
+        draggableThreadKeys.delete(threadKey);
+        activeReorderableThreadKeys.delete(threadKey);
+        continue;
+      }
+      (state.section === "commander"
         ? commander
-        : section === "snoozed"
+        : state.section === "snoozed"
           ? snoozed
-          : section === "settled"
+          : state.section === "settled"
             ? settled
-            : section === "pinned"
+            : state.section === "pinned"
               ? pinned
-              : inbox(thread)
+              : state.section === "working"
+                ? working
+                : active
       ).push(thread);
     }
   }
@@ -3307,6 +3304,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
+          {(() => {
+            const offlineBanner = isSearchingThreads
+              ? null
+              : resolveSidebarOfflineBanner({
+                  visibleThreads: searchableThreads,
+                  connectedEnvironmentIds,
+                  environmentLabelById,
+                });
+            return offlineBanner !== null ? (
+              <div className="mb-1.5" data-testid="sidebar-offline-banner">
+                <Alert variant="warning">
+                  <AlertDescription>{offlineBanner.message}</AlertDescription>
+                </Alert>
+              </div>
+            ) : null;
+          })()}
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider
@@ -3491,6 +3504,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            section={section}
                             titleSuffix={duplicateEmptyTitleSuffixByKey.get(threadKey) ?? null}
                             variant={rowVariant}
                             attention={
