@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { RepositoryIdentity, ThreadEnvMode } from "./environment.ts";
+import { VcsSnapshotFailure } from "./git.ts";
 import { ModelSelection } from "./modelSelection.ts";
 import {
   CommandId,
@@ -533,6 +534,7 @@ export const ProjectCreateNewResult = Schema.Struct({
   workspaceRoot: TrimmedNonEmptyString,
   /** The project and its files exist either way. */
   commitError: Schema.optionalKey(TrimmedNonEmptyString),
+  commitFailure: Schema.optionalKey(VcsSnapshotFailure),
 });
 export type ProjectCreateNewResult = typeof ProjectCreateNewResult.Type;
 

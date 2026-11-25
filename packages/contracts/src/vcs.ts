@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ForwardCompatibleOptional, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 export const VcsDriverKind = Schema.Literals(["git", "jj", "unknown"]);
 export type VcsDriverKind = typeof VcsDriverKind.Type;
@@ -87,6 +87,15 @@ export interface VcsProcessExitFailure {
   readonly stderrTruncated: boolean;
 }
 
+export const VcsProcessSpawnFailureReason = Schema.Literals([
+  "executable_not_found",
+  "permission_denied",
+]);
+export type VcsProcessSpawnFailureReason = typeof VcsProcessSpawnFailureReason.Type;
+
+export const VcsProcessExitFailureReason = Schema.Literals(["index_locked"]);
+export type VcsProcessExitFailureReason = typeof VcsProcessExitFailureReason.Type;
+
 export class VcsProcessSpawnError extends Schema.TaggedError<VcsProcessSpawnError>()(
   "VcsProcessSpawnError",
   {
@@ -94,6 +103,7 @@ export class VcsProcessSpawnError extends Schema.TaggedError<VcsProcessSpawnErro
     command: Schema.String,
     cwd: Schema.String,
     argumentCount: Schema.optional(NonNegativeInt),
+    reason: ForwardCompatibleOptional(VcsProcessSpawnFailureReason),
     cause: Schema.Defect(),
   },
 ) {
@@ -101,9 +111,14 @@ export class VcsProcessSpawnError extends Schema.TaggedError<VcsProcessSpawnErro
     return `VCS process failed to spawn in ${this.operation}: ${this.command} (${this.cwd})`;
   }
 
-  static fromProcessSpawnError(context: VcsProcessErrorContext, error: VcsProcessSpawnFailure) {
+  static fromProcessSpawnError(
+    context: VcsProcessErrorContext,
+    error: VcsProcessSpawnFailure,
+    reason?: VcsProcessSpawnFailureReason,
+  ) {
     return new VcsProcessSpawnError({
       ...context,
+      ...(reason === undefined ? {} : { reason }),
       cause: error.cause,
     });
   }
@@ -119,6 +134,7 @@ export class VcsProcessExitError extends Schema.TaggedError<VcsProcessExitError>
     exitCode: Schema.Number,
     detail: Schema.String,
     failureKind: Schema.optional(VcsProcessExitFailureKind),
+    reason: ForwardCompatibleOptional(VcsProcessExitFailureReason),
     retryable: Schema.optional(Schema.Boolean),
     stderrLength: Schema.optional(NonNegativeInt),
     stderrTruncated: Schema.optional(Schema.Boolean),
