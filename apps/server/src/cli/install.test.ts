@@ -178,9 +178,9 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
     }),
   );
 
-  // POSIX prompt flow: PATH entries split on `:` are matched against POSIX runner caches and
-  // POSIX launcher names, and `t3` detection relies on POSIX layout. Windows prompts share the
-  // same code but need `.cmd` shims and `;` entries, which this fixture cannot express.
+  // The POSIX flavour of the prompt (symlink link, `:` PATH entries, `#!/bin/sh` launchers) fakes a
+  // Linux host over real files; the same prompt on Windows (`;` entries, t3.cmd) runs in the
+  // next case.
   it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
     "asks npx users without a t3 command once per minor release and installs on yes",
     () =>
@@ -286,6 +286,57 @@ it.layer(NodeServices.layer)("t3 install", (it) => {
         assert.isTrue(yield* fs.exists(declined));
         assert.isFalse(yield* fs.exists(link));
       }),
+  );
+
+  it.effect("asks npx users without a t3.cmd once per minor release and installs one on yes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const { root, npmPackage, runtimeDir, executable, provide } = yield* setup;
+      const shim = path.join(root, "bin", "t3.cmd");
+      let asked = 0;
+      const offer = (answer: boolean, env: NodeJS.ProcessEnv = {}) =>
+        provide(
+          offerCliInstall({
+            args: ["connect"],
+            interactive: true,
+            foreground: Effect.succeed(true),
+            confirm: Effect.andThen(
+              Effect.sync(() => (asked += 1)),
+              Effect.succeed(answer),
+            ),
+          }).pipe(Effect.provideService(HostProcess.Platform, "win32")),
+          env,
+        );
+
+      // A t3.cmd in a PATH folder (split on `;`) is an installed t3; a bare `t3` is not.
+      const bareBin = path.join(root, "bare-bin");
+      yield* fs.makeDirectory(bareBin);
+      yield* fs.writeFileString(path.join(bareBin, "t3"), "");
+      const cmdBin = path.join(root, "cmd-bin");
+      yield* fs.makeDirectory(cmdBin);
+      yield* fs.writeFileString(path.join(cmdBin, "t3.cmd"), "");
+      yield* offer(false, { PATH: `${bareBin};${cmdBin}` });
+      assert.equal(asked, 0);
+
+      // A runner's own .bin on PATH is not an installed t3.
+      const npxBin = path.join(npmPackage, "../.bin");
+      yield* fs.makeDirectory(npxBin, { recursive: true });
+      yield* fs.writeFileString(path.join(npxBin, "t3.cmd"), "");
+      yield* offer(false, { PATH: `${npxBin};${bareBin}` });
+      assert.equal(asked, 1);
+      yield* offer(false, { PATH: `${npxBin};${bareBin}` });
+      assert.equal(asked, 1);
+      assert.isFalse(yield* fs.exists(shim));
+
+      yield* fs.remove(path.join(runtimeDir, "install-prompt-declined"));
+      yield* offer(true, { PATH: bareBin });
+      assert.equal(asked, 2);
+      assert.equal(yield* fs.readFileString(shim), `@echo off\r\n"${executable}" %*`);
+      // The shim it wrote counts as an installed t3.
+      yield* offer(true, { PATH: bareBin });
+      assert.equal(asked, 2);
+    }),
   );
 
   it.effect("reads the terminal's foreground group from /proc and ps", () =>

@@ -13,9 +13,9 @@ import {
 } from "./invocation.ts";
 
 it.layer(NodeServices.layer)("root CLI commands", (it) => {
-  // `sudo` commands, PATH split on `:` and POSIX launcher detection; there is no root shell
-  // invocation to build on Windows, where the launcher is a .cmd shim.
-  const skipOnWindows = HostProcess.Platform.defaultValue() === "win32";
+  // The launcher-on-PATH case fakes a Linux host, which splits PATH on `:` and so cannot find a
+  // drive-letter temp folder; the sudo command itself has no Windows counterpart to build on.
+  const fakedLinuxPathSplit = HostProcess.Platform.defaultValue() === "win32";
   const rootCommand = (input: {
     readonly node: string;
     readonly entry: string;
@@ -40,117 +40,115 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
     return bin;
   });
 
-  it.effect.skipIf(skipOnWindows)(
-    "keeps a user-installed Node reachable when the command runs under sudo",
-    () =>
-      Effect.gen(function* () {
-        const npx = "/home/theo/.npm/_npx/abc/node_modules/t3/dist/bin.mjs";
-        expect(yield* rootCommand({ node: "/usr/bin/node", entry: npx })).toBe(
-          "sudo npx t3 browser setup",
-        );
-        expect(
-          yield* rootCommand({ node: "/home/theo/.nvm/versions/node/v24/bin/node", entry: npx }),
-        ).toBe('sudo env "PATH=$PATH" npx t3 browser setup');
-        expect(
-          yield* rootCommand({
-            node: "/home/theo/.local/node/bin/node",
-            entry: "/home/theo/.local/lib/node_modules/t3/dist/bin.mjs",
-            path: yield* pathWithT3,
-          }),
-        ).toBe('sudo env "PATH=$PATH" t3 browser setup');
-      }),
-  );
-
-  it.effect.skipIf(skipOnWindows)(
-    "keeps the arguments, so root runs setup on the same T3 home",
-    () =>
-      Effect.gen(function* () {
-        const args = ["--base-dir", "/srv/t3 home"];
-        expect(
-          yield* rootCommand({
-            node: "/home/theo/.local/node/bin/node",
-            entry: "/home/theo/.local/lib/node_modules/t3/dist/bin.mjs",
-            path: yield* pathWithT3,
-            args,
-          }),
-        ).toBe(`sudo env "PATH=$PATH" t3 browser setup --base-dir '/srv/t3 home'`);
-        expect(
-          yield* rootCommand({ node: "/opt/t3/t3", entry: "/opt/t3/t3", executable: true, args }),
-        ).toBe("sudo /opt/t3/t3 browser setup --base-dir '/srv/t3 home'");
-      }),
-  );
-
-  it.effect.skipIf(skipOnWindows)("names this install's launcher when t3 is not on PATH", () =>
+  it.effect("keeps a user-installed Node reachable when the command runs under sudo", () =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const home = yield* fs.makeTempDirectoryScoped();
-      const shim = path.join(home, ".local bin", "t3");
-      yield* fs.makeDirectory(path.dirname(shim), { recursive: true });
-      yield* fs.writeFileString(shim, "#!/bin/sh\n", { mode: 0o755 });
-      const desktop = {
-        node: "/tmp/.mount_T3abc/t3code",
-        entry: "/tmp/.mount_T3abc/resources/app.asar/apps/server/dist/bin.mjs",
-        env: { T3CODE_CLI_PATH: shim },
-      };
-
-      expect(yield* rootCommand(desktop)).toBe(`sudo '${shim}' browser setup`);
-
-      // An unrelated `t3` on PATH, such as an older npm global, is another install's CLI.
-      expect(yield* rootCommand({ ...desktop, path: yield* pathWithT3 })).toBe(
-        `sudo '${shim}' browser setup`,
+      const npx = "/home/theo/.npm/_npx/abc/node_modules/t3/dist/bin.mjs";
+      expect(yield* rootCommand({ node: "/usr/bin/node", entry: npx })).toBe(
+        "sudo npx t3 browser setup",
       );
-
-      // The link the app installs onto PATH leads to its own launcher, so plain `t3` is right.
-      const linked = yield* fs.makeTempDirectoryScoped();
-      yield* fs.symlink(shim, path.join(linked, "t3"));
-      expect(yield* rootCommand({ ...desktop, path: linked })).toBe(
-        'sudo env "PATH=$PATH" t3 browser setup',
-      );
-
+      expect(
+        yield* rootCommand({ node: "/home/theo/.nvm/versions/node/v24/bin/node", entry: npx }),
+      ).toBe('sudo env "PATH=$PATH" npx t3 browser setup');
       expect(
         yield* rootCommand({
-          node: "/opt/t3/t3",
-          entry: "/opt/t3/t3",
-          executable: true,
-        }),
-      ).toBe("sudo /opt/t3/t3 browser setup");
-
-      // A standalone executable started directly (systemd, no launcher) is still this install.
-      expect(
-        yield* rootCommand({
-          node: "/opt/t3/t3",
-          entry: "/opt/t3/t3",
-          executable: true,
+          node: "/home/theo/.local/node/bin/node",
+          entry: "/home/theo/.local/lib/node_modules/t3/dist/bin.mjs",
           path: yield* pathWithT3,
         }),
-      ).toBe("sudo /opt/t3/t3 browser setup");
-
-      // A global npm launcher runs the downloaded executable; PATH's `t3` is that launcher.
-      const prefix = path.join(home, "npm");
-      const npmLauncher = path.join(prefix, "lib/node_modules/t3/bin/t3.mjs");
-      yield* fs.makeDirectory(path.dirname(npmLauncher), { recursive: true });
-      yield* fs.makeDirectory(path.join(prefix, "bin"));
-      yield* fs.writeFileString(npmLauncher, "", { mode: 0o755 });
-      yield* fs.writeFileString(
-        path.join(prefix, "lib/node_modules/t3/package.json"),
-        `{"name":"t3","version":"${packageJson.version}"}`,
-      );
-      yield* fs.symlink(npmLauncher, path.join(prefix, "bin/t3"));
-      expect(
-        yield* rootCommand({
-          node: "/home/theo/.t3/runtime/versions/1.0.0/t3",
-          entry: "/home/theo/.t3/runtime/versions/1.0.0/t3",
-          executable: true,
-          path: path.join(prefix, "bin"),
-          env: { T3CODE_NPM_LAUNCHER_PATH: npmLauncher },
-        }),
-      ).toBe('sudo env "PATH=$PATH" t3 browser setup');
-
-      expect(
-        yield* rootCommand({ ...desktop, env: { T3CODE_CLI_PATH: path.join(home, "gone") } }),
       ).toBe('sudo env "PATH=$PATH" t3 browser setup');
     }),
+  );
+
+  it.effect("keeps the arguments, so root runs setup on the same T3 home", () =>
+    Effect.gen(function* () {
+      const args = ["--base-dir", "/srv/t3 home"];
+      expect(
+        yield* rootCommand({
+          node: "/home/theo/.local/node/bin/node",
+          entry: "/home/theo/.local/lib/node_modules/t3/dist/bin.mjs",
+          path: yield* pathWithT3,
+          args,
+        }),
+      ).toBe(`sudo env "PATH=$PATH" t3 browser setup --base-dir '/srv/t3 home'`);
+      expect(
+        yield* rootCommand({ node: "/opt/t3/t3", entry: "/opt/t3/t3", executable: true, args }),
+      ).toBe("sudo /opt/t3/t3 browser setup --base-dir '/srv/t3 home'");
+    }),
+  );
+
+  it.effect.skipIf(fakedLinuxPathSplit)(
+    "names this install's launcher when t3 is not on PATH",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const home = yield* fs.makeTempDirectoryScoped();
+        const shim = path.join(home, ".local bin", "t3");
+        yield* fs.makeDirectory(path.dirname(shim), { recursive: true });
+        yield* fs.writeFileString(shim, "#!/bin/sh\n", { mode: 0o755 });
+        const desktop = {
+          node: "/tmp/.mount_T3abc/t3code",
+          entry: "/tmp/.mount_T3abc/resources/app.asar/apps/server/dist/bin.mjs",
+          env: { T3CODE_CLI_PATH: shim },
+        };
+
+        expect(yield* rootCommand(desktop)).toBe(`sudo '${shim}' browser setup`);
+
+        // An unrelated `t3` on PATH, such as an older npm global, is another install's CLI.
+        expect(yield* rootCommand({ ...desktop, path: yield* pathWithT3 })).toBe(
+          `sudo '${shim}' browser setup`,
+        );
+
+        // The link the app installs onto PATH leads to its own launcher, so plain `t3` is right.
+        const linked = yield* fs.makeTempDirectoryScoped();
+        yield* fs.symlink(shim, path.join(linked, "t3"));
+        expect(yield* rootCommand({ ...desktop, path: linked })).toBe(
+          'sudo env "PATH=$PATH" t3 browser setup',
+        );
+
+        expect(
+          yield* rootCommand({
+            node: "/opt/t3/t3",
+            entry: "/opt/t3/t3",
+            executable: true,
+          }),
+        ).toBe("sudo /opt/t3/t3 browser setup");
+
+        // A standalone executable started directly (systemd, no launcher) is still this install.
+        expect(
+          yield* rootCommand({
+            node: "/opt/t3/t3",
+            entry: "/opt/t3/t3",
+            executable: true,
+            path: yield* pathWithT3,
+          }),
+        ).toBe("sudo /opt/t3/t3 browser setup");
+
+        // A global npm launcher runs the downloaded executable; PATH's `t3` is that launcher.
+        const prefix = path.join(home, "npm");
+        const npmLauncher = path.join(prefix, "lib/node_modules/t3/bin/t3.mjs");
+        yield* fs.makeDirectory(path.dirname(npmLauncher), { recursive: true });
+        yield* fs.makeDirectory(path.join(prefix, "bin"));
+        yield* fs.writeFileString(npmLauncher, "", { mode: 0o755 });
+        yield* fs.writeFileString(
+          path.join(prefix, "lib/node_modules/t3/package.json"),
+          `{"name":"t3","version":"${packageJson.version}"}`,
+        );
+        yield* fs.symlink(npmLauncher, path.join(prefix, "bin/t3"));
+        expect(
+          yield* rootCommand({
+            node: "/home/theo/.t3/runtime/versions/1.0.0/t3",
+            entry: "/home/theo/.t3/runtime/versions/1.0.0/t3",
+            executable: true,
+            path: path.join(prefix, "bin"),
+            env: { T3CODE_NPM_LAUNCHER_PATH: npmLauncher },
+          }),
+        ).toBe('sudo env "PATH=$PATH" t3 browser setup');
+
+        expect(
+          yield* rootCommand({ ...desktop, env: { T3CODE_CLI_PATH: path.join(home, "gone") } }),
+        ).toBe('sudo env "PATH=$PATH" t3 browser setup');
+      }),
   );
 });
 
