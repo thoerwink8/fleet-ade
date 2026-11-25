@@ -5,7 +5,6 @@ import {
   ORCHESTRATION_PROTOCOL_VERSION,
   PortSchema,
 } from "@t3tools/contracts";
-import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { formatHostForUrl, isWildcardHost } from "@t3tools/shared/hostClassification";
 import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
@@ -18,7 +17,6 @@ import {
   readTailscaleServeRootHolder,
   readTailscaleStatus,
 } from "@t3tools/tailscale";
-import * as Config from "effect/Config";
 import * as Console from "effect/Console";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -32,7 +30,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } fr
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
-import { resolveBaseDir } from "../os-jank.ts";
+import { resolveBaseDirSelection } from "../os-jank.ts";
 import {
   type PersistedServerRuntimeState,
   isProcessAlive,
@@ -256,25 +254,12 @@ interface DiscoveredPairTarget {
 const discoverPairTarget = Effect.fn("pair.discoverPairTarget")(function* (
   explicitBaseDir: string | undefined,
 ) {
-  const bases: Array<string> = [];
-  let inLinkedWorktree = false;
   const hasExplicitBaseDir = explicitBaseDir !== undefined && explicitBaseDir.trim().length > 0;
-  if (hasExplicitBaseDir) {
-    bases.push(yield* resolveBaseDir(explicitBaseDir));
-  } else {
-    // Same precedence as dev-runner: inside a linked worktree only its own
-    // `.t3` counts. Minting opens the target database with this checkout's
-    // migrations, so falling back to the shared home could migrate the live
-    // install with unreleased schema.
-    const worktreeHome = yield* resolveWorktreeT3Home(yield* HostProcess.WorkingDirectory);
-    if (worktreeHome !== undefined) {
-      bases.push(worktreeHome);
-      inLinkedWorktree = true;
-    } else {
-      const envHome = yield* Config.String("T3CODE_HOME").pipe(Config.option);
-      bases.push(yield* resolveBaseDir(Option.getOrUndefined(envHome)));
-    }
-  }
+  // Minting opens the target database with this checkout's migrations; the
+  // shared resolver keeps a linked worktree off the live install.
+  const selection = yield* resolveBaseDirSelection(explicitBaseDir);
+  const bases: Array<string> = [selection.baseDir];
+  const inLinkedWorktree = selection.source === "worktree";
 
   const checkedStatePaths: Array<string> = [];
   for (const baseDir of new Set(bases)) {

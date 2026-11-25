@@ -9,6 +9,8 @@ import {
   resolveWindowsEnvironment,
   setWindowsPath,
 } from "@t3tools/shared/shell";
+import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
+import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -229,10 +231,51 @@ export const expandHomePath = Effect.fn(function* (input: string) {
   return input;
 });
 
-export const resolveBaseDir = Effect.fn(function* (raw: string | undefined) {
+export type BaseDirSource = "explicit" | "worktree" | "environment" | "fallback" | "default";
+
+/**
+ * Every command picks its data directory here: explicit (`--base-dir`, or `T3CODE_HOME`
+ * marked by `T3CODE_HOME_EXPLICIT=1`), linked worktree `.t3`, `T3CODE_HOME`, `fallback`, `~/.t3`.
+ * A worktree must outrank `T3CODE_HOME` so its migrations never touch live data.
+ */
+export const resolveBaseDirSelection = Effect.fn(function* (
+  explicit: string | undefined,
+  fallback?: string | undefined,
+) {
   const { join, resolve } = yield* Path.Path;
-  if (!raw || raw.trim().length === 0) {
-    return join(yield* HostProcess.HomeDirectory, ".t3");
+  const configured = (raw: string) =>
+    expandHomePath(raw.trim()).pipe(Effect.map((p) => resolve(p)));
+  const present = (raw: string | undefined) => (raw && raw.trim().length > 0 ? raw : undefined);
+  const envHome = present(
+    Option.getOrUndefined(yield* Config.String("T3CODE_HOME").pipe(Config.option)),
+  );
+  const envHomeIsExplicit =
+    Option.getOrUndefined(yield* Config.String("T3CODE_HOME_EXPLICIT").pipe(Config.option)) === "1";
+
+  const explicitRaw = present(explicit) ?? (envHomeIsExplicit ? envHome : undefined);
+  if (explicitRaw !== undefined) {
+    return { baseDir: yield* configured(explicitRaw), source: "explicit" as BaseDirSource };
   }
-  return resolve(yield* expandHomePath(raw.trim()));
+  const worktreeHome = yield* resolveWorktreeT3Home(yield* HostProcess.WorkingDirectory);
+  if (worktreeHome !== undefined) {
+    return { baseDir: worktreeHome, source: "worktree" as BaseDirSource };
+  }
+  if (envHome !== undefined) {
+    return { baseDir: yield* configured(envHome), source: "environment" as BaseDirSource };
+  }
+  const fallbackRaw = present(fallback);
+  if (fallbackRaw !== undefined) {
+    return { baseDir: yield* configured(fallbackRaw), source: "fallback" as BaseDirSource };
+  }
+  return {
+    baseDir: join(yield* HostProcess.HomeDirectory, ".t3"),
+    source: "default" as BaseDirSource,
+  };
+});
+
+export const resolveBaseDir = Effect.fn(function* (
+  explicit: string | undefined,
+  fallback?: string | undefined,
+) {
+  return (yield* resolveBaseDirSelection(explicit, fallback)).baseDir;
 });

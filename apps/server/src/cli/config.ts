@@ -351,9 +351,8 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     Option.fromUndefinedOr(env.t3Home),
   ).pipe(Option.filter((value) => value.trim().length > 0));
   const baseDir = yield* resolveBaseDir(
-    Option.getOrUndefined(
-      resolveOptionPrecedence(explicitBaseDir, Option.fromUndefinedOr(bootstrap?.t3Home)),
-    ),
+    Option.getOrUndefined(normalizedFlags.baseDir),
+    bootstrap?.t3Home,
   );
   const rawCwd = Option.getOrElse(normalizedFlags.cwd, () => process.cwd());
   const cwd = path.resolve(yield* expandHomePath(rawCwd.trim()));

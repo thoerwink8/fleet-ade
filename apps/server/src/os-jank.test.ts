@@ -1,14 +1,19 @@
+// @effect-diagnostics nodeBuiltinImport:off - fixtures build real worktree and repo layouts on disk.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { CommandAvailability, WindowsShellEnvironment } from "@t3tools/shared/shell";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Observe the existing synchronous shell probe without launching the user's login shell.
 import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 import { assert, it, vi } from "vite-plus/test";
 
-import { fixPath, hydratePosixHome } from "./os-jank.ts";
+import { fixPath, hydratePosixHome, resolveBaseDir } from "./os-jank.ts";
 
 vi.mock("node:child_process", { spy: true });
 
@@ -204,3 +209,111 @@ effectIt.effect("replaces a Path-spelled Windows PATH instead of adding a second
     assert.deepEqual(env, { PATH: "C:\\Tools;C:\\Windows" });
   }),
 );
+
+// regression: a CLI run from a linked worktree without --base-dir resolved to the
+// developer's live ~/.t3 and migrated it with the checkout's unreleased schema.
+interface BaseDirCaseRoots {
+  readonly home: string;
+  readonly worktree: string;
+  readonly shared: string;
+  readonly explicit: string;
+}
+
+const baseDirCases: ReadonlyArray<{
+  readonly name: string;
+  readonly worktree: boolean;
+  readonly explicit: string | undefined;
+  readonly env: Record<string, string>;
+  readonly expected: (roots: BaseDirCaseRoots) => string;
+}> = [
+  {
+    name: "a linked worktree without --base-dir or T3CODE_HOME uses the worktree's .t3",
+    worktree: true,
+    explicit: undefined,
+    env: {},
+    expected: (c) => NodePath.join(c.worktree, ".t3"),
+  },
+  {
+    name: "a linked worktree ignores T3CODE_HOME",
+    worktree: true,
+    explicit: undefined,
+    env: { T3CODE_HOME: "<shared>" },
+    expected: (c) => NodePath.join(c.worktree, ".t3"),
+  },
+  {
+    name: "--base-dir wins inside a linked worktree",
+    worktree: true,
+    explicit: "<explicit>",
+    env: { T3CODE_HOME: "<shared>" },
+    expected: (c) => c.explicit,
+  },
+  {
+    name: "an explicit T3CODE_HOME (dev runner --home-dir) wins inside a linked worktree",
+    worktree: true,
+    explicit: undefined,
+    env: { T3CODE_HOME: "<shared>", T3CODE_HOME_EXPLICIT: "1" },
+    expected: (c) => c.shared,
+  },
+  {
+    name: "outside a worktree the default is ~/.t3",
+    worktree: false,
+    explicit: undefined,
+    env: {},
+    expected: (c) => NodePath.join(c.home, ".t3"),
+  },
+  {
+    name: "outside a worktree T3CODE_HOME applies",
+    worktree: false,
+    explicit: undefined,
+    env: { T3CODE_HOME: "<shared>" },
+    expected: (c) => c.shared,
+  },
+  {
+    name: "outside a worktree --base-dir wins over T3CODE_HOME",
+    worktree: false,
+    explicit: "<explicit>",
+    env: { T3CODE_HOME: "<shared>" },
+    expected: (c) => c.explicit,
+  },
+];
+
+for (const testCase of baseDirCases) {
+  effectIt.effect(`resolveBaseDir: ${testCase.name}`, () =>
+    Effect.gen(function* () {
+      const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-base-dir-test-"));
+      const roots: BaseDirCaseRoots = {
+        home: NodePath.join(root, "home"),
+        worktree: NodePath.join(root, "worktree"),
+        shared: NodePath.join(root, "shared"),
+        explicit: NodePath.join(root, "explicit"),
+      };
+      NodeFS.mkdirSync(roots.worktree);
+      // A plain repo has a .git directory; only a linked worktree has a .git file.
+      if (testCase.worktree) {
+        NodeFS.writeFileSync(
+          NodePath.join(roots.worktree, ".git"),
+          `gitdir: ${NodePath.join(root, "repo", ".git", "worktrees", "worktree")}\n`,
+        );
+      } else {
+        NodeFS.mkdirSync(NodePath.join(roots.worktree, ".git"));
+      }
+      const substitute = (value: string) =>
+        value.replace("<shared>", roots.shared).replace("<explicit>", roots.explicit);
+      const env = Object.fromEntries(
+        Object.entries(testCase.env).map(([key, value]) => [key, substitute(value)]),
+      );
+
+      const baseDir = yield* resolveBaseDir(
+        testCase.explicit === undefined ? undefined : substitute(testCase.explicit),
+      ).pipe(
+        Effect.provideService(HostProcess.WorkingDirectory, roots.worktree),
+        Effect.provideService(HostProcess.HomeDirectory, roots.home),
+        Effect.provide(
+          Layer.mergeAll(ConfigProvider.layer(ConfigProvider.fromEnv({ env })), NodeServices.layer),
+        ),
+      );
+
+      assert.equal(baseDir, testCase.expected(roots));
+    }),
+  );
+}
