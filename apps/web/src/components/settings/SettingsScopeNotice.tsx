@@ -66,7 +66,7 @@ export function SettingsScopeNotice({
           const { primary, secondary } = environment
             ? settingsScopeEnvironmentLabels(environment, environments)
             : {
-                primary: member.environmentLabel ?? "Environment",
+                primary: member.environmentLabel ?? "电脑",
                 secondary: member.environmentId,
               };
           return {
@@ -84,7 +84,7 @@ export function SettingsScopeNotice({
         ? groups.map((group) => ({
             label: group.displayName,
             secondary: [
-              ...(group.archived ? ["Archived"] : []),
+              ...(group.archived ? ["已归档"] : []),
               ...(groups.some(
                 (other) =>
                   other.projectKey !== group.projectKey && other.displayName === group.displayName,

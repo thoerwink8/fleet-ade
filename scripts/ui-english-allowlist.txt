@@ -185,6 +185,8 @@ CLIProxyAPI
 High
 # 设备品牌
 Mac
+# 推理模式名，按原名显示
+Ultrathink
 # 配置文件名
 keybindings.json
 # 回调技术名
