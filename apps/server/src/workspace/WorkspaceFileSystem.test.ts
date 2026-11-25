@@ -478,14 +478,19 @@ it.layer(layerTest, { excludeTestServices: true })("WorkspaceFileSystemLive", (i
       }),
     );
 
-    it.effect("rejects binary files without leaking their contents into the error", () =>
+    // GBK text is invalid UTF-8; a lenient decode would replace bytes with U+FFFD and an editor
+    // save would corrupt the file, so the read rejects before any save can start.
+    it.effect.each([
+      { name: "a NUL byte", bytes: [0x61, 0, 0x62] },
+      { name: "invalid UTF-8", bytes: [0x63, 0x61, 0x66, 0xe9] },
+    ])("rejects files with $name without leaking their contents", ({ bytes }) =>
       Effect.gen(function* () {
         const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
         const fileSystem = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const cwd = yield* makeTempDir;
         const absolutePath = path.join(cwd, "asset.bin");
-        yield* fileSystem.writeFile(absolutePath, Uint8Array.from([0x61, 0, 0x62]));
+        yield* fileSystem.writeFile(absolutePath, Uint8Array.from(bytes));
 
         const error = yield* workspaceFileSystem
           .readFile({ cwd, relativePath: "asset.bin" })
@@ -500,6 +505,7 @@ it.layer(layerTest, { excludeTestServices: true })("WorkspaceFileSystemLive", (i
         });
         expect("cause" in error).toBe(false);
         expect("contents" in error).toBe(false);
+        expect([...(yield* fileSystem.readFile(absolutePath))]).toEqual(bytes);
       }),
     );
   });
@@ -609,6 +615,35 @@ it.layer(layerTest, { excludeTestServices: true })("WorkspaceFileSystemLive", (i
           ),
         ),
       ),
+    );
+    it.effect("keeps the UTF-8 BOM of a saved file but never adds one", () =>
+      Effect.gen(function* () {
+        const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const cwd = yield* makeTempDir;
+        const bomContents = "\uFEFFexport const answer = 42;\n";
+        yield* writeTextFile(cwd, "bom.ts", bomContents);
+
+        const read = yield* workspaceFileSystem.readFile({ cwd, relativePath: "bom.ts" });
+        yield* workspaceFileSystem.writeFile({
+          cwd,
+          relativePath: "bom.ts",
+          contents: read.contents.replace("42", "43"),
+        });
+        expect([...(yield* fileSystem.readFile(path.join(cwd, "bom.ts")))]).toEqual([
+          ...new TextEncoder().encode(bomContents.replace("42", "43")),
+        ]);
+
+        yield* workspaceFileSystem.writeFile({
+          cwd,
+          relativePath: "plain.ts",
+          contents: "export const answer = 42;\n",
+        });
+        expect([...(yield* fileSystem.readFile(path.join(cwd, "plain.ts")))].slice(0, 3)).toEqual([
+          0x65, 0x78, 0x70,
+        ]);
+      }),
     );
 
     it.effect("rejects writes outside the workspace root", () =>
