@@ -40,6 +40,7 @@ import { useCheckpointDiff, useTurnItemDetail } from "~/state/queries";
 import { revisionedQuery } from "~/state/revisionedQuery";
 import { cn } from "~/lib/utils";
 import { presentVersionControlError } from "./versionControlError.logic";
+import { VersionControlErrorDetail } from "./VersionControlErrorDetail";
 import {
   resolveToolCallDiffTarget,
   selectThreadBranchBaseRef,
@@ -997,15 +998,13 @@ export default function DiffPanel({
                   })}
                 </DropdownMenuRadioGroup>
                 {branchCommitsErrorPresentation ? (
-                  <DropdownMenuItem disabled>
-                    <span className="flex flex-col">
-                      <span>{branchCommitsErrorPresentation.title}</span>
-                      {branchCommitsErrorPresentation.nextStep ? (
-                        <span>{branchCommitsErrorPresentation.nextStep}</span>
-                      ) : null}
-                      <span>{branchCommitsErrorPresentation.detail}</span>
-                    </span>
-                  </DropdownMenuItem>
+                  <div className="px-2 py-1.5 text-xs text-destructive">
+                    <p>{branchCommitsErrorPresentation.title}</p>
+                    {branchCommitsErrorPresentation.nextStep ? (
+                      <p>{branchCommitsErrorPresentation.nextStep}</p>
+                    ) : null}
+                    <VersionControlErrorDetail error={branchCommitsErrorPresentation} />
+                  </div>
                 ) : !canReadFiles ? (
                   <DropdownMenuItem disabled>
                     {fileAccess.isPending
@@ -1366,9 +1365,10 @@ export default function DiffPanel({
                     {selectedPatchErrorPresentation.nextStep}
                   </p>
                 ) : null}
-                <p className="mb-2 whitespace-pre-wrap text-2xs text-error/80">
-                  {selectedPatchErrorPresentation.detail}
-                </p>
+                <VersionControlErrorDetail
+                  error={selectedPatchErrorPresentation}
+                  className="mb-2 text-error/80"
+                />
               </div>
             )}
             {!renderablePatch && toolCallPreview && toolCallPreview.content.length > 0 ? (

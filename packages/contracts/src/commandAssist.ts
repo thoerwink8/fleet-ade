@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { ProjectId, ThreadId } from "./baseSchemas.ts";
 import { ModelSelection as ModelSelectionSchema } from "./modelSelection.ts";
 import type { ModelSelection } from "./modelSelection.ts";
 
@@ -16,6 +17,37 @@ export const HAND_BACK_NO_BASELINE = "没有给测试基准";
 export const HAND_BACK_NO_GOAL = "没有目标，没做这句判断";
 export const HAND_BACK_FAILED = "没核对成";
 export const HAND_BACK_ALIGNED = "对得上";
+
+export const SPEECH_TIDY_SKIPPED = "跳过";
+export const SPEECH_TIDY_FAILED = "没整理成";
+
+export const CommandAssistRunResult = Schema.Union([
+  Schema.TaggedStruct("skipped", {
+    reason: Schema.Literals(["off", "no-model", "unknown"]),
+  }),
+  Schema.TaggedStruct("failed", { reason: Schema.String }),
+  Schema.TaggedStruct("completed", { text: Schema.String }),
+]);
+export type CommandAssistRunResult = typeof CommandAssistRunResult.Type;
+
+export const CommandAssistSpeech = Schema.Struct({
+  goal: Schema.String,
+  done: Schema.String,
+  avoid: Schema.String,
+  tests: Schema.String,
+  note: Schema.NullOr(Schema.String),
+  original: Schema.String,
+  result: CommandAssistRunResult,
+});
+export type CommandAssistSpeech = typeof CommandAssistSpeech.Type;
+
+export const CommandTidySpeechInput = Schema.Struct({
+  threadId: ThreadId,
+  projectId: Schema.NullOr(ProjectId),
+  cwd: Schema.String,
+  text: Schema.String,
+});
+export type CommandTidySpeechInput = typeof CommandTidySpeechInput.Type;
 
 const COMMAND_ASSIST_STEPS = [
   "naming",

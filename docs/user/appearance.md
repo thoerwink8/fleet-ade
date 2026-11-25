@@ -14,10 +14,11 @@ those modes. Customize these shortcuts under **Settings → General → Keybindi
 
 A phone uses these same settings. [Mobile setup](./install.md#mobile-app)
 
-## Font size
+## Reading size
 
-**Font size** offers three steps: Standard, Comfortable, and Large. One step scales the interface,
-the composer, chat text, code, and the terminal together.
+**Reading size** offers three steps: Standard, Comfortable, and Large. It adjusts conversation text,
+code blocks in messages, and the composer while keeping the sidebar, menus, toolbars, dialogs,
+terminal, diffs, and file previews at the base interface size.
 
 ## Chat width
 

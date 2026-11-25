@@ -58,6 +58,8 @@ import {
   type EnvironmentThreadStatus,
 } from "./threadState.ts";
 
+import { describeRequestFailure } from "../errors/transport.ts";
+
 const THREAD_SUBSCRIPTION_RETRY_DELAY = "250 millis";
 
 function statusWithoutLiveData(
@@ -67,15 +69,16 @@ function statusWithoutLiveData(
 }
 
 function formatThreadError(cause: Cause.Cause<unknown>): string {
-  const error = Cause.squash(cause);
+  const error = describeRequestFailure(cause);
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
     : "无法同步会话。";
 }
 
 function formatHistoryError(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+  const failure = describeRequestFailure(error);
+  if (failure instanceof Error && failure.message.trim().length > 0) {
+    return failure.message;
   }
   return "无法加载更早的活动。";
 }

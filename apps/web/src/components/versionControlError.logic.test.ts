@@ -27,7 +27,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   describeVersionControlError,
-  joinNextStepAndDetail,
+  versionControlErrorDescription,
   newProjectCommitWarningDescription,
   operationAction,
   operationMethodName,
@@ -36,6 +36,7 @@ import {
   projectCloneFailureDescription,
   worktreeSetupFailureDescription,
   type VersionControlError,
+  versionControlErrorDetailMode,
 } from "./versionControlError.logic";
 
 const provider = "github" as SourceControlProviderKind;
@@ -54,8 +55,8 @@ interface ErrorCase {
   readonly title: string;
   readonly nextStep: string;
   readonly detail: string;
+  readonly collapseDetail?: boolean;
 }
-
 const cases: ReadonlyArray<ErrorCase> = [
   {
     name: "GitCommandError with a reason",
@@ -78,6 +79,7 @@ const cases: ReadonlyArray<ErrorCase> = [
     title: "无法提交",
     nextStep: "请确认已选择要提交的改动，且没有未解决的冲突，然后重试。",
     detail: rawDetail,
+    collapseDetail: false,
   },
   {
     name: "GitPullRequestMaterializationError",
@@ -249,13 +251,17 @@ const cases: ReadonlyArray<ErrorCase> = [
 ];
 
 describe("describeVersionControlError", () => {
-  it.each(cases)("presents $name", ({ error, fallbackAction, title, nextStep, detail }) => {
-    expect(describeVersionControlError(error, fallbackAction)).toEqual({
-      title,
-      nextStep,
-      detail,
-    });
-  });
+  it.each(cases)(
+    "presents $name",
+    ({ error, fallbackAction, title, nextStep, detail, collapseDetail = true }) => {
+      expect(describeVersionControlError(error, fallbackAction)).toEqual({
+        title,
+        nextStep,
+        detail,
+        collapseDetail,
+      });
+    },
+  );
 
   const gitReasons: ReadonlyArray<readonly [GitCommandFailureReason, string]> = [
     ["authentication_failed", AUTH],
@@ -291,6 +297,7 @@ describe("describeVersionControlError", () => {
       title: "无法提交",
       nextStep,
       detail: rawDetail,
+      collapseDetail: true,
     });
   });
 
@@ -344,6 +351,7 @@ describe("describeVersionControlError", () => {
       title: "无法提交",
       nextStep: "请安装 Git，并确认它在这台电脑上可以运行，然后重试。",
       detail: error.message,
+      collapseDetail: true,
     });
   });
 
@@ -396,6 +404,7 @@ describe("describeVersionControlError", () => {
       title: "无法提交",
       nextStep: "请先提交、暂存或放弃未提交的改动，然后重试。",
       detail: rawDetail,
+      collapseDetail: true,
     });
   });
 
@@ -432,6 +441,7 @@ describe("describeVersionControlError", () => {
       title: "无法生成提交说明",
       nextStep,
       detail: rawDetail,
+      collapseDetail: true,
     });
   });
 
@@ -460,7 +470,8 @@ describe("describeVersionControlError", () => {
       title: "无法克隆仓库",
       nextStep: AUTH,
       detail: rawDetail,
-      description: `请检查托管平台的登录状态和访问权限，然后重试。详情：${rawDetail}`,
+      collapseDetail: true,
+      description: "请检查托管平台的登录状态和访问权限，然后重试。",
     });
   });
 
@@ -471,7 +482,8 @@ describe("describeVersionControlError", () => {
         const result = presentVcsSnapshotFailure(snapshotFailure({ _tag, reason }), "克隆仓库");
         expect(typeof result.nextStep).toBe("string");
         expect(result.nextStep).not.toBe("");
-        expect(result.description).toContain(rawDetail);
+        expect(result.detail).toBe(rawDetail);
+        expect(result.description).not.toContain(rawDetail);
       }
     },
   );
@@ -484,7 +496,7 @@ describe("describeVersionControlError", () => {
 
   it("uses the structured clone failure instead of the legacy error string", () => {
     expect(projectCloneFailureDescription(snapshotFailure(), "旧的英文错误")).toBe(
-      `请检查托管平台的登录状态和访问权限，然后重试。详情：${rawDetail}`,
+      "请检查托管平台的登录状态和访问权限，然后重试。",
     );
   });
 
@@ -502,9 +514,7 @@ describe("describeVersionControlError", () => {
         snapshotFailure({ action: "create_worktree", reason: "path_already_exists" }),
         "旧的英文错误",
       ),
-    ).toBe(
-      "请选择其他目录，或移走同名文件后重试。详情：fatal: raw git output\nerror: keep this verbatim",
-    );
+    ).toBe("请选择其他目录，或移走同名文件后重试。");
   });
 
   it("keeps the legacy worktree error when an older snapshot has no failure", () => {
@@ -518,9 +528,7 @@ describe("describeVersionControlError", () => {
         "Git has no name or email.",
         "/workspace/new",
       ),
-    ).toBe(
-      "请在 Git 里设置用户名和邮箱，然后重试。详情：fatal: raw git output\nerror: keep this verbatim 项目位于 /workspace/new。",
-    );
+    ).toBe("请在 Git 里设置用户名和邮箱，然后重试。 项目位于 /workspace/new。");
   });
 
   it("keeps the legacy commit warning when an older result has no failure", () => {
@@ -540,6 +548,7 @@ describe("describeVersionControlError", () => {
       title: "无法推送",
       nextStep,
       detail: "unrelated diagnostic words",
+      collapseDetail: true,
     });
   });
 
@@ -586,6 +595,7 @@ describe("describeVersionControlError", () => {
       title: "无法登录托管平台",
       nextStep,
       detail: rawDetail,
+      collapseDetail: true,
     });
   });
 
@@ -677,7 +687,7 @@ describe("describeVersionControlError", () => {
 });
 
 describe("presentVersionControlError", () => {
-  it("joins the next step and the detail into one sentence without pointing below", () => {
+  it("shows Chinese guidance by default and keeps raw detail separate", () => {
     const presentation = presentVersionControlError(
       gitError("GitVcsDriver.pushCurrentBranch", "push_rejected_non_fast_forward"),
       "推送",
@@ -687,7 +697,8 @@ describe("presentVersionControlError", () => {
       title: "无法推送",
       nextStep: "请先拉取远端改动，再重新推送。",
       detail: rawDetail,
-      description: `请先拉取远端改动，再重新推送。详情：${rawDetail}`,
+      collapseDetail: true,
+      description: "请先拉取远端改动，再重新推送。",
     });
   });
 
@@ -697,10 +708,34 @@ describe("presentVersionControlError", () => {
     expect(presentVersionControlError(error, "提交").detail).toBe(error.message);
   });
 
+  it("keeps internal call sites out of the default description", () => {
+    const error = new VcsProcessSpawnError({
+      ...processContext("GitVcsDriver.initRepository"),
+      cause: new Error("spawn git ENOENT"),
+    });
+
+    const presentation = presentVersionControlError(error, "初始化 Git");
+
+    expect(presentation.description).toBe("请确认版本控制工具已安装且可以运行，然后重试。");
+    expect(presentation.description).not.toContain("GitVcsDriver.initRepository");
+  });
+
+  it("preserves the complete raw detail for copying", () => {
+    const cliOutput = "Codex CLI output\n".repeat(40) + "fatal: authentication failed";
+    const presentation = presentVersionControlError(
+      new TextGenerationError({ operation: "generateCommitMessage", detail: cliOutput }),
+      "生成提交说明",
+    );
+
+    expect(presentation.detail).toBe(cliOutput);
+    expect(presentation.description).not.toContain(cliOutput);
+  });
+
   it("keeps unrelated failures on the caller's existing fallback", () => {
     expect(presentVersionControlError(new Error("unrelated"), "打开文件")).toEqual({
       title: "无法打开文件",
       detail: "unrelated",
+      collapseDetail: false,
       description: "unrelated",
     });
   });
@@ -709,22 +744,62 @@ describe("presentVersionControlError", () => {
     expect(presentVersionControlError("Defect: index out of range", "加载差异")).toEqual({
       title: "无法加载差异",
       detail: "Defect: index out of range",
+      collapseDetail: false,
       description: "Defect: index out of range",
     });
     expect(presentVersionControlError(null, "加载差异")).toEqual({
       title: "无法加载差异",
       detail: "发生错误。",
+      collapseDetail: false,
       description: "发生错误。",
     });
   });
+  it("keeps raw output visible when an older server sends no reason code", () => {
+    const presentation = presentVersionControlError(gitError("GitVcsDriver.commit"), "提交");
+
+    expect(presentation.collapseDetail).toBe(false);
+    expect(presentation.description).toBe(
+      `请确认已选择要提交的改动，且没有未解决的冲突，然后重试。详情：${rawDetail}`,
+    );
+  });
 });
 
-describe("joinNextStepAndDetail", () => {
+describe("versionControlErrorDescription", () => {
   it("returns only the detail when there is no next step", () => {
-    expect(joinNextStepAndDetail(undefined, "raw")).toBe("raw");
+    expect(versionControlErrorDescription({ detail: "raw", collapseDetail: false })).toBe("raw");
   });
 
-  it("puts the next step before the detail", () => {
-    expect(joinNextStepAndDetail("请重试。", "raw")).toBe("请重试。详情：raw");
+  it("omits technical detail when classified guidance exists", () => {
+    expect(
+      versionControlErrorDescription({ nextStep: "请重试。", detail: "raw", collapseDetail: true }),
+    ).toBe("请重试。");
+  });
+  it("keeps raw output visible when the error has no classification", () => {
+    expect(
+      versionControlErrorDescription({
+        nextStep: "请重试。",
+        detail: "raw",
+        collapseDetail: false,
+      }),
+    ).toBe("请重试。详情：raw");
+  });
+});
+
+describe("versionControlErrorDetailMode", () => {
+  it("collapses classified detail behind a disclosure", () => {
+    expect(versionControlErrorDetailMode({ detail: rawDetail, collapseDetail: true })).toBe(
+      "disclosure",
+    );
+  });
+
+  it("keeps an unclassified error's raw text visible", () => {
+    const presentation = presentVersionControlError("fatal: repository not found", "克隆仓库");
+
+    expect(versionControlErrorDetailMode(presentation)).toBe("inline");
+    expect(presentation.description).toBe("fatal: repository not found");
+  });
+
+  it("renders nothing for an empty detail", () => {
+    expect(versionControlErrorDetailMode({ detail: "", collapseDetail: true })).toBe("hidden");
   });
 });

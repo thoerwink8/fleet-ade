@@ -7,10 +7,15 @@ import {
   HAND_BACK_NO_BASELINE,
   HAND_BACK_NO_GOAL,
   type CommandAssistLookup,
+  type CommandAssistRunResult,
+  type CommandAssistSpeech,
   lookupCommandAssistRow,
   type ModelSelection,
   type ProjectId,
   ThreadId,
+  type CommandTidySpeechInput,
+  SPEECH_TIDY_FAILED,
+  SPEECH_TIDY_SKIPPED,
 } from "@t3tools/contracts";
 import { resolveCommandAssist } from "@t3tools/shared/projectSettings";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
@@ -36,11 +41,6 @@ export interface CommandAssistRunInput {
   readonly cwd: string;
   readonly prompt: string;
 }
-
-export type CommandAssistRunResult =
-  | { readonly _tag: "skipped"; readonly reason: "off" | "no-model" | "unknown" }
-  | { readonly _tag: "failed"; readonly reason: string }
-  | { readonly _tag: "completed"; readonly text: string };
 
 export interface CommandAssistCompletion {
   readonly model: ModelSelection;
@@ -69,10 +69,6 @@ function failed(reason: string): CommandAssistRunResult {
 }
 
 function failureReason(error: unknown): string {
-  if (typeof error === "object" && error !== null && "reason" in error) {
-    const reason = error.reason;
-    if (typeof reason === "string") return clipReason(reason);
-  }
   if (
     typeof error === "object" &&
     error !== null &&
@@ -114,16 +110,6 @@ export interface CommandAssistObservation {
   readonly drift: string | null;
   readonly outlook: string | null;
   readonly childPhase: string;
-}
-
-export interface CommandAssistSpeech {
-  readonly goal: string;
-  readonly done: string;
-  readonly avoid: string;
-  readonly tests: string;
-  readonly note: string | null;
-  readonly original: string;
-  readonly result: CommandAssistRunResult;
 }
 
 export interface CommandAssistPatrol {
@@ -419,13 +405,7 @@ export class CommandAssist extends Context.Service<
       readonly report: string;
       readonly childPhase: string;
     }) => Effect.Effect<CommandAssistRunResult>;
-    readonly tidy: (input: {
-      readonly threadId: ThreadId;
-      readonly projectId: ProjectId | null;
-      readonly cwd: string;
-      readonly text: string;
-      readonly childPhase: string;
-    }) => Effect.Effect<CommandAssistSpeech>;
+    readonly tidy: (input: CommandTidySpeechInput) => Effect.Effect<CommandAssistSpeech>;
     readonly considerPatrol: (input: {
       readonly threadId: ThreadId;
       readonly projectId: ProjectId | null;
@@ -510,6 +490,9 @@ const make = Effect.gen(function* () {
       prompt: input.prompt,
     });
     return yield* effect.pipe(
+      Effect.tapError((error) =>
+        Effect.logWarning("command-assist.invoke-failed", { reason: error.reason }),
+      ),
       Effect.timeout(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS)),
       Effect.match({
         onFailure: (error) => failed(failureReason(error)),
@@ -734,14 +717,26 @@ const make = Effect.gen(function* () {
 
   const tidy: CommandAssist["Service"]["tidy"] = Effect.fn("CommandAssist.tidy")(function* (input) {
     const original = input.text;
-    const result = yield* run("speech", {
+    const call = yield* run("speech", {
       projectId: input.projectId,
       cwd: input.cwd,
       prompt: speechPrompt(clipChars(original, COMMAND_ASSIST_INPUT_LIMIT)),
     });
-    const empty = { goal: "", done: "", avoid: "", tests: "", note: "没整理成" as string | null };
-    const parsed = result._tag === "completed" ? (parseSpeech(result.text) ?? empty) : empty;
-    const speech = { ...parsed, note: parsed === empty ? "没整理成" : null };
+    const parsed = call._tag === "completed" ? parseSpeech(call.text) : null;
+    const result: CommandAssistRunResult =
+      call._tag === "completed" && parsed === null ? failed(SPEECH_TIDY_FAILED) : call;
+    const speech = {
+      goal: parsed?.goal ?? "",
+      done: parsed?.done ?? "",
+      avoid: parsed?.avoid ?? "",
+      tests: parsed?.tests ?? "",
+      note:
+        result._tag === "skipped"
+          ? SPEECH_TIDY_SKIPPED
+          : result._tag === "failed"
+            ? SPEECH_TIDY_FAILED
+            : null,
+    };
     yield* update(input.threadId, (state) => [{ ...state, ...speechOf(speech) }, undefined]);
     return { ...speech, original, result };
   });

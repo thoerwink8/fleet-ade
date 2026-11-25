@@ -453,4 +453,6 @@ export const layerProduction = Layer.mergeAll(
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
   Layer.provide(Scheduler.layer),
   Layer.provideMerge(layerEventInfrastructure),
+  // Handlers like ws commandTidySpeech reach the same assist state as child summaries.
+  Layer.provideMerge(layerCommandAssist),
 );
