@@ -222,7 +222,7 @@ export function ArchivedThreadsPanel() {
     <SettingsPageContainer>
       {archivedGroups.length === 0 ? (
         <SettingsSection
-          id={isLoadingArchive ? undefined : searchableSetting("archive").id}
+          id={searchableSetting("archive").id}
           title={searchableSetting("archive").title}
         >
           <SettingsRow

@@ -150,6 +150,24 @@ optional-service layer. Don't route around the layer with an imperative runtime.
   or `catchIf` with a schema predicate. `Effect.catch` is for handling the whole channel; `catchIf`
   is for structural checks like a platform error code.
 
+## New commands and states
+
+- A "can be undone" or "takes effect later" feature is decided by the server, not by a client
+  timer; the client sends the command and shows the state. Walk four cases: reload inside the
+  window, a second client open, the action the window delays coming due (a schedule firing), and a
+  server restart.
+- The id a client waits on is the one the client sent, and a test asserts it round-trips. List
+  what the sibling commands return or cancel as side effects, and decide for each whether the new
+  command keeps it. Look at recent changes to the same contract fields and reuse a field that
+  exists rather than adding a parallel one. After a slow step, re-read state under the lock
+  before writing a result.
+- A state machine gets a table of every state by every command, each cell a result or a refusal
+  code, and tests follow the table. A marker written and cleared in pairs ("in progress") lists
+  every path that can skip the clear (crash, throw, delete, archive, superseded) with a test each.
+- A server behavior a client reads (a field, a startup step) lists every reader and what each does
+  on an empty value; when a test is deleted along with the behavior, say which test now guards its
+  property.
+
 ## Before you push
 
 - Does any handler you touched do more than decode, call, and map errors?

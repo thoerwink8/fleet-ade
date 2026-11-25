@@ -199,6 +199,8 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   canSteer: boolean;
   alternateShortcutLabel: string | null;
   isSendBusy: boolean;
+  pendingSendReason?: string | null | undefined;
+  pendingSendStatusId?: string | undefined;
   sendDisabledReason: string | null;
   sendBlockReasonId?: string | undefined;
   isEnvironmentUnavailable: boolean;
@@ -207,6 +209,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   preserveComposerFocusOnPointerDown?: boolean;
   isEditingQueuedMessage: boolean;
   onSubmitMessage: React.MouseEventHandler<HTMLButtonElement>;
+  onCancelPendingSend?: (() => void) | undefined;
   onResume: () => void;
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
@@ -227,6 +230,8 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         canSteer={props.canSteer}
         alternateShortcutLabel={props.alternateShortcutLabel}
         isSendBusy={props.isSendBusy}
+        pendingSendReason={props.pendingSendReason}
+        pendingSendStatusId={props.pendingSendStatusId}
         sendDisabledReason={props.sendDisabledReason}
         {...(props.sendBlockReasonId ? { sendBlockReasonId: props.sendBlockReasonId } : {})}
         isEnvironmentUnavailable={props.isEnvironmentUnavailable}
@@ -236,6 +241,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         preserveComposerFocusOnPointerDown={props.preserveComposerFocusOnPointerDown ?? false}
         isEditingQueuedMessage={props.isEditingQueuedMessage}
         onSubmitMessage={props.onSubmitMessage}
+        onCancelPendingSend={props.onCancelPendingSend}
         onResume={props.onResume}
         onPreviousPendingQuestion={props.onPreviousPendingQuestion}
         onInterrupt={props.onInterrupt}

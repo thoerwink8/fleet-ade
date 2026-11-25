@@ -8,9 +8,9 @@ function normalizeSingleLine(text: string): string {
 }
 
 export interface SidebarEmptyThreadCandidate {
-  readonly latestRun: unknown | null;
-  readonly runtime: unknown | null;
-  readonly latestUserMessageAt: string | null;
+  readonly latestRun?: unknown | null | undefined;
+  readonly runtime?: unknown | null | undefined;
+  readonly latestUserMessageAt?: string | null | undefined;
   readonly visibleItemCount?: number | undefined;
   readonly turnCount?: number | undefined;
   readonly latestMessagePreview?: SidebarThreadSummary["latestMessagePreview"];

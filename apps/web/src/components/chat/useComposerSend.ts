@@ -124,8 +124,9 @@ import {
 import {
   draftSendState,
   type MultipleModelTarget,
-  resolveMultipleModelTargets,
   prepareTurnAttachments,
+  recordDraftSendFailure,
+  resolveMultipleModelTargets,
   restoreComposerDraft,
 } from "./chatViewSend";
 import type {
@@ -146,8 +147,6 @@ import type { useQueuedRunEdit } from "./useQueuedRunEdit";
 import type { useTimelineFollow } from "./useTimelineFollow";
 import type { useUsageLimitsPanel } from "./useUsageLimitsPanel";
 import type { useWorktreeSetup } from "./useWorktreeSetup";
-
-const ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE = 3;
 
 function readEnvironmentPresentation(environmentId: EnvironmentId) {
   return appAtomRegistry.get(environmentPresentations.presentationsAtom).get(environmentId);
@@ -358,7 +357,6 @@ export function useComposerSend(input: ComposerSendInput) {
   });
   const { sendInFlight: sendInFlightRef } = draftSendState(routeThreadKey);
   const composerSendGenerationRef = useRef(0);
-  const environmentUnavailableSendToastSlotRef = useRef(0);
   // A send awaits uploads before it declines, so it reads the approvals pending by then.
   const pendingApprovalsRef = useRef(pendingApprovals);
   const respondingRequestIdsRef = useRef(respondingRequestIds);
@@ -440,14 +438,6 @@ export function useComposerSend(input: ComposerSendInput) {
     if ((isSendBusy && !sendQueuesBehindSetup) || sendInFlightRef.current) {
       if (directAnnotation) {
         notifyDirectAnnotationAttached();
-      } else {
-        toastManager.add(
-          stackedThreadToast({
-            type: "info",
-            title: "上一条消息还在发送。",
-            description: "等它发出或失败后再发送。",
-          }),
-        );
       }
       return;
     }
@@ -466,17 +456,9 @@ export function useComposerSend(input: ComposerSendInput) {
       return;
     }
     if (activeEnvironmentUnavailable) {
-      const toastSlot = environmentUnavailableSendToastSlotRef.current;
-      environmentUnavailableSendToastSlotRef.current =
-        (toastSlot + 1) % ENVIRONMENT_UNAVAILABLE_SEND_TOAST_TRAIL_SIZE;
-      toastManager.add({
-        ...stackedThreadToast({
-          type: "warning",
-          title: "未连接：消息没有发送",
-          description: "正在重新连接电脑，连接后请重试。",
-        }),
-        id: `chat-send-environment-unavailable:${toastSlot}`,
-      });
+      if (directAnnotation) {
+        notifyDirectAnnotationAttached();
+      }
       return;
     }
     // Where side chats are unavailable, `/side` text can still be a literal answer.
@@ -868,6 +850,7 @@ export function useComposerSend(input: ComposerSendInput) {
     const sendGeneration = ++composerSendGenerationRef.current;
     const attachmentCapabilitiesBeforeUpload = readLiveAttachmentCapabilities();
     if (attachmentCapabilitiesBeforeUpload.fileBlockReason !== null) {
+      recordDraftSendFailure(routeThreadKey, attachmentCapabilitiesBeforeUpload.fileBlockReason);
       sendInFlightRef.current = false;
       setThreadError(threadIdForSend, attachmentCapabilitiesBeforeUpload.fileBlockReason);
       return;
@@ -906,11 +889,11 @@ export function useComposerSend(input: ComposerSendInput) {
       !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope) ||
       attachmentCapabilitiesBeforeDispatch.fileBlockReason !== null
     ) {
+      const dispatchBlockReason =
+        attachmentCapabilitiesBeforeDispatch.fileBlockReason ?? "此连接无法修改会话。";
+      recordDraftSendFailure(routeThreadKey, dispatchBlockReason);
       sendInFlightRef.current = false;
-      setThreadError(
-        threadIdForSend,
-        attachmentCapabilitiesBeforeDispatch.fileBlockReason ?? "此连接无法修改会话。",
-      );
+      setThreadError(threadIdForSend, dispatchBlockReason);
       setDockedDraftHeroThreadKey((currentThreadKey) =>
         currentThreadKey === activeThreadKey ? null : currentThreadKey,
       );
@@ -929,6 +912,7 @@ export function useComposerSend(input: ComposerSendInput) {
           ? "发送前请重试或移除上传失败的附件。"
           : null);
       if (uploadBlockReason !== null) {
+        recordDraftSendFailure(routeThreadKey, uploadBlockReason);
         sendInFlightRef.current = false;
         setThreadError(threadIdForSend, uploadBlockReason);
         setDockedDraftHeroThreadKey((currentThreadKey) =>
@@ -988,7 +972,9 @@ export function useComposerSend(input: ComposerSendInput) {
       );
       if (approvalFeedbackTarget !== undefined) {
         if (composerAttachmentsSnapshot.length > 0 || outgoingMessageContext !== undefined) {
-          setThreadError(threadIdForSend, "发送审批反馈时请不要带附件或额外上下文。");
+          const reason = "发送审批反馈时请不要带附件或额外上下文。";
+          setThreadError(threadIdForSend, reason);
+          recordDraftSendFailure(routeThreadKey, reason);
           sendInFlightRef.current = false;
           return;
         }
@@ -997,6 +983,7 @@ export function useComposerSend(input: ComposerSendInput) {
           approvalResponding ||
           currentRouteThreadKeyRef.current !== routeThreadKey
         ) {
+          recordDraftSendFailure(routeThreadKey, "审批状态已变化，上一条消息没有发出。");
           sendInFlightRef.current = false;
           return;
         }
@@ -1005,6 +992,9 @@ export function useComposerSend(input: ComposerSendInput) {
           messageTextForSend,
           onRespondToApprovalStable,
         ).catch(() => false);
+        if (!sent) {
+          recordDraftSendFailure(routeThreadKey, "审批反馈未能发送。");
+        }
         sendInFlightRef.current = false;
         if (
           sent &&
@@ -1041,16 +1031,17 @@ export function useComposerSend(input: ComposerSendInput) {
         approvalArrived ||
         currentRouteThreadKeyRef.current !== routeThreadKey
       ) {
-        sendInFlightRef.current = false;
-        setDockedDraftHeroThreadKey((currentThreadKey) =>
-          currentThreadKey === activeThreadKey ? null : currentThreadKey,
-        );
         const notice = approvalRedirectNotice({
           draftChanged,
           declined,
           approvalResponding,
           approvalArrived,
         });
+        recordDraftSendFailure(routeThreadKey, notice ?? "审批状态已变化，上一条消息没有发出。");
+        sendInFlightRef.current = false;
+        setDockedDraftHeroThreadKey((currentThreadKey) =>
+          currentThreadKey === activeThreadKey ? null : currentThreadKey,
+        );
         if (notice !== null) {
           toastManager.add({
             type: "info",
@@ -1420,9 +1411,14 @@ export function useComposerSend(input: ComposerSendInput) {
           });
         }
       }
+      const failureReason = isAtomCommandInterrupted(failure)
+        ? "上一条消息的发送已中断。"
+        : (() => {
+            const error = squashAtomCommandFailure(failure);
+            return error instanceof Error ? error.message : "无法发送消息。";
+          })();
       if (!isAtomCommandInterrupted(failure)) {
-        const error = squashAtomCommandFailure(failure);
-        setThreadError(threadIdForSend, error instanceof Error ? error.message : "无法发送消息。");
+        setThreadError(threadIdForSend, failureReason);
         if (
           draftId &&
           (backgroundDraftOpened || currentRouteThreadKeyRef.current !== routeThreadKey)
@@ -1431,7 +1427,7 @@ export function useComposerSend(input: ComposerSendInput) {
             stackedThreadToast({
               type: "error",
               title: submissionIntent === "background" ? "无法运行后台任务" : "无法开始会话",
-              description: error instanceof Error ? error.message : "无法发送消息。",
+              description: failureReason,
               actionProps: {
                 children: "打开草稿",
                 onClick: () => {
@@ -1442,6 +1438,7 @@ export function useComposerSend(input: ComposerSendInput) {
           );
         }
       }
+      recordDraftSendFailure(routeThreadKey, failureReason);
     }
     sendInFlightRef.current = false;
     setSetupQueueSendThreadKey((current) => (current === activeThreadKey ? null : current));
@@ -1462,9 +1459,23 @@ export function useComposerSend(input: ComposerSendInput) {
         : refreshBeforeSend();
     if (refresh === null) return onSend(...args);
     sendInFlightRef.current = true;
-    const ready = await refresh.finally(() => {
-      sendInFlightRef.current = false;
-    });
+    const ready = await refresh.then(
+      (ok) => {
+        if (!ok) {
+          recordDraftSendFailure(routeThreadKey, "发送前未能切换到目标电脑。");
+        }
+        sendInFlightRef.current = false;
+        return ok;
+      },
+      (error: unknown) => {
+        recordDraftSendFailure(
+          routeThreadKey,
+          error instanceof Error ? error.message : "发送前刷新电脑状态失败。",
+        );
+        sendInFlightRef.current = false;
+        return false;
+      },
+    );
     if (ready) return onSendLatest(...args);
   };
   return { onSend: onSendWithRouting };
