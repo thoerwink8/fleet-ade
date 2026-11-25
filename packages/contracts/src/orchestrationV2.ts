@@ -71,6 +71,7 @@ import {
   CommandChildrenInput,
   CommandChildrenPage,
 } from "./childSummary.ts";
+import { CommandAssistSpeech, CommandTidySpeechInput } from "./commandAssist.ts";
 import {
   ProviderApprovalDecision,
   ProviderApprovalFullAccessOverride,
@@ -3932,6 +3933,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   commandChildren: "orchestration.commandChildren",
   commandChildDetail: "orchestration.commandChildDetail",
   markChildDriftFalsePositive: "orchestration.markChildDriftFalsePositive",
+  commandTidySpeech: "orchestration.commandTidySpeech",
   subscribeCommandChildren: "orchestration.subscribeCommandChildren",
 } as const;
 
@@ -4776,6 +4778,10 @@ export const OrchestrationV2RpcSchemas = {
   markChildDriftFalsePositive: {
     input: CommandChildDetailInput,
     output: Schema.Struct({}),
+  },
+  commandTidySpeech: {
+    input: CommandTidySpeechInput,
+    output: CommandAssistSpeech,
   },
   subscribeCommandChildren: {
     input: CommandChildrenInput,
