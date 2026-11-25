@@ -169,7 +169,12 @@ On web and desktop, press `Cmd+S` on macOS or `Ctrl+S` on Windows and Linux to s
 the current prompt and its attachments for later. If attachments or context are
 still preparing or uploading, stashing waits until they finish.
 With an empty composer, the same shortcut restores a single stash or opens the
-stash menu when there are several.
+stash menu when there are several. Deleting an entry from the stash menu shows an 8-second
+**Undo** notice to put it back in place.
+
+T3 Code also stashes unsubmitted messages automatically so edits are not lost: failed sends when
+you have already started a new draft, withdrawn queued messages while the composer is occupied, and
+unsaved edits whose queued message started before saving.
 
 Stashes containing uploaded files must be restored on their original computer.
 Those files are retained for 24 hours. After an upload expires, restore the prompt
@@ -187,20 +192,21 @@ shortcut described above.
 On web and desktop, queued messages appear at the end of the thread as dashed messages that have
 not been sent yet. Each shows its text and any attached
 images. **Send now** sends a message right away, into the running turn if there is one. You can
-also edit or remove it.
+also edit or withdraw it: withdrawing returns its text and attachments to the composer when empty, or
+to the prompt stash when the composer already holds other content.
 
 If you stop the agent or the server restarts, queued messages keep their order and are held.
 Press **Resume** in an empty composer to continue. **Resume** also continues a stopped
 run or one that hit a usage limit, even with nothing queued. Sending a new message also resumes the queue, unless it steers a turn that is already
-running. You can edit or remove held messages without starting them.
+running. You can edit or withdraw held messages without starting them.
 
 The pencil on a queued message opens it in the composer for editing. The original message
 stays in the queue until you save, and it is highlighted while you edit. The message's
 attachments appear above the text with a remove control, and new images can be added the usual way.
 The checkmark saves the queued message in place; **Cancel** next to it leaves it unchanged. Whatever
 you had typed in the composer before starting the edit is restored afterwards. If the queued
-message starts or is removed while you are editing, the edit ends: changed content moves into the
-composer when it is empty, and is discarded otherwise.
+message starts or is removed while you are editing, the edit ends and any changed content is saved
+automatically to the prompt stash.
 
 ## Commands and skills
 

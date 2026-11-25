@@ -49,16 +49,14 @@ function runLeftQueue(runs: ReadonlyArray<QueuedRunStatus> | null, runId: RunId)
 
 /**
  * What happens to an open edit when its run leaves the queue: an unchanged
- * edit just closes; a changed one moves into the thread's own draft when that
- * draft is empty, and is dropped otherwise so it never overwrites the user's
- * other work.
+ * edit just closes; a changed one with recoverable content always moves into
+ * the prompt stash, whatever the thread's own draft holds.
  */
 export function resolveQueuedEditExit(input: {
   readonly editChanged: boolean;
-  readonly threadDraftEmpty: boolean;
-}): "kept" | "discarded" | "clean" {
-  if (!input.editChanged) return "clean";
-  return input.threadDraftEmpty ? "kept" : "discarded";
+  readonly hasRecoverableContent: boolean;
+}): "stash" | "clean" {
+  return input.editChanged && input.hasRecoverableContent ? "stash" : "clean";
 }
 
 /**
