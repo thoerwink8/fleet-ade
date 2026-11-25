@@ -1,22 +1,22 @@
 # Outside agents
 
-Agents that T3 Code did not start can work with an environment through its MCP
+Agents that Fleet ADE did not start can work with a computer through its MCP
 server. They can read projects and threads, start and message threads, and
-check which providers and models are available. This covers Claude Code or
+check which agents and models are available. This covers Claude Code or
 Codex in your own terminal, ChatGPT, and bots that support MCP. Each agent signs
 in once, and you choose what it may do.
 
-## Add T3 Code to an assistant app
+## Add Fleet ADE to an assistant app
 
-Open the command palette (`Cmd/Ctrl+K`) and choose **Use T3 Code in another
+Open the command palette (`Cmd/Ctrl+K`) and choose **Use Fleet ADE in another
 app (MCP)**, or use the button in **Settings → Connections**. Pick the
 app and follow the step for that app. Assistants like
 Poke and Claude run in the cloud, so the wizard first asks you to sign in and
-turn it on for the environment. To reach your other machines through the same
-connection, [link them](./remote-access.md#link-another-environment).
+turn it on for that computer. To reach your other computers through the same
+connection, [link them](./remote-access.md#link-another-computer).
 
 When the app opens the sign-in page, choose what it may do and approve with
-your environment session. On an older environment, the wizard asks for the
+your session. On an older background service, the wizard asks for the
 level and gives you a code to paste instead. A code works once, for 5 minutes,
 and approves only that level.
 
@@ -26,27 +26,27 @@ client ID cannot connect.
 
 ## Get the MCP URL
 
-In **Settings → Connections**, open a saved environment's menu and choose
-**Copy MCP URL**. The URL is the environment's address followed by `/mcp`, for
+In **Settings → Connections**, open a saved computer's menu and choose
+**Copy MCP URL**. The URL is the computer's address followed by `/mcp`, for
 example:
 
 ```text
-https://<environment-address>/mcp
+https://<computer-address>/mcp
 ```
 
-When the environment is reached through a saved route, the copied URL uses that
+When the computer is reached through a saved route, the copied URL uses that
 route, which agents can reach wherever that route is available. Otherwise it
 uses the route this device is connected over, so an agent on the same device can
 reach it.
 
-- **An agent on your own computers** can use `localhost` on the host, a Tailscale
+- **An agent on your own computers** can use `localhost` on that computer, a Tailscale
   HTTPS address, or any other `https` address. Signing in sends the agent's
-  credentials to the environment, and agents only do that over `https` or to
+  credentials to the computer, and agents only do that over `https` or to
   `localhost`. A plain-`http` LAN or Tailscale address, like
-  `http://100.x.y.z:3773`, lets an agent find the environment but not finish
+  `http://100.x.y.z:3773`, lets an agent find the computer but not finish
   signing in.
 - **A hosted agent**, such as ChatGPT or a bot running in the cloud, must reach
-  the environment from the internet. Use a public HTTPS route; a Tailscale
+  the computer from the internet. Use a public HTTPS route; a Tailscale
   address only works from your own tailnet.
 
 ## Approve a sign-in
@@ -55,23 +55,23 @@ The first time an agent connects, it opens a sign-in page. Approve the request
 there, without sharing credentials with the agent. The page names the agent and
 where its access goes:
 
-A code from **Use T3 Code in another app (MCP)** already carries the level you
+A code from **Use Fleet ADE in another app (MCP)** already carries the level you
 picked there. With another code, choose what the agent may do here: **Auto** is
 selected by default. Approving without a code starts at **Read only**:
 
 - **Read only** lets the agent read projects and threads and see
-  the available providers and models. It cannot change anything.
+  the available agents and models. It cannot change anything.
 - **Supervised** through **Full access** also let it start, message and stop
   threads in every project. A thread it starts or steers cannot run with more
   permissions than the mode you chose.
 
 ## What outside agents can call
 
-Some tools only work for an agent running inside a T3 thread, because they act
+Some tools only work for an agent running inside a Fleet ADE thread, because they act
 as that thread: subagents, secret requests, rendered HTML,
 and worktree handoff. They still appear in an outside agent's tool
 list, but calling one returns an error saying it needs an agent running inside
-T3 Code.
+Fleet ADE.
 
 - To hand off work, start a thread with `t3_thread_launch`, then follow it with
   `t3_thread_wait` or `t3_thread_read`, instead of `create_threads` or
@@ -84,11 +84,11 @@ T3 Code.
 ## Claude Code
 
 ```sh
-claude mcp add --transport http t3 https://<environment-address>/mcp
+claude mcp add --transport http t3 https://<computer-address>/mcp
 claude mcp login t3
 ```
 
-`claude mcp login` opens the sign-in page in your browser. On a machine
+`claude mcp login` opens the sign-in page in your browser. On a computer
 without a browser, add `--no-browser`, open the printed URL elsewhere, and
 paste the final URL back when asked. `claude mcp list` shows `t3` as connected
 once you approve.
@@ -96,7 +96,7 @@ once you approve.
 ## Codex
 
 ```sh
-codex mcp add t3 --url https://<environment-address>/mcp
+codex mcp add t3 --url https://<computer-address>/mcp
 codex mcp login t3
 ```
 
@@ -105,10 +105,10 @@ codex mcp login t3
 
 ## ChatGPT
 
-Add the environment as a custom MCP app in ChatGPT's apps settings:
+Add the computer as a custom MCP app in ChatGPT's apps settings:
 
 1. Create a new app or plugin with a custom MCP server.
-2. Set the server URL to `https://<environment-address>/mcp`, using the T3
+2. Set the server URL to `https://<computer-address>/mcp`, using the T3
    Connect address.
 3. Choose **OAuth** for authentication. ChatGPT discovers the rest; you do not
    need a client ID or secret.
@@ -120,9 +120,9 @@ Any agent that supports remote MCP servers over HTTP with OAuth can connect. Giv
 it the MCP URL and choose OAuth, and the agent finds the sign-in settings itself.
 Agents without OAuth support cannot connect.
 
-## Scripts on the host
+## Scripts on the computer
 
-On the machine that runs the environment, `t3 thread` uses the same tools
+On the computer that runs the background service, `t3 thread` uses the same tools
 without a sign-in:
 
 ```sh

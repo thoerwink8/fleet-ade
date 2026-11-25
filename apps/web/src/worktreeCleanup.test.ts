@@ -1,9 +1,18 @@
-import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  GitCommandError,
+  ProjectId,
+  ProviderInstanceId,
+  ThreadId,
+} from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE, type Thread } from "./types";
 import { makeThreadFixture } from "./test-fixtures";
-import { getOrphanedWorktreePathForThread } from "./worktreeCleanup";
+import {
+  describeWorktreeCleanupFailure,
+  getOrphanedWorktreePathForThread,
+} from "./worktreeCleanup";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
 
@@ -87,5 +96,39 @@ describe("getOrphanedWorktreePathForThread", () => {
     ];
     const result = getOrphanedWorktreePathForThread(threads, ThreadId.make("thread-1"));
     expect(result).toBe("/tmp/repo/worktrees/feature-a");
+  });
+});
+
+describe("describeWorktreeCleanupFailure", () => {
+  const error = new GitCommandError({
+    operation: "GitVcsDriver.status",
+    command: "git status",
+    cwd: "/repo",
+    detail: "fatal: index file corrupt",
+  });
+
+  it("says the worktree was deleted when only the status refresh failed", () => {
+    const toast = describeWorktreeCleanupFailure({ removalFailed: false, error });
+
+    expect(toast.title).toBe("工作树已删除，但无法刷新 Git 状态");
+    expect(toast.description).toContain("fatal: index file corrupt");
+    expect(toast.title).not.toContain("无法读取");
+  });
+
+  it("reports the worktree that could not be removed", () => {
+    const toast = describeWorktreeCleanupFailure({
+      removalFailed: true,
+      error: new GitCommandError({
+        operation: "GitVcsDriver.removeWorktree",
+        command: "git worktree remove",
+        cwd: "/repo",
+        detail: "fatal: busy",
+      }),
+      worktreePath: "~/wt",
+    });
+
+    expect(toast.title).toBe("无法删除工作树");
+    expect(toast.description.startsWith("无法删除 ~/wt。")).toBe(true);
+    expect(toast.description).toContain("fatal: busy");
   });
 });

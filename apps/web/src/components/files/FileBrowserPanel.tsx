@@ -68,7 +68,7 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label="刷新工作区文件"
+            aria-label="刷新项目文件"
             onClick={props.onRefresh}
           />
         }
@@ -210,7 +210,7 @@ export default function FileBrowserPanel({
           [
             ...fileMenuItems,
             { id: "copy-mention", label: "复制提及" },
-            { id: "add-to-chat", label: "添加到对话" },
+            { id: "add-to-chat", label: "添加到会话" },
           ],
           position,
         );
@@ -233,7 +233,7 @@ export default function FileBrowserPanel({
           } catch (error) {
             toastManager.add({
               type: "error",
-              title: "复制提及失败",
+              title: "无法复制提及",
               description: error instanceof Error ? error.message : "发生错误。",
             });
           }
@@ -244,8 +244,8 @@ export default function FileBrowserPanel({
           if (!composer) {
             toastManager.add({
               type: "error",
-              title: "无法添加到对话",
-              description: "请为此项目打开一个对话后重试。",
+              title: "无法添加到会话",
+              description: "请为此项目打开一个会话后重试。",
             });
             return;
           }
@@ -253,8 +253,8 @@ export default function FileBrowserPanel({
           if (!inserted) {
             toastManager.add({
               type: "error",
-              title: "无法添加到对话",
-              description: "对话当前无法接收输入。",
+              title: "无法添加到会话",
+              description: "会话当前无法接收输入。",
             });
           }
         }

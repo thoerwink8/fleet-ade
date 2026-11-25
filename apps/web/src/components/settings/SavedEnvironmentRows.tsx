@@ -316,7 +316,7 @@ export function SavedBackendListRow({
       serverUpdateState.status !== "running" ? (
         <OutdatedServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} 服务器`}
+          serverLabel={`${environment.label} 后台服务`}
           fromVersion={serverVersion ?? undefined}
           targetVersion={APP_VERSION}
           label={serverUpdateState.status === "failed" ? "重试更新" : "更新"}
@@ -325,7 +325,7 @@ export function SavedBackendListRow({
       {showUpdateAction ? (
         <ServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} 服务器`}
+          serverLabel={`${environment.label} 后台服务`}
           selfUpdate={selfUpdate}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
           desktopAppInstall={environment.serverConfig?.environment.capabilities.desktopAppInstall}
@@ -341,13 +341,13 @@ export function SavedBackendListRow({
               size="sm"
               checked={enabled}
               disabled={isRemoving || blocked}
-              aria-label={`${enabled ? "关闭" : "开启"} ${environment.label}`}
+              aria-label={`${enabled ? "断开" : "连接"} ${environment.label}`}
               onCheckedChange={(checked) => onSetEnabled(environmentId, checked)}
             />
           }
         />
         <TooltipPopup side="top">
-          {blocked ? "不支持此客户端" : enabled ? "关闭" : "开启"}
+          {blocked ? "不支持此客户端" : enabled ? "断开" : "连接"}
         </TooltipPopup>
       </Tooltip>
       <Menu>
@@ -396,8 +396,8 @@ function EmptyRemoteEnvironments() {
         <ChevronsLeftRightEllipsisIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>没有已保存的远程环境</EmptyTitle>
-        <EmptyDescription>点击“添加环境”配对其他环境。</EmptyDescription>
+        <EmptyTitle>没有已保存的远程电脑</EmptyTitle>
+        <EmptyDescription>点击“添加电脑”配对其他电脑。</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );

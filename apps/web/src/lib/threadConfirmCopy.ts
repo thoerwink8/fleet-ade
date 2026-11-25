@@ -39,7 +39,11 @@ export function sideChatDeleteConfirmCopy(title: string): ConfirmCopy {
 export function batchDeleteConfirmCopy(count: number): ConfirmCopy {
   return {
     message: "它们的所有消息和记录会被永久删除，无法恢复。想留着的请改用归档。",
-    options: { title: `删除 ${count} 个会话？`, confirmLabel: "删除", variant: "destructive" },
+    options: {
+      title: `删除 ${count} 个会话？`,
+      confirmLabel: `删除 ${count} 个会话`,
+      variant: "destructive",
+    },
   };
 }
 

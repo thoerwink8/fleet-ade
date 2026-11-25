@@ -232,16 +232,14 @@ export function usePaginatedBranches(target: VcsRefTarget) {
           totalCount: Math.max(...values.map((value) => value.totalCount)),
         };
   const failed = results.find((result) => result._tag === "Failure");
+  const failure = failed?._tag === "Failure" ? Cause.squash(failed.cause) : null;
   const isFetchingNextPage = isPaginatedBranchesNextPagePending(results);
   const error =
-    failed?._tag === "Failure"
-      ? (() => {
-          const cause = Cause.squash(failed.cause);
-          return cause instanceof Error && cause.message.trim().length > 0
-            ? cause.message
-            : "无法加载分支。";
-        })()
-      : null;
+    failure === null
+      ? null
+      : failure instanceof Error && failure.message.trim().length > 0
+        ? failure.message
+        : "无法加载分支。";
   const refresh = () => {
     setPagination({ targetKey, cursors: INITIAL_BRANCH_CURSORS });
     if (targetKey !== null) {
@@ -270,6 +268,7 @@ export function usePaginatedBranches(target: VcsRefTarget) {
     isFetchingNextPage,
     refresh,
     loadNext,
+    failure,
   };
 }
 

@@ -42,15 +42,15 @@ export function LocalEnvironmentSetting() {
         {...searchableSetting("local-environment")}
         description={
           enabled
-            ? "在本机上运行智能体。关闭后，Fleet ADE 将仅使用远程环境。"
-            : "已关闭。智能体仅在远程环境中运行。"
+            ? "在本机上运行智能体。关闭后，Fleet ADE 将仅使用远程电脑。"
+            : "已关闭。智能体仅在远程电脑上运行。"
         }
         control={
           <Switch
             checked={enabled}
             disabled={isUpdating}
             onCheckedChange={() => setConfirmOpen(true)}
-            aria-label="本地环境"
+            aria-label="本机后台服务"
           />
         }
       />
@@ -64,11 +64,13 @@ export function LocalEnvironmentSetting() {
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>{enabled ? "关闭本地环境？" : "开启本地环境？"}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {enabled ? "关闭本机后台服务？" : "开启本机后台服务？"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {enabled
-                ? "Fleet ADE 将重启，不再在本机上运行服务器。本机上运行的智能体和终端将停止，其他设备也将无法连接本机。你的项目、历史记录和远程环境不受影响。"
-                : "Fleet ADE 将重启，并重新在本机上运行服务器。"}
+                ? "Fleet ADE 将重启，不再在本机上运行后台服务。本机上运行的智能体和终端将停止，其他设备也将无法连接本机。你的项目、历史记录和远程电脑不受影响。"
+                : "Fleet ADE 将重启，并重新在本机上运行后台服务。"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}

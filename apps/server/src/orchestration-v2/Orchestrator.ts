@@ -40,7 +40,6 @@ import {
   type ThreadPullRequestLink,
   type ThreadPullRequestWatch,
   OrchestrationV2ThreadTrashFailureCode,
-  type OrchestrationV2RecentlyDeletedThread,
   type OrchestrationV2ThreadTrashFailureCode as OrchestrationV2ThreadTrashFailureCodeType,
   type OrchestrationV2BatchThreadResult,
   type OrchestrationV2AppThread,
@@ -165,6 +164,7 @@ import {
   type ProjectionRecords,
   type ProjectionCheckpointContext,
   type OlderSettledThreadsListing,
+  type RecentlyDeletedProjection,
   type ActiveShellIndexEntry,
   type OlderSettledThreadsQuery,
   type ShellSnapshotOptions,
@@ -630,10 +630,7 @@ export interface OrchestratorV2Shape {
   readonly listOlderSettledThreads: (
     query: OlderSettledThreadsQuery,
   ) => Effect.Effect<OlderSettledThreadsListing, OrchestratorV2Error>;
-  readonly listRecentlyDeleted: () => Effect.Effect<
-    ReadonlyArray<OrchestrationV2RecentlyDeletedThread>,
-    OrchestratorV2Error
-  >;
+  readonly listRecentlyDeleted: () => Effect.Effect<RecentlyDeletedProjection, OrchestratorV2Error>;
   readonly readShellSnapshot: (
     options?: ShellSnapshotOptions,
   ) => Effect.Effect<

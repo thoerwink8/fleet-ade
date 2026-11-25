@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import * as DateTime from "effect/DateTime";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
@@ -8,12 +9,14 @@ import { FleetSummaryReportInput, phaseFromSessionRun } from "./fleetSummary.ts"
 import {
   ORCHESTRATION_V2_WS_METHODS,
   OrchestrationV2AppThreadJson,
+  OrchestrationV2RecentlyDeleted,
   THREAD_TRASH_RETENTION_MS,
 } from "./orchestrationV2.ts";
 import { WS_METHODS, WsRpcGroup } from "./rpc.ts";
 
 const decodeThread = Schema.decodeUnknownSync(OrchestrationV2AppThreadJson);
 const decodeCapabilities = Schema.decodeUnknownSync(ExecutionEnvironmentCapabilities);
+const decodeRecentlyDeleted = Schema.decodeUnknownSync(OrchestrationV2RecentlyDeleted);
 
 describe("WebSocket RPC contracts", () => {
   it("keeps recoverable thread deletion at seven days", () => {
@@ -174,6 +177,21 @@ describe("WebSocket RPC contracts", () => {
   it("registers the recently deleted read RPC", () => {
     const request = WsRpcGroup.requests.get(ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted);
     expect(request).toBeDefined();
+  });
+
+  it("decodes recently deleted responses before and after totals", () => {
+    const response = {
+      snapshotSequence: 1,
+      now: DateTime.makeUnsafe("2026-11-25T00:00:00.000Z"),
+      items: [],
+    };
+    expect(decodeRecentlyDeleted(response).totals).toBeUndefined();
+    expect(
+      decodeRecentlyDeleted({
+        ...response,
+        totals: { count: 2, attachmentBytes: null, worktreeBytes: null },
+      }).totals,
+    ).toEqual({ count: 2, attachmentBytes: null, worktreeBytes: null });
   });
 
   it("lets the server pick a new worktree's folder", () => {

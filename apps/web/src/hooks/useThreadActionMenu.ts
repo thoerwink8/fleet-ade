@@ -1,12 +1,18 @@
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { requestCustomSnooze } from "../components/CustomSnoozeDialog";
+import { attentionDismissVisitedAt } from "../components/Sidebar.logic";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
   settlePromise,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { canSnooze, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
+import {
+  canSnooze,
+  effectiveSnoozed,
+  threadWokeAt,
+} from "@t3tools/client-runtime/state/thread-settled";
 import {
   AuthOrchestrationOperateScope,
   type ScopedThreadRef,
@@ -14,11 +20,17 @@ import {
 } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
 
-import { pickSnoozePreset, resolveSnoozePresets } from "../components/Sidebar.snooze";
+import {
+  pickSnoozePreset,
+  resolveSnoozePresets,
+  type SnoozePreset,
+} from "../components/Sidebar.snooze";
 import {
   buildThreadActionMenuItems,
   threadActionRequiresOperate,
   type ThreadActionMenuId,
+  type ThreadActionMenuState,
+  type ThreadActionMenuSurface,
 } from "../components/threadActionMenu.logic";
 import { titleRegenerationToast } from "../components/threadTitleRegenerationToast";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
@@ -29,9 +41,12 @@ import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope } from "../state/session";
 import {
+  readEnvironmentHasCommanderConfig,
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
+  readEnvironmentSupportsVisitedTracking,
   readThreadShell,
+  readThreadShells,
   useProjects,
 } from "../state/entities";
 import { usePrimaryEnvironmentId } from "../state/environments";
@@ -42,11 +57,19 @@ import {
   selectProjectGroupingSettings,
 } from "@t3tools/client-runtime/state/project-grouping";
 import { buildPhysicalToLogicalProjectKeyMap } from "../sidebarProjectGrouping";
-import { threadRuntimeCanArchive } from "@t3tools/client-runtime/state/models";
+import {
+  threadRuntimeCanArchive,
+  type EnvironmentThreadShell,
+} from "@t3tools/client-runtime/state/models";
+import { showThreadUndoNotice } from "./showThreadUndoNotice";
 import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
-import { canTurnThreadIntoProject, useThreadActions } from "./useThreadActions";
+import {
+  canTurnThreadIntoProject,
+  useAcknowledgeThreadWoke,
+  useThreadActions,
+} from "./useThreadActions";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -58,13 +81,47 @@ function failureToast(title: string, error: unknown) {
   );
 }
 
+export interface ThreadActionMenuOpenOverride {
+  readonly threadRef?: ScopedThreadRef | undefined;
+  readonly thread?: EnvironmentThreadShell | undefined;
+  readonly projectCwd?: string | null | undefined;
+  readonly projectFilter?: ThreadActionMenuState["projectFilter"] | undefined;
+  readonly attentionDismissible?: boolean | undefined;
+  readonly isSettled?: boolean | undefined;
+  readonly isSnoozed?: boolean | undefined;
+  readonly supports?: ThreadActionMenuState["supports"] | undefined;
+  readonly hasAnyCommanderThread?: boolean | undefined;
+  readonly hasCommanderConfig?: boolean | undefined;
+  readonly supportsVisitedTracking?: boolean | undefined;
+  readonly onStartRename?: (() => void) | undefined;
+  readonly onFilterByProject?: (() => void) | undefined;
+  readonly onOpenProjectSettings?: (() => void) | undefined;
+}
+
 export function useThreadActionMenu(input: {
   readonly threadRef: ScopedThreadRef | null;
   readonly projectCwd: string | null;
+  readonly surface?: ThreadActionMenuSurface | undefined;
   readonly onStartRename: () => void;
   readonly onFind?: ((threadRef: ScopedThreadRef) => void) | undefined;
+  readonly onFilterByProject?: ((threadRef: ScopedThreadRef) => void) | undefined;
+  readonly onOpenProjectSettings?: ((threadRef: ScopedThreadRef) => void) | undefined;
+  readonly onSettle?: ((threadRef: ScopedThreadRef) => void) | undefined;
+  readonly onSnooze?:
+    | ((threadRef: ScopedThreadRef, preset: Pick<SnoozePreset, "snoozedUntil">) => void)
+    | undefined;
 }) {
-  const { threadRef, projectCwd, onStartRename, onFind } = input;
+  const {
+    threadRef,
+    projectCwd,
+    surface = "chat-header",
+    onStartRename,
+    onFind,
+    onFilterByProject,
+    onOpenProjectSettings,
+    onSettle,
+    onSnooze,
+  } = input;
   const router = useRouter();
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
@@ -74,6 +131,7 @@ export function useThreadActionMenu(input: {
     settings: projectGroupingSettings,
     primaryEnvironmentId,
   });
+  const acknowledgeWoke = useAcknowledgeThreadWoke();
   const {
     settleThread,
     unsettleThread,
@@ -115,52 +173,73 @@ export function useThreadActionMenu(input: {
     onError: (error) => failureToast("无法复制会话 ID", error),
   });
 
-  const openMenu = (position: { x: number; y: number }) => {
-    if (threadRef === null) return;
+  const openMenu = (
+    position: { x: number; y: number },
+    override?: ThreadActionMenuOpenOverride,
+  ) => {
+    const targetRef = override?.threadRef ?? threadRef;
+    if (targetRef === null) return;
+    const effectiveProjectCwd =
+      override?.projectCwd !== undefined ? override.projectCwd : projectCwd;
     void (async () => {
       const api = readLocalApi();
       if (!api) return;
-      const thread = readThreadShell(threadRef);
+      const thread = override?.thread ?? readThreadShell(targetRef);
       if (!thread) {
         failureToast("会话操作不可用", new Error("这个会话还没有加载。"));
         return;
       }
       const now = new Date();
-      const configLoaded = readEnvironmentServerConfigLoaded(threadRef.environmentId);
-      const supports = {
+      const configLoaded = readEnvironmentServerConfigLoaded(targetRef.environmentId);
+      const supports = override?.supports ?? {
         settlement: configLoaded,
-        autoSettleOptOut: readEnvironmentSupportsAutoSettleOptOut(threadRef.environmentId),
+        autoSettleOptOut: readEnvironmentSupportsAutoSettleOptOut(targetRef.environmentId),
         snooze: configLoaded,
         pinning: configLoaded,
         commander: configLoaded,
         titleRegeneration: configLoaded,
       };
+      const hasAnyCommanderThread =
+        override?.hasAnyCommanderThread ??
+        (thread.commander === true ||
+          readThreadShells().some(
+            (candidate) => candidate.archivedAt === null && candidate.commander === true,
+          ));
+      const hasCommanderConfig =
+        override?.hasCommanderConfig ?? readEnvironmentHasCommanderConfig(targetRef.environmentId);
       const isRegeneratingTitle = thread.titleRegeneration != null;
-      const snoozePresets = resolveSnoozePresets(now, timestampFormat, threadRef.environmentId);
+      const snoozePresets = resolveSnoozePresets(now, timestampFormat, targetRef.environmentId);
       const items = buildThreadActionMenuItems({
-        canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
+        surface,
+        canOperate: readEnvironmentScope(targetRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
         canExport: true,
         branch: thread.branch ?? null,
-        projectFilter: null,
+        projectFilter: override?.projectFilter ?? null,
         isPinned: thread.pinnedAt != null,
         isCommander: thread.commander === true,
-        isSettled: supports.settlement && thread.settledOverride === "settled",
+        hasAnyCommanderThread,
+        hasCommanderConfig,
+        isSettled:
+          override?.isSettled ?? (supports.settlement && thread.settledOverride === "settled"),
         autoSettleEnabled: thread.autoSettleDisabledAt == null,
-        isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
+        isSnoozed:
+          override?.isSnoozed ??
+          (supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() })),
         canSnoozeNow: canSnooze(thread, { now: now.toISOString() }),
         isRegeneratingTitle,
+        attentionDismissible: override?.attentionDismissible ?? false,
         isRunning: !threadRuntimeCanArchive(thread.runtime),
         supports,
         snoozePresets,
-        canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+        canTurnIntoProject: canTurnThreadIntoProject(targetRef),
       });
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;
       const action: ThreadActionMenuId = clicked.value;
       if (
         threadActionRequiresOperate(action) &&
-        !readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)
+        !readEnvironmentScope(targetRef.environmentId, AuthOrchestrationOperateScope)
       ) {
         failureToast("无法执行会话操作", new Error("此连接无法修改会话。"));
         return;
@@ -173,10 +252,14 @@ export function useThreadActionMenu(input: {
                 snoozePresets,
                 action.slice("snooze:".length),
                 timestampFormat,
-                threadRef.environmentId,
+                targetRef.environmentId,
               );
         if (!preset) return;
-        const result = await snoozeThread(threadRef, preset.snoozedUntil);
+        if (onSnooze) {
+          onSnooze(targetRef, preset);
+          return;
+        }
+        const result = await snoozeThread(targetRef, preset.snoozedUntil);
         if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
           failureToast("无法暂缓会话", squashAtomCommandFailure(result));
         }
@@ -193,9 +276,24 @@ export function useThreadActionMenu(input: {
       };
       switch (action) {
         case "find":
-          onFind?.(threadRef);
+          onFind?.(targetRef);
+          return;
+        case "filter-by-project":
+          if (override?.onFilterByProject) {
+            override.onFilterByProject();
+          } else {
+            onFilterByProject?.(targetRef);
+          }
           return;
         case "project-settings": {
+          if (override?.onOpenProjectSettings) {
+            override.onOpenProjectSettings();
+            return;
+          }
+          if (onOpenProjectSettings) {
+            onOpenProjectSettings(targetRef);
+            return;
+          }
           const project = projects.find(
             (candidate) =>
               candidate.environmentId === thread.environmentId && candidate.id === thread.projectId,
@@ -212,7 +310,7 @@ export function useThreadActionMenu(input: {
         }
         case "new-thread-on-branch": {
           const result = await settlePromise(() =>
-            handleNewThread(scopeProjectRef(threadRef.environmentId, thread.projectId), {
+            handleNewThread(scopeProjectRef(targetRef.environmentId, thread.projectId), {
               branch: thread.branch,
               worktreePath: thread.worktreePath,
               envMode: thread.worktreePath ? "worktree" : "local",
@@ -225,52 +323,91 @@ export function useThreadActionMenu(input: {
           return;
         }
         case "settle":
-          await reportFailure("无法标为完成", () => settleThread(threadRef));
+          if (onSettle) {
+            onSettle(targetRef);
+            return;
+          }
+          await reportFailure("无法标为完成", () => settleThread(targetRef));
           return;
         case "unsettle":
-          await reportFailure("无法取消完成", () => unsettleThread(threadRef));
+          await reportFailure("无法取消完成", () => unsettleThread(targetRef));
           return;
         case "unsnooze":
-          await reportFailure("无法取消暂缓", () => unsnoozeThread(threadRef));
+          await reportFailure("无法取消暂缓", () => unsnoozeThread(targetRef));
           return;
         case "pin":
-          await reportFailure("无法置顶会话", () => pinThread(threadRef));
+          await reportFailure("无法置顶会话", () => pinThread(targetRef));
           return;
         case "unpin": {
-          await reportFailure("无法取消置顶会话", () => unpinThread(threadRef));
+          await reportFailure("无法取消置顶会话", () => unpinThread(targetRef));
           return;
         }
         case "mark-commander":
-          await reportFailure("无法标成指挥", () => markCommanderThread(threadRef));
+          await reportFailure("无法标成指挥", () => markCommanderThread(targetRef));
           return;
         case "unmark-commander":
-          await reportFailure("无法取消指挥", () => unmarkCommanderThread(threadRef));
+          await reportFailure("无法取消指挥", () => unmarkCommanderThread(targetRef));
           return;
         case "auto-settle:enabled":
         case "auto-settle:disabled":
           await reportFailure("无法更新自动标为完成设置", () =>
-            setThreadAutoSettle(threadRef, action === "auto-settle:enabled"),
+            setThreadAutoSettle(targetRef, action === "auto-settle:enabled"),
           );
           return;
         case "rename":
-          onStartRename();
+          if (override?.onStartRename) {
+            override.onStartRename();
+          } else {
+            onStartRename();
+          }
           return;
         case "regenerate-title": {
           if (isRegeneratingTitle) return;
           const toast = titleRegenerationToast([
             await regenerateThreadTitle({
-              environmentId: threadRef.environmentId,
-              input: { threadId: threadRef.threadId },
+              environmentId: targetRef.environmentId,
+              input: { threadId: targetRef.threadId },
             }),
           ]);
           if (toast) toastManager.add(toast);
           return;
         }
+        case "dismiss-attention": {
+          acknowledgeWoke(
+            targetRef,
+            attentionDismissVisitedAt(
+              thread,
+              threadWokeAt(thread, { now: new Date().toISOString() }),
+            ),
+          );
+          const canUndo =
+            override?.supportsVisitedTracking ??
+            readEnvironmentSupportsVisitedTracking(targetRef.environmentId);
+          if (canUndo) {
+            const claim = ThreadUndo.begin("dismiss-attention", scopedThreadKey(targetRef));
+            showThreadUndoNotice({
+              action: "DismissedAttention",
+              title: thread.title,
+              claim,
+              undo: () => markThreadUnread(targetRef),
+              failureTitle: "无法撤销移出等你处理",
+            });
+            return;
+          }
+          toastManager.add(
+            stackedThreadToast({
+              type: "success",
+              title: "已移出等你处理",
+              description: "已把这条会话标记为看过，所有设备同步。",
+            }),
+          );
+          return;
+        }
         case "mark-unread":
-          void markThreadUnread(threadRef);
+          void markThreadUnread(targetRef);
           return;
         case "turn-into-project": {
-          const result = await turnThreadIntoProject(threadRef);
+          const result = await turnThreadIntoProject(targetRef);
           if (result._tag === "Success") {
             toastManager.add({
               type: "success",
@@ -288,14 +425,14 @@ export function useThreadActionMenu(input: {
               candidate.environmentId === thread.environmentId && candidate.id === thread.projectId,
           );
           await exportThreadMarkdown({
-            threadRef,
+            threadRef: targetRef,
             title: thread.title,
             projectName: project?.title ?? null,
           });
           return;
         }
         case "copy-path": {
-          const workspacePath = thread.worktreePath ?? projectCwd;
+          const workspacePath = thread.worktreePath ?? effectiveProjectCwd;
           if (!workspacePath) {
             toastManager.add(
               stackedThreadToast({
@@ -315,14 +452,14 @@ export function useThreadActionMenu(input: {
           }
           return;
         case "copy-thread":
-          void copyThreadReference(threadChipCopyTarget(threadRef, thread.title));
+          void copyThreadReference(threadChipCopyTarget(targetRef, thread.title));
           return;
         case "copy-thread-id":
           copyThreadIdToClipboard(thread.id, { threadId: thread.id });
           return;
         case "archive": {
           let didArchive = false;
-          const result = await archiveThread(threadRef, {
+          const result = await archiveThread(targetRef, {
             onArchived: () => {
               didArchive = true;
             },
@@ -336,14 +473,14 @@ export function useThreadActionMenu(input: {
           return;
         }
         case "delete": {
-          const deleted = await deleteThread(threadRef, {
+          const deleted = await deleteThread(targetRef, {
             confirmDeletion: { threadTitle: thread.title, always: confirmThreadDelete },
           });
           if (
             deleted._tag === "Failure" &&
             !isAtomCommandInterrupted(deleted) &&
             // A missing thread means cleanup failed after deletion; deleteThread already toasted that failure.
-            readThreadShell(threadRef) !== null
+            readThreadShell(targetRef) !== null
           ) {
             failureToast("无法删除会话", squashAtomCommandFailure(deleted));
           }

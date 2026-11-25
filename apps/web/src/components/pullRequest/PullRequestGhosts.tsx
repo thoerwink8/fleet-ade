@@ -24,7 +24,7 @@ const META_WIDTHS = ["w-2/5", "w-1/3", "w-2/5", "w-1/4", "w-1/3", "w-2/5", "w-1/
 
 export function PullRequestListGhost({ rows = 7, caption }: { rows?: number; caption?: string }) {
   return (
-    <div role="status" aria-label={caption ?? "正在加载拉取请求"} className="space-y-0.5">
+    <div role="status" aria-label={caption ?? "正在加载 PR"} className="space-y-0.5">
       {/* Outside the pulse so the explanation stays readable. */}
       {caption ? (
         <p className="px-3 pb-1 text-meta font-medium text-muted-foreground">{caption}</p>

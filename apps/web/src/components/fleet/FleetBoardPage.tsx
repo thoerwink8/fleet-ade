@@ -71,9 +71,9 @@ export interface FleetSearch {
 
 const STATUS_LABELS: Record<FleetBoardStatus, string> = {
   needsYou: "要你看",
-  stuck: "卡住",
-  working: "在做",
-  done: "做完",
+  stuck: "出错了",
+  working: "运行中",
+  done: "已完成",
 };
 
 function useFleetSearch(): FleetSearch {
@@ -157,7 +157,7 @@ function FleetMachineFilter({
           </MenuItem>
         ))}
         {options.length === 0 ? (
-          <p className="px-2 py-2 text-xs text-muted-foreground">还没有机器记过活。</p>
+          <p className="px-2 py-2 text-xs text-muted-foreground">还没有电脑记过活。</p>
         ) : null}
       </MenuPopup>
     </Menu>
@@ -333,7 +333,7 @@ export function FleetBoardPage() {
     fleetMachineName(environmentId, linkedNames, directory);
   const displaySourceId = sourceEnvironmentId ?? fallbackSourceId;
   const sourceName =
-    displaySourceId === null ? "这台机器" : (directory.get(displaySourceId) ?? "这台机器");
+    displaySourceId === null ? "这台电脑" : (directory.get(displaySourceId) ?? "这台电脑");
   const repoNames = [
     ...new Set(allRows.flatMap((row) => (row.repo === undefined ? [] : [row.repo]))),
   ].sort((a, b) => a.localeCompare(b));
@@ -363,7 +363,7 @@ export function FleetBoardPage() {
       replace,
     });
 
-  const machineLabel = search.machine === undefined ? "所有机器" : machineName(search.machine);
+  const machineLabel = search.machine === undefined ? "所有电脑" : machineName(search.machine);
   const activeFilterCount =
     (filterStatus !== undefined ? 1 : 0) +
     (search.machine !== undefined ? 1 : 0) +
@@ -379,7 +379,7 @@ export function FleetBoardPage() {
   const machineFilter = machineFilterVisible ? (
     <FleetMachineFilter
       label={machineLabel}
-      emptyLabel="所有机器"
+      emptyLabel="所有电脑"
       options={machineIds}
       optionName={machineName}
       onSelect={(environmentId) =>
@@ -474,7 +474,7 @@ export function FleetBoardPage() {
               onSelect={(environmentId) => patchSearch({ source: environmentId })}
             />
           </span>
-          <span className="min-w-0">（只含这台机器记下的活）</span>
+          <span className="min-w-0">（只含这台电脑记下的活）</span>
           {environments.length === 0 ? null : summary.status === "live" && sourceConnected ? (
             <Badge variant="success">已连接</Badge>
           ) : summary.status === "error" || summaryForbidden || sessionReadError ? (
@@ -542,8 +542,8 @@ export function FleetBoardPage() {
             {allRows.length === 0 && environments.length === 0 ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
-                title="还没有连上的环境"
-                description="连上一台 Fleet ADE 服务器后，这里会汇总它记下的各台机器的活。"
+                title="还没有连上的电脑"
+                description="连上一台运行 Fleet ADE 的电脑后，这里会汇总它记下的各台电脑的活。"
                 action={
                   <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
                     去连接
@@ -554,7 +554,7 @@ export function FleetBoardPage() {
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="正在读取"
-                description="第一次读取要等这台机器把它记下的活送过来。"
+                description="第一次读取要等这台电脑把它记下的活送过来。"
               />
             ) : allRows.length === 0 && summaryForbidden ? (
               <FleetBoardEmpty
@@ -569,8 +569,8 @@ export function FleetBoardPage() {
             ) : allRows.length === 0 && sourceDisconnected ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
-                title={`汇总机 ${sourceName} 连不上`}
-                description="连上这台机器后，这里会显示它记下的各台机器的活。"
+                title={`汇总电脑 ${sourceName} 连不上`}
+                description="连上这台电脑后，这里会显示它记下的各台电脑的活。"
                 action={
                   <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
                     去连接
@@ -581,7 +581,7 @@ export function FleetBoardPage() {
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="读不到机群汇总"
-                description="汇总读取失败，机器恢复后重试。"
+                description="汇总读取失败，电脑恢复后重试。"
                 action={
                   <Button
                     variant="outline"
@@ -603,12 +603,12 @@ export function FleetBoardPage() {
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="正在读取"
-                description="第一次读取要等这台机器把它记下的活送过来。"
+                description="第一次读取要等这台电脑把它记下的活送过来。"
               />
             ) : allRows.length === 0 ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
-                title="这台汇总机上没有在跑或 24 小时内做完的活"
+                title="这台汇总电脑上没有运行中或 24 小时内已完成的任务"
               />
             ) : groups.length === 0 ? (
               <FleetBoardEmpty icon={<SearchIcon />} title="没有符合筛选的" action={clearFilters} />
@@ -681,7 +681,7 @@ export function FleetBoardPage() {
                                 !open && "-rotate-90",
                               )}
                             />
-                            做完 {rows.done.length}
+                            已完成 {rows.done.length}
                           </CollapsibleTrigger>
                           <CollapsiblePanel>
                             <div className="flex flex-col">
@@ -741,7 +741,7 @@ export function FleetBoardPage() {
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-6 pb-8">
             {machineFilter !== null ? (
               <section className="flex flex-col gap-2">
-                <p className="text-xs text-muted-foreground">机器</p>
+                <p className="text-xs text-muted-foreground">电脑</p>
                 {machineFilter}
               </section>
             ) : null}

@@ -361,7 +361,7 @@ export function ProviderModelsSection({
       >
         {visibleModels.length === 0 ? (
           <p className="px-2 py-2 text-xs text-muted-foreground">
-            {isFiltering ? "没有匹配的模型。" : "此提供方尚未返回模型。"}
+            {isFiltering ? "没有匹配的模型。" : "此智能体尚未返回模型。"}
           </p>
         ) : null}
         {visibleModels.map((model, index) => {

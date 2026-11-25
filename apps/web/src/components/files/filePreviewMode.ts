@@ -17,12 +17,12 @@ export function filePreviewReadErrorMessage(error: ProjectReadFileError): string
     case "binary_file":
       return "此文件是二进制文件，无法以文本显示。";
     case "workspace_path_outside_root":
-      return "请求的路径不在工作区内。";
+      return "请求的路径不在项目目录内。";
     case "resolved_path_outside_root":
-      return "此路径指向工作区之外的位置。";
+      return "此路径指向项目目录之外的位置。";
     case "operation_failed":
       return error.operation === "realpath-workspace-root"
-        ? "无法访问工作区文件夹。"
+        ? "无法访问项目目录。"
         : "无法访问或读取该文件，它可能已不存在或无权访问。";
     default:
       return error.message;

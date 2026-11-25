@@ -264,7 +264,7 @@ describe("scoped settings writes", () => {
     const unsupported = [
       {
         label: server.label,
-        message: "此环境不支持该设置，请更新该环境上的 Fleet ADE。",
+        message: "这台电脑不支持该设置，请更新这台电脑上的 Fleet ADE。",
       },
     ];
 
@@ -449,7 +449,7 @@ describe("scoped settings writes", () => {
       planScopedSettingsPatch(project, environments, { enableProviderUpdateChecks: false }),
     ).toMatchObject({
       serverWrites: [],
-      unavailableReason: "此设置是环境级设置，无法由项目覆盖。",
+      unavailableReason: "此设置是电脑级设置，无法由项目覆盖。",
     });
   });
 
@@ -460,7 +460,7 @@ describe("scoped settings writes", () => {
         clientPatch: {},
         hasClientWrite: false,
         serverWrites: [],
-        unavailableReason: "此设置是环境级设置，无法由项目覆盖。",
+        unavailableReason: "此设置是电脑级设置，无法由项目覆盖。",
       });
       expect(
         planScopedSettingsPatch(scope, environments, { fontScale: "large" }, { deviceOnly: true }),

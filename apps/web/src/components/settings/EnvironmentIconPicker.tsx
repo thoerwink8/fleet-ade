@@ -25,10 +25,10 @@ export function resolveEnvironmentIconPickerLock(input: {
   readonly operateAccess: "granted" | "denied" | "pending";
 }): string | null {
   if (input.serverConfig === null) {
-    return "连接此环境后即可更改图标。";
+    return "连接这台电脑后即可更改图标。";
   }
   if (input.operateAccess !== "granted") {
-    return "你在此环境中的会话无法更改其设置。";
+    return "你在这台电脑上的会话无法更改其设置。";
   }
   return null;
 }

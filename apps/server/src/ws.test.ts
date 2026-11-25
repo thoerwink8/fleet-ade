@@ -2420,11 +2420,14 @@ it.effect("orchestration.getRecentlyDeleted returns items with server time and s
       Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({}),
       Layer.mock(DirectEndpoints.DirectEndpoints)({}),
       Layer.mock(ProviderRegistry.ProviderRegistry)({}),
-      Layer.mock(ThreadManagement.ThreadManagementService)({
-        listRecentlyDeleted: () => Effect.succeed([item]),
-      }),
       Layer.mock(OrchestrationEventStore.OrchestrationEventStore)({
         latestApplicationSequence: Effect.succeed(41),
+      }),
+      Layer.mock(StorageCleanup.StorageCleanup)({
+        listRecentlyDeleted: Effect.succeed({
+          items: [item],
+          totals: { count: 1, attachmentBytes: 24, worktreeBytes: null },
+        }),
       }),
     );
     const client = yield* RpcTest.makeClient(WsRpcGroup).pipe(
@@ -2447,6 +2450,11 @@ it.effect("orchestration.getRecentlyDeleted returns items with server time and s
     assert.equal(result.snapshotSequence, 41);
     assert.lengthOf(result.items, 1);
     assert.deepEqual(result.items[0], item);
+    assert.deepEqual(result.totals, {
+      count: 1,
+      attachmentBytes: 24,
+      worktreeBytes: null,
+    });
     assert.ok(DateTime.isUtc(result.now));
   }),
 );

@@ -8,8 +8,6 @@ import {
 } from "./chat/threadContextDrag";
 import { discardComposerDraft } from "../lib/discardComposerDraft";
 import { batchDeleteConfirmCopy } from "../lib/threadConfirmCopy";
-import { showThreadUndoNotice } from "../hooks/showThreadUndoNotice";
-import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
@@ -35,7 +33,6 @@ import {
 import {
   asLaunchingThread,
   createInboxReturnTracker,
-  isThreadWorking,
 } from "@t3tools/client-runtime/state/thread-inbox";
 import { sortSettledThreads } from "@t3tools/client-runtime/state/thread-sort";
 import {
@@ -56,12 +53,7 @@ import {
   scopeThreadRef,
   scopedThreadKey,
 } from "@t3tools/client-runtime/environment";
-import {
-  AuthOrchestrationOperateScope,
-  ProjectId,
-  type ScopedThreadRef,
-  type ThreadId,
-} from "@t3tools/contracts";
+import { AuthOrchestrationOperateScope, ProjectId, type ScopedThreadRef } from "@t3tools/contracts";
 import type { OlderSettledScope } from "@t3tools/client-runtime/state/threads";
 
 import { CheckIcon, ChevronDownIcon, FolderIcon, PlusIcon, SettingsIcon } from "lucide-react";
@@ -109,11 +101,8 @@ import {
 } from "../sidebarProjectGrouping";
 import { useUiStateStore } from "../uiStateStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
-import {
-  canTurnThreadIntoProject,
-  useAcknowledgeThreadWoke,
-  useThreadActions,
-} from "../hooks/useThreadActions";
+import { useAcknowledgeThreadWoke, useThreadActions } from "../hooks/useThreadActions";
+import { useThreadActionMenu } from "../hooks/useThreadActionMenu";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
 import { useProjectPin } from "../hooks/useProjectGroupUpdate";
@@ -157,17 +146,12 @@ import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { cn } from "~/lib/utils";
 import { ProjectEnvironmentBadge } from "./ProjectEnvironmentBadge";
 import { ProjectRowActions } from "./ProjectComboboxRow";
-import {
-  buildDraftActionMenuItems,
-  buildThreadActionMenuItems,
-  threadActionRequiresOperate,
-} from "./threadActionMenu.logic";
+import { buildDraftActionMenuItems, hasCommanderDispatchConfig } from "./threadActionMenu.logic";
 import {
   applySidebarThreadDrop,
+  buildMultiSelectThreadMenuItems,
+  buildSidebarListItems,
   filterSidebarV2VisibleThreads,
-  buildBulkTitleRegenerationContextMenuItem,
-  buildBulkUnpinContextMenuItem,
-  applyThreadBatch,
   filterSidebarProjectScopeItems,
   firstValidTimestampMs,
   isSidebarNestedLinkClick,
@@ -179,15 +163,17 @@ import {
   resolveSidebarSweepKeys,
   resolveSidebarDropTarget,
   isThreadAttentionDismissible,
+  isSidebarLiveWorking,
   resolveSidebarDropVerb,
-  resolveSidebarThreadSection,
-  resolveThreadAttention,
+  resolveSidebarOfflineBanner,
+  resolveSidebarThreadState,
   resolveThreadLastVisitedAt,
   type ThreadAttention,
   resolveSidebarReorderableThreadKeys,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
   shouldNavigateAfterThreadSnooze,
+  shouldShowSidebarEmptyState,
   sidebarListItemId,
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
@@ -198,10 +184,8 @@ import {
   useSnoozeWakeClock,
   threadShortcutContext,
   useThreadJumpHintsVisible,
-  type SidebarListItem,
   type SidebarSection,
   resolveSidebarRowThreadId,
-  attentionDismissVisitedAt,
 } from "./Sidebar.logic";
 import {
   createSidebarCollisionDetection,
@@ -227,8 +211,7 @@ import {
 } from "./sidebar/routeReveal";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { titleRegenerationToast } from "./threadTitleRegenerationToast";
-import { copyThreadReference } from "../lib/copyThreadReference";
-import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
+import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { isProjectPinShortcut, ProjectPinButton } from "./ProjectPinButton";
 import {
@@ -258,6 +241,7 @@ import {
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
 import { resolveDuplicateEmptyThreadTitleSuffixes } from "./sidebar/SidebarThreadRow.logic";
+import { SidebarArchivedEntry } from "./sidebar/SidebarArchivedEntry";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarDragBoundary,
@@ -642,7 +626,12 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     lastVisitedAtById,
   } = input;
   const preciseNow = new Date().toISOString();
-  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
+  const visible = filterSidebarV2VisibleThreads(
+    threads,
+    scopedProjectKeys,
+    delegatedUnderParent,
+    routeRowThreadKey,
+  );
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
   const commander: EnvironmentThreadShell[] = [];
   const pinned: EnvironmentThreadShell[] = [];
@@ -650,7 +639,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const working: EnvironmentThreadShell[] = [];
   const inbox = (thread: EnvironmentThreadShell, manuallyMoved = false) =>
     workingShelfEnabled &&
-    (manuallyMoved ? isThreadWorking(thread) : inboxObservation.isWorking(thread))
+    (manuallyMoved ? isSidebarLiveWorking(thread) : inboxObservation.isWorking(thread))
       ? working
       : active;
   const snoozed: EnvironmentThreadShell[] = [];
@@ -683,40 +672,36 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
           : { ...projected, snoozedAt: thread.snoozedAt, snoozedUntil: thread.snoozedUntil },
       );
     } else {
-      const snoozedNow = configLoaded && effectiveSnoozed(thread, { now: preciseNow });
-      const settledNow = configLoaded && thread.settledOverride === "settled";
-      if (thread.commander !== true) {
-        const entry = resolveThreadAttention(
-          { ...thread, pendingRuntimeRequest: thread.source.pendingRuntimeRequest },
-          resolveThreadLastVisitedAt(thread.lastVisitedAt, lastVisitedAtById[threadKey]),
-        );
-        const isRoute = routeRowThreadKey === threadKey;
-        if (
-          entry !== null &&
-          (entry.blocking || (!snoozedNow && !settledNow && (entry.unseen || isRoute)))
-        ) {
-          attention.push(thread);
-          attentionByKey.set(threadKey, { ...entry, demoted: isRoute });
-          draggableThreadKeys.delete(threadKey);
-          activeReorderableThreadKeys.delete(threadKey);
-          continue;
-        }
-      }
-      const section = resolveSidebarThreadSection({
-        commander: thread.commander === true,
-        snoozed: snoozedNow,
-        settled: settledNow,
-        pinned: thread.pinnedAt != null,
+      const state = resolveSidebarThreadState({
+        thread,
+        lastVisitedAt: resolveThreadLastVisitedAt(
+          thread.lastVisitedAt,
+          lastVisitedAtById[threadKey],
+        ),
+        isRoute: routeRowThreadKey === threadKey,
+        configLoaded,
+        workingShelfEnabled,
+        isWorkingGrace: workingShelfEnabled && inboxObservation.isWorking(thread),
+        now: preciseNow,
       });
-      (section === "commander"
+      if (state.section === "attention" && state.attention !== null) {
+        attention.push(thread);
+        attentionByKey.set(threadKey, state.attention);
+        draggableThreadKeys.delete(threadKey);
+        activeReorderableThreadKeys.delete(threadKey);
+        continue;
+      }
+      (state.section === "commander"
         ? commander
-        : section === "snoozed"
+        : state.section === "snoozed"
           ? snoozed
-          : section === "settled"
+          : state.section === "settled"
             ? settled
-            : section === "pinned"
+            : state.section === "pinned"
               ? pinned
-              : inbox(thread)
+              : state.section === "working"
+                ? working
+                : active
       ).push(thread);
     }
   }
@@ -986,26 +971,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     unsnoozeThread,
     pinThread,
     unpinThread,
-    markCommanderThread,
-    unmarkCommanderThread,
-    setThreadAutoSettle,
-    turnThreadIntoProject,
     reorderPinnedThread,
     reorderActiveThread,
-    markThreadUnread,
-    archiveThread,
     archiveThreads,
     markThreadsUnread,
     deleteThreads,
-    deleteThread,
   } = useThreadActions();
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
   const regenerateThreadTitle = useOrchestrationCommand(threadEnvironment.regenerateTitle, {
-    reportFailure: false,
-  });
-  const batchThreads = useOrchestrationCommand(threadEnvironment.batch, {
     reportFailure: false,
   });
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
@@ -1040,24 +1015,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         stackedThreadToast({
           type: "error",
           title: "无法复制分支名",
-          description: error instanceof Error ? error.message : "发生错误。",
-        }),
-      );
-    },
-  });
-  const { copyToClipboard: copyThreadIdToClipboard } = useCopyToClipboard<{ threadId: ThreadId }>({
-    onCopy: ({ threadId }) => {
-      toastManager.add({
-        type: "success",
-        title: "会话 ID 已复制",
-        description: threadId,
-      });
-    },
-    onError: (error) => {
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: "无法复制会话 ID",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -1494,6 +1451,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const orderedThreadKeysRef = useRef(orderedThreadKeys);
   // Read changing maps/sets through refs so streamed events preserve row callbacks.
+  const threadsRef = useRef(threads);
   const threadByKeyRef = useRef(threadByKey);
   const settledThreadKeysRef = useRef(settledThreadKeys);
   const snoozedThreadKeysRef = useRef(snoozedThreadKeys);
@@ -1845,6 +1803,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   useLayoutEffect(() => {
     projectGroupsRef.current = projectGroups;
     orderedThreadKeysRef.current = orderedThreadKeys;
+    threadsRef.current = threads;
     threadByKeyRef.current = threadByKey;
     settledThreadKeysRef.current = settledThreadKeys;
     snoozedThreadKeysRef.current = snoozedThreadKeys;
@@ -1917,21 +1876,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   ) {
     setOptimisticDrop(null);
   }
-  const attemptPin = (threadRef: ScopedThreadRef) => {
-    void (async () => {
-      const result = await pinThread(threadRef);
-      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "无法置顶会话",
-            description: error instanceof Error ? error.message : "发生错误。",
-          }),
-        );
-      }
-    })();
-  };
   const attemptUnpin = (threadRef: ScopedThreadRef) => {
     void (async () => {
       const result = await unpinThread(threadRef);
@@ -1941,36 +1885,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           stackedThreadToast({
             type: "error",
             title: "无法取消置顶会话",
-            description: error instanceof Error ? error.message : "发生错误。",
-          }),
-        );
-      }
-    })();
-  };
-  const attemptMarkCommander = (threadRef: ScopedThreadRef) => {
-    void (async () => {
-      const result = await markCommanderThread(threadRef);
-      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "无法标成指挥",
-            description: error instanceof Error ? error.message : "发生错误。",
-          }),
-        );
-      }
-    })();
-  };
-  const attemptUnmarkCommander = (threadRef: ScopedThreadRef) => {
-    void (async () => {
-      const result = await unmarkCommanderThread(threadRef);
-      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "无法取消指挥",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -2006,54 +1920,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         event.activatorEvent instanceof PointerEvent ? event.activatorEvent.clientY : null,
     });
   };
-  const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
-    const rowsOf = (
-      list: readonly EnvironmentThreadShell[],
-      section: SidebarSection,
-    ): SidebarListItem[] =>
-      list.map((thread) => {
-        const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
-        return { kind: "thread", key, section };
-      });
-    if (
-      commanderThreads.length +
-        attentionThreads.length +
-        pinnedThreads.length +
-        activeThreads.length +
-        workingThreads.length +
-        snoozedThreads.length +
-        settledCount ===
-      0
-    ) {
-      return [];
-    }
-    const items: SidebarListItem[] = rowsOf(commanderThreads, "commander");
-    if (attentionThreads.length > 0) {
-      items.push({ kind: "marker", marker: "attention-header" });
-      items.push(...rowsOf(visibleAttentionThreads, "attention"));
-      if (hiddenAttentionCount > 0) items.push({ kind: "marker", marker: "attention-more" });
-    }
-    items.push({ kind: "marker", marker: "pinned-header" });
-    const pinnedRows = rowsOf(pinnedThreads, "pinned");
-    items.push(...pinnedRows);
-    items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(activeThreads, "active");
-    items.push({ kind: "marker", marker: "active-placeholder" });
-    items.push(...activeRows);
-    if (workingThreads.length > 0) {
-      items.push({ kind: "marker", marker: "working-header" });
-      items.push(...rowsOf(visibleWorkingThreads, "working"));
-    }
-    if (snoozedThreads.length > 0) {
-      items.push({ kind: "marker", marker: "snoozed-header" });
-      items.push(...rowsOf(visibleSnoozedThreads, "snoozed"));
-    }
-    items.push({ kind: "marker", marker: "settled-header" });
-    const settledRows = rowsOf(renderedSettledThreads, "settled");
-    items.push({ kind: "marker", marker: "settled-placeholder" });
-    items.push(...settledRows);
-    return items;
-  })();
+  const sidebarListItemsFresh = buildSidebarListItems({
+    commanderKeys: commanderThreads.map(threadShellKey),
+    visibleAttentionKeys: visibleAttentionThreads.map(threadShellKey),
+    attentionCount: attentionThreads.length,
+    hiddenAttentionCount,
+    pinnedKeys: pinnedThreads.map(threadShellKey),
+    activeKeys: activeThreads.map(threadShellKey),
+    visibleWorkingKeys: visibleWorkingThreads.map(threadShellKey),
+    workingCount: workingThreads.length,
+    visibleSnoozedKeys: visibleSnoozedThreads.map(threadShellKey),
+    snoozedCount: snoozedThreads.length,
+    renderedSettledKeys: renderedSettledThreads.map(threadShellKey),
+    settledCount,
+    isDragging: dragState !== null && !isContextDrag,
+  });
   // Preserve the list while streamed updates leave order unchanged to retain row memoization.
   const sidebarListItemsKey = sidebarListItemsFresh
     .map((item) => (item.kind === "thread" ? item.section + ":" + item.key : item.marker))
@@ -2356,9 +2237,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         return thread ? [thread] : [];
       });
       const settlingThreads = selectedThreads.filter(
-        (thread) => thread.settledOverride !== "settled",
+        (thread) => serverConfigs.has(thread.environmentId) && thread.settledOverride !== "settled",
       );
-      const canSnoozeSelection = selectedThreads.every(
+      const snoozeableThreads = selectedThreads.filter(
         (thread) =>
           serverConfigs.has(thread.environmentId) &&
           canSnooze(thread, { now: selectionNow.toISOString() }),
@@ -2369,86 +2250,40 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       const regeneratableTitleThreads = titleRegenerationThreads.filter(
         (thread) => thread.titleRegeneration == null,
       );
-      const titleRegenerationMenuItem = buildBulkTitleRegenerationContextMenuItem({
-        supportedCount: titleRegenerationThreads.length,
-        actionableCount: regeneratableTitleThreads.length,
-      });
       const pinnedSelectedThreads = selectedThreads.filter(
         (thread) => serverConfigs.has(thread.environmentId) && thread.pinnedAt != null,
       );
-      const unpinMenuItem = buildBulkUnpinContextMenuItem({
-        pinnedCount: pinnedSelectedThreads.length,
-      });
+      const archiveableThreads = selectedThreads.filter((thread) =>
+        threadRuntimeCanArchive(thread.runtime),
+      );
       // Presets sync across environments, so the first selected thread's stand for all.
       const menuOpenedAt = new Date();
+      const snoozePresetThread = snoozeableThreads[0] ?? selectedThreads[0]!;
       const snoozePresets = resolveSnoozePresets(
         menuOpenedAt,
         timestampFormat,
-        selectedThreads[0]!.environmentId,
+        snoozePresetThread.environmentId,
       );
       const clicked = await settlePromise(() =>
         api.contextMenu.show(
-          [
-            ...(unpinMenuItem
-              ? [{ ...unpinMenuItem, disabled: !canOperateThreads(pinnedSelectedThreads) }]
-              : []),
-            {
-              id: "settle",
-              label: `标为完成（${count}）`,
-              disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads),
-            },
-            ...(canSnoozeSelection
-              ? [
-                  {
-                    id: "snooze",
-                    label: `暂缓（${count}）`,
-                    disabled: !canOperateThreads(selectedThreads),
-                    children: [
-                      ...snoozePresets.map((preset) => ({
-                        id: `snooze:${preset.id}`,
-                        label: preset.label,
-                        detail: preset.whenLabel,
-                        disabled: !canOperateThreads(selectedThreads),
-                      })),
-                      {
-                        id: "snooze:custom",
-                        label: "自定义…",
-                        separatorBefore: snoozePresets.length > 0,
-                        disabled: !canOperateThreads(selectedThreads),
-                      },
-                    ],
-                  },
-                ]
-              : []),
-            ...(titleRegenerationMenuItem
-              ? [
-                  {
-                    ...titleRegenerationMenuItem,
-                    disabled:
-                      titleRegenerationMenuItem.disabled ||
-                      !canOperateThreads(regeneratableTitleThreads),
-                  },
-                ]
-              : []),
-            {
-              id: "archive",
-              label: `归档（${count}）`,
-              disabled: !canOperateThreads(selectedThreads),
-            },
-            {
-              id: "unarchive",
-              label: `取消归档（${count}）`,
-              disabled: !canOperateThreads(selectedThreads),
-            },
-            { id: "select-all", label: "全选当前列表" },
-            { id: "mark-unread", label: `标为未读（${count}）` },
-            {
-              id: "delete",
-              label: `删除（${count}）`,
-              destructive: true,
-              disabled: !canOperateThreads(selectedThreads),
-            },
-          ],
+          buildMultiSelectThreadMenuItems({
+            selectedCount: count,
+            totalSelectableCount: orderedThreadKeysRef.current.length,
+            pinnedCount: pinnedSelectedThreads.length,
+            canOperatePinned: canOperateThreads(pinnedSelectedThreads),
+            unsettledCount: settlingThreads.length,
+            canOperateUnsettled: canOperateThreads(settlingThreads),
+            snoozeableCount: snoozeableThreads.length,
+            canOperateSnoozeable: canOperateThreads(snoozeableThreads),
+            snoozePresets,
+            titleRegenerationSupportedCount: titleRegenerationThreads.length,
+            titleRegenerationInFlightCount:
+              titleRegenerationThreads.length - regeneratableTitleThreads.length,
+            canOperateRegeneratable: canOperateThreads(regeneratableTitleThreads),
+            archiveableCount: archiveableThreads.length,
+            canOperateArchiveable: canOperateThreads(archiveableThreads),
+            canOperateAll: canOperateThreads(selectedThreads),
+          }),
           position,
         ),
       );
@@ -2458,17 +2293,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ? pinnedSelectedThreads
           : clicked.value === "regenerate-title"
             ? regeneratableTitleThreads
-            : clicked.value === "settle"
-              ? settlingThreads.flatMap((thread) => {
-                  const current = threadByKeyRef.current.get(
-                    scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-                  );
-                  return current && current.settledOverride !== "settled" ? [current] : [];
-                })
-              : selectedThreads;
+            : clicked.value === "archive"
+              ? archiveableThreads
+              : clicked.value.startsWith("snooze:")
+                ? snoozeableThreads
+                : clicked.value === "settle"
+                  ? settlingThreads.flatMap((thread) => {
+                      const current = threadByKeyRef.current.get(
+                        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+                      );
+                      return current && current.settledOverride !== "settled" ? [current] : [];
+                    })
+                  : selectedThreads;
       if (clicked.value === "settle" && actionTargets.length === 0) return;
+      if (clicked.value === "archive" && actionTargets.length === 0) return;
       if (clicked.value !== "mark-unread" && !checkThreadOperations(actionTargets)) return;
       if (clicked.value?.startsWith("snooze:")) {
+        if (snoozeableThreads.length === 0) return;
         const preset =
           clicked.value === "snooze:custom"
             ? await requestCustomSnooze()
@@ -2476,13 +2317,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 snoozePresets,
                 clicked.value.slice("snooze:".length),
                 timestampFormat,
-                selectedThreads[0]!.environmentId,
+                snoozePresetThread.environmentId,
               );
         if (preset) {
-          const coSnoozingKeys = new Set(threadKeys);
+          const coSnoozingKeys = new Set(
+            snoozeableThreads.map((thread) =>
+              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+            ),
+          );
           clearSelection();
           const outcomes = await Promise.all(
-            selectedThreads.map(async (thread) => {
+            snoozeableThreads.map(async (thread) => {
               const threadRef = scopeThreadRef(thread.environmentId, thread.id);
               const outcome = await performSnooze(threadRef, preset, { coSnoozingKeys });
               return { outcome, threadRef };
@@ -2573,28 +2418,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         clearSelection();
         return;
       }
-      const finishBatch = async (operation: "unarchive") => {
-        const { prunedKeys, failures } = await applyThreadBatch({
-          threads: batchTargets,
-          dispatch: (group) =>
-            batchThreads({
-              environmentId: group.environmentId,
-              input: { operation, threadIds: group.threadIds },
-            }),
-        });
-        if (failures.length > 0) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "无法处理部分会话",
-              description: failures.join("\n"),
-            }),
-          );
-        }
-        removeFromSelection([...prunedKeys]);
-      };
       if (clicked.value === "archive") {
-        const { archivedKeys, prunedKeys, failures } = await archiveThreads(batchTargets);
+        const archiveTargets = actionTargets.map((thread) => ({
+          environmentId: thread.environmentId,
+          id: thread.id,
+          title: thread.title,
+          key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+        }));
+        const { archivedKeys, prunedKeys, failures } = await archiveThreads(archiveTargets);
         if (failures.length > 0) {
           toastManager.add(
             stackedThreadToast({
@@ -2605,10 +2436,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           );
         }
         removeFromSelection([...prunedKeys]);
-        return;
-      }
-      if (clicked.value === "unarchive") {
-        await finishBatch("unarchive");
         return;
       }
       if (clicked.value !== "delete") return;
@@ -2692,311 +2519,94 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   );
 
+  const { openMenu: openThreadActionMenu } = useThreadActionMenu({
+    threadRef: null,
+    projectCwd: null,
+    surface: "sidebar",
+    onStartRename: () => {},
+    onSettle: attemptSettle,
+    onSnooze: attemptSnooze,
+  });
+
   const handleThreadContextMenu = useStableCallback(
     (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
-      void (async () => {
-        const api = readLocalApi();
-        if (!api) return;
-        const threadKey = scopedThreadKey(threadRef);
-        const selectionState = useThreadSelectionStore.getState();
-        if (selectionState.hasSelection() && selectionState.selectedThreadKeys.has(threadKey)) {
-          await handleMultiSelectContextMenu(position);
-          return;
-        }
-        const thread = threadByKeyRef.current.get(threadKey);
-        if (!thread) return;
-        const threadWorkspacePath =
-          thread.worktreePath ??
-          projectByKey.get(`${thread.environmentId}:${thread.projectId}`)?.workspaceRoot ??
-          null;
-        const configLoaded = serverConfigs.has(thread.environmentId);
-        const supportsAutoSettleOptOut =
-          serverConfigs.get(thread.environmentId)?.environment.capabilities
-            .threadAutoSettleOptOut === true;
-        const isRegeneratingTitle = thread.titleRegeneration != null;
-        const isSettled = settledThreadKeysRef.current.has(threadKey);
-        const isSnoozed = snoozedThreadKeysRef.current.has(threadKey);
-        const isPinned = thread.pinnedAt != null;
-        const snoozePresets = resolveSnoozePresets(
-          new Date(),
-          timestampFormat,
-          thread.environmentId,
-        );
-        const threadProjectGroup =
-          projectGroupsRef.current.find((project) =>
-            project.memberProjectRefs.some(
-              (projectRef) =>
-                projectRef.environmentId === thread.environmentId &&
-                projectRef.projectId === thread.projectId,
-            ),
-          ) ?? null;
-        const clicked = await settlePromise(() =>
-          api.contextMenu.show(
-            buildThreadActionMenuItems({
-              canOperate: readEnvironmentScope(
-                threadRef.environmentId,
-                AuthOrchestrationOperateScope,
-              ),
-              branch: thread.branch ?? null,
-              // An archived project is not a filter choice.
-              projectFilter:
-                threadProjectGroup && !threadProjectGroup.archived
-                  ? {
-                      label: threadProjectGroup.displayName,
-                      isActive: projectScopeKeys.includes(threadProjectGroup.projectKey),
-                    }
-                  : null,
-              isPinned,
-              isCommander: thread.commander === true,
-              isSettled,
-              autoSettleEnabled: thread.autoSettleDisabledAt == null,
-              isSnoozed,
-              canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
-              isRegeneratingTitle,
-              attentionDismissible: isThreadAttentionDismissible({
-                attention: attentionByKey.get(threadKey),
-                attentionOffline: !connectedEnvironmentIds.includes(thread.environmentId),
-              }),
-              isRunning: !threadRuntimeCanArchive(thread.runtime),
-              canTurnIntoProject: canTurnThreadIntoProject(threadRef),
-              supports: {
-                settlement: configLoaded,
-                autoSettleOptOut: supportsAutoSettleOptOut,
-                snooze: configLoaded,
-                pinning: configLoaded,
-                commander: configLoaded,
-                titleRegeneration: configLoaded,
-              },
-              snoozePresets,
-            }),
-            position,
+      const threadKey = scopedThreadKey(threadRef);
+      const selectionState = useThreadSelectionStore.getState();
+      if (selectionState.hasSelection() && selectionState.selectedThreadKeys.has(threadKey)) {
+        void handleMultiSelectContextMenu(position);
+        return;
+      }
+      const thread = threadByKeyRef.current.get(threadKey);
+      if (!thread) return;
+      const threadWorkspacePath =
+        thread.worktreePath ??
+        projectByKey.get(`${thread.environmentId}:${thread.projectId}`)?.workspaceRoot ??
+        null;
+      const serverConfig = serverConfigs.get(thread.environmentId);
+      const configLoaded = serverConfig !== undefined;
+      const supportsAutoSettleOptOut =
+        serverConfig?.environment.capabilities.threadAutoSettleOptOut === true;
+      const threadProjectGroup =
+        projectGroupsRef.current.find((project) =>
+          project.memberProjectRefs.some(
+            (projectRef) =>
+              projectRef.environmentId === thread.environmentId &&
+              projectRef.projectId === thread.projectId,
           ),
-        );
-        if (clicked._tag === "Failure" || clicked.value === null) return;
-        if (threadActionRequiresOperate(clicked.value) && !checkThreadOperations([thread])) return;
-        if (clicked.value?.startsWith("snooze:")) {
-          const preset =
-            clicked.value === "snooze:custom"
-              ? await requestCustomSnooze()
-              : pickSnoozePreset(
-                  snoozePresets,
-                  clicked.value.slice("snooze:".length),
-                  timestampFormat,
-                  thread.environmentId,
-                );
-          if (preset) attemptSnooze(threadRef, preset);
-          return;
-        }
-        switch (clicked.value) {
-          case "filter-by-project":
-            if (threadProjectGroup) {
-              setProjectScopeKeys(
-                projectScopeKeys.includes(threadProjectGroup.projectKey)
-                  ? []
-                  : [threadProjectGroup.projectKey],
-              );
-            }
-            return;
-          case "project-settings":
-            if (threadProjectGroup)
-              openProjectSettings(threadProjectGroup, {
-                environmentId: threadRef.environmentId,
-                projectId: thread.projectId,
-              });
-            return;
-          case "new-thread-on-branch": {
-            const result = await settlePromise(() =>
-              handleNewThread(scopeProjectRef(thread.environmentId, thread.projectId), {
-                branch: thread.branch,
-                worktreePath: thread.worktreePath,
-                envMode: thread.worktreePath ? "worktree" : "local",
-                startFromOrigin: false,
-              }),
+        ) ?? null;
+      openThreadActionMenu(position, {
+        threadRef,
+        thread,
+        projectCwd: threadWorkspacePath,
+        // An archived project is not a filter choice.
+        projectFilter:
+          threadProjectGroup && !threadProjectGroup.archived
+            ? {
+                label: threadProjectGroup.displayName,
+                isActive: projectScopeKeys.includes(threadProjectGroup.projectKey),
+              }
+            : null,
+        isSettled: settledThreadKeysRef.current.has(threadKey),
+        isSnoozed: snoozedThreadKeysRef.current.has(threadKey),
+        attentionDismissible: isThreadAttentionDismissible({
+          attention: attentionByKey.get(threadKey),
+          attentionOffline: !connectedEnvironmentIds.includes(thread.environmentId),
+        }),
+        supports: {
+          settlement: configLoaded,
+          autoSettleOptOut: supportsAutoSettleOptOut,
+          snooze: configLoaded,
+          pinning: configLoaded,
+          commander: configLoaded,
+          titleRegeneration: configLoaded,
+        },
+        hasAnyCommanderThread:
+          thread.commander === true ||
+          threadsRef.current.some(
+            (candidate) => candidate.archivedAt === null && candidate.commander === true,
+          ),
+        hasCommanderConfig: hasCommanderDispatchConfig(serverConfig?.settings),
+        supportsVisitedTracking:
+          serverConfig?.environment.capabilities.threadVisitedTracking === true,
+        onStartRename: () => startThreadRename(threadRef, thread.title),
+        onFilterByProject: () => {
+          if (threadProjectGroup) {
+            setProjectScopeKeys(
+              projectScopeKeys.includes(threadProjectGroup.projectKey)
+                ? []
+                : [threadProjectGroup.projectKey],
             );
-            if (result._tag === "Failure") {
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "无法创建会话",
-                  description: error instanceof Error ? error.message : "发生错误。",
-                }),
-              );
-            }
-            return;
           }
-          case "settle":
-            attemptSettle(threadRef);
-            return;
-          case "unsettle":
-            attemptUnsettle(threadRef);
-            return;
-          case "unsnooze":
-            attemptUnsnooze(threadRef);
-            return;
-          case "pin":
-            attemptPin(threadRef);
-            return;
-          case "unpin":
-            attemptUnpin(threadRef);
-            return;
-          case "mark-commander":
-            attemptMarkCommander(threadRef);
-            return;
-          case "unmark-commander":
-            attemptUnmarkCommander(threadRef);
-            return;
-          case "turn-into-project": {
-            const result = await turnThreadIntoProject(threadRef);
-            if (result._tag === "Success") {
-              toastManager.add({
-                type: "success",
-                title: "项目已创建",
-                description: thread.title,
-              });
-            } else if (!isAtomCommandInterrupted(result)) {
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "无法将会话转换为项目",
-                  description: error instanceof Error ? error.message : "发生错误。",
-                }),
-              );
-            }
-            return;
-          }
-          case "auto-settle:enabled":
-          case "auto-settle:disabled": {
-            const result = await setThreadAutoSettle(
-              threadRef,
-              clicked.value === "auto-settle:enabled",
-            );
-            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "无法更新自动标为完成设置",
-                  description: error instanceof Error ? error.message : "发生错误。",
-                }),
-              );
-            }
-            return;
-          }
-          case "rename":
-            startThreadRename(threadRef, thread.title);
-            return;
-          case "regenerate-title": {
-            if (isRegeneratingTitle) return;
-            const toast = titleRegenerationToast([
-              await regenerateThreadTitle({
-                environmentId: threadRef.environmentId,
-                input: { threadId: threadRef.threadId },
-              }),
-            ]);
-            if (toast) toastManager.add(toast);
-            return;
-          }
-          case "dismiss-attention": {
-            acknowledgeWoke(
-              threadRef,
-              attentionDismissVisitedAt(
-                thread,
-                threadWokeAt(thread, { now: new Date().toISOString() }),
-              ),
-            );
-            const canUndo =
-              serverConfigs.get(threadRef.environmentId)?.environment.capabilities
-                .threadVisitedTracking === true;
-            if (canUndo) {
-              const claim = ThreadUndo.begin("dismiss-attention", scopedThreadKey(threadRef));
-              showThreadUndoNotice({
-                action: "DismissedAttention",
-                title: thread.title,
-                claim,
-                undo: () => markThreadUnread(threadRef),
-                failureTitle: "无法撤销移出等你处理",
-              });
-              return;
-            }
-            toastManager.add(
-              stackedThreadToast({
-                type: "success",
-                title: "已移出等你处理",
-                description: "已把这条会话标记为看过，所有设备同步。",
-              }),
-            );
-            return;
-          }
-          case "mark-unread":
-            void markThreadUnread(threadRef);
-            return;
-          case "copy-path":
-            if (!threadWorkspacePath) {
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "路径不可用",
-                  description: "此会话没有可复制的目录路径。",
-                }),
-              );
-              return;
-            }
-            copyPathToClipboard(threadWorkspacePath, { path: threadWorkspacePath });
-            return;
-          case "copy-branch":
-            if (thread.branch) {
-              copyBranchToClipboard(thread.branch, { branch: thread.branch });
-            }
-            return;
-          case "copy-thread":
-            void copyThreadReference(threadChipCopyTarget(threadRef, thread.title));
-            return;
-          case "copy-thread-id":
-            copyThreadIdToClipboard(thread.id, { threadId: thread.id });
-            return;
-          case "archive": {
-            let didArchive = false;
-            const result = await archiveThread(threadRef, {
-              onArchived: () => {
-                didArchive = true;
-              },
+        },
+        onOpenProjectSettings: () => {
+          if (threadProjectGroup) {
+            openProjectSettings(threadProjectGroup, {
+              environmentId: threadRef.environmentId,
+              projectId: thread.projectId,
             });
-            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: didArchive ? "会话已归档，但无法跳转页面" : "无法归档会话",
-                  description: error instanceof Error ? error.message : "发生错误。",
-                }),
-              );
-              return;
-            }
-            return;
           }
-          case "delete": {
-            const result = await deleteThread(threadRef, {
-              confirmDeletion: { threadTitle: thread.title, always: confirmThreadDelete },
-            });
-            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "无法删除会话",
-                  description: error instanceof Error ? error.message : "发生错误。",
-                }),
-              );
-              return;
-            }
-            return;
-          }
-          default:
-            return;
-        }
-      })();
+        },
+      });
     },
   );
 
@@ -3303,6 +2913,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               activeSearchResultIndex={activeSearchResultIndex}
               onClearSearch={clearThreadSearch}
             />
+            {/* Fixed header, not the scrolling list: offline is global and must stay in view. */}
+            {(() => {
+              const offlineBanner = isSearchingThreads
+                ? null
+                : resolveSidebarOfflineBanner({
+                    visibleThreads: searchableThreads,
+                    connectedEnvironmentIds,
+                    environmentLabelById,
+                  });
+              return offlineBanner !== null ? (
+                <div className="mt-1.5" data-testid="sidebar-offline-banner">
+                  <Alert variant="warning">
+                    <AlertDescription>{offlineBanner.message}</AlertDescription>
+                  </Alert>
+                </div>
+              ) : null;
+            })()}
           </SidebarGroup>
         }
       >
@@ -3387,15 +3014,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             )
           ) : null}
           {/* A scope can hide every active thread; say so even when its project still has settled ones. */}
-          {!isSearchingThreads &&
-          visibleDraftSessionCount === 0 &&
-          commanderThreads.length +
-            pinnedThreads.length +
-            activeThreads.length +
-            workingThreads.length +
-            snoozedThreads.length ===
-            0 &&
-          (settledCount === 0 || (scopedProjectGroups.length > 0 && !settledShelfExpanded)) ? (
+          {shouldShowSidebarEmptyState({
+            isSearchingThreads,
+            visibleDraftSessionCount,
+            commanderCount: commanderThreads.length,
+            attentionCount: attentionThreads.length,
+            pinnedCount: pinnedThreads.length,
+            activeCount: activeThreads.length,
+            workingCount: workingThreads.length,
+            snoozedCount: snoozedThreads.length,
+            settledCount,
+            hasProjectScope: scopedProjectGroups.length > 0,
+            settledShelfExpanded,
+          }) ? (
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
@@ -3427,7 +3058,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   </button>
                 </>
               ) : (
-                "暂无会话"
+                <>
+                  <span>暂无会话</span>
+                  <button
+                    type="button"
+                    onClick={handleNewThreadClick}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                  >
+                    <PlusIcon className="-mx-0.5 size-3" />
+                    开始新会话
+                  </button>
+                </>
               )}
             </div>
           ) : null}
@@ -3491,6 +3132,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            section={section}
                             titleSuffix={duplicateEmptyTitleSuffixByKey.get(threadKey) ?? null}
                             variant={rowVariant}
                             attention={
@@ -3708,6 +3350,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="settled-shelf-header"
                                 marker="settled-header"
+                                className={cn(
+                                  workingThreads.length === 0 &&
+                                    snoozedThreads.length === 0 &&
+                                    "mt-auto",
+                                )}
                                 label="已完成"
                                 count={settledCount}
                                 dragging={from !== null}
@@ -3769,6 +3416,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 </SortableContext>
               </DndContext>
             </TooltipProvider>
+          ) : null}
+          {!isSearchingThreads ? (
+            <SidebarArchivedEntry
+              connectedEnvironmentIds={connectedEnvironmentIds}
+              scopedProjectKeys={scopedProjectKeys}
+            />
           ) : null}
         </SidebarGroup>
       </SidebarContent>

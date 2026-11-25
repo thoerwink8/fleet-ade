@@ -234,7 +234,7 @@ export function parseRemotePairingFields(input: {
   const host = input.host.trim();
   const pairingCode = input.pairingCode.trim();
   if (!host) {
-    throw new Error("请输入后端主机。");
+    throw new Error("请输入主机地址。");
   }
   if (!pairingCode) {
     throw new Error("请输入配对码。");

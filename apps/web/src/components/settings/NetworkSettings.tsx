@@ -116,7 +116,7 @@ export function NetworkSettingsPanel() {
           serverScoped
           settingKeys={["network"]}
           title="线路"
-          description="ADE 自己的出站请求，以及它新拉起的智能体，都走这条线路。新开的会话马上生效。已经开着的会话要新开一个才换线路。"
+          description="Fleet ADE 自己的出站请求，以及它新拉起的智能体，都走这条线路。新开的会话马上生效。已经开着的会话要新开一个才换线路。"
           control={
             <Select
               value={network.line}

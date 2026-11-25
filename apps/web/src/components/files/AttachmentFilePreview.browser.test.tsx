@@ -1109,7 +1109,7 @@ describe("attachment HTML preview recovery", () => {
     refresh.mockResolvedValue(null);
     await toggleMode(screen, "显示 HTML 源码");
     expect(attachmentFetches()).toEqual([]);
-    expect(alert(screen)?.textContent).toContain("请重新连接环境后重试。");
+    expect(alert(screen)?.textContent).toContain("请重新连接电脑后重试。");
 
     await toggleMode(screen, "显示渲染后的页面");
     await toggleMode(screen, "显示 HTML 源码");

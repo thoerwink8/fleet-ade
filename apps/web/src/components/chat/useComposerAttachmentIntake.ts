@@ -53,6 +53,7 @@ import {
   addPreparingComposerImages,
   getPreparingComposerImages,
   isPreparingComposerImage,
+  recordPreparingComposerImageFailure,
   removePreparingComposerImages,
 } from "./preparingComposerImages";
 
@@ -85,7 +86,9 @@ export function useComposerAttachmentIntake(input: {
   readonly insertAttachmentReferences: (
     references: ReadonlyArray<ComposerContextReference>,
     selection?: { start: number; end: number },
+    options?: { readonly systemAttachmentCompletion?: boolean | undefined },
   ) => boolean;
+  readonly onUserAttachmentsMutated?: (() => void) | undefined;
 }) {
   const {
     activeThreadId,
@@ -110,6 +113,7 @@ export function useComposerAttachmentIntake(input: {
     addComposerFilesToDraft,
     removeComposerImageFromDraft,
     insertAttachmentReferences,
+    onUserAttachmentsMutated,
   } = input;
   const pastedTextFileNamesRef = useRef<{ targetKey: string; names: Set<string> }>({
     targetKey: "",
@@ -122,6 +126,7 @@ export function useComposerAttachmentIntake(input: {
       readonly source?: ChatFileAttachment["source"];
       readonly selection?: { start: number; end: number };
       readonly skipImageInlineChip?: boolean;
+      readonly fromPendingWork?: boolean;
     },
   ): Promise<boolean> => {
     if (!activeThreadId || files.length === 0 || isRevertingCheckpointRef.current) return false;
@@ -221,6 +226,12 @@ export function useComposerAttachmentIntake(input: {
       }
     }
     setThreadError(threadId, error);
+    if (
+      (acceptedFiles.length > 0 || acceptedImages.length > 0) &&
+      options?.fromPendingWork !== true
+    ) {
+      onUserAttachmentsMutated?.();
+    }
     let insertedAny = false;
     if (acceptedFiles.length > 0) {
       const storedIds = new Set(addComposerFilesToDraft(acceptedFiles));
@@ -229,6 +240,7 @@ export function useComposerAttachmentIntake(input: {
         insertedAny = insertAttachmentReferences(
           storedFiles.map(fileContextReference),
           options?.selection,
+          options?.fromPendingWork === true ? { systemAttachmentCompletion: true } : undefined,
         );
       }
       if (options?.source?._tag === "pasted-text" && storedFiles.length > 0) {
@@ -266,7 +278,14 @@ export function useComposerAttachmentIntake(input: {
       changeQuestionAttachmentPreparation(questionAttachmentTarget, acceptedImages.length);
     const compressed: { id: string; file: File }[] = [];
     // Keyed by image so a failure whose tile was removed (even mid-compression) is not reported.
-    const compressionErrors = new Map<string, string>();
+    const compressionErrors = new Map<
+      string,
+      {
+        readonly fileName: string;
+        readonly reason: "unreadable" | "too-large";
+        readonly message: string;
+      }
+    >();
     for (const { id, file } of preparingImages) {
       // Removed from the strip while an earlier image was compressing.
       if (!isPreparingComposerImage(attachmentTargetKey, id)) continue;
@@ -277,12 +296,16 @@ export function useComposerAttachmentIntake(input: {
         PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
       ).catch(() => ({ ok: false, reason: "unreadable" }) as const);
       if (!result.ok) {
-        compressionErrors.set(
-          id,
-          result.reason === "unreadable"
-            ? `'${file.name}' could not be read as an image.`
-            : `'${file.name}' is too large to attach, even after compression.`,
-        );
+        const fileName = file.name || "image";
+        const reason = result.reason === "too-large" ? "too-large" : "unreadable";
+        compressionErrors.set(id, {
+          fileName,
+          reason,
+          message:
+            reason === "unreadable"
+              ? `无法将“${fileName}”作为图片读取。`
+              : `“${fileName}”即使压缩后也过大，无法添加。`,
+        });
         continue;
       }
       await inheritComposerImageThumbnail(file, result.file);
@@ -301,6 +324,13 @@ export function useComposerAttachmentIntake(input: {
     if (questionAttachmentTarget)
       changeQuestionAttachmentPreparation(questionAttachmentTarget, -stillPreparingIds.size);
     if (questionDiscarded) return false;
+    for (const [id, failure] of compressionErrors) {
+      if (!stillPreparingIds.has(id)) continue;
+      recordPreparingComposerImageFailure(attachmentTargetKey, {
+        fileName: failure.fileName,
+        reason: failure.reason,
+      });
+    }
     const nextImages: ComposerImageAttachment[] = compressed
       .filter(({ id }) => stillPreparingIds.has(id))
       .map(({ id, file }) => ({
@@ -326,7 +356,9 @@ export function useComposerAttachmentIntake(input: {
     }
     if (storedImages.length > 0 && imageAttachmentsGetChips) {
       insertedAny =
-        insertAttachmentReferences(storedImages.map(imageContextReference)) || insertedAny;
+        insertAttachmentReferences(storedImages.map(imageContextReference), undefined, {
+          systemAttachmentCompletion: true,
+        }) || insertedAny;
     }
     // Only failures are reported here. Success must not pass `null`: by
     // now other work (a failed send, an overlapping paste) may have set a
@@ -334,7 +366,7 @@ export function useComposerAttachmentIntake(input: {
     // swallow that message.
     const compressionError = [...compressionErrors]
       .filter(([id]) => stillPreparingIds.has(id))
-      .map(([, message]) => message)
+      .map(([, failure]) => failure.message)
       .at(-1);
     if (compressionError !== undefined) {
       setThreadError(threadId, compressionError);
@@ -344,6 +376,7 @@ export function useComposerAttachmentIntake(input: {
 
   const removeComposerImage = (imageId: string) => {
     if (removePreparingComposerImages(attachmentTargetKey, new Set([imageId])).size > 0) {
+      onUserAttachmentsMutated?.();
       // Its compression finishes in the background and is dropped.
       if (questionAttachmentTarget)
         changeQuestionAttachmentPreparation(questionAttachmentTarget, -1);
@@ -354,6 +387,7 @@ export function useComposerAttachmentIntake(input: {
       image ? imageContextReference(image).contextId : "",
     );
     if (!referenced) {
+      onUserAttachmentsMutated?.();
       removeComposerImageFromDraft(imageId);
       return;
     }
@@ -363,11 +397,14 @@ export function useComposerAttachmentIntake(input: {
       variant: "destructive",
     });
     if (!confirmation) {
+      onUserAttachmentsMutated?.();
       removeComposerImageFromDraft(imageId);
       return;
     }
     void confirmation.then((confirmed) => {
-      if (confirmed) removeComposerImageFromDraft(imageId);
+      if (!confirmed) return;
+      onUserAttachmentsMutated?.();
+      removeComposerImageFromDraft(imageId);
     });
   };
 

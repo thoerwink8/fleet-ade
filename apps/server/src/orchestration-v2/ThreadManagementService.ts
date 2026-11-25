@@ -1,5 +1,4 @@
 import type {
-  OrchestrationV2RecentlyDeletedThread,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
 } from "@t3tools/contracts";
@@ -452,10 +451,7 @@ export interface ThreadManagementServiceShape {
     readonly projectId?: ProjectId | undefined;
     readonly includeSubagents: boolean;
   }) => Effect.Effect<ReadonlyArray<OrchestrationV2ThreadShell>, ThreadManagementError>;
-  readonly listRecentlyDeleted: () => Effect.Effect<
-    ReadonlyArray<OrchestrationV2RecentlyDeletedThread>,
-    Orchestrator.OrchestratorV2Error
-  >;
+  readonly listRecentlyDeleted: Orchestrator.OrchestratorV2["Service"]["listRecentlyDeleted"];
   readonly restoreThread: (input: {
     readonly commandId: CommandId;
     readonly threadId: ThreadId;

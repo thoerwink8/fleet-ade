@@ -83,7 +83,7 @@ export function SourceControlAccountSettings({
   if (groups.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        请在服务器主机上运行{" "}
+        请在这台电脑上运行{" "}
         <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code>{" "}
         登录，然后重新扫描，即可在这里选择账户。
       </p>
@@ -221,7 +221,7 @@ export function SourceControlAccountSettings({
             ))}
             {group.environmentVariable ? (
               <p className="text-xs text-warning">
-                服务器已设置 {group.environmentVariable}，在取消设置前会覆盖此处选择的账户。
+                这台电脑已设置 {group.environmentVariable}，在取消设置前会覆盖此处选择的账户。
               </p>
             ) : null}
           </div>

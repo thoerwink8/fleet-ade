@@ -24,7 +24,7 @@ export function showAnchoredCopyErrorToast(ref: RefObject<HTMLButtonElement | nu
     positionerProps: {
       anchor: ref.current,
     },
-    title: "复制失败",
+    title: "无法复制",
     description: error.message,
   });
 }

@@ -47,8 +47,10 @@ vi.mock("../state/session", () => ({
     scope === AuthOrchestrationOperateScope && state.granted.has(environmentId),
 }));
 vi.mock("../state/entities", () => ({
+  readEnvironmentHasCommanderConfig: () => false,
   readEnvironmentServerConfigLoaded: () => true,
   readEnvironmentSupportsAutoSettleOptOut: () => true,
+  readEnvironmentSupportsVisitedTracking: () => true,
   readThreadShell: () => ({
     id: "thread",
     environmentId: "secondary",
@@ -59,6 +61,7 @@ vi.mock("../state/entities", () => ({
     runtime: null,
     latestRun: null,
   }),
+  readThreadShells: () => [],
   useProjects: () => [{ id: "project", environmentId: "secondary" }],
 }));
 vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "primary" }));
@@ -98,6 +101,12 @@ vi.mock("../components/ui/toast", () => ({
   stackedThreadToast: (toast: unknown) => toast,
   toastManager: { add: () => state.completed.resolve() },
 }));
+vi.mock("../components/Sidebar.logic", () => ({
+  attentionDismissVisitedAt: () => "2099-01-01T00:00:00Z",
+}));
+vi.mock("./showThreadUndoNotice", () => ({
+  showThreadUndoNotice: () => recordEffect("undo-notice"),
+}));
 vi.mock("../lib/exportThreadMarkdown", () => ({
   exportThreadMarkdown: async () => recordEffect("export-markdown"),
 }));
@@ -122,6 +131,7 @@ vi.mock("./useSettings", () => ({
 }));
 vi.mock("./useThreadActions", () => ({
   canTurnThreadIntoProject: () => false,
+  useAcknowledgeThreadWoke: () => () => recordEffect("acknowledge-woke"),
   useThreadActions: () =>
     Object.fromEntries(
       [
@@ -204,5 +214,31 @@ describe("thread menu permissions", () => {
     expect(exportItem).toMatchObject({ id: "export-markdown", label: "导出为 Markdown" });
     expect(exportItem?.disabled).not.toBe(true);
     expect(state.effects).toEqual(["export-markdown"]);
+  });
+
+  it("renders sidebar surface with filter-by-project + export-markdown and without find", async () => {
+    state.granted.add("secondary");
+    const onFilterByProject = vi.fn(() => recordEffect("filter-by-project"));
+    state.show.mockResolvedValue("filter-by-project");
+    const menu = useThreadActionMenu({
+      threadRef: null,
+      projectCwd: null,
+      surface: "sidebar",
+      onStartRename: () => recordEffect("rename"),
+      onFind: () => recordEffect("find"),
+    });
+    menu.openMenu(position, {
+      threadRef: target,
+      projectCwd: "/project",
+      projectFilter: { label: "Demo", isActive: false },
+      onFilterByProject,
+    });
+    await state.completed.promise;
+    const items = state.show.mock.calls[0]![0];
+    expect(items.some((item) => item.id === "find")).toBe(false);
+    expect(items.some((item) => item.id === "filter-by-project")).toBe(true);
+    expect(items.some((item) => item.id === "export-markdown")).toBe(true);
+    expect(state.effects).toEqual(["filter-by-project"]);
+    expect(onFilterByProject).toHaveBeenCalledOnce();
   });
 });

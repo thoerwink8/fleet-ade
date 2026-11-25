@@ -19,7 +19,7 @@ export function LinkAddressWarning({ address }: { readonly address: string }) {
     <Alert variant="warning">
       <AlertTitle>请核对此地址</AlertTitle>
       <AlertDescription>
-        此应用无法确认它是你的机器之一。你粘贴的配对码会发送到那里。
+        此应用无法确认它是你的电脑之一。你粘贴的配对码会发送到那里。
         <span className="block break-all">{linkDestination(address)}</span>
       </AlertDescription>
     </Alert>
@@ -68,7 +68,7 @@ export function LinkMachineSelect({
   return (
     <div className="space-y-1.5">
       <span id={labelId} className="block text-meta font-medium text-foreground">
-        机器
+        电脑
       </span>
       <Select
         value={value}
@@ -82,7 +82,7 @@ export function LinkMachineSelect({
             {(selected: string | null) => {
               if (selected === ANOTHER_ADDRESS) return "其他地址…";
               const machine = machines.find((candidate) => candidate.environmentId === selected);
-              return machine === undefined ? "选择机器" : <MachineName machine={machine} />;
+              return machine === undefined ? "选择电脑" : <MachineName machine={machine} />;
             }}
           </SelectValue>
         </SelectTrigger>

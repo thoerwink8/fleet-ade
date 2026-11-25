@@ -9,6 +9,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId } from "@t3tools/contracts";
 
+import { presentVersionControlError } from "~/components/versionControlError.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { waitForProject } from "~/state/entities";
 import { projectEnvironment } from "~/state/projects";
@@ -45,11 +46,15 @@ export function useNewProject() {
     });
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(result),
+          `创建 ${label} 仓库`,
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: `无法创建 ${label} 仓库`,
-            description: `${errorMessage(squashAtomCommandFailure(result))} 请使用 Git 菜单中的“发布仓库”重试。`,
+            title: presentation.title,
+            description: `${presentation.description} 之后也可以在 Git 菜单中选择“发布仓库”。`,
           }),
         );
       }

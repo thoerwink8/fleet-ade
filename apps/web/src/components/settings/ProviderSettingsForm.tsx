@@ -138,7 +138,7 @@ export function deriveProviderSettingsFields(
                 ? "可执行文件"
                 : (annotatedTitle ?? titleizeFieldKey(key)),
           ...(isLocalAcp && key === "commandPath"
-            ? { description: "此环境中的可执行文件名称或路径。" }
+            ? { description: "这台电脑上的可执行文件名称或路径。" }
             : annotatedDescription !== undefined
               ? { description: annotatedDescription }
               : {}),

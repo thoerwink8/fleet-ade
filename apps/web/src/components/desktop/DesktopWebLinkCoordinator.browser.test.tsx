@@ -88,7 +88,7 @@ it("adds the backend from a pairing link after the user confirms its host", asyn
   );
   expect(state.confirm).toHaveBeenCalledExactlyOnceWith(
     "添加后会在这台设备上保存配对信息，可以随时在设置里移除。",
-    { title: "添加位于 https://vps.example.com 的后端？", confirmLabel: "添加" },
+    { title: "添加位于 https://vps.example.com 的电脑？", confirmLabel: "添加" },
   );
   expect(state.navigate).not.toHaveBeenCalled();
 });

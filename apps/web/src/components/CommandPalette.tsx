@@ -216,7 +216,6 @@ import {
   type AddProjectCloneFlow,
   type AddProjectEnvironmentOption,
   buildPaletteRemoteSourceReadiness,
-  errorMessage,
   getEnvironmentBrowsePlatform,
   remoteProjectInputPlaceholder,
   reduceCommandPaletteSearchState,
@@ -226,7 +225,6 @@ import { batchDeleteConfirmCopy } from "../lib/threadConfirmCopy";
 import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
 import {
   isSidebarHiddenThread,
-  applyThreadBatch,
   firstValidTimestampMs,
   resolveThreadAttention,
 } from "./Sidebar.logic";
@@ -271,6 +269,7 @@ import { CommandDialog, CommandDialogPopup, CommandFooterAction } from "./ui/com
 import { Button } from "./ui/button";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { suggestAppAccessForRemote } from "./sourceControlAppAccessToast";
+import { presentVersionControlError } from "./versionControlError.logic";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { ComposerHandleContext, useComposerHandleContext } from "../composerHandleContext";
 import type { ChatComposerHandle } from "./chat/ChatComposer";
@@ -419,7 +418,6 @@ function OpenCommandPaletteDialog(props: {
   const pathname = useLocation({ select: (location) => location.pathname });
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
-  const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
   const {
     archiveThreads,
     deleteThreads,
@@ -1816,7 +1814,7 @@ function OpenCommandPaletteDialog(props: {
         },
       ];
     });
-  const runSelectionBatch = async (operation: "archive" | "unarchive" | "delete") => {
+  const runSelectionBatch = async (operation: "archive" | "delete") => {
     if (operation === "delete") {
       const { failures } = await deleteThreads(selectedBatchThreads());
       if (failures.length > 0) {
@@ -1831,33 +1829,12 @@ function OpenCommandPaletteDialog(props: {
       useThreadSelectionStore.getState().clearSelection();
       return;
     }
-    if (operation === "archive") {
-      const { archivedKeys, failures } = await archiveThreads(selectedBatchThreads());
-      if (failures.length > 0) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: archivedKeys.size > 0 ? "无法归档部分会话" : "无法归档会话",
-            description: failures.join("\n"),
-          }),
-        );
-      }
-      useThreadSelectionStore.getState().clearSelection();
-      return;
-    }
-    const { failures } = await applyThreadBatch({
-      threads: selectedBatchThreads(),
-      dispatch: (group) =>
-        batchThreads({
-          environmentId: group.environmentId,
-          input: { operation, threadIds: group.threadIds },
-        }),
-    });
+    const { archivedKeys, failures } = await archiveThreads(selectedBatchThreads());
     if (failures.length > 0) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法处理部分会话",
+          title: archivedKeys.size > 0 ? "无法归档部分会话" : "无法归档会话",
           description: failures.join("\n"),
         }),
       );
@@ -1888,16 +1865,6 @@ function OpenCommandPaletteDialog(props: {
             icon: <FolderIcon className={ITEM_ICON_CLASS} />,
             run: async () => {
               await runSelectionBatch("archive");
-            },
-          },
-          {
-            kind: "action",
-            value: "selection:unarchive",
-            title: "取消归档已选",
-            searchTerms: ["unarchive", "取消归档"],
-            icon: <FolderIcon className={ITEM_ICON_CLASS} />,
-            run: async () => {
-              await runSelectionBatch("unarchive");
             },
           },
           {
@@ -2305,11 +2272,15 @@ function OpenCommandPaletteDialog(props: {
       setIsRemoteProjectLookingUp(false);
       if (lookupResult._tag === "Failure") {
         if (!isAtomCommandInterrupted(lookupResult)) {
+          const presentation = presentVersionControlError(
+            squashAtomCommandFailure(lookupResult),
+            "查询仓库",
+          );
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "无法查询仓库",
-              description: errorMessage(squashAtomCommandFailure(lookupResult)),
+              title: presentation.title,
+              description: presentation.description,
             }),
           );
         }
@@ -2397,11 +2368,15 @@ function OpenCommandPaletteDialog(props: {
     setIsRemoteProjectCloning(false);
     if (startResult._tag === "Failure") {
       if (!isAtomCommandInterrupted(startResult)) {
+        const presentation = presentVersionControlError(
+          squashAtomCommandFailure(startResult),
+          "克隆仓库",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法克隆仓库",
-            description: errorMessage(squashAtomCommandFailure(startResult)),
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

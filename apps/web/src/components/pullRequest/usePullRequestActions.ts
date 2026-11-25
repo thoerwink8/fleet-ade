@@ -228,8 +228,8 @@ export function usePullRequestCloseBatch(
       type: failures.length > 0 ? "error" : "success",
       title:
         failures.length > 0
-          ? `已关闭 ${batch.length} 个 pull request 中的 ${closed} 个`
-          : `已关闭 ${closed} 个 pull request`,
+          ? `已关闭 ${batch.length} 个 PR 中的 ${closed} 个`
+          : `已关闭 ${closed} 个 PR`,
       ...(failures.length > 0 ? { description: failures.slice(0, 3).join("\n") } : {}),
     });
   };
@@ -334,7 +334,7 @@ export function usePullRequestHandoffs({
     // Explicit timeouts survive toast updates and would pin the result after loading.
     const toastId = toastManager.add({
       type: "loading",
-      title: `正在准备 ${terminology.singular} 的工作副本…`,
+      title: `正在准备 ${terminology.singular} 的项目目录…`,
       data: {
         onClose: () => {
           cancelled = true;
@@ -355,7 +355,7 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "无法为工作副本打开会话",
+        title: "无法为项目目录打开会话",
         description: "请从项目中重试，或先打开一个会话。",
       });
       return;
@@ -373,7 +373,7 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: `无法准备 ${terminology.singular} 的工作副本`,
+        title: `无法准备 ${terminology.singular} 的项目目录`,
         description: checkoutFailureDescription(
           isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
         ),
@@ -397,7 +397,7 @@ export function usePullRequestHandoffs({
       toastManager.update(toastId, {
         type: "error",
         title: "已检出，但会话仍在原处",
-        description: `工作副本已在 \`${prepared.value.branch}\` 上准备好。请从分支选择器将会话指向它，然后再次提问。`,
+        description: `项目目录已在 \`${prepared.value.branch}\` 上准备好。请从分支选择器将会话指向它，然后再次提问。`,
       });
       return;
     }
@@ -433,7 +433,7 @@ export function usePullRequestHandoffs({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "工作副本已就绪",
+            title: "项目目录已就绪",
             description: "任务已在输入框中。请检查后发送。",
           }
         : offHeadPullRequestCheckoutToast(terminology),

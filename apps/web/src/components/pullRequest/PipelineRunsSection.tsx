@@ -197,13 +197,13 @@ function PipelineConnected({ environmentId }: { environmentId: EnvironmentId }) 
         <RunSection
           section="needsAction"
           title="要你拍的"
-          note="下面卡住的单只放链接。"
+          note="下面出错的单只放链接。"
           runs={groups.stuck}
           empty="现在没有要你拍的"
           emphasis
         />
         <RunSection section="running" title="在跑的" runs={groups.running} empty="现在没有在跑的" />
-        <RunSection section="stuck" title="卡住的" runs={groups.stuck} empty="现在没有卡住的" />
+        <RunSection section="stuck" title="出错的" runs={groups.stuck} empty="现在没有出错的" />
       </>
     );
   }
@@ -224,7 +224,7 @@ export function PipelineRunsSection() {
   if (environmentId === null) {
     return (
       <PipelineFrame pending={false} refreshDisabled onRefresh={() => {}}>
-        <p className="text-sm text-muted-foreground">还没有连上的环境。</p>
+        <p className="text-sm text-muted-foreground">还没有连上的电脑。</p>
       </PipelineFrame>
     );
   }
