@@ -11119,6 +11119,37 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           ),
         );
 
+        // A notification publishes the outcome in the roster before the entry leaves it.
+        yield* Queue.offer(
+          harness.sdkMessages,
+          claudeSdkFrame({
+            type: "system",
+            subtype: "task_notification",
+            task_id: "moved-shell",
+            tool_use_id: "toolu_moved_shell",
+            status: "failed",
+            output_file: "/tmp/claude-replay/tasks/moved-shell.output",
+            summary: "Foreground build failed (exit code 1)",
+            uuid: "00000000-0000-4000-8000-000000000205",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+        yield* harness.until(() =>
+          providerThreadRosterEvents(harness.events).some((event) =>
+            event.providerThread.pendingBackgroundTasks?.some(
+              (task) => task.taskId === "moved-shell" && task.status === "failed",
+            ),
+          ),
+        );
+        yield* harness.until(() =>
+          providerThreadRosterEvents(harness.events).some(
+            (event) =>
+              event.providerThread.pendingBackgroundTasks?.every(
+                (task) => task.taskId !== "moved-shell",
+              ) ?? false,
+          ),
+        );
+
         yield* harness.offerAndWait(emptyRoster);
         assert.include(
           (

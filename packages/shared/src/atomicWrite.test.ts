@@ -60,6 +60,127 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
     }),
   );
 
+  it.effect.each(HostProcess.Platform.defaultValue() === "linux" ? [255] : [])(
+    "saves a file whose name is %i bytes long",
+    (length) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+        const filePath = path.join(root, `${"s".repeat(length - 5)}.json`);
+
+        yield* writeFileStringAtomically({ filePath, contents: "after" });
+
+        assert.strictEqual(yield* fs.readFileString(filePath), "after");
+      }),
+  );
+
+  it.effect("syncs the written contents before the rename and the directory after it", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+      const filePath = path.join(root, "settings.json");
+      const events: Array<string> = [];
+      const recording = FileSystem.make({
+        ...fs,
+        open: (openedPath, options) =>
+          fs.open(openedPath, options).pipe(
+            // The real handle keeps its methods on its prototype, so it is extended, not spread.
+            Effect.map((file): FileSystem.File =>
+              Object.create(file, {
+                writeAll: {
+                  value: (buffer: Uint8Array) =>
+                    file.writeAll(buffer).pipe(
+                      Effect.tap(() =>
+                        Effect.sync(() => {
+                          events.push("write temp file");
+                        }),
+                      ),
+                    ),
+                },
+                sync: {
+                  value: file.sync.pipe(
+                    Effect.tap(() =>
+                      Effect.sync(() => {
+                        events.push(openedPath === root ? "sync directory" : "sync temp file");
+                      }),
+                    ),
+                  ),
+                },
+              }),
+            ),
+          ),
+        rename: (from, to) =>
+          fs.rename(from, to).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                events.push("rename");
+              }),
+            ),
+          ),
+      });
+
+      yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
+        Effect.provideService(FileSystem.FileSystem, recording),
+      );
+
+      assert.strictEqual(yield* fs.readFileString(filePath), "after");
+      // Windows cannot open a directory to sync it, so that sync is skipped there.
+      assert.deepStrictEqual(
+        events,
+        HostProcess.Platform.defaultValue() === "win32"
+          ? ["write temp file", "sync temp file", "rename"]
+          : ["write temp file", "sync temp file", "rename", "sync directory"],
+      );
+    }),
+  );
+
+  // ENOTSUP means this filesystem cannot sync directories at all; EIO means the rename may not survive a crash.
+  it.effect.each(
+    HostProcess.Platform.defaultValue() === "win32"
+      ? []
+      : [
+          { code: "ENOTSUP", saved: true },
+          { code: "EIO", saved: false },
+        ],
+  )("reports a directory sync failing with $code after the rename", ({ code, saved }) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+      const filePath = path.join(root, "settings.json");
+      const syncFailure = PlatformError.systemError({
+        _tag: "Unknown",
+        module: "FileSystem",
+        method: "sync",
+        pathOrDescriptor: root,
+        cause: Object.assign(new Error(`${code}, fsync`), { code }),
+      });
+      const failingDirectorySync = FileSystem.make({
+        ...fs,
+        open: (openedPath, options) =>
+          fs
+            .open(openedPath, options)
+            .pipe(
+              Effect.map((file): FileSystem.File =>
+                openedPath === root
+                  ? Object.create(file, { sync: { value: Effect.fail(syncFailure) } })
+                  : file,
+              ),
+            ),
+      });
+
+      const exit = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
+        Effect.provideService(FileSystem.FileSystem, failingDirectorySync),
+        Effect.exit,
+      );
+
+      assert.deepStrictEqual(exit, saved ? Exit.void : Exit.fail(syncFailure));
+      assert.strictEqual(yield* fs.readFileString(filePath), "after");
+    }),
+  );
+
   it.effect("keeps a symlinked file linked and rewrites its destination", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -225,45 +346,36 @@ it.effect("surfaces an unreadable link instead of writing over it", () =>
 
 it.effect("succeeds when the write lands but its temp directory cannot be removed", () =>
   Effect.gen(function* () {
-    const renamed: Array<string> = [];
-    const removed: Array<string> = [];
-    const fileSystem = FileSystem.layerNoop({
-      readLink: (path) =>
-        Effect.fail(
-          PlatformError.systemError({
-            _tag: "NotFound",
-            module: "FileSystem",
-            method: "readLink",
-            pathOrDescriptor: path,
-          }),
-        ),
-      makeDirectory: () => Effect.void,
-      makeTempDirectory: () => Effect.succeed("/home/settings.json.abc123"),
-      writeFileString: () => Effect.void,
-      rename: (_from, to) => Effect.sync(() => void renamed.push(to)),
-      remove: (path) =>
-        Effect.sync(() => void removed.push(path)).pipe(
-          Effect.andThen(
-            Effect.fail(
-              PlatformError.systemError({
-                _tag: "PermissionDenied",
-                module: "FileSystem",
-                method: "remove",
-                pathOrDescriptor: path,
-              }),
-            ),
-          ),
-        ),
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+    const filePath = path.join(root, "settings.json");
+    const removeAttempts: Array<string> = [];
+    const unremovable = FileSystem.make({
+      ...fs,
+      remove: (removedPath) =>
+        Effect.suspend(() => {
+          removeAttempts.push(removedPath);
+          return Effect.fail(
+            PlatformError.systemError({
+              _tag: "PermissionDenied",
+              module: "FileSystem",
+              method: "remove",
+              pathOrDescriptor: removedPath,
+            }),
+          );
+        }),
     });
 
-    const result = yield* Effect.exit(
-      writeFileStringAtomically({ filePath: "/home/settings.json", contents: "after" }).pipe(
-        Effect.provide(Layer.mergeAll(Path.layer, fileSystem)),
-      ),
+    yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
+      Effect.provideService(FileSystem.FileSystem, unremovable),
     );
 
-    assert.deepStrictEqual(result, Exit.void);
-    assert.deepStrictEqual(renamed, ["/home/settings.json"]);
-    assert.deepStrictEqual(removed, ["/home/settings.json.abc123"]);
-  }),
+    assert.strictEqual(yield* fs.readFileString(filePath), "after");
+    assert.strictEqual(removeAttempts.length, 1);
+    assert.deepStrictEqual(
+      (yield* fs.readDirectory(root)).toSorted(),
+      [path.basename(removeAttempts[0]!), "settings.json"].toSorted(),
+    );
+  }).pipe(Effect.provide(NodeServices.layer)),
 );

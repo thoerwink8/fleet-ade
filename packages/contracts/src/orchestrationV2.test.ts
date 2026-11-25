@@ -695,6 +695,94 @@ describe("background work kinds from older or newer servers", () => {
       }),
     ).toThrow();
   });
+
+  it("decodes roster entries written before their timing and status fields existed", () => {
+    const providerThread = decodeOrchestrationV2ProviderThreadJson({
+      id: "provider-thread-1",
+      driver: "claude",
+      providerInstanceId: "claudeAgent",
+      providerSessionId: null,
+      appThreadId: "thread-1",
+      ownerNodeId: null,
+      nativeThreadRef: null,
+      nativeConversationHeadRef: null,
+      status: "idle",
+      firstRunOrdinal: 1,
+      lastRunOrdinal: 1,
+      handoffIds: [],
+      forkedFrom: null,
+      createdAt: "2026-04-20T00:00:00.000Z",
+      updatedAt: "2026-04-20T00:00:00.000Z",
+      pendingBackgroundTasks: [{ taskId: "bg-1", kind: "command", description: "sleep 30" }],
+    });
+    const [entry] = providerThread.pendingBackgroundTasks ?? [];
+    expect(entry?.status).toBeUndefined();
+    expect(entry?.startedAt).toBeUndefined();
+    expect(entry?.completedAt).toBeUndefined();
+    expect(providerThread.completedBackgroundTasks).toEqual([]);
+  });
+
+  it("keeps an entry's timing and status through the roster round trip", () => {
+    const providerThread = decodeOrchestrationV2ProviderThreadJson({
+      id: "provider-thread-1",
+      driver: "claude",
+      providerInstanceId: "claudeAgent",
+      providerSessionId: null,
+      appThreadId: "thread-1",
+      ownerNodeId: null,
+      nativeThreadRef: null,
+      nativeConversationHeadRef: null,
+      status: "idle",
+      firstRunOrdinal: 1,
+      lastRunOrdinal: 1,
+      handoffIds: [],
+      forkedFrom: null,
+      createdAt: "2026-04-20T00:00:00.000Z",
+      updatedAt: "2026-04-20T00:00:00.000Z",
+      pendingBackgroundTasks: [
+        {
+          taskId: "bg-1",
+          kind: "command",
+          status: "running",
+          startedAt: "2026-04-20T00:01:00.000Z",
+        },
+      ],
+      completedBackgroundTasks: [
+        {
+          taskId: "bg-0",
+          kind: "command",
+          status: "completed",
+          startedAt: "2026-04-20T00:00:10.000Z",
+          completedAt: "2026-04-20T00:00:40.000Z",
+        },
+      ],
+    });
+    const [active] = providerThread.pendingBackgroundTasks ?? [];
+    expect(active?.status).toBe("running");
+    expect(DateTime.formatIso(active?.startedAt ?? now)).toBe("2026-04-20T00:01:00.000Z");
+    const [ended] = providerThread.completedBackgroundTasks ?? [];
+    expect(ended?.status).toBe("completed");
+    expect(DateTime.formatIso(ended?.completedAt ?? now)).toBe("2026-04-20T00:00:40.000Z");
+
+    const reencoded = encodeOrchestrationV2ProviderThreadJson(providerThread);
+    expect(reencoded.pendingBackgroundTasks).toEqual([
+      {
+        taskId: "bg-1",
+        kind: "command",
+        status: "running",
+        startedAt: "2026-04-20T00:01:00.000Z",
+      },
+    ]);
+    expect(reencoded.completedBackgroundTasks).toEqual([
+      {
+        taskId: "bg-0",
+        kind: "command",
+        status: "completed",
+        startedAt: "2026-04-20T00:00:10.000Z",
+        completedAt: "2026-04-20T00:00:40.000Z",
+      },
+    ]);
+  });
 });
 
 describe("latestProviderTurnForAttempt", () => {

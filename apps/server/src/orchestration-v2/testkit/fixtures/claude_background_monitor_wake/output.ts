@@ -36,7 +36,11 @@ export function assertClaudeBackgroundMonitorWakeOutput(
   // The first roster precedes task_started linking the Monitor call, so that entry reads command.
   assert.isAbove(rosterTasks.length, 1);
   for (const task of rosterTasks.slice(1)) {
-    assert.deepEqual(task, {
+    // Stored roster entries carry the ledger's start and status once the ingestor stamped them.
+    const { status, startedAt, ...unstamped } = task;
+    assert.oneOf(status, [undefined, "running"]);
+    assert.isTrue(status === undefined || startedAt !== undefined);
+    assert.deepEqual(unstamped, {
       taskId: MONITOR_TASK_ID,
       description: "Background monitor test",
       kind: "monitor",

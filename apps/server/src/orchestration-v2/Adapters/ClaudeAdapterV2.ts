@@ -85,6 +85,7 @@ import {
   mcpAppToolResourceUri,
 } from "@t3tools/shared/mcpApp";
 import { AgentScope } from "@t3tools/shared/AgentScope";
+import { backgroundTaskStatusFromOutcome } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import * as ProviderProcesses from "../../process/providerProcesses.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { applyClaudePromptEffortPrefix } from "@t3tools/shared/model";
@@ -6223,6 +6224,22 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           );
 
         // Untraced with roster emission: this runs for each streamed roster update.
+        // Ended tasks stay on the roster until their wake consumes them, so their outcome rides
+        // the owed-wake copies; the projection files them from that status.
+        const stampOwedWakeOutcomes = Effect.fnUntraced(function* (
+          nativeThreadId: string,
+          tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>,
+        ) {
+          const reports = (yield* Ref.get(wakeReportsByNativeThread)).reports.get(nativeThreadId);
+          if (reports === undefined) return tasks;
+          return tasks.map((task) => {
+            const status = backgroundTaskStatusFromOutcome(
+              reports.get(task.taskId)?.report.outcome,
+            );
+            return status === undefined || task.status !== undefined ? task : { ...task, status };
+          });
+        });
+
         const owedWakeTasksForNativeThread = Effect.fnUntraced(function* (nativeThreadId: string) {
           const previous = (yield* Ref.get(lastProviderThreadByNativeThread)).get(nativeThreadId);
           const roster = rosterForNativeThread(
@@ -6253,7 +6270,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             yield* Ref.get(awaitedBackgroundTasksByNativeThread),
             input.nativeThreadId,
           );
-          const owedWakeTasks = yield* owedWakeTasksForNativeThread(input.nativeThreadId);
+          const owedWakeTasks = yield* stampOwedWakeOutcomes(
+            input.nativeThreadId,
+            yield* owedWakeTasksForNativeThread(input.nativeThreadId),
+          );
           const now = yield* DateTime.now;
           const providerThread: OrchestrationV2ProviderThread = {
             ...input.providerThread,
@@ -9023,7 +9043,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   lastRunOrdinal: input.context.input.runOrdinal,
                   pendingBackgroundTasks: [
                     ...publishedPendingBackgroundTasks(nativeThreadId, roster, awaitedTaskIds),
-                    ...owedWakeTasks,
+                    ...(nativeThreadId === null
+                      ? []
+                      : yield* stampOwedWakeOutcomes(nativeThreadId, owedWakeTasks)),
                   ],
                   status: input.status === "completed" ? "active" : "idle",
                   updatedAt: input.completedAt,
@@ -9510,6 +9532,13 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 : [],
             ),
           );
+          const outcomeByTaskId = new Map(
+            retired.flatMap((entry) =>
+              entry.type === "system" && entry.subtype === "task_notification"
+                ? [[entry.task_id, claudeTaskOutcome(entry.status)] as const]
+                : [],
+            ),
+          );
           const settledToolUseIds = claudeSettledSubagentToolUseIds(retired);
           const kept = [
             ...retired.filter(
@@ -9522,6 +9551,27 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...later,
           ];
           if (!(yield* replaceWakeBuffer(nativeThreadId, buffered, kept, retiredTaskIds))) return;
+          const roster = rosterForNativeThread(
+            yield* Ref.get(pendingBackgroundTasksByNativeThread),
+            nativeThreadId,
+          );
+          let stampedTerminal = false;
+          for (const taskId of retiredTaskIds) {
+            const entry = roster.get(taskId);
+            if (entry === undefined) continue;
+            yield* upsertPendingBackgroundTask(nativeThreadId, {
+              ...entry,
+              status: outcomeByTaskId.get(taskId) ?? "interrupted",
+            });
+            stampedTerminal = true;
+          }
+          if (stampedTerminal) {
+            const providerThread = (yield* Ref.get(lastProviderThreadByNativeThread)).get(
+              nativeThreadId,
+            );
+            if (providerThread !== undefined)
+              yield* emitProviderThreadRoster({ nativeThreadId, providerThread });
+          }
           for (const taskId of retiredTaskIds) {
             yield* clearPendingBackgroundTask(nativeThreadId, taskId);
             yield* clearTaskIdFromNativeThreadSet(
@@ -9775,12 +9825,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               input.nativeThreadId,
               message.task_id,
             );
+            rosterChanged = removed;
             yield* clearTaskIdFromNativeThreadSet(
               wakeEligibleBackgroundTasksByNativeThread,
               input.nativeThreadId,
               message.task_id,
             );
-            rosterChanged = removed;
           }
 
           if (!rosterChanged) {
@@ -12453,12 +12503,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     ...turnInput.providerThread,
                     pendingBackgroundTasks: [
                       ...(turnInput.providerThread.pendingBackgroundTasks ?? []),
-                      ...owedWakeTasks.filter(
-                        (task) =>
-                          !(turnInput.providerThread.pendingBackgroundTasks ?? []).some(
-                            (current) => current.taskId === task.taskId,
-                          ),
-                      ),
+                      ...(yield* stampOwedWakeOutcomes(
+                        nativeThreadId,
+                        owedWakeTasks.filter(
+                          (task) =>
+                            !(turnInput.providerThread.pendingBackgroundTasks ?? []).some(
+                              (current) => current.taskId === task.taskId,
+                            ),
+                        ),
+                      )),
                     ],
                   },
             );
