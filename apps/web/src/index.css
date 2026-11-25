@@ -93,6 +93,16 @@
      status text, group labels. */
   --font-size-prose: 0.9375rem;
   --line-height-prose: 1.6;
+  --font-size-code: 0.875rem;
+  --line-height-code: 1.55;
+  --reading-font-size-prose: 15px;
+  --reading-line-height-prose: 1.6;
+  --reading-font-size-prompt: 14px;
+  --reading-line-height-prompt: 1.5;
+  --reading-font-size-code: 14px;
+  --reading-line-height-code: 1.55;
+  --reading-fold-max-height: calc(var(--font-size-prose) * var(--line-height-prose) * 7.5);
+  --reading-fold-fade-height: calc(var(--font-size-prose) * var(--line-height-prose) * 1.2);
   --font-size-row: 0.875rem;
   --line-height-row: 1.25rem;
   --font-size-ui: 0.875rem;
@@ -105,8 +115,8 @@
   --font-size-dialog-title: 1.125rem;
   --line-height-dialog-title: 1.75rem;
   --thread-details-panel-width: 17.5rem;
-  /* Below 640px the composer is at least 16px: iOS zooms on focus under that. */
-  --font-size-prompt-touch: max(var(--font-size-prompt, 1rem), 16px);
+  /* Below 640px or on coarse pointers the composer is at least 16px: iOS zooms on focus under that. */
+  --font-size-prompt-touch: max(var(--reading-font-size-prompt, 14px), 16px);
   /* Horizontal gutter shared by the page header and the chat column, clear of
      the device's safe area. */
   --workspace-gutter: 0.75rem;
@@ -127,6 +137,21 @@
     --app-scrollbar-thumb: rgb(255 255 255 / 8%);
     --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
   }
+}
+
+[data-reading-area] {
+  --font-size-prose: var(--reading-font-size-prose);
+  --line-height-prose: var(--reading-line-height-prose);
+  --font-size-code: var(--reading-font-size-code);
+  --line-height-code: var(--reading-line-height-code);
+  --font-size-prompt: var(--reading-font-size-prompt);
+  --leading-prompt: var(--reading-line-height-prompt);
+  --reading-fold-max-height: calc(
+    var(--reading-font-size-prose) * var(--reading-line-height-prose) * 7.5
+  );
+  --reading-fold-fade-height: calc(
+    var(--reading-font-size-prose) * var(--reading-line-height-prose) * 1.2
+  );
 }
 
 .wco {
@@ -183,7 +208,7 @@
   --text-dialog-title: var(--font-size-dialog-title);
   --text-dialog-title--line-height: var(--line-height-dialog-title);
   /* The composer line height, 21px at the default 14px prompt size and proportional above it. */
-  --leading-prompt: 1.5;
+  --leading-prompt: var(--reading-line-height-prompt, 1.5);
   /* Motion. drawer is the decelerating curve for surfaces that slide or pop in
      (composer context, pills). */
   --inset-shadow-control-highlight: 0 1px rgb(255 255 255 / 16%);
@@ -1394,9 +1419,10 @@ code {
    Inline code stays relative to its sentence so it never towers over prose;
    diffs and file previews take the size through --diffs-font-size. */
 .chat-markdown .chat-markdown-shiki :is(.shiki, .diffs),
-.chat-markdown .chat-markdown-codeblock pre,
+:is(.chat-markdown, .composer-tiptap) .chat-markdown-codeblock pre,
 :is(.chat-markdown, .composer-tiptap) pre code {
   font-size: var(--font-size-code, inherit);
+  line-height: var(--line-height-code, 1.55);
 }
 
 /* @pierre/diffs surfaces (diffs, file previews, annotatable code, search
@@ -1407,6 +1433,7 @@ code {
 :root {
   --diffs-font-family: var(--font-mono);
   --diffs-header-font-family: var(--font-sans);
+  --diffs-font-size: 0.875rem;
 }
 
 /* Pele diagrams read their colors through these, so a theme change recolors
@@ -1788,7 +1815,7 @@ code {
   border-radius: 0.5rem;
   background: var(--muted);
   padding: 0.8rem 0.9rem;
-  line-height: 1.55;
+  line-height: var(--line-height-code, 1.55);
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--contrast-border) 78%, transparent) transparent;
 }
@@ -1797,7 +1824,7 @@ code {
   border: none;
   background: transparent;
   padding: 0;
-  line-height: 1.55;
+  line-height: var(--line-height-code, 1.55);
 }
 
 .chat-markdown pre::-webkit-scrollbar {
@@ -1818,7 +1845,7 @@ code {
   border: none;
   border-radius: 0;
   background: transparent;
-  line-height: 1.55;
+  line-height: var(--line-height-code, 1.55);
 }
 
 :is(.chat-markdown, .composer-tiptap) .chat-markdown-codeblock[data-wrap="true"] pre {
@@ -1883,8 +1910,8 @@ code {
   border-collapse: collapse;
   overflow-wrap: normal;
   word-break: normal;
-  /* One step under 15px prose. */
-  font-size: var(--font-size-row);
+  /* One step under prose. */
+  font-size: calc(var(--font-size-prose) - 1px);
   line-height: 1.5;
 }
 

@@ -27,7 +27,8 @@ import { useTallEnoughToFold } from "./useTallEnoughToFold";
 import { SubagentTooltipContent } from "./SubagentTooltipContent";
 import { EnvironmentSubagentAvatar } from "./V2LifecycleRow";
 
-const FOLDED_SCRIPT_MASK = "linear-gradient(to bottom, black calc(100% - 1.75rem), transparent)";
+const FOLDED_SCRIPT_MASK =
+  "linear-gradient(to bottom, black calc(100% - var(--reading-fold-fade-height)), transparent)";
 
 function scriptMarkdown(script: string) {
   const longestRun = Math.max(2, ...(script.match(/`+/g) ?? []).map((run) => run.length));
@@ -213,7 +214,7 @@ function WorkflowScript(props: { readonly script: string }) {
     <div>
       <div
         ref={revealRef}
-        className={cn("relative", folded && "max-h-44 overflow-hidden")}
+        className={cn("relative", folded && "max-h-(--reading-fold-max-height) overflow-hidden")}
         data-thread-find-text="true"
         data-thread-find-fold={folded ? "" : undefined}
         style={
