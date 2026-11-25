@@ -16,7 +16,7 @@ import { DraftInput } from "../ui/draft-input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
-import { effectiveRouteSentence } from "./NetworkSettings.logic";
+import { effectiveRouteSentence, proxyUrlError } from "./NetworkSettings.logic";
 import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
@@ -148,7 +148,11 @@ export function NetworkSettingsPanel() {
                   aria-label="代理地址"
                   value={network.proxyUrl}
                   placeholder="http://127.0.0.1:7890"
-                  onCommit={(next) => save({ ...network, proxyUrl: next })}
+                  onCommit={(next) => {
+                    const reason = proxyUrlError(next);
+                    if (reason) return reason;
+                    return save({ ...network, proxyUrl: next.trim() });
+                  }}
                 />
               </div>
             }
@@ -270,15 +274,17 @@ export function NetworkSettingsPanel() {
                       aria-label={`${label}的代理地址`}
                       value={override.proxyUrl}
                       placeholder="http://127.0.0.1:7890"
-                      onCommit={(next) =>
-                        save({
+                      onCommit={(next) => {
+                        const reason = proxyUrlError(next);
+                        if (reason) return reason;
+                        return save({
                           ...network,
                           agentOverrides: {
                             ...network.agentOverrides,
-                            [driver]: { ...override, line: "custom", proxyUrl: next },
+                            [driver]: { ...override, line: "custom", proxyUrl: next.trim() },
                           },
-                        })
-                      }
+                        });
+                      }}
                     />
                   ) : null}
                 </div>

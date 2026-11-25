@@ -89,7 +89,10 @@ export function getProviderSummary(provider: ServerProvider | undefined): {
     const authLabel = provider.auth.label ?? provider.auth.type;
     return {
       headline: authLabel ? `未登录 · ${authLabel}` : "未登录",
-      ...splitProviderDiagnosticMessage(provider.message, "登录后即可开始使用。"),
+      // The sign-in button sits right next to this text, so a "run `claude auth login`" hint would duplicate it.
+      ...(provider.driver === "claudeAgent" && provider.setup?.canAuthenticate === true
+        ? { detail: "登录后即可开始使用。", rawDetail: null }
+        : splitProviderDiagnosticMessage(provider.message, "登录后即可开始使用。")),
     };
   }
   if (isAntigravitySignInUnchecked(provider)) {

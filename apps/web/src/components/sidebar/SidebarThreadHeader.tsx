@@ -1,11 +1,4 @@
-import {
-  EllipsisIcon,
-  FolderPlusIcon,
-  ListFilterIcon,
-  SearchIcon,
-  SquarePenIcon,
-  XIcon,
-} from "lucide-react";
+import { ListFilterIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -21,7 +14,7 @@ import {
 } from "~/hooks/useKeyboardShortcutHints";
 import { Button } from "../ui/button";
 import { Kbd } from "../ui/kbd";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+
 import { SidebarInput, SidebarMenuButton } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -99,16 +92,13 @@ export function SidebarThreadHeader({
 
 export interface SidebarHeaderActionsProps {
   hasProjects: boolean;
-  /** The project filter popup. It has no trigger of its own; the more menu opens it. */
+  /** The project filter popup. It has no trigger of its own; the scope button opens it. */
   projectScope: ReactNode;
-  /** Whether a project filter is set, shown as a dot on the more button. */
-  projectScopeActive: boolean;
-  /** Wraps the more button so the filter popup can anchor to it. */
+  projectScopeLabel: string;
+  /** Wraps the scope button so the filter popup can anchor to it. */
   projectScopeAnchorRef: RefObject<HTMLSpanElement | null>;
   onOpenProjectScope: () => void;
-  onNewProject: () => void;
   onNewThread: (event: ReactMouseEvent) => void;
-  onNewThreadIn?: (() => void) | undefined;
   newThreadDisabled: boolean;
   newThreadShortcutLabel: string | null | undefined;
   newThreadTooltipTitle?: string | undefined;
@@ -118,12 +108,10 @@ export interface SidebarHeaderActionsProps {
 export function SidebarHeaderActions({
   hasProjects,
   projectScope,
-  projectScopeActive,
+  projectScopeLabel,
   projectScopeAnchorRef,
   onOpenProjectScope,
-  onNewProject,
   onNewThread,
-  onNewThreadIn,
   newThreadDisabled,
   newThreadShortcutLabel,
   newThreadTooltipTitle,
@@ -139,50 +127,23 @@ export function SidebarHeaderActions({
   return (
     <div className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center pointer-coarse:gap-3">
       {hasProjects ? (
-        <span ref={projectScopeAnchorRef} className="flex">
-          <Menu>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <MenuTrigger
-                    render={
-                      <SidebarMenuButton
-                        size="icon-sm"
-                        type="button"
-                        aria-label="更多"
-                        className="relative shrink-0"
-                      />
-                    }
-                  />
-                }
-              >
-                <EllipsisIcon />
-                {projectScopeActive ? (
-                  <span
-                    aria-hidden
-                    className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
-                  />
-                ) : null}
-              </TooltipTrigger>
-              <TooltipPopup side="top">更多</TooltipPopup>
-            </Tooltip>
-            <MenuPopup align="end">
-              <MenuItem onClick={onOpenProjectScope}>
-                <ListFilterIcon />
-                按项目筛选会话
-              </MenuItem>
-              {onNewThreadIn ? (
-                <MenuItem onClick={onNewThreadIn}>
-                  <SquarePenIcon />
-                  在以下位置新建会话…
-                </MenuItem>
-              ) : null}
-              <MenuItem onClick={onNewProject}>
-                <FolderPlusIcon />
-                添加项目
-              </MenuItem>
-            </MenuPopup>
-          </Menu>
+        <span ref={projectScopeAnchorRef} className="flex min-w-0">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <SidebarMenuButton
+                  type="button"
+                  aria-label={`按项目筛选会话，当前是${projectScopeLabel}`}
+                  onClick={onOpenProjectScope}
+                  size="scope"
+                />
+              }
+            >
+              <ListFilterIcon />
+              <span className="pointer-events-none min-w-0 truncate">{projectScopeLabel}</span>
+            </TooltipTrigger>
+            <TooltipPopup side="top">按项目筛选会话</TooltipPopup>
+          </Tooltip>
           {projectScope}
         </span>
       ) : null}

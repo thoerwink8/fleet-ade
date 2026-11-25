@@ -222,14 +222,14 @@ export function SettingsSectionHeader({
       className={cn("flex min-h-6 items-center justify-between gap-4 px-1", className)}
     >
       <div className="flex min-w-0 items-center gap-1">
-        <Heading className="flex min-h-6 items-center gap-2 text-dialog-title font-medium text-foreground">
+        <Heading className="flex min-h-6 min-w-0 items-center gap-2 text-dialog-title font-medium text-foreground">
           {icon}
-          {title}
+          <span className="min-w-0 wrap-break-word">{title}</span>
         </Heading>
         {titleAction}
       </div>
       {headerAction ? (
-        <div className="flex min-h-6 min-w-6 items-center justify-end">{headerAction}</div>
+        <div className="flex min-h-6 min-w-6 shrink-0 items-center justify-end">{headerAction}</div>
       ) : null}
     </div>
   );
@@ -404,45 +404,52 @@ export function SettingsRow({
   ) : (
     resetAction
   );
-  const inertControl = (message: string) => (
-    <Tooltip>
+  // One element shape whether or not the control is locked: swapping wrappers would remount the
+  // control and drop a draft typed before the connection went away.
+  const lockMessage = unavailable
+    ? !canWriteSettings
+      ? `此连接没有权限更改 ${
+          context
+            ? context.connectedEnvironments
+                .filter((target) => !writableIds.has(target.environmentId))
+                .map((target) => target.label)
+                .join(", ") || "所选电脑"
+            : (primaryEnvironment?.label ?? "主电脑")
+        } 的设置。`
+      : context
+        ? "请重新连接所选电脑以修改此设置。"
+        : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE
+    : environmentWide
+      ? "这是电脑级设置，请先选择一台电脑再修改。"
+      : null;
+  const renderedControl = control ? (
+    <Tooltip disabled={lockMessage === null}>
       <TooltipTrigger
         render={
           <span
-            tabIndex={0}
-            className="flex w-full items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring @min-[32rem]/settings-row:w-auto"
+            tabIndex={lockMessage === null ? undefined : 0}
+            className={
+              lockMessage === null
+                ? "contents"
+                : "flex w-full items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring @min-[32rem]/settings-row:w-auto"
+            }
           />
         }
       >
         <div
-          inert
-          className="flex w-full items-center gap-2 opacity-50 @min-[32rem]/settings-row:w-auto"
+          inert={lockMessage !== null}
+          className={
+            lockMessage === null
+              ? "contents"
+              : "flex w-full items-center gap-2 opacity-50 @min-[32rem]/settings-row:w-auto"
+          }
         >
           {control}
         </div>
       </TooltipTrigger>
-      <TooltipPopup side="top">{message}</TooltipPopup>
+      <TooltipPopup side="top">{lockMessage}</TooltipPopup>
     </Tooltip>
-  );
-  const renderedControl =
-    unavailable && control
-      ? inertControl(
-          !canWriteSettings
-            ? `此连接没有权限更改 ${
-                context
-                  ? context.connectedEnvironments
-                      .filter((target) => !writableIds.has(target.environmentId))
-                      .map((target) => target.label)
-                      .join(", ") || "所选电脑"
-                  : (primaryEnvironment?.label ?? "主电脑")
-              } 的设置。`
-            : context
-              ? "请重新连接所选电脑以修改此设置。"
-              : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
-        )
-      : environmentWide && control
-        ? inertControl("这是电脑级设置，请先选择一台电脑再修改。")
-        : control;
+  ) : null;
   const customized =
     context !== null &&
     settingKeys.some((key) =>
@@ -530,13 +537,11 @@ export function SettingsRow({
           </div>
         ) : null}
       </div>
-      {unavailable && children ? (
-        <div inert className="opacity-50">
+      {children ? (
+        <div inert={unavailable} className={unavailable ? "opacity-50" : "contents"}>
           {children}
         </div>
-      ) : (
-        children
-      )}
+      ) : null}
     </div>
   );
 }
@@ -633,6 +638,27 @@ export function SettingsPageContainer({
   );
 }
 
+/**
+ * While a computer is away its panels stay mounted but hidden under the notice, so a draft typed
+ * before the drop survives the reconnect. Used by every page that shows a picked computer's settings.
+ */
+export function SettingsDisconnectedHold({
+  notice,
+  children,
+}: {
+  readonly notice: ReactNode | null;
+  readonly children: ReactNode;
+}) {
+  return (
+    <>
+      {notice}
+      <div hidden={notice !== null} className={notice !== null ? undefined : "contents"}>
+        {children}
+      </div>
+    </>
+  );
+}
+
 /** Environment panels on a merged page show a connect notice; the rest of the page stays usable. */
 export function SettingsEnvironmentScopeGate({ children }: { readonly children: ReactNode }) {
   const scope = useOptionalSettingsScope();
@@ -640,14 +666,21 @@ export function SettingsEnvironmentScopeGate({ children }: { readonly children: 
   if (scope.scope.kind === "unavailable") {
     return <p className="text-sm text-muted-foreground">{scope.scope.message}</p>;
   }
-  if (scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        重新连接 {scope.scope.label}，才能改它的设置。
-      </p>
-    );
-  }
-  return children;
+  const disconnected =
+    scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0;
+  return (
+    <SettingsDisconnectedHold
+      notice={
+        disconnected ? (
+          <p className="text-sm text-muted-foreground">
+            重新连接 {scope.scope.label}，才能改它的设置。
+          </p>
+        ) : null
+      }
+    >
+      {children}
+    </SettingsDisconnectedHold>
+  );
 }
 
 export function scrollToSettingsTarget(

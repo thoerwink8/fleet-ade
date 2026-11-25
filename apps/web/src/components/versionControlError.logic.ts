@@ -63,6 +63,7 @@ const GIT_REASON_NEXT_STEPS: Record<GitCommandFailureReason, string> = {
   index_locked:
     "请结束正在使用这个仓库的 Git 操作；确认没有操作后，可以删除仓库里的索引锁文件，然后重试。",
   merge_conflict: "请打开差异，解决标出的冲突并完成提交，然后重试。",
+  network_unreachable: "请检查网络连接，确认能访问远端仓库所在的主机，然后重试。",
   not_a_repository: "请选择 Git 仓库目录，或先初始化 Git。",
   not_fast_forward: "请先拉取远端改动，再重新推送。",
   path_already_exists: "请选择其他目录，或移走同名文件后重试。",
@@ -70,7 +71,7 @@ const GIT_REASON_NEXT_STEPS: Record<GitCommandFailureReason, string> = {
   push_rejected_non_fast_forward: "请先拉取远端改动，再重新推送。",
   ref_name_conflict: "请换一个不与现有分支或标签冲突的名称。",
   ref_not_found: "请刷新分支列表，确认分支或标签仍然存在。",
-  remote_unreachable: "请检查网络连接和远端仓库地址，然后重试。",
+  remote_unreachable: "请确认远端仓库地址正确、仓库存在且你有访问权限，然后重试。",
   tag_would_be_clobbered: "请先同步远端标签，或保留本地同名标签后重试。",
   working_tree_dirty: "请先提交、暂存或放弃未提交的改动，然后重试。",
 };

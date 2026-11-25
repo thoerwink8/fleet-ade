@@ -46,6 +46,7 @@ import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingsRow } from "./settingsLayout";
 import { ProviderSettingsForm, deriveProviderSettingsFields } from "./ProviderSettingsForm";
+import { AdvancedSettings } from "./AdvancedSettings";
 import { WizardPanel, WizardPopup, WizardHeader, WizardFooter } from "../ui/wizard";
 import {
   ADD_PROVIDER_WIZARD_STEPS,
@@ -648,41 +649,45 @@ export function AddProviderInstanceDialog({
                     />
                   }
                 />
-                <SettingsRow
-                  title={<label htmlFor="add-provider-instance-id">智能体 ID</label>}
-                  description={
-                    <span id="add-provider-instance-id-description">字母、数字、“-”或“_”。</span>
-                  }
-                  status={
-                    showInstanceIdError ? (
-                      <span
-                        id="add-provider-instance-id-error"
-                        role="alert"
-                        className="text-destructive"
-                      >
-                        {instanceIdError}
+                <AdvancedSettings targetIds={[]} forceOpen={showInstanceIdError}>
+                  <SettingsRow
+                    title={<label htmlFor="add-provider-instance-id">智能体 ID</label>}
+                    description={
+                      <span id="add-provider-instance-id-description">
+                        默认根据标签自动生成并去重；可在此修改。
                       </span>
-                    ) : undefined
-                  }
-                  control={
-                    <Input
-                      id="add-provider-instance-id"
-                      aria-describedby={
-                        showInstanceIdError
-                          ? "add-provider-instance-id-description add-provider-instance-id-error"
-                          : "add-provider-instance-id-description"
-                      }
-                      size="sm"
-                      className="w-full @min-[32rem]/settings-row:w-56"
-                      placeholder={`${driver}_work`}
-                      value={instanceId}
-                      onChange={(event) => {
-                        setIdentityDraft({ instanceIdOverride: event.target.value });
-                      }}
-                      aria-invalid={showInstanceIdError}
-                    />
-                  }
-                />
+                    }
+                    status={
+                      showInstanceIdError ? (
+                        <span
+                          id="add-provider-instance-id-error"
+                          role="alert"
+                          className="text-destructive"
+                        >
+                          {instanceIdError}
+                        </span>
+                      ) : undefined
+                    }
+                    control={
+                      <Input
+                        id="add-provider-instance-id"
+                        aria-describedby={
+                          showInstanceIdError
+                            ? "add-provider-instance-id-description add-provider-instance-id-error"
+                            : "add-provider-instance-id-description"
+                        }
+                        size="sm"
+                        className="w-full @min-[32rem]/settings-row:w-56"
+                        placeholder={`${driver}_work`}
+                        value={instanceId}
+                        onChange={(event) => {
+                          setIdentityDraft({ instanceIdOverride: event.target.value });
+                        }}
+                        aria-invalid={showInstanceIdError}
+                      />
+                    }
+                  />
+                </AdvancedSettings>
                 <SettingsRow
                   title="强调色"
                   description="选择器中显示的可选标记。"

@@ -1624,6 +1624,12 @@ export const ServerSettingsOperation = Schema.Literals([
   "prepare-directory",
 ]);
 export type ServerSettingsOperation = typeof ServerSettingsOperation.Type;
+export const ServerSettingsWriteFailureReason = Schema.Literals([
+  "permission_denied",
+  "disk_full",
+  "write_failed",
+]);
+export type ServerSettingsWriteFailureReason = typeof ServerSettingsWriteFailureReason.Type;
 
 export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>()(
   "ServerSettingsError",
@@ -1633,6 +1639,8 @@ export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>
     providerInstanceId: Schema.optional(Schema.String),
     environmentVariable: Schema.optional(Schema.String),
     cause: Schema.optional(Schema.Defect()),
+    reason: ForwardCompatibleOptional(ServerSettingsWriteFailureReason),
+    detail: Schema.optional(Schema.String),
   },
 ) {
   override get message(): string {
@@ -1642,7 +1650,8 @@ export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>
       this.environmentVariable === undefined
         ? ""
         : ` and environment variable ${this.environmentVariable}`;
-    return `Server settings ${this.operation} failed${provider}${variable} at ${this.settingsPath}.`;
+    const reason = this.reason === undefined ? "" : ` (${this.reason})`;
+    return `Server settings ${this.operation} failed${provider}${variable}${reason}.`;
   }
 }
 

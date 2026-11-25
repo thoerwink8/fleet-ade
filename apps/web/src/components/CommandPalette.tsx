@@ -269,6 +269,7 @@ import { openUseInAnotherApp } from "./mcp/UseInAnotherAppDialog";
 import { openShortcutCheatsheet } from "./ShortcutCheatsheet";
 import { ProjectContentSearchDialog } from "./search/ProjectContentSearchDialog";
 import { settingsForThisPlatform, SETTINGS_SECTION_LABELS } from "./settings/settingsSearch";
+import { multiEnvironmentControlsVisible } from "./settings/settingsScopeAxis";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { resolveShortcutCommand, threadJumpIndexFromCommand } from "../keybindings";
 import { CommandDialog, CommandDialogPopup, CommandFooterAction } from "./ui/command";
@@ -1560,6 +1561,17 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+  actionItems.push({
+    kind: "action",
+    value: "action:reopen-closed-view",
+    searchTerms: ["reopen", "closed", "tab", "view", "重新打开"],
+    title: "重新打开已关闭的标签页",
+    icon: <RotateCcwIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "view.reopenClosed",
+    run: async () => {
+      window.dispatchEvent(new CustomEvent("t3:reopen-closed-view"));
+    },
+  });
 
   actionItems.push({
     kind: "action",
@@ -1700,17 +1712,19 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
-  actionItems.push({
-    kind: "action",
-    value: "action:fleet",
-    searchTerms: ["fleet", "machines", "机群", "看板"],
-    title: "打开机群",
-    icon: <NetworkIcon className={ITEM_ICON_CLASS} />,
-    shortcutCommand: "fleet.open",
-    run: async () => {
-      await navigate({ to: "/fleet" });
-    },
-  });
+  if (multiEnvironmentControlsVisible(environments)) {
+    actionItems.push({
+      kind: "action",
+      value: "action:fleet",
+      searchTerms: ["fleet", "machines", "机群", "看板"],
+      title: "打开机群",
+      icon: <NetworkIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: "fleet.open",
+      run: async () => {
+        await navigate({ to: "/fleet" });
+      },
+    });
+  }
 
   for (const direction of [1, -1] as const) {
     const title = direction === 1 ? "聚焦下一个面板区域" : "聚焦上一个面板区域";
