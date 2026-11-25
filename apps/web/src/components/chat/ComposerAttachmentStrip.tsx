@@ -355,7 +355,7 @@ export function ComposerAttachmentFileList({
             <button
               type="button"
               disabled={needsReattach}
-              className="min-w-0 flex-1 truncate text-left hover:underline focus-visible:outline-2"
+              className="ade-touch-target ade-touch-target--y min-w-0 flex-1 truncate text-left hover:underline focus-visible:outline-2"
               onClick={() => onPreviewFile(file.id)}
             >
               {file.name}
@@ -377,40 +377,42 @@ export function ComposerAttachmentFileList({
                 formatAttachmentSize(file.sizeBytes)
               )}
             </span>
-            {!needsReattach && upload?.status === "failed" ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      icon
-                      onClick={() =>
-                        retryAttachmentUpload({
-                          environmentId,
-                          image: file,
-                          draftTarget: attachmentDraftTarget,
-                        })
-                      }
-                      disabled={!canOperateThread}
-                      aria-label={`重新上传 ${file.name}`}
-                    />
-                  }
-                >
-                  <RefreshIcon />
-                </TooltipTrigger>
-                <TooltipPopup side="top">{upload.reason}</TooltipPopup>
-              </Tooltip>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="xs"
-              icon
-              onClick={() => onRemoveFile(file.id)}
-              aria-label={`移除 ${file.name}`}
-            >
-              <XIcon />
-            </Button>
+            <span className="ade-touch-row ade-touch-row--gap-5 flex shrink-0 items-center gap-1 pointer-coarse:gap-5">
+              {!needsReattach && upload?.status === "failed" ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        icon
+                        onClick={() =>
+                          retryAttachmentUpload({
+                            environmentId,
+                            image: file,
+                            draftTarget: attachmentDraftTarget,
+                          })
+                        }
+                        disabled={!canOperateThread}
+                        aria-label={`重新上传 ${file.name}`}
+                      />
+                    }
+                  >
+                    <RefreshIcon />
+                  </TooltipTrigger>
+                  <TooltipPopup side="top">{upload.reason}</TooltipPopup>
+                </Tooltip>
+              ) : null}
+              <Button
+                variant="ghost"
+                size="xs"
+                icon
+                onClick={() => onRemoveFile(file.id)}
+                aria-label={`移除 ${file.name}`}
+              >
+                <XIcon />
+              </Button>
+            </span>
           </div>
         );
       })}

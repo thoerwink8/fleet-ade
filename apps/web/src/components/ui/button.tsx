@@ -189,6 +189,7 @@ const inlineButtonVariants = cva(
       touchTarget: {
         compact:
           "justify-center max-md:-my-1.5 max-md:min-h-8 max-md:min-w-8 pointer-coarse:-my-1.5 pointer-coarse:min-h-8 pointer-coarse:min-w-8",
+        expand: "ade-touch-target",
         padded: "pointer-coarse:min-h-11 pointer-coarse:px-1.5",
       },
       tone: {
