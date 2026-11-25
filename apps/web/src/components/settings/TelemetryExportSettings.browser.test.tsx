@@ -96,7 +96,7 @@ describe("TelemetryExportSettings", () => {
       environmentId: "env",
       input: { patch: { observability: { otlpMetricsUrl: "http://new/v1/metrics" } } },
     });
-    expect(container.textContent).toContain("已保存。重启服务器后生效。");
+    expect(container.textContent).toContain("已保存。重启后台服务后生效。");
   });
 
   it("reports and tests the endpoint the environment set over an empty setting", async () => {
@@ -117,7 +117,7 @@ describe("TelemetryExportSettings", () => {
     };
     await using screen = await render(<TelemetryExportSettings />);
 
-    await expect.element(screen.getByText("由环境设置 · 已连接 · 12 ms")).toBeInTheDocument();
+    await expect.element(screen.getByText("由环境变量设置 · 已连接 · 12 ms")).toBeInTheDocument();
     await expect
       .element(
         screen.getByText("运行中：http://collector/v1/traces 来自 OTEL_EXPORTER_OTLP_ENDPOINT"),

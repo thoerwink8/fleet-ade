@@ -191,7 +191,7 @@ it("shows the disconnected source state instead of loading when offline and no r
   });
 
   await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
-  await expect.element(page.getByText("汇总机 远端机 连不上")).toBeVisible();
+  await expect.element(page.getByText("汇总电脑 远端机 连不上")).toBeVisible();
   await expect.element(page.getByText("连不上", { exact: true })).toBeVisible();
   await expect.element(page.getByRole("link", { name: "去连接" })).toBeVisible();
 });
@@ -232,7 +232,7 @@ it("hides the loading badge and search box on zero-environment, forbidden, and r
   setup({ readableIds: [], rows: new Map(), summaryStatus: "loading" });
   mocks.environments = [];
   await using screenZero = await render(<FleetBoardPage />, { router: "/fleet" });
-  await expect.element(page.getByText("还没有连上的环境")).toBeVisible();
+  await expect.element(page.getByText("还没有连上的电脑")).toBeVisible();
   await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
   await expect
     .element(page.getByRole("searchbox", { name: "搜索机群任务" }))

@@ -48,7 +48,7 @@ function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentI
         <WizardHeader title={title} />
         <WizardPanel>
           {environment === null ? (
-            <p className="text-sm text-muted-foreground">请先连接一个环境。</p>
+            <p className="text-sm text-muted-foreground">请先连接一台电脑。</p>
           ) : mcpUrl === null ? (
             <p className="text-sm text-muted-foreground">
               请先连接 {environment.label}。连接后，这里会给出它的 MCP 地址。

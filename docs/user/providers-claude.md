@@ -1,15 +1,15 @@
 # Claude
 
-T3 Code uses Claude Code's login and configuration. Start with the default provider
-for one account; [provider setup](./install.md#providers) covers installation and
-shared provider settings.
+Fleet ADE uses Claude Code's login and configuration. Start with the default agent
+for one account; [agent setup](./install.md#agents) covers installation and
+shared agent settings.
 
 ## Separate accounts or configurations
 
 Use a separate Claude config directory for each account. This also works for named
 presets that need different Claude settings or a router connection.
 
-Keep your existing account in the default directory. On the environment's machine,
+Keep your existing account in the default directory. On that computer,
 create the second login:
 
 ```bash
@@ -17,9 +17,9 @@ mkdir -p ~/.claude_personal
 CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
 ```
 
-Add another Claude instance in **Settings > Providers**:
+Add another Claude agent in **Settings > Agents**:
 
-| Instance        | Binary path | CLAUDE_CONFIG_DIR path |
+| Agent           | Binary path | CLAUDE_CONFIG_DIR path |
 | --------------- | ----------- | ---------------------- |
 | Claude Work     | `claude`    | Leave empty            |
 | Claude Personal | `claude`    | `~/.claude_personal`   |
@@ -27,27 +27,27 @@ Add another Claude instance in **Settings > Providers**:
 An empty config-directory setting uses Claude Code's normal configuration. The
 custom setting changes `CLAUDE_CONFIG_DIR`, leaving `HOME` and the system keychain
 location intact. Use the same variable for the login command. Setting `HOME`
-instead can put credentials where this provider will not find them.
+instead can put credentials where this agent will not find them.
 
-Check the account reported in provider settings after signing in. Existing
-threads can switch only between Claude instances with the same config directory.
+Check the account reported in agent settings after signing in. Existing
+threads can switch only between Claude agents with the same config directory.
 Separate account directories stay isolated, including their local conversation
 state. Claude does not have Codex's shared-home and shadow-home arrangement.
 
-For presets that differ only in API keys or endpoints, use the instance's
+For presets that differ only in API keys or endpoints, use the agent's
 **Environment variables**. Variable assignments do not belong in **Launch arguments**.
 
 File paths in the `--settings` and `--append-system-prompt-file` launch arguments
-can start with `~` for the home directory of the machine running T3 Code. Any
+can start with `~` for the home directory of the computer running Fleet ADE. Any
 other relative path is read from the thread's project folder, or its worktree.
 
 Claude Code's verbose mode can stay enabled when you use Claude for text generation, including
-thread titles, branch names, commit messages, and pull request descriptions. On a remote connection,
-T3 Code uses the Claude configuration on the connected server.
+thread titles, branch names, commit messages, and PR descriptions. On a remote connection,
+Fleet ADE uses the Claude configuration on the connected computer.
 
 ## Compact long conversations
 
-Set **Auto-compact after** in the Claude provider settings to an integer between
+Set **Auto-compact after** in the Claude agent settings to an integer between
 `100000` and `1000000`. For example, `300000` asks Claude to summarize at about
 300,000 tokens. This changes when compaction happens, not the model's context
 window. Leave it empty for Claude Code's default.
@@ -64,13 +64,13 @@ history for that message. The cache lasts about an hour on a Claude
 subscription and 5 minutes with an API key, Bedrock, or Vertex. See [commands and skills](./composer.md#commands-and-skills) for using
 composer commands.
 
-**Compact idle threads** in **Settings > Providers > Advanced** controls this for threads
-over 200,000 tokens. Each Claude provider's settings can override it:
+**Compact idle threads** in **Settings > Agents > Advanced** controls this for threads
+over 200,000 tokens. Each Claude agent's settings can override it:
 
 - **When you return** shows the **Compact** chip described above. This is the default.
 - **Before the cache expires (beta)** tries to compact an idle thread shortly before its
   prompt cache expires, while the history is still cached.
-  The compaction appears in the thread as a `/compact` turn sent by T3 Code.
+  The compaction appears in the thread as a `/compact` turn sent by Fleet ADE.
   If the window is missed, such as when you enable this mode after the cache has
   expired or the server restarts before compaction runs, it falls back to
   **When you return**. Switch the chip to **Keep** to keep the full history for that message.
@@ -101,27 +101,27 @@ which refuses skills reserved for manual invocation.
 ## Task lists
 
 To show Claude task lists in the web and desktop apps, add
-`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` under **Variables** in the Claude instance's
-**Environment** section in **Settings > Providers**. Each update shows as a Tasks
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` under **Environment variables** in the Claude agent
+settings in **Settings > Agents**. Each update shows as a Tasks
 row in the thread; open it to see every step.
 
 ## Claude in Chrome
 
 Claude threads can use the Claude in Chrome extension, which works in your own
-Chrome with its sign-ins. T3 Code sessions load it only when asked: add `--chrome`
-to **Launch arguments** in the Claude instance's settings in **Settings > Providers**.
+Chrome with its sign-ins. Fleet ADE sessions load it only when asked: add `--chrome`
+to **Launch arguments** in the Claude agent's settings in **Settings > Agents**.
 It applies to sessions that start after you save. Set up the extension as you would
 for Claude Code first; see Claude Code's [Chrome guide](https://code.claude.com/docs/en/chrome).
 
-The instance must be signed in with `/login` on a direct Anthropic plan. Instances
+The agent must be signed in with `/login` on a direct Anthropic plan. Agents
 that use an API key or a `claude setup-token` token don't get it, even with
 `--chrome`, and neither do third-party providers such as Amazon Bedrock. Claude Code
 doesn't support it in WSL.
 
 ## OpenRouter
 
-Create a Claude instance with its own config directory, such as
-`~/.claude_openrouter`, and keep **Binary path** set to `claude`. In that instance's
+Create a Claude agent with its own config directory, such as
+`~/.claude_openrouter`, and keep **Binary path** set to `claude`. In that agent's
 **Environment variables**, use:
 
 | Variable               | Value                                     |
@@ -134,11 +134,11 @@ If that Claude config directory has a cached Anthropic login, run `/logout` in a
 Claude Code session using that directory before starting the router setup. Cached
 login credentials can conflict with the router token.
 
-Select the model you want in T3 Code. For an OpenRouter model outside the built-in
-list, open that Claude instance in **Settings > Providers** and add its full model
-ID with **Add custom model**. Then select it in the chat model picker.
+Select the model you want in Fleet ADE. For an OpenRouter model outside the built-in
+list, open that Claude agent in **Settings > Agents** and add its full model
+ID with **Add custom model**. Then select it in the composer model picker.
 `ANTHROPIC_DEFAULT_*_MODEL` variables map Claude Code aliases such as `sonnet`; they
-do not replace the explicit model ID selected in T3 Code. Custom models may have
+do not replace the explicit model ID selected in Fleet ADE. Custom models may have
 fewer effort, thinking, or context controls than built-in models.
 
 Verify the model used in OpenRouter's activity dashboard. For current compatibility
@@ -147,8 +147,8 @@ requirements, use the
 
 ## Other routers
 
-A local router uses an ordinary Claude provider instance. Give it a separate
+A local router uses an ordinary Claude agent. Give it a separate
 config directory and put the router's endpoint and credential variables in that
-instance's **Environment variables**. The router must run where the environment
+agent's **Environment variables**. The router must run where that computer
 can reach it. Follow the [Claude Code Router instructions](https://github.com/musistudio/claude-code-router)
 for its installation and routing configuration.

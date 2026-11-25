@@ -19,7 +19,7 @@ export function LinkAccessPicker({
   return (
     <div className="space-y-1.5">
       <span id={labelId} className="block text-meta font-medium">
-        这里的智能体在另一环境中的权限
+        这里的智能体在另一台电脑中的权限
       </span>
       <Select
         value={value}
@@ -54,8 +54,8 @@ export function LinkAccessPicker({
         </SelectPopup>
       </Select>
       <p className="text-xs text-muted-foreground">
-        {selected.description}{" "}
-        智能体在另一环境中的权限不会高于它在这里的运行模式。未授予完全访问权限时，它只能更改通过此连接启动的会话，不能更改该机器自身的会话、项目或设置。
+        {selected.description}
+        智能体在另一台电脑中的权限不会高于它在这里的运行模式。未授予完全访问权限时，它只能更改通过此连接启动的会话，不能更改这台电脑自身的会话、项目或设置。
       </p>
     </div>
   );

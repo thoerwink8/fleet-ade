@@ -69,7 +69,7 @@ export function EnvironmentRoutesList({
   const confirmRemove = async (route: ConnectionRoute) => {
     const address = connectionRouteAddress(route);
     const confirmed = await requestConfirmDialog(
-      `${connectionRouteLabel(route)}${address === null ? "" : `（${address}）`}会从这个环境的线路里移除，需要时要重新添加。`,
+      `${connectionRouteLabel(route)}${address === null ? "" : `（${address}）`}会从这台电脑的线路里移除，需要时要重新添加。`,
       { title: "移除这条线路？", confirmLabel: "移除", variant: "destructive" },
     );
     if (confirmed !== true) return;

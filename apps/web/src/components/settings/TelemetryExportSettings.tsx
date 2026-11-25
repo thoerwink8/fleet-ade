@@ -40,7 +40,7 @@ const SIGNALS = [
 type SignalDescriptor = (typeof SIGNALS)[number];
 type SignalKey = SignalDescriptor["key"];
 
-const OVERRIDE_LABELS = { environment: "由环境设置", bootstrap: "由桌面端设置" } as const;
+const OVERRIDE_LABELS = { environment: "由环境变量设置", bootstrap: "由桌面端设置" } as const;
 
 function runningOverride(
   running: ServerObservability | undefined,
@@ -76,7 +76,7 @@ export function TelemetryExportSettings() {
   if (scope.kind !== "environment" || !environment) {
     return (
       <SettingsSection title="OpenTelemetry 导出" id="telemetry-export">
-        <SettingsScopeNotice target="environment">选择一个环境来配置遥测导出。</SettingsScopeNotice>
+        <SettingsScopeNotice target="environment">选择一台电脑来配置遥测导出。</SettingsScopeNotice>
       </SettingsSection>
     );
   }
@@ -162,16 +162,16 @@ function TelemetryExportForm() {
           setSaving(false);
           if (result._tag === "Success") {
             setDraft({});
-            setMessage("已保存。重启服务器后生效。");
+            setMessage("已保存。重启后台服务后生效。");
           }
         }}
       >
         <p className="text-xs text-muted-foreground">
-          将追踪、指标和日志发送到OTLP的HTTP接收端。重启服务器后生效。环境变量会覆盖这些设置。
+          将追踪、指标和日志发送到OTLP的HTTP接收端。重启后台服务后生效。环境变量会覆盖这些设置。
         </p>
         {!canEdit && (
           <p className="text-xs text-muted-foreground">
-            此连接无权修改 {environment?.label ?? "所选环境"} 上的设置。
+            此连接无权修改 {environment?.label ?? "所选电脑"} 上的设置。
           </p>
         )}
         {SIGNALS.map((descriptor) => {

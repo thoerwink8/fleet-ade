@@ -272,9 +272,9 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "chat-width",
-    title: "聊天宽度",
+    title: "会话宽度",
     to: "/settings/appearance",
-    searchTerms: ["wide full width column layout messages composer monitor"],
+    searchTerms: ["wide full width column layout messages composer monitor", "聊天宽度 聊天 对话"],
   },
   {
     id: "thread-details-items",
@@ -661,18 +661,20 @@ export const SETTINGS_SEARCH_ITEMS = [
   ...KEYBINDING_SEARCH_ITEMS,
   {
     id: "providers",
-    title: "智能体提供方",
+    title: "智能体",
     to: "/settings/providers",
     searchTerms: [
       "agents cli codex claude grok antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
+      "账号 提供方 提供方实例 提供商 实例",
     ],
   },
   {
     id: "usage-providers",
-    title: "用量数据提供方",
+    title: "用量来源",
     to: "/settings/providers",
     searchTerms: [
       "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
+      "用量数据提供方 提供方 提供商",
     ],
     providerSettingsOnly: true,
   },
@@ -791,16 +793,22 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "environment-icon",
-    title: "环境图标",
+    title: "电脑图标",
     to: "/settings/connections",
     targetId: "connections-environment",
-    searchTerms: ["machine glyph sidebar mac mini studio laptop desktop server cloud vm"],
+    searchTerms: [
+      "machine glyph sidebar mac mini studio laptop desktop server cloud vm",
+      "环境图标 环境 机器",
+    ],
   },
   {
     id: "local-environment",
-    title: "本地环境",
+    title: "本机后台服务",
     to: "/settings/connections",
-    searchTerms: ["turn off on disable enable local server agents remote only restart"],
+    searchTerms: [
+      "turn off on disable enable local server agents remote only restart",
+      "本地环境 环境 后端 服务器",
+    ],
     desktopOnly: true,
   },
   {
@@ -822,10 +830,11 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "wsl-backend",
-    title: "WSL 后端",
+    title: "WSL 后台服务",
     to: "/settings/connections",
     searchTerms: [
       "windows subsystem linux distro second server projects stop windows backend restart wsl only",
+      "后端 服务器",
     ],
     desktopOnly: true,
     windowsOnly: true,
@@ -838,21 +847,28 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/connections",
     searchTerms: [
       "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
+      "配对 配对码 配对链接 已授权的客户端 令牌 引导凭据",
     ],
   },
   {
     id: "linked-environments",
     peerLinksOnly: true,
-    title: "关联环境",
+    title: "关联电脑",
     to: "/settings/connections",
     targetId: "linked-environments",
-    searchTerms: ["link peer another machine vps agents work there handoff pairing code"],
+    searchTerms: [
+      "link peer another machine vps agents work there handoff pairing code",
+      "关联环境 环境 配对 配对码 电脑",
+    ],
   },
   {
     id: "remote-environments",
-    title: "环境",
+    title: "电脑",
     to: "/settings/connections",
-    searchTerms: ["add pair backend host code ssh config agent tunnel saved"],
+    searchTerms: [
+      "add pair backend host code ssh config agent tunnel saved",
+      "环境 机器 主机 服务器 设备 关联电脑 配对 配对码",
+    ],
   },
   {
     id: "load-balancing",
@@ -872,9 +888,9 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "secret-providers",
-    title: "凭据提供方",
+    title: "密钥来源",
     to: "/settings/connections",
-    searchTerms: ["vault credentials api key"],
+    searchTerms: ["vault credentials api key", "凭据提供方 提供方 凭据"],
     secretsFeatureOnly: true,
   },
   {

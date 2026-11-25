@@ -199,7 +199,7 @@ function InstanceSessionManagement(
       setNextCursor(result.value.nextCursor);
       return;
     }
-    reportFailure("无法列出 ACP 运行实例", result);
+    reportFailure("无法列出 ACP 原生会话", result);
   };
 
   const importNativeSession = async (session: AcpRegistrySession) => {
@@ -233,11 +233,11 @@ function InstanceSessionManagement(
       );
       toastManager.add({
         type: "success",
-        title: result.value.imported ? "已导入 ACP 运行实例" : "ACP 运行实例已导入",
+        title: result.value.imported ? "已导入 ACP 原生会话" : "ACP 原生会话已导入",
       });
       return;
     }
-    reportFailure("无法导入 ACP 运行实例", result);
+    reportFailure("无法导入 ACP 原生会话", result);
   };
 
   const deleteNativeSession = async (session: AcpRegistrySession) => {
@@ -245,8 +245,8 @@ function InstanceSessionManagement(
     if (projectId === null || deletingSessionId !== null || session.importedThreadId !== null)
       return;
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `“${session.title ?? session.sessionId}”是 ACP 的原生运行实例，删除后无法恢复。`,
-      { title: "永久删除这个运行实例？", confirmLabel: "删除", variant: "destructive" },
+      `“${session.title ?? session.sessionId}”是 ACP 的原生会话，删除后无法恢复。`,
+      { title: "永久删除这个原生会话？", confirmLabel: "删除", variant: "destructive" },
     );
     if (
       generation !== projectGeneration.current ||
@@ -265,10 +265,10 @@ function InstanceSessionManagement(
       setSessions((current) =>
         current.filter((candidate) => candidate.sessionId !== session.sessionId),
       );
-      toastManager.add({ type: "success", title: "已删除 ACP 运行实例" });
+      toastManager.add({ type: "success", title: "已删除 ACP 原生会话" });
       return;
     }
-    reportFailure("无法删除 ACP 运行实例", result);
+    reportFailure("无法删除 ACP 原生会话", result);
   };
 
   const loadProviders = async (resetProviderId?: string) => {
@@ -299,7 +299,7 @@ function InstanceSessionManagement(
       );
       return;
     }
-    reportFailure("无法列出 ACP 提供方", result);
+    reportFailure("无法列出 ACP 模型服务", result);
   };
 
   const saveProvider = async (provider: AcpRegistryConfigurableProvider) => {
@@ -317,7 +317,7 @@ function InstanceSessionManagement(
     if (!parsedHeaders.ok) {
       toastManager.add({
         type: "error",
-        title: "提供方请求头无效",
+        title: "模型服务请求头无效",
         description: parsedHeaders.error,
       });
       return;
@@ -338,11 +338,11 @@ function InstanceSessionManagement(
     if (generation !== projectGeneration.current) return;
     setSavingProviderId(null);
     if (result._tag === "Success") {
-      toastManager.add({ type: "success", title: "已配置 ACP 提供方" });
+      toastManager.add({ type: "success", title: "已配置 ACP 模型服务" });
       await loadProviders(provider.providerId);
       return;
     }
-    reportFailure("无法配置 ACP 提供方", result);
+    reportFailure("无法配置 ACP 模型服务", result);
   };
 
   const disableConfiguredProvider = async (provider: AcpRegistryConfigurableProvider) => {
@@ -351,7 +351,7 @@ function InstanceSessionManagement(
       return;
     const confirmed = await ensureLocalApi().dialogs.confirm(
       `“${provider.providerId}”会被停用，停用后不能再使用它。`,
-      { title: "停用这个 ACP 提供方？", confirmLabel: "停用", variant: "destructive" },
+      { title: "停用这个 ACP 模型服务？", confirmLabel: "停用", variant: "destructive" },
     );
     if (
       generation !== projectGeneration.current ||
@@ -367,11 +367,11 @@ function InstanceSessionManagement(
     if (generation !== projectGeneration.current) return;
     setSavingProviderId(null);
     if (result._tag === "Success") {
-      toastManager.add({ type: "success", title: "已停用 ACP 提供方" });
+      toastManager.add({ type: "success", title: "已停用 ACP 模型服务" });
       await loadProviders(provider.providerId);
       return;
     }
-    reportFailure("无法停用 ACP 提供方", result);
+    reportFailure("无法停用 ACP 模型服务", result);
   };
 
   const logoutProvider = async () => {
@@ -394,10 +394,10 @@ function InstanceSessionManagement(
   return (
     <div className="grid gap-3">
       <SettingsRow
-        title="原生运行实例"
-        description="将智能体的原生运行实例导入 Fleet ADE 会话并继续。"
+        title="原生会话"
+        description="将智能体的原生会话导入 Fleet ADE 会话并继续。"
         status={
-          canList && props.projects.length === 0 ? "请先添加项目，再导入运行实例。" : undefined
+          canList && props.projects.length === 0 ? "请先添加项目，再导入原生会话。" : undefined
         }
         control={
           <div className="flex flex-wrap items-center gap-2">
@@ -422,7 +422,7 @@ function InstanceSessionManagement(
                     props.onProjectChange(value as ProjectId);
                   }}
                 >
-                  <SelectTrigger aria-label="ACP 运行实例所属项目" className="w-40" size="sm">
+                  <SelectTrigger aria-label="ACP 原生会话所属项目" className="w-40" size="sm">
                     <SelectValue>
                       {props.projects.find((project) => project.id === projectId)?.title}
                     </SelectValue>
@@ -442,7 +442,7 @@ function InstanceSessionManagement(
                   disabled={!canRead || loading || projectId === null}
                   onClick={() => void loadSessions()}
                 >
-                  {loading ? "正在加载" : sessions.length === 0 ? "列出运行实例" : "刷新"}
+                  {loading ? "正在加载" : sessions.length === 0 ? "列出原生会话" : "刷新"}
                 </Button>
               </>
             ) : null}
@@ -526,7 +526,7 @@ function InstanceSessionManagement(
         <div className="grid gap-3 border-t border-border/60 px-3 py-3 sm:px-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-meta font-medium text-foreground">智能体提供方</p>
+              <p className="text-meta font-medium text-foreground">模型服务</p>
               <p className="text-xs text-muted-foreground">
                 配置不含凭据的路由信息。请求头只能写入，无法读取。
               </p>
@@ -540,7 +540,7 @@ function InstanceSessionManagement(
               }
               onClick={() => void loadProviders()}
             >
-              {loadingProviders ? "正在加载" : providers.length === 0 ? "列出提供方" : "刷新"}
+              {loadingProviders ? "正在加载" : providers.length === 0 ? "列出模型服务" : "刷新"}
             </Button>
           </div>
 
@@ -553,7 +553,7 @@ function InstanceSessionManagement(
                 props.onProjectChange(value as ProjectId);
               }}
             >
-              <SelectTrigger aria-label="ACP 提供方所属项目" className="min-w-48" size="xs">
+              <SelectTrigger aria-label="ACP 模型服务所属项目" className="min-w-48" size="xs">
                 <SelectValue>
                   {props.projects.find((project) => project.id === projectId)?.title}
                 </SelectValue>

@@ -109,7 +109,7 @@ describe("candidate display", () => {
     ).toEqual({
       name: "gpt-6-luna",
       slug: "gpt-6-luna",
-      unavailableReason: "此环境上没有这个提供方。",
+      unavailableReason: "这台电脑上没有这个智能体。",
     });
     expect(
       pipelineCandidateDisplay({

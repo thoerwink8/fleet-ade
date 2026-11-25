@@ -114,7 +114,7 @@ export function ProjectActionsSettings() {
         settingKeys={["defaultProjectScripts"]}
         mixed={mixed}
         title="操作"
-        description="在此项目的工作副本或工作树中运行的命令，可设置快捷键。"
+        description="在此项目的项目目录或工作树中运行的命令，可设置快捷键。"
         onResetOverride={() => void persist(() => null)}
         control={
           <div className="flex flex-wrap items-center gap-1.5">
@@ -138,7 +138,7 @@ export function ProjectActionsSettings() {
                   <MenuGroup>
                     <MenuGroupLabel>从 t3.json 导入</MenuGroupLabel>
                     <p className="px-2 pb-2 text-pretty text-sm text-muted-foreground">
-                      直接添加此工作副本声明的操作，无需先编辑。
+                      直接添加此项目目录声明的操作，无需先编辑。
                     </p>
                   </MenuGroup>
                   <MenuSeparator />
@@ -173,8 +173,8 @@ export function ProjectActionsSettings() {
       />
       {mixed ? (
         <SettingsRow
-          title="各工作副本的操作不一致"
-          description="请把上方的选择缩小到一个工作副本，再编辑它的列表。在这里添加操作会加到每一个选中的工作副本。"
+          title="各项目目录的操作不一致"
+          description="请把上方的选择缩小到一个项目目录，再编辑它的列表。在这里添加操作会加到每一个选中的项目目录。"
         />
       ) : (
         <ProjectActionsList
@@ -187,7 +187,7 @@ export function ProjectActionsSettings() {
       {t3File.status === "invalid" ? (
         <SettingsRow
           title="t3.json 无效"
-          description="此工作副本的 t3.json 无法解析，其中声明的所有操作和图标都会忽略。请检查 JSON 语法和图标值。"
+          description="此项目目录的 t3.json 无法解析，其中声明的所有操作和图标都会忽略。请检查 JSON 语法和图标值。"
           className="text-warning"
         />
       ) : null}

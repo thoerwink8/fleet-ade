@@ -135,9 +135,9 @@ describe("project removal confirmation", () => {
       ],
     });
     expect(plan.projectThreads).toHaveLength(3);
-    expect(plan.confirmationTitle).toBe("移除“仓库”这个条目并删除它的 1 个会话？");
+    expect(plan.confirmationTitle).toBe("移除“仓库”这个条目并永久删除它的 1 个会话？");
     expect(plan.confirmationMessage).toBe(
-      "路径：/work/repo\n电脑：本地\n这些会话及所有已归档会话将从 Fleet ADE 中删除。智能体会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。",
+      "路径：/work/repo\n电脑：本地\n这些会话及所有已归档会话将被永久删除。智能体会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。",
     );
   });
 
@@ -152,9 +152,7 @@ describe("project removal confirmation", () => {
     expect(plan.targetKind).toBe("checkout");
     expect(plan.confirmationMessage).toContain("电脑：Remote");
     expect(plan.confirmationMessage).toContain("此项目组中的其他条目不受影响。");
-    expect(plan.confirmationMessage).toContain(
-      "所有已归档会话将从 Fleet ADE 中删除。智能体会话会保留。",
-    );
+    expect(plan.confirmationMessage).toContain("所有已归档会话将被永久删除。智能体会话会保留。");
   });
 
   // regression: #21409 project-wide removal must count every checkout's threads and keep files

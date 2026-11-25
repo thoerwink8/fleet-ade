@@ -6,7 +6,7 @@ import { serverEnvironment } from "../../state/server";
 import { Alert, AlertDescription } from "../ui/alert";
 
 const MULTIPLE_ACCOUNTS_FAQ_URL =
-  "https://github.com/thoerwink8/fleet-ade/blob/main/docs/user/faq.md#can-i-add-a-bunch-of-accounts-for-one-provider";
+  "https://github.com/thoerwink8/fleet-ade/blob/main/docs/user/faq.md#can-i-add-a-bunch-of-accounts-for-one-agent";
 
 const PROVIDER_NAMES = new Map<string, string>([
   ["codex", "Codex"],

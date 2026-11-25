@@ -43,7 +43,7 @@ export function ThreadTitleInstructionsSettings() {
           rows={4}
           defaultValue={mixed ? "" : settings.threadTitleInstructions}
           placeholder={
-            mixed ? "各不相同。输入指令后将应用到所有所选目标。" : "标题保持简短，开头点明主题。"
+            mixed ? "多项不同。输入指令后将应用到所有所选目标。" : "标题保持简短，开头点明主题。"
           }
           onBlur={(event) => {
             const value = event.target.value.trim();

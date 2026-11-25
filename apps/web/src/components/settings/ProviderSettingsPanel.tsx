@@ -211,10 +211,10 @@ function ProviderLastChecked({ environmentId }: { environmentId: EnvironmentId }
 }
 
 function providerEnvironmentDetail(environment: EnvironmentPresentation): string {
-  if (environment.entry.target._tag === "PrimaryConnectionTarget") return "主要设备";
+  if (environment.entry.target._tag === "PrimaryConnectionTarget") return "主电脑";
   if (environment.entry.target._tag === "SshConnectionTarget") return "SSH";
-  if (isDesktopLocalConnectionTarget(environment.entry.target)) return "本地设备";
-  return environment.displayUrl ?? "远程设备";
+  if (isDesktopLocalConnectionTarget(environment.entry.target)) return "本机";
+  return environment.displayUrl ?? "远程电脑";
 }
 
 const providerCardHeightClassName =
@@ -269,10 +269,10 @@ function EnvironmentUnavailablePlaceholder({
 }) {
   const isLoading = access.kind === "loading";
   const title = isLoading
-    ? "正在加载提供方设置"
+    ? "正在加载智能体设置"
     : access.kind === "error"
-      ? "无法连接此设备"
-      : "提供方设置不可用";
+      ? "无法连接这台电脑"
+      : "智能体设置不可用";
   const description = isLoading
     ? access.reason === "permissions"
       ? "正在检查此会话的修改权限。"
@@ -377,7 +377,7 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
     !target.scoped && !onlyPrimaryDevice && options.length > 0 ? (
       <ScrollArea radius="none" hideScrollbars scrollFade className="h-11 min-w-0 flex-1">
         <ToggleGroup
-          aria-label="设备"
+          aria-label="电脑"
           variant="segmented"
           className="my-2"
           value={effectiveEnvironmentId ? [effectiveEnvironmentId] : []}
@@ -429,17 +429,15 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
         <ProviderSettingsPlaceholder
           deviceTabs={deviceTabs}
           icon={<EnvironmentMachineIcon kind={resolveEnvironmentMachineKind(null)} />}
-          title="设备不可用"
-          description="重新连接此设备以设置提供方，或选择其他设备。"
+          title="电脑不可用"
+          description="重新连接这台电脑以设置智能体，或选择其他电脑。"
         />
       ) : null}
       {options.length === 0 && !targetEnvironmentMissing ? (
         <ProviderSettingsPlaceholder
           icon={<EnvironmentMachineIcon kind={resolveEnvironmentMachineKind(null)} />}
-          title={isReady ? "没有已连接的设备" : "正在加载设备"}
-          description={
-            isReady ? "配置提供方前，请先连接一个执行环境。" : "正在读取已连接的执行环境。"
-          }
+          title={isReady ? "没有已连接的电脑" : "正在加载电脑"}
+          description={isReady ? "配置智能体前，请先连接一台电脑。" : "正在读取已连接的电脑。"}
         />
       ) : null}
 
@@ -594,7 +592,7 @@ export function EnvironmentProviderSettings({
           toastManager.add({
             type: "warning",
             title: "认证请求已过期",
-            description: "请刷新提供方并重新开始认证。",
+            description: "请刷新智能体并重新开始认证。",
           });
           return;
         }
@@ -669,7 +667,7 @@ export function EnvironmentProviderSettings({
           stackedThreadToast({
             type: "error",
             title: `无法更新 ${PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver}`,
-            description: error instanceof Error ? error.message : "无法启动提供方更新命令。",
+            description: error instanceof Error ? error.message : "无法启动智能体更新命令。",
           }),
         );
       }
@@ -789,7 +787,7 @@ export function EnvironmentProviderSettings({
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "无法更新提供方实例",
+        title: "无法更新智能体",
         description: error instanceof Error ? error.message : "设置更新失败。",
       });
     }
@@ -823,7 +821,7 @@ export function EnvironmentProviderSettings({
     async (instanceId: ProviderInstanceId, instance: ProviderInstanceConfig) => {
       const confirmed = await confirmProviderInstanceRemoval(
         `移除 ${providerInstanceName(instance)} 智能体？`,
-        { title: "删除这个提供方实例？", confirmLabel: "删除" },
+        { title: "移除这个智能体？", confirmLabel: "移除" },
       );
       if (!confirmed) return;
       const updateResult = await persistProviderInstance({
@@ -834,7 +832,7 @@ export function EnvironmentProviderSettings({
         const error = squashAtomCommandFailure(updateResult);
         toastManager.add({
           type: "error",
-          title: "无法删除提供方实例",
+          title: "无法移除智能体",
           description: error instanceof Error ? error.message : "设置更新失败。",
         });
         return;
@@ -854,7 +852,7 @@ export function EnvironmentProviderSettings({
         const error = squashAtomCommandFailure(uninstallResult);
         toastManager.add({
           type: "warning",
-          title: "已删除提供方，但仍有托管文件残留",
+          title: "已移除智能体，但仍有托管文件残留",
           description: error instanceof Error ? error.message : "清理托管可执行文件失败。",
         });
       }
@@ -869,7 +867,7 @@ export function EnvironmentProviderSettings({
       !resolveProviderInstanceEnabled({ driver: driverKind });
     const confirmed = await confirmProviderInstanceRemoval(
       `将 ${providerInstanceName(instance)} 智能体重置为默认值？`,
-      { title: "把这个提供方恢复为默认？", confirmLabel: "恢复默认" },
+      { title: "把这个智能体恢复为默认？", confirmLabel: "恢复默认" },
       turnsOff ? " 它也会被停用。" : "",
     );
     if (!confirmed) return;
@@ -878,7 +876,7 @@ export function EnvironmentProviderSettings({
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "无法重置提供方实例",
+        title: "无法重置智能体",
         description: error instanceof Error ? error.message : "设置更新失败。",
       });
     }
@@ -972,13 +970,13 @@ export function EnvironmentProviderSettings({
                     size="icon-xs"
                     variant="ghost-muted"
                     onClick={() => setIsAddInstanceDialogOpen(true)}
-                    aria-label="添加提供方"
+                    aria-label="添加智能体"
                   >
                     <PlusIcon />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">添加提供方</TooltipPopup>
+              <TooltipPopup side="top">添加智能体</TooltipPopup>
             </Tooltip>
           ) : null
         }
@@ -997,10 +995,10 @@ export function EnvironmentProviderSettings({
                     onClick={() => void refreshProviders()}
                   >
                     <RefreshIcon refreshing={isRefreshingProviders} />
-                    <span className="sr-only">刷新提供方状态</span>
+                    <span className="sr-only">刷新智能体状态</span>
                     <span className="hidden min-w-0 truncate sm:inline">
                       {isRefreshingProviders ? (
-                        "正在刷新提供方"
+                        "正在刷新智能体"
                       ) : (
                         <ProviderLastChecked environmentId={environmentId} />
                       )}
@@ -1008,7 +1006,7 @@ export function EnvironmentProviderSettings({
                   </Button>
                 }
               />
-              <TooltipPopup side="top">刷新提供方状态</TooltipPopup>
+              <TooltipPopup side="top">刷新智能体状态</TooltipPopup>
             </Tooltip>
           </div>
         }
@@ -1020,7 +1018,7 @@ export function EnvironmentProviderSettings({
           <SettingsGroup divided={false} className="overflow-hidden">
             <SettingsRow
               title="权限受限"
-              description={`此会话可以查看 ${environmentLabel} 的提供方，但无法修改设置。`}
+              description={`此会话可以查看 ${environmentLabel} 的智能体，但无法修改设置。`}
             />
           </SettingsGroup>
         ) : null}
@@ -1046,7 +1044,7 @@ export function EnvironmentProviderSettings({
                     onClick={() => setIsAddInstanceDialogOpen(true)}
                   >
                     <PlusIcon className="size-4 shrink-0" />
-                    添加提供方
+                    添加智能体
                   </button>
                 ) : null}
               </div>
@@ -1063,7 +1061,7 @@ export function EnvironmentProviderSettings({
               </ScrollArea>
             ) : (
               <div className="p-6 text-sm text-muted-foreground">
-                {targetInstanceMissing ? "此提供方实例在该设备上已不可用。" : "尚未配置提供方。"}
+                {targetInstanceMissing ? "此智能体在这台电脑上已不可用。" : "尚未配置智能体。"}
               </div>
             )}
           </div>
@@ -1100,11 +1098,11 @@ export function EnvironmentProviderSettings({
             <span className="inline-flex items-center gap-1.5">
               {searchableSetting("provider-health-check-interval").title}
               <PolicyTooltip>
-                在此设置间隔；计时结束后，由共享的后台活动策略决定是否检查提供方。自定义间隔在维护设置中显示为“高级”。
+                在此设置间隔；计时结束后，由共享的后台活动策略决定是否检查智能体。自定义间隔在维护设置中显示为“高级”。
               </PolicyTooltip>
             </span>
           }
-          description="在后台刷新提供方状态、版本和模型。设为 0 可停用。"
+          description="在后台刷新智能体状态、版本和模型。设为 0 可停用。"
           resetAction={
             providerHealthRefreshIntervalSeconds !== defaultProviderHealthRefreshIntervalSeconds ? (
               <span
@@ -1112,7 +1110,7 @@ export function EnvironmentProviderSettings({
                 className={!canWriteSettings ? "opacity-50" : undefined}
               >
                 <SettingResetButton
-                  label="提供方健康检查间隔"
+                  label="智能体健康检查间隔"
                   onClick={() =>
                     updateSettings(
                       backgroundActivityOverrideSettings(
@@ -1136,7 +1134,7 @@ export function EnvironmentProviderSettings({
               )}
             >
               <IntervalSecondsField
-                label="提供方健康检查间隔"
+                label="智能体健康检查间隔"
                 value={providerHealthRefreshIntervalSeconds}
                 min={0}
                 step={PROVIDER_HEALTH_INTERVAL_STEP_SECONDS}
@@ -1372,7 +1370,7 @@ function ProviderInstanceRow({
       headerAction={
         mode === "editor" && isDefault && isDirty ? (
           <SettingResetButton
-            label={`${resetLabel} 提供方设置`}
+            label={`${resetLabel} 智能体设置`}
             onClick={() => actions.resetDefaultInstance(driver)}
           />
         ) : null

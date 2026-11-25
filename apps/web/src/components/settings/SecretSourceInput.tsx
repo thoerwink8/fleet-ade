@@ -156,7 +156,7 @@ function SecretCheckButton(props: {
     const response = await checkSecretSource({ environmentId, input: { source: secret } });
     const next: SecretCheck =
       response._tag !== "Success"
-        ? { status: "failed", detail: "无法连接服务器" }
+        ? { status: "failed", detail: "无法连接后台服务" }
         : response.value._tag === "Resolved"
           ? { status: "resolved" }
           : { status: "failed", detail: response.value.detail };
@@ -167,7 +167,7 @@ function SecretCheckButton(props: {
 
   if (!supported) return null;
   const description = !canCheck
-    ? "无法在此环境上检查密钥"
+    ? "无法在这台电脑上检查密钥"
     : state === undefined
       ? "检查密钥能否解析"
       : state.status === "checking"

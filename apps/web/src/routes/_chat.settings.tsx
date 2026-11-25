@@ -66,8 +66,8 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         eligibleEnvironmentIds={autoSettlementAvailability.eligibleEnvironmentIds}
       >
         {autoSettlementAvailability.eligibleEnvironmentIds.length > 0
-          ? `${searchTarget.title}需要支持此功能的环境。请选择一个环境以继续。`
-          : `${searchTarget.title}需要支持此功能的环境。请连接或更新环境以继续。`}
+          ? `${searchTarget.title}需要支持此功能的电脑。请选择一台电脑以继续。`
+          : `${searchTarget.title}需要支持此功能的电脑。请连接或更新电脑以继续。`}
       </SettingsScopeNotice>
     );
   }

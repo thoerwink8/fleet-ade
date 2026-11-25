@@ -1,11 +1,11 @@
 # Terminal history
 
-Each terminal keeps up to 5,000 lines and 8 MiB of scrollback on its environment
-server. T3 Code removes the oldest output when either limit is reached. A long
+Each terminal keeps up to 5,000 lines and 8 MiB of scrollback on that computer's
+background service. Fleet ADE removes the oldest output when either limit is reached. A long
 line can be shortened at the start. New terminal output is not truncated.
 
-These limits apply when you reconnect and when T3 Code restores saved terminal
-history. A client can show less scrollback than the server keeps.
+These limits apply when you reconnect and when Fleet ADE restores saved terminal
+history. A client can show less scrollback than the background service keeps.
 
 On web and desktop, use Shift+PageUp and Shift+PageDown to read scrollback
 without leaving terminal input. Ctrl+Shift+Home and Ctrl+Shift+End jump to the
@@ -20,12 +20,12 @@ that menu too.
 
 ## fish
 
-T3 Code starts fish with `no-query-term`, avoiding startup waits for terminal
+Fleet ADE starts fish with `no-query-term`, avoiding startup waits for terminal
 replies. This disables optional fish features that depend on those replies.
-T3 Code's exported `fish_features` also hides any universal flags you set with
+Fleet ADE's exported `fish_features` also hides any universal flags you set with
 `set -U fish_features`.
 
 To preserve those flags or enable queries with `query-term`, include them in
-`fish_features` in the environment that launches T3 Code. A shell export applies
-when you launch T3 Code from that shell; it does not configure a desktop app
+`fish_features` in the environment that launches Fleet ADE. A shell export applies
+when you launch Fleet ADE from that shell; it does not configure a desktop app
 launched from the Dock or Finder. Enabling queries can restore the startup wait.

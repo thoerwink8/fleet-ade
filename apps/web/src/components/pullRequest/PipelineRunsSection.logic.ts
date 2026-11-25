@@ -22,7 +22,7 @@ export const PIPELINE_STATUS_LABEL: Record<PipelineRunStatus, string> = {
   verify: "验收中",
   mergeable: "可合并",
   merged: "已合并",
-  stuck: "卡住",
+  stuck: "出错了",
 };
 
 /** Badge tone for each status. Stuck is the only danger mark. */

@@ -46,7 +46,7 @@ function HighlightedFuzzyText(props: {
 function getEmptyStateMessage(query: string, error: string | null, isPending: boolean): string {
   if (error) return error;
   const isSearching = query.trim().length > 0;
-  if (isPending) return isSearching ? "正在搜索工作区文件…" : "正在索引工作区文件…";
+  if (isPending) return isSearching ? "正在搜索项目文件…" : "正在索引项目文件…";
   return isSearching ? "没有匹配的文件。" : "未找到文件。";
 }
 

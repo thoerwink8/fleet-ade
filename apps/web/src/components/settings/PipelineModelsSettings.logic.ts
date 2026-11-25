@@ -102,7 +102,7 @@ export function pipelineCandidateDisplay(input: {
   );
   const unavailableReason =
     entry === undefined
-      ? "此环境上没有这个提供方。"
+      ? "这台电脑上没有这个智能体。"
       : !entry.enabled
         ? `${entry.displayName} 已关闭。`
         : !entry.isAvailable

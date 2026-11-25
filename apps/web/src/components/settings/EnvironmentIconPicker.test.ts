@@ -9,7 +9,7 @@ describe("resolveEnvironmentIconPickerLock", () => {
   it("waits for a settings grant before allowing changes", () => {
     expect(
       resolveEnvironmentIconPickerLock({ serverConfig: config, operateAccess: "pending" }),
-    ).toContain("你在此环境中的会话无法更改其设置。");
+    ).toContain("你在这台电脑上的会话无法更改其设置。");
     expect(
       resolveEnvironmentIconPickerLock({ serverConfig: config, operateAccess: "granted" }),
     ).toBeNull();

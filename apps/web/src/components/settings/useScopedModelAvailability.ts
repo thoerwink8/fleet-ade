@@ -32,7 +32,7 @@ export function useScopedModelDisabledReason(
       const environment = environments.find(
         (entry) => entry.environmentId === candidate.environmentId,
       );
-      const unavailable = `此模型在 ${environment?.label ?? "所选环境"} 上不可用。请选择该环境，再单独为它选择模型。`;
+      const unavailable = `此模型在 ${environment?.label ?? "所选电脑"} 上不可用。请选择这台电脑，再单独为它选择模型。`;
       const generator = textGeneratorForSelection(candidate.settings, instanceId);
       if (shownGenerator !== undefined || generator !== undefined) {
         // Only the shown environment's model list is loaded; elsewhere it must reach the same API.

@@ -124,5 +124,5 @@ A provider lives in its own `packages/provider-<name>` package, with
 - **Client registration:** the client definition in the web provider registry, and
   settings search terms. Clients draw the package icon; do not add a per-driver icon branch.
 - **Docs:** a `docs/user/providers-<name>.md` guide in the product's voice, a row in the
-  [install](../user/install.md#providers) table, and any provider difference that changes the
+  [install](../user/install.md#agents) table, and any provider difference that changes the
   [permission modes](../user/permission-modes.md) page.

@@ -32,7 +32,7 @@ export function planProjectRemoval<
   const targetLabel = singleMember?.title ?? displayName;
   const subject = targetKind === "checkout" ? `“${targetLabel}”这个条目` : `项目“${targetLabel}”`;
   const confirmationTitle =
-    threadCount > 0 ? `移除${subject}并删除它的 ${threadCount} 个会话？` : `移除${subject}？`;
+    threadCount > 0 ? `移除${subject}并永久删除它的 ${threadCount} 个会话？` : `移除${subject}？`;
   const confirmationMessage = [
     ...(singleMember
       ? [
@@ -41,8 +41,8 @@ export function planProjectRemoval<
         ]
       : [`将移除 ${members.length} 个已分组的项目条目。`]),
     ...(threadCount > 0
-      ? ["这些会话及所有已归档会话将从 Fleet ADE 中删除。智能体会话会保留。"]
-      : ["所有已归档会话将从 Fleet ADE 中删除。智能体会话会保留。"]),
+      ? ["这些会话及所有已归档会话将被永久删除。智能体会话会保留。"]
+      : ["所有已归档会话将被永久删除。智能体会话会保留。"]),
     isWholeGroup && !hasOtherMembers
       ? "仅移除项目条目，磁盘上的文件会保留。"
       : "此项目组中的其他条目不受影响。",

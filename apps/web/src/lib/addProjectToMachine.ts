@@ -137,7 +137,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
         destinationPath: input.destinationPath,
       },
     },
-    { label: "将项目添加到机器", reportFailure: false },
+    { label: "将项目添加到电脑", reportFailure: false },
   );
   if (started._tag === "Failure") {
     setFileCopy(requestedKey, null);
@@ -183,7 +183,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
             contents: read.contents,
           },
         },
-        { label: "将文件复制到机器", reportFailure: false },
+        { label: "将文件复制到电脑", reportFailure: false },
       );
       if (written._tag === "Failure")
         failed.push(`${read.relativePath}: ${failureMessage(written)}`);

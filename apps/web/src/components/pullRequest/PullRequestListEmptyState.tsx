@@ -73,8 +73,8 @@ export function PullRequestListEmptyState({
       <Empty>
         <BranchMark joined={false} />
         <EmptyHeader>
-          <EmptyTitle>此工作区没有项目</EmptyTitle>
-          <EmptyDescription>添加项目后，其仓库的 pull request 会显示在这里。</EmptyDescription>
+          <EmptyTitle>当前没有项目</EmptyTitle>
+          <EmptyDescription>添加项目后，其仓库的 PR 会显示在这里。</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
@@ -127,9 +127,7 @@ export function PullRequestListEmptyState({
       <EmptyHeader>
         <EmptyTitle>{filtered ? "这些筛选条件下没有结果" : "没有 PR"}</EmptyTitle>
         <EmptyDescription>
-          {filtered
-            ? "放宽状态、参与方式或项目筛选以查看更多。"
-            : "此工作区中所有项目的 pull request 都会显示在这里。"}
+          {filtered ? "放宽状态、参与方式或项目筛选以查看更多。" : "所有项目的 PR 都会显示在这里。"}
         </EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">

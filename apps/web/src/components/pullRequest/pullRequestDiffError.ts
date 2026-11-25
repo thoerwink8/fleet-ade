@@ -13,6 +13,6 @@ export function describePullRequestDiffError(error: string, providerName: string
 
   return {
     title: "无法加载更改",
-    description: `环境无法加载此 ${term} 的差异。请重试，或在 ${providerName} 上查看更改。`,
+    description: `这台电脑无法加载此 ${term} 的差异。请重试，或在 ${providerName} 上查看更改。`,
   };
 }
