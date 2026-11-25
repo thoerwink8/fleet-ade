@@ -95,6 +95,7 @@ export const make = Effect.gen(function* () {
           (error) =>
             new TextGenerationError({
               operation: request.operation,
+              ...(error.reason !== undefined ? { reason: error.reason } : {}),
               detail: error.detail,
               cause: error,
             }),
@@ -112,6 +113,7 @@ export const make = Effect.gen(function* () {
         Effect.fail(
           new TextGenerationError({
             operation: request.operation,
+            reason: "unavailable",
             detail: `${label} is off. Turn it on in Settings → Providers.`,
           }),
         )) satisfies TextGenerationOperations.Runner;
