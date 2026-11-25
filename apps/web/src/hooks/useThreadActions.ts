@@ -64,9 +64,12 @@ import { useDiffPanelStore } from "../diffPanelStore";
 import { useRightPanelStore } from "../rightPanelStore";
 import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../threadRoutes";
-import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
+import {
+  describeWorktreeCleanupFailure,
+  formatWorktreePathForDisplay,
+  getOrphanedWorktreePathForThread,
+} from "../worktreeCleanup";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
-import { presentVersionControlError } from "../components/versionControlError.logic";
 import { useClientSettings } from "./useSettings";
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { showThreadUndoNotice, showThreadUndoNotices } from "./showThreadUndoNotice";
@@ -955,10 +958,11 @@ export function useThreadActions() {
     if (cleanupFailure) {
       const removalFailed = removeResult._tag === "Failure";
       const error = squashAtomCommandFailure(cleanupFailure);
-      const presentation = presentVersionControlError(
+      const toast = describeWorktreeCleanupFailure({
+        removalFailed,
         error,
-        removalFailed ? "删除工作树" : "刷新 Git 状态",
-      );
+        worktreePath: displayWorktreePath ?? orphanedWorktreePath,
+      });
       console.error("Worktree cleanup failed after thread deletion", {
         threadId: threadRef.threadId,
         projectCwd: threadProject.workspaceRoot,
@@ -968,10 +972,8 @@ export function useThreadActions() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: presentation.title,
-          description: removalFailed
-            ? `无法删除 ${displayWorktreePath ?? orphanedWorktreePath}。${presentation.description}`
-            : presentation.description,
+          title: toast.title,
+          description: toast.description,
         }),
       );
       // Cleanup has its own toast; reporting its failure would falsely imply deletion failed.
@@ -1200,15 +1202,15 @@ export function useThreadActions() {
             : null;
       if (cleanupFailure) {
         const error = squashAtomCommandFailure(cleanupFailure);
-        const presentation = presentVersionControlError(
+        const toast = describeWorktreeCleanupFailure({
+          removalFailed: removeResult._tag === "Failure",
           error,
-          removeResult._tag === "Failure" ? "删除工作树" : "刷新 Git 状态",
-        );
+        });
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: presentation.title,
-            description: presentation.description,
+            title: toast.title,
+            description: toast.description,
           }),
         );
       }
