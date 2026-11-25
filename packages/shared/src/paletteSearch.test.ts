@@ -328,7 +328,7 @@ describe("scoreThreadSearch beyond Latin text and titles", () => {
     }
     // The app's own worktree prefix is not part of what the branch says.
     expect(scoreThreadSearch("cleanup", subject, NOW)?.explain?.()).toEqual({
-      label: "Branch",
+      label: "分支",
       text: "cleanup-payloads",
       ranges: [{ start: 0, end: 7 }],
     });
