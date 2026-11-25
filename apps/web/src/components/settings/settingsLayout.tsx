@@ -191,7 +191,7 @@ export function PolicyTooltip({ children }: { readonly children: string }) {
       <TooltipTrigger
         delay={200}
         render={
-          <Button size="icon-micro" variant="ghost-muted" aria-label="后台策略详情">
+          <Button size="xs" icon variant="muted" aria-label="后台策略详情">
             <InfoIcon className="size-3.5" />
           </Button>
         }
@@ -559,8 +559,9 @@ export function SettingResetButton({
       <TooltipTrigger
         render={
           <Button
-            size="icon-micro"
-            variant="ghost-muted"
+            size="xs"
+            icon
+            variant="muted"
             aria-label={`将 ${label} 恢复为默认值`}
             disabled={disabled}
             onClick={(event) => {

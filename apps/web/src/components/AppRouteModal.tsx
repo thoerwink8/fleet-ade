@@ -91,7 +91,7 @@ export function AppRouteModalClose() {
         render={
           <DialogPrimitive.Close
             aria-label="关闭"
-            render={<Button size="icon-sm" variant="ghost" />}
+            render={<Button size="sm" icon variant="ghost" />}
           />
         }
       >

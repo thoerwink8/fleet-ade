@@ -94,8 +94,9 @@ export function PullRequestDetailGhost({
           <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground sm:text-xs">
             {onBack ? (
               <Button
-                size="icon-micro"
-                variant="ghost-muted"
+                size="xs"
+                icon
+                variant="muted"
                 className="-ml-1.5"
                 onClick={onBack}
                 aria-label="返回到此会话的 PR"
@@ -125,7 +126,8 @@ export function PullRequestDetailGhost({
         <div className="mr-4 flex h-7 shrink-0 items-center justify-end gap-1">
           {onClose ? (
             <Button
-              size="icon-xs"
+              size="xs"
+              icon
               variant="ghost"
               aria-label={`折叠 ${terminology.singular} 面板`}
               onClick={onClose}

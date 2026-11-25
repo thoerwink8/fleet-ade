@@ -171,7 +171,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
           </h3>
         </div>
         <Menu>
-          <MenuTrigger render={<Button aria-label="计划操作" size="icon-xs" variant="outline" />}>
+          <MenuTrigger render={<Button aria-label="计划操作" size="xs" icon variant="secondary" />}>
             <EllipsisIcon aria-hidden="true" className="size-4" />
           </MenuTrigger>
           <MenuPopup align="end">
@@ -220,7 +220,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
           <div className="mt-4 flex justify-center">
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               data-scroll-anchor-ignore
               onClick={() => setExpanded((value) => !value)}
             >
@@ -295,7 +295,7 @@ function SavePlanToWorkspaceForm({
         </label>
       </DialogPanel>
       <DialogFooter>
-        <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={saving}>
           取消
         </Button>
         <Button size="sm" onClick={() => onSave(savePath)} disabled={!canWriteFiles || saving}>

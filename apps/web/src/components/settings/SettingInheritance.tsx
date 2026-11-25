@@ -246,8 +246,9 @@ export function SettingInheritance({
             <PopoverTrigger
               render={
                 <Button
-                  size="icon-micro"
-                  variant="ghost-muted"
+                  size="xs"
+                  icon
+                  variant="muted"
                   aria-label={`${overrideSummary}。查看此值的来源`}
                 />
               }
@@ -327,7 +328,8 @@ export function SettingInheritance({
                       render={
                         <Button
                           variant="ghost"
-                          size="sm-multiline"
+                          size="sm"
+                          multiline
                           className="w-full justify-start text-left"
                         />
                       }

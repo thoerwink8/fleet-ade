@@ -70,8 +70,8 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
           <Button
             key={option.decision}
             {...buttonProps}
-            size={presentation === "inline" ? "action" : "xs"}
-            variant={option.decision === "accept" ? "default" : "outline"}
+            size={presentation === "inline" ? "sm" : "xs"}
+            variant={option.decision === "accept" ? "primary" : "secondary"}
           >
             {content}
           </Button>
@@ -91,8 +91,9 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             disabled={disabled || isResponding || !canRespond}
             render={
               <Button
-                size={presentation === "inline" ? "action" : "icon-xs"}
-                variant="outline"
+                size={presentation === "inline" ? "sm" : "xs"}
+                icon={presentation !== "inline"}
+                variant="secondary"
                 aria-label="更多审批选项"
               />
             }

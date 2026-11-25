@@ -214,7 +214,7 @@ describe("standard painted theme colors", () => {
         createElement(
           "div",
           null,
-          createElement(Button, { variant: "destructive" }, "Delete"),
+          createElement(Button, { variant: "danger" }, "Delete"),
           createElement(Badge, { variant: "destructive" }, "Danger"),
         ),
       );

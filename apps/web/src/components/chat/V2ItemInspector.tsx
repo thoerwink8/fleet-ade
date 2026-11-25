@@ -288,7 +288,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
             {props.onOpenToolDiff ? (
               <Button
                 size="xs"
-                variant="outline"
+                variant="secondary"
                 onClick={() =>
                   props.onOpenToolDiff?.({
                     threadId: props.projectedItem.sourceThreadId,

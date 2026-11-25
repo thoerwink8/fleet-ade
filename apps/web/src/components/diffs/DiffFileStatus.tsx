@@ -17,8 +17,9 @@ export function DiffFileStatus({
       <TooltipTrigger
         render={
           <Button
-            size="icon-micro"
-            variant="ghost-muted"
+            size="xs"
+            icon
+            variant="muted"
             aria-label={error ? "重试加载差异" : "部分差异预览"}
             onClick={(event) => {
               event.stopPropagation();

@@ -42,7 +42,7 @@ describe("Touch hit-area expansion and overlap splitting", () => {
     await using screen = await render(
       <SidebarProvider>
         <div className="flex flex-col items-start gap-12 p-12">
-          <Button size="icon-xs" aria-label="Icon XS">
+          <Button size="xs" icon aria-label="Icon XS">
             <PlusIcon className="size-3.5" />
           </Button>
           <Toggle size="xs" aria-label="Toggle XS">
@@ -100,21 +100,21 @@ describe("Touch hit-area expansion and overlap splitting", () => {
     await using screen = await render(
       <div className="flex flex-col items-start gap-12 p-12">
         <div className="ade-touch-row ade-touch-row--gap-1 flex items-center gap-1">
-          <Button size="icon-xs" aria-label="Tight Left">
+          <Button size="xs" icon aria-label="Tight Left">
             <PlusIcon className="size-3.5" />
           </Button>
-          <Button size="icon-xs" aria-label="Tight Right">
+          <Button size="xs" icon aria-label="Tight Right">
             <PlusIcon className="size-3.5" />
           </Button>
         </div>
         <div className="ade-touch-row ade-touch-row--gap-5 flex items-center gap-1 pointer-coarse:gap-5">
-          <Button size="icon-xs" aria-label="Wide First">
+          <Button size="xs" icon aria-label="Wide First">
             <PlusIcon className="size-3.5" />
           </Button>
-          <Button size="icon-xs" aria-label="Wide Middle">
+          <Button size="xs" icon aria-label="Wide Middle">
             <PlusIcon className="size-3.5" />
           </Button>
-          <Button size="icon-xs" aria-label="Wide Last">
+          <Button size="xs" icon aria-label="Wide Last">
             <PlusIcon className="size-3.5" />
           </Button>
         </div>

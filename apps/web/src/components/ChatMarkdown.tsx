@@ -300,7 +300,7 @@ function CodexArtifactTemplateCard(props: {
           data-thread-find-ignore
           type="button"
           size="sm"
-          variant="outline"
+          variant="secondary"
           className="shrink-0"
           onClick={() => props.onUse?.(props.template)}
         >

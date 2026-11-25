@@ -1091,8 +1091,9 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     <Button
                       aria-label="添加面板"
                       className="shrink-0"
-                      size="icon-xs"
-                      variant="ghost-muted"
+                      size="xs"
+                      icon
+                      variant="muted"
                     />
                   }
                 >
@@ -1138,7 +1139,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                       aria-label="向左滚动标签"
                       disabled={!tabScrollState.canScrollLeft}
                       onClick={() => scrollTabs(-1)}
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       variant="ghost"
                     >
                       <ChevronLeft />
@@ -1156,7 +1158,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                       aria-label="向右滚动标签"
                       disabled={!tabScrollState.canScrollRight}
                       onClick={() => scrollTabs(1)}
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       variant="ghost"
                     >
                       <ChevronRight />

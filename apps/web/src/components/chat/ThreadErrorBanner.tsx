@@ -120,7 +120,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         </AlertDescription>
         {onDismiss ? (
           <AlertAction>
-            <Button variant="ghost-muted" size="icon-sm" aria-label="关闭错误" onClick={onDismiss}>
+            <Button variant="muted" size="sm" icon aria-label="关闭错误" onClick={onDismiss}>
               <XIcon />
             </Button>
           </AlertAction>
@@ -168,10 +168,10 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
       ) : null}
       {(nextStepAction || chatGptLimit || onDismiss) && (
         <AlertAction>
-          {chatGptLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
+          {chatGptLimit ? <ChatGptUsageButton variant="primary" size="sm" /> : null}
           {nextStepAction ? (
             <Button
-              variant={classified.variant === "warning" ? "default" : "outline"}
+              variant={classified.variant === "warning" ? "primary" : "secondary"}
               size="sm"
               onClick={nextStepAction.onClick}
             >
@@ -179,7 +179,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
             </Button>
           ) : null}
           {onDismiss ? (
-            <Button variant="ghost-muted" size="icon-sm" aria-label="关闭错误" onClick={onDismiss}>
+            <Button variant="muted" size="sm" icon aria-label="关闭错误" onClick={onDismiss}>
               <XIcon />
             </Button>
           ) : null}

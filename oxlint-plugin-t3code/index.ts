@@ -18,6 +18,7 @@ import noSparklesIcon from "./rules/no-sparkles-icon.ts";
 import noUnreasonedStateSync from "./rules/no-unreasoned-state-sync.ts";
 import noOutsetStateIndicators from "./rules/no-outset-state-indicators.ts";
 import noPollingLoopInTests from "./rules/no-polling-loop-in-tests.ts";
+import noText13px from "./rules/no-text-13px.ts";
 import noRawMcpRegistration from "./rules/no-raw-mcp-registration.ts";
 import noRawResizeObserver from "./rules/no-raw-resize-observer.ts";
 import noRealTimeWaitInTests from "./rules/no-real-time-wait-in-tests.ts";
@@ -55,6 +56,7 @@ export default definePlugin({
     "no-unreasoned-state-sync": noUnreasonedStateSync,
     "no-outset-state-indicators": noOutsetStateIndicators,
     "no-polling-loop-in-tests": noPollingLoopInTests,
+    "no-text-13px": noText13px,
     "no-raw-mcp-registration": noRawMcpRegistration,
     "no-raw-resize-observer": noRawResizeObserver,
     "no-real-time-wait-in-tests": noRealTimeWaitInTests,

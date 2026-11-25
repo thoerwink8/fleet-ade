@@ -135,7 +135,8 @@ export function ThreadAutomationsPanel(props: {
           <TooltipTrigger
             render={
               <ThreadDetailsControl
-                size="icon-xs"
+                size="xs"
+                icon
                 variant="ghost"
                 part="icon"
                 aria-label="管理定时任务"
@@ -194,7 +195,8 @@ export function ThreadAutomationsPanel(props: {
                 <TooltipTrigger
                   render={
                     <ThreadDetailsControl
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       variant="ghost"
                       part="icon"
                       aria-label={`编辑 ${task.title}`}
@@ -217,7 +219,8 @@ export function ThreadAutomationsPanel(props: {
                   <TooltipTrigger
                     render={
                       <ThreadDetailsControl
-                        size="icon-xs"
+                        size="xs"
+                        icon
                         variant="ghost"
                         part="icon"
                         aria-label={`立即运行 ${task.title}`}

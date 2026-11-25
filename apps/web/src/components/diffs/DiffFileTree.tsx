@@ -194,7 +194,8 @@ export function DiffFileTree({
               render={
                 <Button
                   type="button"
-                  size="icon-xs"
+                  size="xs"
+                  icon
                   variant="ghost"
                   aria-label={allDirectoriesExpanded ? "折叠全部文件夹" : "展开全部文件夹"}
                   onClick={() =>

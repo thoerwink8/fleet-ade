@@ -405,7 +405,7 @@ function InstanceSessionManagement(
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={props.readOnly || loggingOut}
                 onClick={() => void logoutProvider()}
               >
@@ -438,7 +438,7 @@ function InstanceSessionManagement(
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={!canRead || loading || projectId === null}
                   onClick={() => void loadSessions()}
                 >
@@ -470,7 +470,7 @@ function InstanceSessionManagement(
                       <Button
                         type="button"
                         size="xs"
-                        variant="ghost-muted"
+                        variant="muted"
                         disabled={
                           !canOperate ||
                           !canImport ||
@@ -489,7 +489,7 @@ function InstanceSessionManagement(
                         <Button
                           type="button"
                           size="xs"
-                          variant="ghost-muted"
+                          variant="muted"
                           disabled={
                             !canOperate ||
                             session.importedThreadId !== null ||
@@ -510,7 +510,7 @@ function InstanceSessionManagement(
               <Button
                 type="button"
                 size="xs"
-                variant="ghost-muted"
+                variant="muted"
                 className="w-fit"
                 disabled={!canRead || loading}
                 onClick={() => void loadSessions(nextCursor)}
@@ -534,7 +534,7 @@ function InstanceSessionManagement(
             <Button
               type="button"
               size="xs"
-              variant="outline"
+              variant="secondary"
               disabled={
                 !canRead || loadingProviders || savingProviderId !== null || projectId === null
               }
@@ -597,7 +597,7 @@ function InstanceSessionManagement(
                         <Button
                           type="button"
                           size="xs"
-                          variant="outline"
+                          variant="secondary"
                           disabled={
                             props.readOnly ||
                             savingProviderId !== null ||
@@ -613,7 +613,7 @@ function InstanceSessionManagement(
                           <Button
                             type="button"
                             size="xs"
-                            variant="ghost-muted"
+                            variant="muted"
                             disabled={
                               props.readOnly || savingProviderId !== null || loadingProviders
                             }

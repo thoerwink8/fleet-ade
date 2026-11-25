@@ -137,7 +137,7 @@ export function FleetRowDetail({
                   </p>
                   <div className="flex">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       render={<Link to="/settings/connections" />}
                     >

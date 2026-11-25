@@ -50,7 +50,8 @@ export function HtmlRenderDialog(props: {
           <Button
             ref={closeButtonRef}
             aria-label="关闭"
-            size="icon-xs"
+            size="xs"
+            icon
             variant="media-close"
             className="absolute right-0 -top-10 z-20"
             onClick={props.onClose}
@@ -75,7 +76,8 @@ export function HtmlRenderDialog(props: {
             <div className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center gap-1 pointer-coarse:gap-3">
               <Button
                 aria-label="缩小"
-                size="icon-sm"
+                size="sm"
+                icon
                 variant="overlay"
                 disabled={zoom === 0.5}
                 onClick={() => setZoom((value) => value - 0.25)}
@@ -87,7 +89,8 @@ export function HtmlRenderDialog(props: {
               </Button>
               <Button
                 aria-label="放大"
-                size="icon-sm"
+                size="sm"
+                icon
                 variant="overlay"
                 disabled={zoom === 2}
                 onClick={() => setZoom((value) => value + 0.25)}

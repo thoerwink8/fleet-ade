@@ -325,8 +325,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         {pendingAction.questionIndex > 0 ? (
           compact ? (
             <Button
-              size="icon-sm"
-              variant="outline"
+              size="sm"
+              icon
+              variant="secondary"
               {...pointerFocusProps}
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
@@ -337,7 +338,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           ) : (
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               {...pointerFocusProps}
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}

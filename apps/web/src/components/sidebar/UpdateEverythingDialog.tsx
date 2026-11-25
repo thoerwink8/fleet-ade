@@ -196,7 +196,7 @@ function UpdateEverythingDialogContent({
                 : `${threads}会被打断，其中 ${continuing} 个重启后可以继续。`}
           </p>
         ) : null}
-        <AlertDialogClose ref={cancelRef} render={<Button variant="outline" />}>
+        <AlertDialogClose ref={cancelRef} render={<Button variant="secondary" />}>
           取消
         </AlertDialogClose>
         <Button onClick={onConfirm}>更新</Button>

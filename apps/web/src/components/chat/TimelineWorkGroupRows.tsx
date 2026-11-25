@@ -333,8 +333,8 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
       <PopoverTrigger
         render={
           <Button
-            variant="ghost-muted"
-            size="micro"
+            variant="muted"
+            size="xs"
             className="ml-auto min-w-0 shrink-0"
             aria-label={`后台设置仍在运行：${scriptName}。显示设置进度。`}
           />

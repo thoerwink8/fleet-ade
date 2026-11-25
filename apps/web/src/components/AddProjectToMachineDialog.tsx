@@ -398,7 +398,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             ) : null}
           </DialogPanel>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={close}>
+            <Button type="button" variant="secondary" onClick={close}>
               取消
             </Button>
             <Button type="submit" disabled={unavailable || submitting}>

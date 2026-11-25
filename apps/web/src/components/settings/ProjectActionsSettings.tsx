@@ -161,7 +161,7 @@ export function ProjectActionsSettings() {
             ) : null}
             <Button
               size="xs"
-              variant="outline"
+              variant="secondary"
               disabled={saving || !canWriteSettings || targets.length === 0}
               onClick={() => setRequest({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT })}
             >

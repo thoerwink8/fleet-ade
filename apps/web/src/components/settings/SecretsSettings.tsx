@@ -186,9 +186,9 @@ function RemoveSecretProviderButton({
             <SecretProviderUses environmentId={environmentId} id={id} label={label} />
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
             <Button
-              variant="destructive"
+              variant="danger"
               onClick={() => {
                 setOpen(false);
                 onConfirm();

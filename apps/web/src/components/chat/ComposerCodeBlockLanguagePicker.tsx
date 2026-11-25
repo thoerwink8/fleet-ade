@@ -67,7 +67,7 @@ export function ComposerCodeBlockLanguagePicker(props: {
           render={
             <Button
               type="button"
-              variant="ghost-muted"
+              variant="muted"
               size="xs"
               disabled={props.disabled}
               aria-label={`代码语言：${codeLanguageLabel(props.language)}`}

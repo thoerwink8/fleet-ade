@@ -530,7 +530,7 @@ export function ThreadDetailsPrRow({
               <AlertDialogDescription>{mergeCopy.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogClose render={<Button variant="outline" size="sm" />}>
+              <AlertDialogClose render={<Button variant="secondary" size="sm" />}>
                 取消
               </AlertDialogClose>
               <Button

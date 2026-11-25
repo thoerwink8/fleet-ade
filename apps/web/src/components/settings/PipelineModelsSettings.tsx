@@ -207,8 +207,9 @@ function PipelineCandidateRow({
                       <TooltipTrigger
                         render={
                           <Button
-                            size="icon-micro"
-                            variant="ghost-muted"
+                            size="xs"
+                            icon
+                            variant="muted"
                             disabled={!editable || index === 0}
                             onClick={() => onChange(moveCandidate(candidates, index, -1))}
                             aria-label={`上移 ${display.name}`}
@@ -223,8 +224,9 @@ function PipelineCandidateRow({
                       <TooltipTrigger
                         render={
                           <Button
-                            size="icon-micro"
-                            variant="ghost-muted"
+                            size="xs"
+                            icon
+                            variant="muted"
                             disabled={!editable || index === candidates.length - 1}
                             onClick={() => onChange(moveCandidate(candidates, index, 1))}
                             aria-label={`下移 ${display.name}`}
@@ -239,8 +241,9 @@ function PipelineCandidateRow({
                       <TooltipTrigger
                         render={
                           <Button
-                            size="icon-micro"
-                            variant="ghost-muted"
+                            size="xs"
+                            icon
+                            variant="muted"
                             disabled={!editable}
                             onClick={() => onChange(removeCandidateAt(candidates, index))}
                             aria-label={`移除 ${display.name}`}
