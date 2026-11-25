@@ -9,7 +9,10 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId } from "@t3tools/contracts";
 
-import { presentVersionControlError } from "~/components/versionControlError.logic";
+import {
+  newProjectCommitWarningDescription,
+  presentVersionControlError,
+} from "~/components/versionControlError.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { waitForProject } from "~/state/entities";
 import { projectEnvironment } from "~/state/projects";
@@ -92,15 +95,19 @@ export function useNewProject() {
       return false;
     }
 
-    const { projectId, workspaceRoot, commitError } = result.value;
+    const { projectId, workspaceRoot, commitError, commitFailure } = result.value;
     toastManager.add(
       stackedThreadToast(
-        commitError === undefined
+        commitError === undefined && commitFailure === undefined
           ? { type: "success", title: `已创建 ${input.name}`, description: workspaceRoot }
           : {
               type: "warning",
               title: `已创建 ${input.name}，但还没有首个提交`,
-              description: `${commitError} 项目位于 ${workspaceRoot}。`,
+              description: newProjectCommitWarningDescription(
+                commitFailure,
+                commitError,
+                workspaceRoot,
+              ),
             },
       ),
     );
