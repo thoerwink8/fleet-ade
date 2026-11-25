@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {
+  multiEnvironmentControlsVisible,
   selectEnvironmentAxis,
   selectProjectAxis,
   settingsScopeCheckoutChoices,
@@ -47,6 +48,15 @@ describe("settings scope axes", () => {
 
     expect(settingsScopeCheckoutLabel(second, [first, second, other])).toBe("C:\\work\\two\\app");
     expect(settingsScopeCheckoutLabel(other, [first, second, other])).toBe("tools");
+  });
+
+  it.each([
+    [0, false],
+    [1, false],
+    [2, true],
+    [3, true],
+  ])("hides multi-environment controls for %i computers: %s", (count, visible) => {
+    expect(multiEnvironmentControlsVisible(count)).toBe(visible);
   });
 
   it.each([

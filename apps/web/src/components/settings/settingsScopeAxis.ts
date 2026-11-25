@@ -168,3 +168,8 @@ export function settingsScopeControlsVisible(
 ): boolean {
   return environmentCount > 1 || projectCount > 1;
 }
+
+/** Fleet and connection entries compare computers; one computer has nothing to compare. */
+export function multiEnvironmentControlsVisible(environmentCount: number): boolean {
+  return environmentCount > 1;
+}
