@@ -26,6 +26,11 @@ describe("t3code/no-text-13px", () => {
     `,
   );
 
+  rule.invalid(
+    "reports other spellings of 13px: line-height suffix, rem and length hint",
+    `<div className="text-[13px]/5 text-[0.8125rem] text-[.8125rem] text-[length:13px] text-[13.0px]" />;`,
+  );
+
   rule.invalid("reports text-[13px]", `<div className="text-[13px]" />;`);
 
   rule.invalid(

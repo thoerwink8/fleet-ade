@@ -1,5 +1,7 @@
 import { defineRule, type ESTree } from "@oxlint/plugins";
 
+const TEXT_13PX = /^text-\[(?:length:)?(?:13(?:\.0+)?px|0?\.8125rem)\](?:\/.+)?$/u;
+
 function stripVariants(token: string): string {
   let depth = 0;
   let start = 0;
@@ -16,7 +18,7 @@ function offenders(text: string): string[] {
   const found: string[] = [];
   for (const token of text.split(/\s+/u)) {
     if (!token) continue;
-    if (stripVariants(token) === "text-[13px]") found.push(token);
+    if (TEXT_13PX.test(stripVariants(token))) found.push(token);
   }
   return found;
 }
