@@ -93,6 +93,7 @@ describe("Esc in a shortcut recorder", () => {
     await userEvent.tab();
     await activate(field, "focus");
     await expect.element(field).toHaveAttribute("placeholder", "按下快捷键");
+    await expect.element(field).toHaveAttribute("data-keybinding-capture");
 
     await userEvent.keyboard("{Escape}");
 

@@ -648,7 +648,7 @@ export function AddProviderInstanceDialog({
                     />
                   }
                 />
-                <AdvancedSettings targetIds={[]}>
+                <AdvancedSettings targetIds={[]} forceOpen={showInstanceIdError}>
                   <SettingsRow
                     title={<label htmlFor="add-provider-instance-id">智能体 ID</label>}
                     description={

@@ -1,5 +1,5 @@
 import { NotificationSettings } from "./NotificationSettings";
-import { AddEnvironmentDialog } from "./AddEnvironmentDialog";
+import { AddComputerControl } from "./AddComputerControl";
 import { CheckIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -411,16 +411,7 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           title="添加电脑"
           description="配对另一台电脑后，连接和机群入口会出现在侧边栏和设置中。"
-          control={
-            <AddEnvironmentDialog
-              open={false}
-              routeTarget={null}
-              error={null}
-              savedEnvironments={[]}
-              onOpenChange={() => undefined}
-              onErrorChange={() => undefined}
-            />
-          }
+          control={<AddComputerControl />}
         />
       </SettingsSection>
 

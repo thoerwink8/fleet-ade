@@ -843,6 +843,7 @@ function KeybindingKeyControl({
         </button>
       ) : (
         <Input
+          data-keybinding-capture=""
           autoFocus={isRecording}
           aria-label={`${commandLabel(row.command)} 的快捷键`}
           value={isRecording ? "" : keybindingDraftDisplay(keyDraft)}
