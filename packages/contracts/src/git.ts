@@ -404,7 +404,7 @@ export const GitCommandAction = Schema.Literals([
 ]);
 export type GitCommandAction = typeof GitCommandAction.Type;
 
-const VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH = 1000;
+export const VCS_SNAPSHOT_FAILURE_DETAIL_MAX_LENGTH = 1000;
 
 export const VcsSnapshotFailure = Schema.Struct({
   _tag: TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(128)),

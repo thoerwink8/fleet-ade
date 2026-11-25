@@ -476,7 +476,7 @@ const GIT_FAILURE_REASON_PATTERNS: ReadonlyArray<readonly [RegExp, GitCommandFai
   // The same prefix also reports permission errors, which retrying cannot fix.
   [/could not lock config file .+: File exists/i, "config_locked"],
   [
-    /^(?:fatal: unable to auto-detect email address|fatal: empty ident name|error: author identity unknown)/im,
+    /^(?:fatal: unable to auto-detect email address|fatal: empty ident name|fatal: no (?:name|email) was given|error: author identity unknown)/im,
     "author_identity_unknown",
   ],
   [
@@ -547,7 +547,7 @@ const SSH_TRANSPORT_REFUSAL_PATTERN =
 const GIT_STDOUT_CONFLICT_PATTERN =
   /^CONFLICT \([^)\r\n]+\):[\s\S]*^Automatic merge failed; fix conflicts/m;
 
-function classifyGitFailure(stderr: string, stdout = ""): GitCommandFailureReason | null {
+export function classifyGitFailure(stderr: string, stdout = ""): GitCommandFailureReason | null {
   const diagnostics = stderr
     .split(/\r?\n/)
     .filter(

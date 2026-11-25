@@ -468,6 +468,13 @@ it.effect("keeps a named project and reports why when Git cannot commit", () =>
         const result = yield* folders.createNamedProject({ name: "No Identity" });
 
         assert.include(result.commitError ?? "", "no name or email");
+        assert.deepStrictEqual(result.commitFailure, {
+          _tag: "GitCommandError",
+          operation: "ManagedProjectFolders.commit",
+          action: "commit",
+          reason: "author_identity_unknown",
+          detail: result.commitFailure?.detail ?? "",
+        });
         assert.isTrue(Option.isSome(yield* projects.getById(result.projectId)));
         assert.isTrue(yield* fileSystem.exists(path.join(result.workspaceRoot, "README.md")));
         assert.isTrue(yield* fileSystem.exists(path.join(result.workspaceRoot, ".git")));
