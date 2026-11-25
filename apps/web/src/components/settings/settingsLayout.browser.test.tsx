@@ -1,3 +1,4 @@
+import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { useSyncExternalStore } from "react";
 
@@ -13,16 +14,45 @@ const connection = vi.hoisted(() => {
     all: { kind: "all", label: "全部", environmentIds: ["env-1"] },
   };
   let scope: (typeof scopes)[keyof typeof scopes] = scopes.environment;
+  // With a real provider the page reads one fake computer whose link and config the test drives.
+  let real = false;
+  let serverConfig: { settings: unknown; environment: unknown } = {
+    settings: {},
+    environment: { platform: { os: "linux" } },
+  };
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
   return {
     get: () => connected,
     scope: () => scope,
+    isReal: () => real,
     pick: (kind: keyof typeof scopes) => {
       scope = scopes[kind];
       connected = true;
+      real = false;
+    },
+    useRealProvider: (settings: unknown) => {
+      real = true;
+      connected = true;
+      serverConfig = { settings, environment: { platform: { os: "linux" } } };
+    },
+    environments: () => [
+      {
+        environmentId: "env-1",
+        label: "Build workstation",
+        displayUrl: "",
+        connection: { phase: connected ? "connected" : "disconnected" },
+        serverConfig,
+      },
+    ],
+    /** The config another device saved; the page learns it once the link is back. */
+    serverSaves: (settings: unknown) => {
+      serverConfig = { settings, environment: { platform: { os: "linux" } } };
     },
     toggle: () => {
       connected = !connected;
-      for (const listener of listeners) listener();
+      notify();
     },
     subscribe: (listener: () => void) => {
       listeners.add(listener);
@@ -31,20 +61,35 @@ const connection = vi.hoisted(() => {
   };
 });
 
-vi.mock(import("./SettingsScopeContext"), async (original) => ({
+vi.mock(import("./SettingsScopeContext"), async (original) => {
+  const actual = await original();
+  return {
+    ...actual,
+    useOptionalSettingsScope: (() => {
+      const connected = useSyncExternalStore(connection.subscribe, connection.get);
+      const real = actual.useOptionalSettingsScope();
+      if (connection.isReal()) return real;
+      return {
+        scope: connection.scope(),
+        connectedEnvironments: connected
+          ? [{ environmentId: "env-1", label: "Build workstation" }]
+          : [],
+        targets: [],
+        environments: [],
+        groups: [],
+      };
+    }) as never,
+  };
+});
+
+vi.mock(import("../../state/environments"), async (original) => ({
   ...(await original()),
-  useOptionalSettingsScope: (() => {
-    const connected = useSyncExternalStore(connection.subscribe, connection.get);
-    return {
-      scope: connection.scope(),
-      connectedEnvironments: connected
-        ? [{ environmentId: "env-1", label: "Build workstation" }]
-        : [],
-      targets: [],
-      environments: [],
-      groups: [],
-    };
+  useEnvironments: (() => {
+    useSyncExternalStore(connection.subscribe, connection.get);
+    return { isReady: true, networkStatus: "online", environments: connection.environments() };
   }) as never,
+  usePrimaryEnvironmentId: (() => "env-1") as never,
+  usePrimaryEnvironment: (() => connection.environments()[0]) as never,
 }));
 
 vi.mock(import("../../state/session"), async (original) => ({
@@ -54,6 +99,8 @@ vi.mock(import("../../state/session"), async (original) => ({
     new Set(environments.map((environment) => environment.environmentId))) as never,
 }));
 
+import { BranchNamingSettings } from "./BranchNamingSettings";
+import { SettingsScopeProvider } from "./SettingsScopeContext";
 import { DraftInput, DraftTextarea } from "../ui/draft-input";
 import { SettingsEnvironmentScopeGate, SettingsRow } from "./settingsLayout";
 
@@ -118,5 +165,50 @@ describe("SettingsRow", () => {
 
     await act(() => connection.toggle());
     await expect.element(textarea).toHaveValue("keep this");
+  });
+});
+
+describe("branch naming on a dropped connection", () => {
+  const custom = {
+    ...DEFAULT_SERVER_SETTINGS,
+    branchNamingMode: "custom",
+    branchNameInstructions: "use julius/",
+  };
+  const renderPage = () =>
+    render(
+      <SettingsScopeProvider search={{}} onChange={() => {}}>
+        <BranchNamingSettings />
+      </SettingsScopeProvider>,
+    );
+
+  it("keeps the mode and a typed instruction draft when the connection drops", async () => {
+    connection.useRealProvider(custom);
+    await using screen = await renderPage();
+    const textarea = screen.getByRole("textbox", { name: "分支命名指令" });
+    await textarea.fill("line one\nline two");
+
+    await act(() => connection.toggle());
+    // The mode still reads "custom", so the textarea that depends on it is not unmounted.
+    expect(screen.container.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe(
+      "line one\nline two",
+    );
+    expect(screen.container.querySelector("[inert]")).not.toBeNull();
+
+    await act(() => connection.toggle());
+    await expect.element(textarea).toHaveValue("line one\nline two");
+  });
+
+  it("shows what another device saved once the connection is back", async () => {
+    connection.useRealProvider(custom);
+    await using screen = await renderPage();
+    const textarea = screen.getByRole("textbox", { name: "分支命名指令" });
+    await expect.element(textarea).toHaveValue("use julius/");
+
+    await act(() => connection.toggle());
+    await expect.element(textarea).toHaveValue("use julius/");
+
+    connection.serverSaves({ ...custom, branchNameInstructions: "use fleet/" });
+    await act(() => connection.toggle());
+    await expect.element(textarea).toHaveValue("use fleet/");
   });
 });

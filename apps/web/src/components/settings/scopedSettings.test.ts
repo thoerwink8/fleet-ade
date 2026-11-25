@@ -22,6 +22,8 @@ import {
   resolveScopedSettingsTargets,
   scopedSettingsAreMixed,
   scopedSettingsSource,
+  nextHeldServerConfigs,
+  withHeldServerConfigs,
   selectScopedSettingsEnvironments,
 } from "./scopedSettings";
 import { resolveSettingsScope } from "./settingsScope";
@@ -494,6 +496,14 @@ describe("scoped settings writes", () => {
     ).toEqual({ projectSettingsOverrides: { [projectId]: null } });
   });
 
+  it("asks for a connection without stray spaces around a generic computer", () => {
+    const scope = resolveSettingsScope({}, [], [offline]);
+    expect(
+      planScopedSettingsPatch(scope, [offline], { enableProviderUpdateChecks: false })
+        .unavailableReason,
+    ).toBe("请连接一台电脑以保存此设置。");
+  });
+
   it("never substitutes an environment-default write for an invalid scope", () => {
     const scope = resolveSettingsScope({ machine: "removed" }, [group], environments);
     const plan = planScopedSettingsPatch(scope, environments, { enableAgentDeviceAccess: false });
@@ -592,6 +602,37 @@ describe("scopedSettingsFailureMessage", () => {
       "无法在 Build workstation 上保存：连接已断开，内容已保留，恢复后再试。",
     );
     expect(interruptedSentence.match(/保存/g)).toHaveLength(1);
+  });
+});
+
+describe("held server configs", () => {
+  const first = EnvironmentId.make("first");
+  const config = (id: string) => ({
+    settings: { ...DEFAULT_SERVER_SETTINGS, branchNamePrefix: id },
+  });
+
+  it("keeps the last config while a computer has none, and replaces it when a new one arrives", () => {
+    const before = config("a");
+    const held = nextHeldServerConfigs([{ environmentId: first, serverConfig: before }], new Map());
+    expect(held.get(first)).toBe(before);
+
+    const dropped = nextHeldServerConfigs([{ environmentId: first, serverConfig: null }], held);
+    expect(dropped).toBe(held);
+
+    const after = config("b");
+    const back = nextHeldServerConfigs([{ environmentId: first, serverConfig: after }], dropped);
+    expect(back.get(first)).toBe(after);
+  });
+
+  it("reads settings from the held config for a disconnected computer", () => {
+    const held = new Map([[first, config("a")]]);
+    const offlineFirst = {
+      ...environment("First", { loaded: false }),
+      environmentId: first,
+    };
+    const [shown] = withHeldServerConfigs([offlineFirst], held);
+    expect(shown?.serverConfig?.settings.branchNamePrefix).toBe("a");
+    expect(withHeldServerConfigs([offlineFirst], new Map())).toEqual([]);
   });
 });
 

@@ -637,6 +637,27 @@ export function SettingsPageContainer({
   );
 }
 
+/**
+ * While a computer is away its panels stay mounted but hidden under the notice, so a draft typed
+ * before the drop survives the reconnect. Used by every page that shows a picked computer's settings.
+ */
+export function SettingsDisconnectedHold({
+  notice,
+  children,
+}: {
+  readonly notice: ReactNode | null;
+  readonly children: ReactNode;
+}) {
+  return (
+    <>
+      {notice}
+      <div hidden={notice !== null} className={notice !== null ? undefined : "contents"}>
+        {children}
+      </div>
+    </>
+  );
+}
+
 /** Environment panels on a merged page show a connect notice; the rest of the page stays usable. */
 export function SettingsEnvironmentScopeGate({ children }: { readonly children: ReactNode }) {
   const scope = useOptionalSettingsScope();
@@ -646,18 +667,18 @@ export function SettingsEnvironmentScopeGate({ children }: { readonly children: 
   }
   const disconnected =
     scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0;
-  // The panels stay mounted while hidden, so a draft typed before the drop survives the reconnect.
   return (
-    <>
-      {disconnected ? (
-        <p className="text-sm text-muted-foreground">
-          重新连接 {scope.scope.label}，才能改它的设置。
-        </p>
-      ) : null}
-      <div hidden={disconnected} className={disconnected ? undefined : "contents"}>
-        {children}
-      </div>
-    </>
+    <SettingsDisconnectedHold
+      notice={
+        disconnected ? (
+          <p className="text-sm text-muted-foreground">
+            重新连接 {scope.scope.label}，才能改它的设置。
+          </p>
+        ) : null
+      }
+    >
+      {children}
+    </SettingsDisconnectedHold>
   );
 }
 

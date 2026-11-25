@@ -73,6 +73,38 @@ export function selectScopedSettingsEnvironments<T extends ScopedSettingsEnviron
   return { environments, connectedEnvironments, environment };
 }
 
+type HeldServerConfig = NonNullable<ScopedSettingsEnvironment["serverConfig"]>;
+
+/**
+ * The last config each environment delivered. A dropped connection must not turn the page into
+ * defaults, because controls that depend on a value (a mode picks which inputs exist) would unmount.
+ * Returns `held` itself when nothing changed, so callers can store it without looping.
+ */
+export function nextHeldServerConfigs(
+  environments: readonly Pick<ScopedSettingsEnvironment, "environmentId" | "serverConfig">[],
+  held: ReadonlyMap<EnvironmentId, HeldServerConfig>,
+): ReadonlyMap<EnvironmentId, HeldServerConfig> {
+  const next = new Map<EnvironmentId, HeldServerConfig>();
+  for (const environment of environments) {
+    const config = environment.serverConfig ?? held.get(environment.environmentId);
+    if (config) next.set(environment.environmentId, config);
+  }
+  return next.size === held.size && [...next].every(([id, config]) => held.get(id) === config)
+    ? held
+    : next;
+}
+
+/** Environments to read settings from: live config when there is one, else the held one. */
+export function withHeldServerConfigs<T extends ScopedSettingsEnvironment>(
+  environments: readonly T[],
+  held: ReadonlyMap<EnvironmentId, HeldServerConfig>,
+): T[] {
+  return environments.flatMap((environment) => {
+    const serverConfig = environment.serverConfig ?? held.get(environment.environmentId) ?? null;
+    return serverConfig ? [{ ...environment, serverConfig }] : [];
+  });
+}
+
 export interface ScopedSettingsTarget {
   readonly environmentId: EnvironmentId;
   readonly label: string;
@@ -338,7 +370,9 @@ export function planScopedSettingsPatch(
           ? "此设置是电脑级设置，无法由项目覆盖。"
           : isProjectScope
             ? "请连接所选项目目录，或更新它们所在的电脑，以保存项目覆盖设置。"
-            : `请连接 ${scope.kind === "environment" ? scope.label : "一台电脑"} 以保存此设置。`;
+            : scope.kind === "environment"
+              ? `请连接 ${scope.label} 以保存此设置。`
+              : "请连接一台电脑以保存此设置。";
   return { clientPatch, hasClientWrite, serverWrites, unavailableReason };
 }
 
