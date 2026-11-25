@@ -113,7 +113,8 @@ export function useCommitOnBlur(
       const text = draft ?? value;
       if (text === valueOnFocus.current) {
         if (rejected === null) {
-          setDraft(null);
+          // A draft still saving must survive so a failure can keep showing it.
+          if (pending === null || pending !== text) setDraft(null);
           return;
         }
         if (rejected.text !== text || rejected.kind === "invalid") return;

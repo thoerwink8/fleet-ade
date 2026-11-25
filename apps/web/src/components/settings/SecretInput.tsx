@@ -27,7 +27,7 @@ export function SecretInput({
         {...shared}
         onCommit={(next) => {
           if (configured && next === "") return;
-          onCommit(next);
+          return onCommit(next);
         }}
       />
     );
