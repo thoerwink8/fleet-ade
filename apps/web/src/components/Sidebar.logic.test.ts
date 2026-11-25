@@ -2141,6 +2141,37 @@ describe("resolveSidebarThreadState status × section consistency", () => {
       expectedSubtitle: "有新结果，点开查看",
       expectedUnread: true,
     },
+    {
+      name: "unopened thread asking for input sits in attention and says what it waits for",
+      thread: makeThreadFixture({ hasPendingUserInput: true, runtime: runningRuntime }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "attention",
+      expectedStatus: "input",
+      expectedMarkLabel: "等你回答",
+      expectedHoverLabel: "等你回答",
+      expectedSubtitle: "等你回答，点开处理",
+      expectedUnread: false,
+    },
+    {
+      name: "pinned thread that is running stays pinned and reads as running",
+      thread: makeThreadFixture({
+        pinnedAt: afterVisit,
+        latestRun: makeRun("running", null),
+        runtime: runningRuntime,
+        lastVisitedAt: visitedAt,
+      }),
+      isRoute: false,
+      workingShelfEnabled: true,
+      isWorkingGrace: false,
+      expectedSection: "pinned",
+      expectedStatus: "working",
+      expectedMarkLabel: "运行中",
+      expectedHoverLabel: "运行中",
+      expectedSubtitle: null,
+      expectedUnread: false,
+    },
   ] as const;
 
   it.each(matrix)("$name", (row) => {

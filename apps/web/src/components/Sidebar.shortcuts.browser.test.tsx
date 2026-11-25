@@ -38,6 +38,7 @@ vi.mock(import("~/state/server"), async (original) => {
   const { compileResolvedKeybindingsConfig } = await import("@t3tools/shared/keybindings");
   const keybindings = compileResolvedKeybindingsConfig([
     { key: "mod+shift+]", command: "thread.next", when: "!terminalFocus && !terminalOpen" },
+    { key: "mod+shift+[", command: "thread.previous", when: "!terminalFocus && !terminalOpen" },
     { key: "mod+1", command: "thread.jump.1", when: "!terminalFocus" },
   ]);
   return { ...actual, primaryServerKeybindingsAtom: Atom.make(keybindings) };
@@ -60,6 +61,7 @@ it("keeps thread shortcuts available with the files panel open", async () => {
   await expect.element(page.getByText(`会话 ${second.id}`).first()).toBeVisible();
 
   const press = () => userEvent.keyboard("{Control>}{Shift>}]{/Shift}{/Control}");
+  const pressPrevious = () => userEvent.keyboard("{Control>}{Shift>}[[{/Shift}{/Control}");
   const jumpHint = () => document.querySelector("[data-jump-hint]");
   const whileHoldingControl = async (assertJumpHints: () => void) => {
     let now = Date.parse("2026-01-01T00:00:00.000Z");
@@ -78,8 +80,9 @@ it("keeps thread shortcuts available with the files panel open", async () => {
   expect(router.history.location.pathname).toBe(`/${ENVIRONMENT_ID}/${second.id}`);
   await whileHoldingControl(() => expect(jumpHint()).not.toBeNull());
 
+  // The open thread keeps its place in the list, so the second thread is last: step back instead.
   await act(() => useRightPanelStore.getState().close(firstRef));
-  await press();
+  await pressPrevious();
   await vi.waitFor(() => expect(router.history.location.pathname).toBe(firstPath));
   await whileHoldingControl(() => expect(jumpHint()).not.toBeNull());
 });
