@@ -450,7 +450,8 @@ function droppedSettingKeys(write: ScopedServerWrite, saved: ServerSettings | un
 }
 
 const INTERRUPTED_SAVE_MESSAGE = "连接已断开，内容已保留，恢复后重新保存";
-const UNKNOWN_SAVE_MESSAGE = "保存失败，请稍后再试。";
+// The toast already opens with "无法在 <电脑> 上保存：", so this half must not say "保存" again.
+const UNKNOWN_SAVE_MESSAGE = "请稍后再试。";
 
 /** Maps a transport failure to a sentence the user can act on. */
 export function scopedSettingsFailureMessage(error: unknown): string {

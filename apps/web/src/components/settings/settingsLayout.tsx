@@ -404,45 +404,52 @@ export function SettingsRow({
   ) : (
     resetAction
   );
-  const inertControl = (message: string) => (
-    <Tooltip>
+  // One element shape whether or not the control is locked: swapping wrappers would remount the
+  // control and drop a draft typed before the connection went away.
+  const lockMessage = unavailable
+    ? !canWriteSettings
+      ? `此连接没有权限更改 ${
+          context
+            ? context.connectedEnvironments
+                .filter((target) => !writableIds.has(target.environmentId))
+                .map((target) => target.label)
+                .join(", ") || "所选电脑"
+            : (primaryEnvironment?.label ?? "主电脑")
+        } 的设置。`
+      : context
+        ? "请重新连接所选电脑以修改此设置。"
+        : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE
+    : environmentWide
+      ? "这是电脑级设置，请先选择一台电脑再修改。"
+      : null;
+  const renderedControl = control ? (
+    <Tooltip disabled={lockMessage === null}>
       <TooltipTrigger
         render={
           <span
-            tabIndex={0}
-            className="flex w-full items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring @min-[32rem]/settings-row:w-auto"
+            tabIndex={lockMessage === null ? undefined : 0}
+            className={
+              lockMessage === null
+                ? "contents"
+                : "flex w-full items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring @min-[32rem]/settings-row:w-auto"
+            }
           />
         }
       >
         <div
-          inert
-          className="flex w-full items-center gap-2 opacity-50 @min-[32rem]/settings-row:w-auto"
+          inert={lockMessage !== null}
+          className={
+            lockMessage === null
+              ? "contents"
+              : "flex w-full items-center gap-2 opacity-50 @min-[32rem]/settings-row:w-auto"
+          }
         >
           {control}
         </div>
       </TooltipTrigger>
-      <TooltipPopup side="top">{message}</TooltipPopup>
+      <TooltipPopup side="top">{lockMessage}</TooltipPopup>
     </Tooltip>
-  );
-  const renderedControl =
-    unavailable && control
-      ? inertControl(
-          !canWriteSettings
-            ? `此连接没有权限更改 ${
-                context
-                  ? context.connectedEnvironments
-                      .filter((target) => !writableIds.has(target.environmentId))
-                      .map((target) => target.label)
-                      .join(", ") || "所选电脑"
-                  : (primaryEnvironment?.label ?? "主电脑")
-              } 的设置。`
-            : context
-              ? "请重新连接所选电脑以修改此设置。"
-              : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
-        )
-      : environmentWide && control
-        ? inertControl("这是电脑级设置，请先选择一台电脑再修改。")
-        : control;
+  ) : null;
   const customized =
     context !== null &&
     settingKeys.some((key) =>
@@ -530,13 +537,11 @@ export function SettingsRow({
           </div>
         ) : null}
       </div>
-      {unavailable && children ? (
-        <div inert className="opacity-50">
+      {children ? (
+        <div inert={unavailable} className={unavailable ? "opacity-50" : "contents"}>
           {children}
         </div>
-      ) : (
-        children
-      )}
+      ) : null}
     </div>
   );
 }

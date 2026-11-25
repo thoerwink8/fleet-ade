@@ -577,10 +577,16 @@ describe("scopedSettingsFailureMessage", () => {
     [new Error("Disconnected during save"), "Disconnected during save"],
     [new Error("ECONNRESET"), "ECONNRESET"],
     [{ _tag: "ServerRejected", message: "此连接无权修改这些设置。" }, "此连接无权修改这些设置。"],
-    ["plain text", "保存失败，请稍后再试。"],
-    [undefined, "保存失败，请稍后再试。"],
+    ["plain text", "请稍后再试。"],
+    [undefined, "请稍后再试。"],
   ])("keeps an unrecognized error as is", (error, expected) => {
     expect(scopedSettingsFailureMessage(error)).toBe(expected);
+  });
+
+  it("reads once under the toast's own '无法在 … 上保存' lead-in", () => {
+    const sentence = `无法在 Build workstation 上保存：${scopedSettingsFailureMessage(undefined)}`;
+    expect(sentence).toBe("无法在 Build workstation 上保存：请稍后再试。");
+    expect(sentence.match(/保存/g)).toHaveLength(1);
   });
 });
 

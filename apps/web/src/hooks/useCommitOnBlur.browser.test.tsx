@@ -33,6 +33,29 @@ describe("settings draft commits", () => {
     expect(saved).toBe("/projects");
   });
 
+  it("shows a value another device saved in a field nobody is editing", async () => {
+    const commit = vi.fn();
+    await using screen = await render(<DraftInput value="t3" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await expect.element(input).toHaveValue("t3");
+
+    await screen.rerender(<DraftInput value="elsewhere/" onCommit={commit} />);
+
+    await expect.element(input).toHaveValue("elsewhere/");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("keeps the text being typed when another device saves a new value", async () => {
+    const commit = vi.fn();
+    await using screen = await render(<DraftInput value="t3" onCommit={commit} />);
+    const input = screen.getByRole("textbox");
+    await input.fill("typing/");
+
+    await screen.rerender(<DraftInput value="elsewhere/" onCommit={commit} />);
+
+    await expect.element(input).toHaveValue("typing/");
+  });
+
   it("preserves a saved edit when refocused before its server snapshot arrives", async () => {
     let saved = "~/";
     const commit = (next: string) => {
