@@ -819,6 +819,9 @@ export default function ChatView(props: ChatViewProps) {
   const draftProviders = draftThread
     ? (providersByEnvironment.get(draftThread.environmentId) ?? [])
     : [];
+  const draftPreferDevReplay = draftThread
+    ? environmentById.get(draftThread.environmentId)?.serverConfig?.devMode === true
+    : false;
   const draftDefaultModelSelection =
     draftThread && draftConfiguredDefaultModelSelection !== null
       ? resolveNewSessionDefaultModelSelection({
@@ -826,6 +829,7 @@ export default function ChatView(props: ChatViewProps) {
           providers: draftProviders,
           settings,
           projectId: draftThread.projectId,
+          preferDevReplay: draftPreferDevReplay,
         })
       : null;
   const draftModelResolution = draftThread
@@ -836,6 +840,7 @@ export default function ChatView(props: ChatViewProps) {
             draftProviders,
             settings,
             draftThread.projectId,
+            { preferDevReplay: draftPreferDevReplay },
           ),
         fallbackSelection: settings.fallbackModelSelection,
         providers: draftProviders,
@@ -1345,6 +1350,7 @@ export default function ChatView(props: ChatViewProps) {
     ],
     lockedProvider,
     lockedInstanceId: activeRuntime?.providerInstanceId ?? activeThreadModelInstanceId,
+    preferDevReplay: serverConfig?.devMode === true,
   });
   const selectedProvider = selectedProviderEntry?.driverKind ?? requestedDriverKind;
   const activeProviderInstanceId = selectedProviderEntry?.instanceId ?? null;
@@ -2632,6 +2638,7 @@ export default function ChatView(props: ChatViewProps) {
         providerStatuses,
         settings,
         draftThread?.projectId ?? null,
+        { preferDevReplay: serverConfig?.devMode === true },
       );
     const fallback =
       !isServerThread &&
@@ -3868,6 +3875,7 @@ export default function ChatView(props: ChatViewProps) {
                                 }
                                 providerStatuses={providerStatuses as ServerProvider[]}
                                 providerCatalogKnown={serverConfig !== null}
+                                preferDevReplay={serverConfig?.devMode === true}
                                 activeProjectDefaultModelSelection={
                                   activeProjectDefaultModelSelection
                                 }

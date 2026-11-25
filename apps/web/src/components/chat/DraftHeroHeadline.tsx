@@ -212,6 +212,7 @@ export function DraftHeroHeadline({
         (environment) => environment.environmentId === project.environmentId,
       )?.serverConfig;
       const environmentSettings = environmentConfig?.settings;
+      const preferDevReplay = environmentConfig?.devMode === true;
       const configuredDefaultSelection = environmentSettings
         ? resolveProjectSettings(environmentSettings, project.id, project).settings
             .defaultModelSelection
@@ -224,6 +225,7 @@ export function DraftHeroHeadline({
               providers: projectProviders,
               settings: environmentSettings,
               projectId: project.id,
+              preferDevReplay,
             })
           : configuredDefaultSelection;
       const fallbackResolution = resolveNewThreadModelSelection({
@@ -235,6 +237,7 @@ export function DraftHeroHeadline({
                 projectProviders,
                 environmentSettings,
                 project.id,
+                { preferDevReplay },
               )),
         fallbackSelection: environmentSettings?.fallbackModelSelection ?? null,
         providers: projectProviders,

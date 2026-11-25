@@ -2,6 +2,7 @@ import { pipe } from "effect/Function";
 import {
   DEFAULT_MODEL_BY_PROVIDER,
   defaultInstanceIdForDriver,
+  DEV_REPLAY_INSTANCE_ID,
   resolveProjectProviderInstanceEnabled,
   type ModelSelection,
   type ProjectId,
@@ -224,12 +225,29 @@ export function getDefaultProviderInstanceModel(
   );
 }
 
+interface ProviderSelectionOptions {
+  readonly preferDevReplay?: boolean | undefined;
+}
+
+export function findUsableDevReplayEntry(
+  entries: ReadonlyArray<ProviderInstanceEntry>,
+): ProviderInstanceEntry | undefined {
+  return entries.find(
+    (entry) =>
+      entry.instanceId === DEV_REPLAY_INSTANCE_ID &&
+      entry.driverKind === "acpRegistry" &&
+      isProviderInstanceUsableForDefault(entry),
+  );
+}
+
 const isSelectableProviderInstanceEntry = (entry: ProviderInstanceEntry): boolean =>
   entry.enabled && entry.isAvailable;
 
 const pickPreferredSelectableEntry = (
   entries: ReadonlyArray<ProviderInstanceEntry>,
+  options?: ProviderSelectionOptions,
 ): ProviderInstanceEntry | undefined =>
+  (options?.preferDevReplay ? findUsableDevReplayEntry(entries) : undefined) ??
   entries.find(
     (entry) =>
       isProviderInstancePickerReady(entry) && entry.snapshot.auth.status === "authenticated",
@@ -240,6 +258,7 @@ const pickPreferredSelectableEntry = (
 export function resolveSelectableProviderInstanceEntry(
   entries: ReadonlyArray<ProviderInstanceEntry>,
   instanceId: ProviderInstanceId | undefined,
+  options?: ProviderSelectionOptions,
 ): ProviderInstanceEntry | undefined {
   if (instanceId !== undefined) {
     const requested = entries.find((entry) => entry.instanceId === instanceId);
@@ -248,7 +267,7 @@ export function resolveSelectableProviderInstanceEntry(
     }
   }
   return (
-    pickPreferredSelectableEntry(entries) ??
+    pickPreferredSelectableEntry(entries, options) ??
     entries.find((entry) => isSelectableProviderInstanceEntry(entry) && entry.status !== "error")
   );
 }
@@ -256,16 +275,18 @@ export function resolveSelectableProviderInstanceEntry(
 export function resolveSelectableProviderInstance(
   providers: ReadonlyArray<ServerProvider>,
   instanceId: ProviderInstanceId | undefined,
+  options?: ProviderSelectionOptions,
 ): ProviderInstanceId | undefined {
   const entries = deriveProviderInstanceEntries(providers);
-  return resolveSelectableProviderInstanceEntry(entries, instanceId)?.instanceId;
+  return resolveSelectableProviderInstanceEntry(entries, instanceId, options)?.instanceId;
 }
 
 export function resolveDefaultProviderModelSelection(
   providers: ReadonlyArray<ServerProvider>,
   selection: ModelSelection | null | undefined,
+  options?: ProviderSelectionOptions,
 ): ModelSelection | null {
-  const instanceId = resolveSelectableProviderInstance(providers, selection?.instanceId);
+  const instanceId = resolveSelectableProviderInstance(providers, selection?.instanceId, options);
   if (instanceId === undefined) return null;
   if (selection?.instanceId === instanceId) return selection;
   const model = getDefaultProviderInstanceModel(providers, instanceId);
@@ -276,17 +297,19 @@ export function resolveProjectDefaultProviderModelSelection(
   providers: ReadonlyArray<ServerProvider>,
   settings: Pick<ServerSettings, "providerInstances" | "projectSettingsOverrides">,
   projectId: ProjectId | null,
+  options?: ProviderSelectionOptions,
 ): ModelSelection | null {
   const entries = providerInstanceEntriesFor(providers, settings, projectId);
   const firstDriverEntries = entries.filter(
     (candidate) => candidate.driverKind === entries[0]?.driverKind,
   );
-  // Matches resolveComposerProviderSelection: the first driver group wins when it has a usable agent.
+  // Matches resolveComposerProviderSelection: in dev mode Replay wins ahead of the first real driver group.
   const entry =
-    pickPreferredSelectableEntry(firstDriverEntries) ??
-    pickPreferredSelectableEntry(entries) ??
-    resolveSelectableProviderInstanceEntry(firstDriverEntries, undefined) ??
-    resolveSelectableProviderInstanceEntry(entries, undefined);
+    (options?.preferDevReplay ? findUsableDevReplayEntry(entries) : undefined) ??
+    pickPreferredSelectableEntry(firstDriverEntries, options) ??
+    pickPreferredSelectableEntry(entries, options) ??
+    resolveSelectableProviderInstanceEntry(firstDriverEntries, undefined, options) ??
+    resolveSelectableProviderInstanceEntry(entries, undefined, options);
   const model = entry ? getDefaultProviderInstanceModel(providers, entry.instanceId) : undefined;
   return entry && model ? { instanceId: entry.instanceId, model } : null;
 }
@@ -296,6 +319,7 @@ export function resolveNewSessionDefaultModelSelection(input: {
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly settings: Pick<ServerSettings, "providerInstances" | "projectSettingsOverrides">;
   readonly projectId: ProjectId | null;
+  readonly preferDevReplay?: boolean | undefined;
 }): ModelSelection | null {
   if (input.providers.length === 0) {
     return input.defaultSelection;
@@ -309,7 +333,8 @@ export function resolveNewSessionDefaultModelSelection(input: {
       return input.defaultSelection;
     }
   }
-  const usableFallback = pickPreferredSelectableEntry(entries);
+  const options: ProviderSelectionOptions = { preferDevReplay: input.preferDevReplay };
+  const usableFallback = pickPreferredSelectableEntry(entries, options);
   if (usableFallback) {
     const model = getDefaultProviderInstanceModel(input.providers, usableFallback.instanceId);
     if (model) {
@@ -321,6 +346,11 @@ export function resolveNewSessionDefaultModelSelection(input: {
   }
   return (
     input.defaultSelection ??
-    resolveProjectDefaultProviderModelSelection(input.providers, input.settings, input.projectId)
+    resolveProjectDefaultProviderModelSelection(
+      input.providers,
+      input.settings,
+      input.projectId,
+      options,
+    )
   );
 }

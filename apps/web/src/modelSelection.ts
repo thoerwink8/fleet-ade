@@ -319,14 +319,17 @@ export function defaultModelSelectionsAreMixed(
     projectId: ProjectId | null;
     settings: ServerSettings;
     providers: ReadonlyArray<ServerProvider>;
+    preferDevReplay?: boolean | undefined;
   }>,
 ): boolean {
-  const selections = targets.map(({ projectId, settings, providers }) => {
+  const selections = targets.map(({ projectId, settings, providers, preferDevReplay }) => {
     const stored = settings.defaultModelSelection;
     const selection =
       stored === null
-        ? resolveProjectDefaultProviderModelSelection(providers, settings, projectId)
-        : resolveDefaultProviderModelSelection(providers, stored);
+        ? resolveProjectDefaultProviderModelSelection(providers, settings, projectId, {
+            preferDevReplay,
+          })
+        : resolveDefaultProviderModelSelection(providers, stored, { preferDevReplay });
     return {
       stored,
       effective: selection

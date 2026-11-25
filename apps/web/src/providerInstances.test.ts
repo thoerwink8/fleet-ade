@@ -700,4 +700,161 @@ describe("resolveNewSessionDefaultModelSelection", () => {
       model: "gpt-5.4",
     });
   });
+
+  it("defaults automatic new-session selection to Replay only in dev mode", () => {
+    const devReplayId = ProviderInstanceId.make("devReplay");
+    const settings = {
+      providerInstances: {
+        [devReplayId]: {
+          driver: ProviderDriverKind.make("acpRegistry"),
+          displayName: "Replay (dev)",
+        },
+      },
+      projectSettingsOverrides: {},
+    };
+    const disabledReplaySettings = {
+      providerInstances: {
+        [devReplayId]: {
+          driver: ProviderDriverKind.make("acpRegistry"),
+          displayName: "Replay (dev)",
+          enabled: false,
+        },
+      },
+      projectSettingsOverrides: {},
+    };
+    const emptySettings = {
+      providerInstances: {},
+      projectSettingsOverrides: {},
+    };
+    const authenticatedCodex = provider({
+      provider: ProviderDriverKind.make("codex"),
+      instanceId: "codex",
+      status: "ready",
+      auth: { status: "authenticated" },
+      models: [model("gpt-5.4", false, true)],
+    });
+    const authenticatedClaude = provider({
+      provider: ProviderDriverKind.make("claudeAgent"),
+      instanceId: "claudeAgent",
+      status: "ready",
+      auth: { status: "authenticated" },
+      models: [model("claude-opus-4-6", false, true)],
+    });
+    const devReplay = provider({
+      provider: ProviderDriverKind.make("acpRegistry"),
+      instanceId: "devReplay",
+      displayName: "Replay (dev)",
+      status: "ready",
+      auth: { status: "unknown" },
+      models: [model("showcase", false, true)],
+    });
+    const disabledDevReplay = { ...devReplay, enabled: false };
+    const unauthenticatedCodex = {
+      ...authenticatedCodex,
+      status: "warning" as const,
+      auth: { status: "unauthenticated" as const },
+    };
+    const allReady = [authenticatedCodex, authenticatedClaude, devReplay];
+
+    expect(
+      resolveProjectDefaultProviderModelSelection(allReady, settings, null, {
+        preferDevReplay: true,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("devReplay"),
+      model: "showcase",
+    });
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: null,
+        providers: allReady,
+        settings,
+        projectId: null,
+        preferDevReplay: true,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("devReplay"),
+      model: "showcase",
+    });
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "gpt-5.4",
+        },
+        providers: [unauthenticatedCodex, authenticatedClaude, devReplay],
+        settings,
+        projectId: null,
+        preferDevReplay: true,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("devReplay"),
+      model: "showcase",
+    });
+
+    // Respects explicit user/project choice in dev mode.
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: {
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          model: "claude-opus-4-6",
+        },
+        providers: allReady,
+        settings,
+        projectId: null,
+        preferDevReplay: true,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      model: "claude-opus-4-6",
+    });
+
+    // Respects disabling Replay in settings (both explicit disable and absent setting entry).
+    expect(
+      resolveProjectDefaultProviderModelSelection(
+        [authenticatedCodex, authenticatedClaude, disabledDevReplay],
+        disabledReplaySettings,
+        null,
+        { preferDevReplay: true },
+      ),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5.4",
+    });
+    expect(
+      resolveProjectDefaultProviderModelSelection(allReady, emptySettings, null, {
+        preferDevReplay: true,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5.4",
+    });
+
+    // Non-dev mode never defaults to Replay even if a leftover devReplay instance is present.
+    expect(
+      resolveProjectDefaultProviderModelSelection(allReady, settings, null, {
+        preferDevReplay: false,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5.4",
+    });
+    expect(resolveProjectDefaultProviderModelSelection(allReady, settings, null)).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5.4",
+    });
+
+    // Bundled dev builds without devReplay fall back to the real provider.
+    expect(
+      resolveProjectDefaultProviderModelSelection(
+        [authenticatedCodex, authenticatedClaude],
+        settings,
+        null,
+        { preferDevReplay: true },
+      ),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5.4",
+    });
+  });
 });

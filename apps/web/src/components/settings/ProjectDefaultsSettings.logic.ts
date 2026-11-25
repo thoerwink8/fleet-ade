@@ -19,6 +19,7 @@ export function resolveDefaultModelSettingsPresentation(input: {
   readonly providers: ReadonlyArray<ServerProvider>;
   readonly settings: UnifiedSettings;
   readonly projectId: ProjectId | null;
+  readonly preferDevReplay?: boolean | undefined;
 }): DefaultModelSettingsPresentation {
   const saved = input.settings.defaultModelSelection;
   if (saved === null) {
@@ -26,6 +27,7 @@ export function resolveDefaultModelSettingsPresentation(input: {
       input.providers,
       input.settings,
       input.projectId,
+      { preferDevReplay: input.preferDevReplay },
     );
     return {
       selection: automatic
@@ -36,7 +38,9 @@ export function resolveDefaultModelSettingsPresentation(input: {
   }
 
   const savedEntry = input.entries.find((entry) => entry.instanceId === saved.instanceId);
-  const resolved = resolveDefaultProviderModelSelection(input.providers, saved);
+  const resolved = resolveDefaultProviderModelSelection(input.providers, saved, {
+    preferDevReplay: input.preferDevReplay,
+  });
   // Settings can turn a provider off before the server snapshot catches up, so check both.
   if (
     !savedEntry?.enabled ||

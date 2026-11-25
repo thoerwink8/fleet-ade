@@ -109,8 +109,9 @@ export function createNewThreadHandler(router: AnyRouter) {
     const projectGroupingSettings = selectProjectGroupingSettings(getClientSettings());
     // Read at call time; status pushes replace the config map and would recreate every sidebar handler.
     const environmentServerConfigs = appAtomRegistry.get(environmentServerConfigsAtom);
-    const targetServerSettings =
-      environmentServerConfigs.get(projectRef.environmentId)?.settings ?? DEFAULT_SERVER_SETTINGS;
+    const targetServerConfig = environmentServerConfigs.get(projectRef.environmentId);
+    const targetServerSettings = targetServerConfig?.settings ?? DEFAULT_SERVER_SETTINGS;
+    const preferDevReplay = targetServerConfig?.devMode === true;
     const {
       getComposerDraft,
       getDraftSessionByLogicalProjectKey,
@@ -173,6 +174,7 @@ export function createNewThreadHandler(router: AnyRouter) {
             providers,
             settings: targetServerSettings,
             projectId: projectRef.projectId,
+            preferDevReplay,
           })
         : null;
     const fallbackResolution = resolveNewThreadModelSelection({
@@ -184,6 +186,7 @@ export function createNewThreadHandler(router: AnyRouter) {
               providers,
               targetServerSettings,
               projectRef.projectId,
+              { preferDevReplay },
             )),
       fallbackSelection: targetServerSettings.fallbackModelSelection ?? null,
       providers,

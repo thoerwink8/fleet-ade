@@ -1,5 +1,6 @@
 import {
   DEFAULT_SERVER_SETTINGS,
+  DEV_REPLAY_INSTANCE_ID,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -20,7 +21,6 @@ import { describe, expect, it } from "vite-plus/test";
 import * as ServerConfig from "../config.ts";
 import { ServerSettingsService } from "../serverSettings.ts";
 import {
-  DEV_REPLAY_INSTANCE_ID,
   deriveProviderInstanceConfigMap,
   layerSettingsWatcher,
   seedBuiltinOmpInstance,

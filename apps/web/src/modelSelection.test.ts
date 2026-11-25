@@ -176,6 +176,44 @@ describe("scoped default model selections", () => {
         inherited,
       ]),
     ).toBe(true);
+
+    const devReplayId = ProviderInstanceId.make("devReplay");
+    const replayProviders = [
+      ...codex.providers,
+      provider({
+        instanceId: "devReplay",
+        provider: ProviderDriverKind.make("acpRegistry"),
+        auth: { status: "unknown" },
+        models: ["showcase"],
+      }),
+    ];
+    const replaySettings = {
+      ...DEFAULT_UNIFIED_SETTINGS,
+      providerInstances: {
+        [devReplayId]: {
+          driver: ProviderDriverKind.make("acpRegistry"),
+          displayName: "Replay (dev)",
+        },
+      },
+    };
+    const devTarget = {
+      projectId: null,
+      settings: replaySettings,
+      providers: replayProviders,
+      preferDevReplay: true,
+    };
+    const prodTarget = {
+      projectId: null,
+      settings: replaySettings,
+      providers: replayProviders,
+      preferDevReplay: false,
+    };
+    expect(defaultModelSelectionsAreMixed(DEFAULT_CLIENT_SETTINGS, [devTarget, prodTarget])).toBe(
+      true,
+    );
+    expect(defaultModelSelectionsAreMixed(DEFAULT_CLIENT_SETTINGS, [devTarget, devTarget])).toBe(
+      false,
+    );
   });
 
   it("keeps automatic, explicit, and different saved options distinct", () => {
