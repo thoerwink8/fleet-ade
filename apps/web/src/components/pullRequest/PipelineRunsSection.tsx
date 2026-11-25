@@ -173,7 +173,7 @@ function PipelineFrame({
     <section aria-label="流水线" className="grid min-w-0 gap-4 rounded-xl border p-4">
       <div className="flex items-center gap-3">
         <h2 className="min-w-0 flex-1 text-base font-medium">流水线</h2>
-        <Button variant="outline" size="sm" disabled={refreshDisabled} onClick={onRefresh}>
+        <Button variant="secondary" size="sm" disabled={refreshDisabled} onClick={onRefresh}>
           <RefreshIcon refreshing={pending} />
           刷新
         </Button>

@@ -2849,8 +2849,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               }
                               settings={
                                 <Button
-                                  size="icon-xs"
-                                  variant="ghost-muted"
+                                  size="xs"
+                                  icon
+                                  variant="muted"
                                   tabIndex={-1}
                                   aria-hidden="true"
                                   title={`${project.displayName} 的项目设置`}

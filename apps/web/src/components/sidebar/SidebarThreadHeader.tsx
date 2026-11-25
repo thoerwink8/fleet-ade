@@ -77,9 +77,10 @@ export function SidebarThreadHeader({
       {isSearching ? (
         <Button
           type="button"
-          size="icon-micro"
+          size="xs"
+          icon
           touchTarget="compact"
-          variant="ghost-muted"
+          variant="muted"
           className="shrink-0 max-md:-mr-2 pointer-coarse:-mr-2"
           aria-label="清除会话搜索"
           onClick={() => {

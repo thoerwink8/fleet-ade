@@ -42,9 +42,10 @@ export function ProjectPinButton(props: {
       )}
     >
       <Button
-        size="icon-xs"
+        size="xs"
+        icon
         touchTarget="compact"
-        variant="ghost-muted"
+        variant="muted"
         tabIndex={-1}
         aria-hidden="true"
         title={visibleShortcutLabel ? `${action} (${visibleShortcutLabel})` : action}

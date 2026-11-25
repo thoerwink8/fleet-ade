@@ -196,7 +196,7 @@ function RootRouteErrorView({ error }: ErrorComponentProps) {
         >
           重试
         </Button>
-        <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+        <Button size="sm" variant="secondary" onClick={() => window.location.reload()}>
           重新加载应用
         </Button>
         <CopyErrorButton report={report} />
@@ -216,7 +216,7 @@ function CopyErrorButton({ report }: { report: string }) {
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-report" });
 
   return (
-    <Button size="sm" variant="outline" onClick={() => copyToClipboard(report)}>
+    <Button size="sm" variant="secondary" onClick={() => copyToClipboard(report)}>
       {isCopied ? <CheckIcon className="text-success" /> : <CopyIcon />}
       {isCopied ? "已复制" : "复制错误信息"}
     </Button>

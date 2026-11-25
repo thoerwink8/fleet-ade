@@ -62,7 +62,7 @@ export function ProviderSetupSection(props: ProviderSetupSectionProps) {
               {props.environmentLabel}
             </span>
             {!props.enabled && !props.readOnly ? (
-              <Button size="sm" variant="outline" onClick={props.onEnable}>
+              <Button size="sm" variant="secondary" onClick={props.onEnable}>
                 启用 Antigravity
               </Button>
             ) : null}
@@ -257,7 +257,7 @@ function ProviderSetupActions({
                 {installActive && installation.operationId ? (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={actionsDisabled}
                     onClick={() => {
                       const operationId = installation.operationId;
@@ -272,7 +272,7 @@ function ProviderSetupActions({
                 ) : !installActive && provider.setup?.canInstall ? (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={actionsDisabled || authActive}
                     onClick={() => void runCommand("正在开始安装", () => startInstall(target))}
                   >
@@ -294,7 +294,8 @@ function ProviderSetupActions({
                   <TooltipTrigger
                     render={
                       <Button
-                        size="icon-sm"
+                        size="sm"
+                        icon
                         variant="ghost"
                         className="col-start-1 row-start-1"
                         aria-label="移除下载的运行环境"
@@ -338,7 +339,7 @@ function ProviderSetupActions({
           {queryError ? (
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               className="w-fit"
               onClick={() => {
                 authQuery.refresh();

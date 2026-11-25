@@ -524,8 +524,8 @@ function StorageCleanupConfirmDialog({
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
-          <Button variant="destructive" disabled={dialog.confirmDisabled} onClick={onConfirm}>
+          <AlertDialogClose render={<Button variant="secondary" />}>取消</AlertDialogClose>
+          <Button variant="danger" disabled={dialog.confirmDisabled} onClick={onConfirm}>
             {dialog.confirmLabel}
           </Button>
         </AlertDialogFooter>
@@ -1024,7 +1024,7 @@ function CleanupSection() {
           }
           control={
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={
                 buttonPhase === "previewing" ||

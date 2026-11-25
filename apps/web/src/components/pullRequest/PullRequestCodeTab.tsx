@@ -555,7 +555,7 @@ function PullRequestCodeTab({
         {diffQuery.error !== null ? (
           <>
             <span>此差异的剩余部分无法加载。</span>
-            <Button size="xs" variant="outline" onClick={() => diffQuery.refresh()}>
+            <Button size="xs" variant="secondary" onClick={() => diffQuery.refresh()}>
               重试
             </Button>
           </>
@@ -569,8 +569,9 @@ function PullRequestCodeTab({
     const collapsed = item.collapsed === true;
     return (
       <Button
-        size="icon-micro"
-        variant="ghost-muted"
+        size="xs"
+        icon
+        variant="muted"
         aria-expanded={!collapsed}
         aria-label={collapsed ? "展开差异" : "折叠差异"}
         className="mr-1"
@@ -719,7 +720,7 @@ function PullRequestCodeTab({
             <TooltipTrigger
               render={
                 <DropdownMenuTrigger
-                  render={<Button size="icon-sm" variant="ghost" />}
+                  render={<Button size="sm" icon variant="ghost" />}
                   className="@lg:hidden"
                   aria-label="差异选项"
                 />
@@ -823,7 +824,8 @@ function PullRequestCodeTab({
               render={
                 <Button
                   type="button"
-                  size="icon-sm"
+                  size="sm"
+                  icon
                   variant="ghost"
                   aria-label={allFilesCollapsed ? "展开所有文件" : "折叠所有文件"}
                   onClick={toggleAllFiles}
@@ -1047,7 +1049,7 @@ function PullRequestCodeTab({
                     <Button
                       type="button"
                       size="xs"
-                      variant="outline"
+                      variant="secondary"
                       className="w-full"
                       disabled={diffQuery.isPending}
                       onClick={diffQuery.error !== null ? () => diffQuery.refresh() : loadNextSlice}

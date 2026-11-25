@@ -420,7 +420,7 @@ function ProjectDetail({
       {hasMultipleCheckouts ? (
         <Button
           size="sm"
-          variant="outline"
+          variant="secondary"
           disabled={!editableIds.has(member.environmentId)}
           onClick={() => void removeMembers([member])}
           aria-label={`移除项目目录 ${member.workspaceRoot}`}
@@ -580,7 +580,7 @@ function ProjectDetail({
                 <ProjectFavicon project={group} className="size-6" />
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   type="button"
                   aria-label="选择项目图标"
                   disabled={isSavingFavicon || !canEditGroup}
@@ -590,7 +590,7 @@ function ProjectDetail({
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   type="button"
                   aria-label="选择项目图标文件"
                   disabled={isSavingFavicon || !canEditGroup}
@@ -630,7 +630,7 @@ function ProjectDetail({
                 control={
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={isOrganizing}
                     onClick={() =>
                       void organize(
@@ -668,7 +668,7 @@ function ProjectDetail({
             control={
               <Button
                 size="sm"
-                variant="destructive-outline"
+                variant="danger-secondary"
                 disabled={!canEditGroup}
                 onClick={() => void removeMembers(group.memberProjects)}
               >

@@ -255,7 +255,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
             disabled={primaryAction.disabled}
             onClick={primaryAction.onClick}
             size="sm"
-            variant="outline"
+            variant="secondary"
           >
             {primaryAction.label}
           </Button>
@@ -263,8 +263,9 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         <Button
           aria-label={`关闭 ${providerName} 提示（${status.status}）`}
           onClick={onDismiss}
-          size="icon-sm"
-          variant="ghost-muted"
+          size="sm"
+          icon
+          variant="muted"
         >
           <XIcon />
         </Button>

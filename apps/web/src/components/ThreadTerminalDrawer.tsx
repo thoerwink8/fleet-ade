@@ -1676,7 +1676,7 @@ export default function ThreadTerminalDrawer({
           <p>此会话还没有终端。</p>
           <Button
             size="xs"
-            variant="outline"
+            variant="secondary"
             onClick={onNewTerminalAction}
             disabled={!canOperateTerminal}
           >

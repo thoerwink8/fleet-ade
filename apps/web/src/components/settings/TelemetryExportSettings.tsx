@@ -219,7 +219,7 @@ function TelemetryExportForm() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={!isHttpUrl(url) || checks[key]?.result === null}
                     onClick={() => void checkEndpoint(key, signal, url)}
                   >
@@ -249,7 +249,7 @@ function TelemetryExportForm() {
             <Button
               type="button"
               size="xs"
-              variant="outline"
+              variant="secondary"
               disabled={!changed || saving || !canEdit}
               onClick={() => {
                 setDraft({});

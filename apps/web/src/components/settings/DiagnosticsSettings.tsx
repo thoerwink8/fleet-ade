@@ -215,8 +215,9 @@ function TraceIdCell({ traceId }: { traceId: string }) {
         <TooltipTrigger
           render={
             <Button
-              size="icon-micro"
-              variant="ghost-muted"
+              size="xs"
+              icon
+              variant="muted"
               aria-label={copied ? "已复制追踪 ID" : "复制追踪 ID"}
               onClick={() => copyToClipboard(traceId)}
             >
@@ -263,8 +264,9 @@ function ProcessNameCell({
     >
       {hasChildren ? (
         <Button
-          size="icon-micro"
-          variant="ghost-muted"
+          size="xs"
+          icon
+          variant="muted"
           aria-label={isExpanded ? `收起 ${name}` : `展开 ${name}`}
           onClick={() => onToggle(process.pid)}
         >
@@ -692,8 +694,9 @@ function DiagnosticsRefreshButton({
       <TooltipTrigger
         render={
           <Button
-            size="icon-xs"
-            variant="ghost-muted"
+            size="xs"
+            icon
+            variant="muted"
             disabled={isPending}
             onClick={onClick}
             aria-label={label}
@@ -1046,8 +1049,9 @@ function DiagnosticsSettingsBody() {
               <TooltipTrigger
                 render={
                   <Button
-                    size="icon-xs"
-                    variant="ghost-muted"
+                    size="xs"
+                    icon
+                    variant="muted"
                     disabled={
                       !canOpenHostEditor ||
                       !observability?.logsDirectoryPath ||

@@ -133,7 +133,7 @@ function PendingLinkRequest(props: {
           <Button
             type="button"
             size="xs"
-            variant="ghost-muted"
+            variant="muted"
             disabled={declining}
             onClick={() => void decline()}
           >
@@ -402,7 +402,7 @@ function LinkRequestDialog(props: {
         <WizardFooter>
           {current === "access" && steps.length > 1 ? (
             <Button
-              variant="outline"
+              variant="secondary"
               type="button"
               disabled={busy}
               onClick={() => {
@@ -413,7 +413,7 @@ function LinkRequestDialog(props: {
               返回
             </Button>
           ) : (
-            <Button variant="outline" type="button" disabled={busy} onClick={close}>
+            <Button variant="secondary" type="button" disabled={busy} onClick={close}>
               取消
             </Button>
           )}

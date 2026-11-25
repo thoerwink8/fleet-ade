@@ -92,7 +92,7 @@ function ProviderCustomColorPanel(props: {
         {props.showAddButton ? (
           <PopoverClose
             render={
-              <Button type="button" size="compact" onClick={() => onCommit(currentColor)}>
+              <Button type="button" size="sm" onClick={() => onCommit(currentColor)}>
                 添加颜色
               </Button>
             }
@@ -123,8 +123,9 @@ function ProviderCustomColorPicker(props: {
         render={
           <Button
             type="button"
-            size="icon-sm"
-            variant="ghost-muted"
+            size="sm"
+            icon
+            variant="muted"
             style={normalized ? { backgroundColor: normalized } : undefined}
             aria-label={`${normalized ? "更改" : "添加"} ${props.displayName} 的强调色`}
           >
@@ -145,8 +146,8 @@ function ProviderCustomColorPicker(props: {
               render={
                 <Button
                   type="button"
-                  size="compact"
-                  variant="ghost-muted"
+                  size="sm"
+                  variant="muted"
                   className="w-full justify-start"
                   onClick={props.onClear}
                 >

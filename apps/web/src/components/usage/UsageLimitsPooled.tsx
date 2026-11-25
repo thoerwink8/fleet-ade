@@ -202,7 +202,7 @@ function SegmentPopover({
               {choice.availableCount > 0 ? (
                 <Button
                   size="xs"
-                  variant="outline"
+                  variant="secondary"
                   disabled={redeem.busy || !redeem.canManageProviders}
                   className="ms-auto"
                   onClick={() => onRedeem(choice)}
@@ -449,7 +449,7 @@ function LegendRow({
       handle={popover}
       payload={payload}
       style={{ gridColumn: "1 / -1", gridRow: index + 1 }}
-      render={<Button variant="ghost" size="compact" />}
+      render={<Button variant="ghost" size="sm" />}
       className="min-w-0 @2xl/pool:hidden"
     >
       <AccountName account={account} className="min-w-0 truncate font-medium text-foreground" />
@@ -637,7 +637,7 @@ export function UsageLimitsPooled({
             </div>
           </div>
           <Button
-            variant="ghost-muted"
+            variant="muted"
             size="xs"
             onClick={() => void ensureLocalApi().shell.openExternal(link.url)}
           >

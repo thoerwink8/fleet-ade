@@ -159,7 +159,8 @@ function HistoryNavigationButton({
             )}
             disabled={!enabled}
             onClick={() => navigateHistory(direction)}
-            size="icon-sm"
+            size="sm"
+            icon
             touchTarget="compact"
             variant={onBackdrop ? "media-navigation" : "ghost"}
           />

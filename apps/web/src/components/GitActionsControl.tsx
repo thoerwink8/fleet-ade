@@ -673,7 +673,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                           render={
                             <Button
                               variant="warning-outline"
-                              size="micro"
+                              size="xs"
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
@@ -907,7 +907,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                   </span>
                 </div>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="w-full"
                   onClick={() => {
@@ -931,7 +931,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
           ) : (
             <>
               <Button
-                variant="outline"
+                variant="secondary"
                 disabled={publishRepositoryAction.isPending}
                 onClick={() => {
                   if (publishWizardStep === 0) {
@@ -1971,7 +1971,7 @@ export default function GitActionsControl({
           </DialogPanel>
           <DialogFooter variant="bare">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => {
                 setIsCommitDialogOpen(false);
@@ -1983,7 +1983,7 @@ export default function GitActionsControl({
               取消
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={!canChangeThreadBranch || noneSelected}
               onClick={runDialogActionOnNewBranch}
@@ -2032,7 +2032,7 @@ export default function GitActionsControl({
           <DialogFooter variant="bare" className="sm:flex-wrap sm:items-center">
             <Button
               className="w-full sm:mr-auto sm:w-auto"
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => setPendingDefaultBranchAction(null)}
             >
@@ -2040,8 +2040,9 @@ export default function GitActionsControl({
             </Button>
             <Button
               className="w-full max-w-full sm:w-auto"
-              variant="outline"
-              size="sm-multiline"
+              variant="secondary"
+              size="sm"
+              multiline
               onClick={() => continuePendingDefaultBranchAction(false)}
               disabled={!canWriteSourceControl}
             >
@@ -2049,7 +2050,8 @@ export default function GitActionsControl({
             </Button>
             <Button
               className="w-full max-w-full sm:w-auto"
-              size="sm-multiline"
+              size="sm"
+              multiline
               onClick={() => continuePendingDefaultBranchAction(true)}
               disabled={!canChangeThreadBranch || featureBranchUnavailableReason !== null}
             >

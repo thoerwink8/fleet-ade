@@ -136,7 +136,7 @@ function DialogPopup({
           <DialogPrimitive.Close
             aria-label="关闭"
             className="absolute end-2 top-2"
-            render={<Button size="icon" variant="ghost" />}
+            render={<Button size="md" icon variant="ghost" />}
           >
             <XIcon />
           </DialogPrimitive.Close>
@@ -162,7 +162,7 @@ function DialogPopup({
 }
 
 type DialogActionProps = Omit<React.ComponentProps<typeof Button>, "variant"> & {
-  variant?: Exclude<ButtonVariant, `${string}destructive${string}`>;
+  variant?: Exclude<ButtonVariant, `${string}danger${string}`>;
 };
 
 function DialogAction(props: DialogActionProps) {

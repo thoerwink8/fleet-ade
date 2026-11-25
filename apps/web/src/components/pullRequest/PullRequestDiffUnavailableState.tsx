@@ -36,13 +36,13 @@ export function PullRequestDiffUnavailableState({
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">
-        <Button size="sm" variant="default" onClick={onRetry}>
+        <Button size="sm" variant="primary" onClick={onRetry}>
           <RefreshIcon />
           重试
         </Button>
         <Button
           size="sm"
-          variant="outline"
+          variant="secondary"
           render={<a href={url} target="_blank" rel="noopener noreferrer" />}
         >
           <ExternalLinkIcon aria-hidden />在 {providerName} 上打开

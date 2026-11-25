@@ -13,11 +13,11 @@ import { Toggle } from "./toggle";
 const toRgb = converter("rgb");
 
 const SIZES = [
-  ["default", "--fa-ctrl", "default", "icon"],
-  ["sm", "--fa-ctrl-sm", "sm", "icon-sm"],
-  ["compact", "--fa-ctrl-sm", "sm", "icon-sm"],
-  ["xs", "--fa-ctrl-xs", "xs", "icon-xs"],
-  ["segmented", "--fa-ctrl-xs", "xs", "icon-xs"],
+  ["default", "--fa-ctrl", "md", "md icon"],
+  ["sm", "--fa-ctrl-sm", "sm", "sm icon"],
+  ["compact", "--fa-ctrl-sm", "sm", "sm icon"],
+  ["xs", "--fa-ctrl-xs", "xs", "xs icon"],
+  ["segmented", "--fa-ctrl-xs", "xs", "xs icon"],
 ] as const;
 
 function computed(prop: "height" | "backgroundColor" | "color" | "outlineColor", value: string) {
@@ -94,7 +94,7 @@ describe("Toggle", () => {
                 非
               </Toggle>
             ))}
-            <Button aria-label="button default" size="default">
+            <Button aria-label="button md" size="md">
               <PlusIcon />
             </Button>
             <Button aria-label="button sm" size="sm">
@@ -103,13 +103,13 @@ describe("Toggle", () => {
             <Button aria-label="button xs" size="xs">
               <PlusIcon />
             </Button>
-            <Button aria-label="button icon" size="icon">
+            <Button aria-label="button md icon" size="md" icon>
               <PlusIcon />
             </Button>
-            <Button aria-label="button icon-sm" size="icon-sm">
+            <Button aria-label="button sm icon" size="sm" icon>
               <PlusIcon />
             </Button>
-            <Button aria-label="button icon-xs" size="icon-xs">
+            <Button aria-label="button xs icon" size="xs" icon>
               <PlusIcon />
             </Button>
           </div>,

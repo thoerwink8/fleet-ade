@@ -209,7 +209,7 @@ export function SourceControlWritingSettingsSection() {
                 />
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={allInstructions === null}
                   onClick={() => {
                     if (allInstructions === null) return;
@@ -228,7 +228,7 @@ export function SourceControlWritingSettingsSection() {
             ) : (
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 onClick={() => {
                   setAllInstructions(null);
                   setEditingAllInstructions(true);

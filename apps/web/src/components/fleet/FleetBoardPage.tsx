@@ -411,7 +411,7 @@ export function FleetBoardPage() {
   );
   const clearFilters = (
     <Button
-      variant="ghost-muted"
+      variant="muted"
       size="sm"
       onClick={() => {
         patchSearch({ q: undefined, status: undefined, machine: undefined, repo: undefined });
@@ -513,7 +513,7 @@ export function FleetBoardPage() {
               {isMobile ? (
                 machineFilterVisible || repoFilterVisible || activeFilterCount > 0 ? (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setFiltersOpen(true)}
                     aria-label="筛选"
@@ -545,7 +545,11 @@ export function FleetBoardPage() {
                 title="还没有连上的电脑"
                 description="连上一台运行 Fleet ADE 的电脑后，这里会汇总它记下的各台电脑的活。"
                 action={
-                  <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    render={<Link to="/settings/connections" />}
+                  >
                     去连接
                   </Button>
                 }
@@ -561,7 +565,11 @@ export function FleetBoardPage() {
                 icon={<MonitorIcon />}
                 title="这个连接没有读取会话的权限，看不到机群汇总"
                 action={
-                  <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    render={<Link to="/settings/connections" />}
+                  >
                     去设置
                   </Button>
                 }
@@ -572,7 +580,11 @@ export function FleetBoardPage() {
                 title={`汇总电脑 ${sourceName} 连不上`}
                 description="连上这台电脑后，这里会显示它记下的各台电脑的活。"
                 action={
-                  <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    render={<Link to="/settings/connections" />}
+                  >
                     去连接
                   </Button>
                 }
@@ -584,7 +596,7 @@ export function FleetBoardPage() {
                 description="汇总读取失败，电脑恢复后重试。"
                 action={
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     disabled={retryPending}
                     onClick={() => {
@@ -703,7 +715,7 @@ export function FleetBoardPage() {
                               })}
                               {open && rows.done.length > visibleDone.length ? (
                                 <Button
-                                  variant="ghost-muted"
+                                  variant="muted"
                                   size="sm"
                                   className="self-start"
                                   onClick={() => setDoneLimit((limit) => limit + 50)}

@@ -125,7 +125,7 @@ export function PairingRouteSurface({
             disabled={isSubmitting}
             onClick={() => window.location.reload()}
             size="sm"
-            variant="outline"
+            variant="secondary"
           >
             重新加载应用
           </Button>

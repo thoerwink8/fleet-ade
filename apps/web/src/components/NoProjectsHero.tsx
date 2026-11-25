@@ -41,7 +41,7 @@ export function NoProjectsHero() {
               {scratchTargetEnvironmentId === null ? null : (
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   onClick={() => void startScratchThread(scratchTargetEnvironmentId)}
                 >
                   <MessageSquareDashedIcon className="size-4" />

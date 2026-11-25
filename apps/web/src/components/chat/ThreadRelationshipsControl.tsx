@@ -939,7 +939,8 @@ export function ThreadRelationshipsPanel(props: {
               <TooltipTrigger
                 render={
                   <ThreadDetailsControl
-                    size="icon-xs"
+                    size="xs"
+                    icon
                     variant="ghost"
                     part="icon"
                     tone="destructive"
@@ -985,7 +986,8 @@ export function ThreadRelationshipsPanel(props: {
                 <MenuTrigger
                   render={
                     <ThreadDetailsControl
-                      size="icon-xs"
+                      size="xs"
+                      icon
                       variant="ghost"
                       part="icon"
                       aria-label="更多会话操作"
