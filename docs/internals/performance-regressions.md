@@ -144,6 +144,10 @@ Windows. While a trace write is slow, producers keep up to one trace file of rec
 that time a stall survive it; records drop only while the disk stays stuck. Provider logging
 retains backpressure. Shutdown drains accepted writes before closing their scope.
 
+A performance change measures the baseline first, on the same data and for the longest task, then
+reports the median of alternating runs on `main` and the branch. It also ships one behavior test
+(a cache that is invalidated still behaves as before), since a speed number does not show that.
+
 Focused coverage: `ProjectionSettlement.test.ts`, `ThreadSettlementService.test.ts`,
 `runtimeLayer.test.ts`, `GitVcsDriverCore.test.ts`, and
 `desktopLocal.test.ts`.

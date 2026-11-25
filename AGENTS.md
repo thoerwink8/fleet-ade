@@ -2,8 +2,6 @@
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Grok, Antigravity) plus any [ACP](docs/user/providers-acp.md) agent, and serves web and desktop clients.
 
-You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
-
 ## What makes T3 Code special?
 
 We have over 500,000 users who love T3 Code. It's important we maintain the things they love as we continue to iterate on the product. Here's a brief list of the things we can never compromise on.
@@ -14,7 +12,7 @@ T3 Code is truly open. We share our roadmap, we share how we think about things,
 
 ### 2. Performance without compromise
 
-Lots of apps have gotten bogged down with bad tech decisions and "slop". We have not, and we're proud of the performance of T3 Code. We regularly audit for performance regressions, often caused by sending too much data over websockets, css animations causing gpu spikes, lists being hard to render, and more. Make sure all changes are considerate of performance impact.
+Lots of apps have gotten bogged down with bad tech decisions and "slop". We have not, and we're proud of the performance of T3 Code. We regularly audit for performance regressions: too much data over websockets, css animations that spike the gpu, lists that are hard to render. Keep every change considerate of performance.
 
 ### 3. Remote ready
 
@@ -22,7 +20,7 @@ The architecture of T3 Code's websocket layer (`t3`) enables a lot of awesome re
 
 ### 4. Multi-surface
 
-T3 Code has 2 key app surfaces: **web** and **desktop**. Phones and tablets use the same web app in a mobile browser.
+T3 Code has 2 key app surfaces: **web** and **desktop**.
 
 **Web** is kind of two surfaces, as we have the public facing "app.t3.codes" as well as locally hosting the web app through the `t3` command. Both need to be supported by all new features where reasonable.
 
@@ -80,7 +78,7 @@ The most common defect in this repo is a change that works on the path you teste
 - Setup runs in the background. While `.t3/setup-running` names a live PID, wait for it and do not run `vp i`. It ends with `.t3/setup-done` or `.t3/setup-failed` (with the error tail). With no marker at all, setup never ran here, so run `vp i` yourself.
 - `pnpm dev` starts server and web through `scripts/dev-runner.ts` and records the child pid and ports in `_tmp/run/dev.json`. In a worktree, state defaults to that worktree's gitignored `.t3`, which deliberately outranks an ambient `T3CODE_HOME` so you cannot land on shared state by accident. An explicit `--home-dir` still wins (`pnpm dev --home-dir <path>`).
 - Ports derive from the worktree path and are stable across restarts, but read the real ones from the `[dev-runner]` line since occupied ports shift.
-- Sharing over the tailnet is three steps: run `pnpm dev --share` in the background, wait for the `pairingUrl:` line in its output, then give that full URL to an unpaired browser. Do not wire up `tailscale serve` by hand, open the URL yourself, or consume the user's pairing link. A browser with the reusable dev cookie can use the bare origin. If a normal one-time token was consumed, mint a fresh one with `node apps/server/src/bin.ts pair`. It carries standard scopes, while the startup URL carries admin scopes needed for Connections settings.
+- Sharing over the tailnet is three steps: run `pnpm dev --share` in the background, wait for the `pairingUrl:` line in its output, then give that full URL to an unpaired browser. Do not wire up `tailscale serve` by hand, open the URL yourself, or consume the user's pairing link. A browser with the reusable dev cookie can use the bare origin. If a normal one-time token was consumed, mint a fresh one with `node apps/server/src/bin.ts pair`. It carries standard scopes, while the startup URL carries admin scopes needed for Connections settings. Never click a page's copy button when testing; the clipboard prompt locks browser automation.
 - To reuse web dev auth across worktrees, configure one fixed `T3CODE_DEV_AUTH_TOKEN` in the main checkout's gitignored `.env`. The `t3.json` setup links that file into worktrees. Never commit or publish the token or a startup URL. See [Reusable dev credential](docs/operations/development.md#reusable-dev-credential).
 - `pnpm stop` stops only the dev and start process trees recorded under `_tmp/run`. `vp` does not pass SIGTERM on, so signalling a `vp` pid alone leaves Vite and the server running; stop kills the recorded pid's tree (`taskkill /T` on Windows, the process group on Linux). See rule 1.
 - Run dev servers, Metro, and builds from your own shell so they end with your session. Do not detach them with `systemd-run`, `nohup`, `setsid`, or `tmux` unless the user asks for one that outlives the session. Detached servers ran for weeks and filled RAM and swap. The dev runner stops itself above `--memory-limit-gb` (half of RAM, at most 16 GiB) on Linux.
@@ -100,13 +98,16 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 - Before you push, run `pnpm check:changed`. It runs the fast checks for changed files: format, lint, knip, typecheck of affected packages and dependents, tests beside changes, and the cross-file checks those miss. CI runs `pnpm check` (lint, the interface English scan, typecheck, and the full Linux test suites).
 - While you iterate, run `vp test run <files>`. For big files, add `-t "<name>"`.
+- Run commands with the Node pinned in `engines`; the repo refuses other versions. Never write "main is already red" without a root cause. Server suites that assume POSIX paths are skipped on Windows, and CI on Linux decides.
 - Use `vp run typecheck`; it caches per package. Each package runs `effect-tsgo tsrs --noEmit`, the Rust TypeScript 7 checker with Effect's diagnostics built in. There is no `typescript` package to run.
 - Run `node -e` snippets from `apps/server` or the owning package. `effect` does not resolve from the repo root.
 - Test behavior that can break, such as orchestration and event-sourcing, provider protocol translation, auth and permission guards, persistence and migrations, external-format parsing, race fixes, and the logic a bug fix changed. Leave out tests for what types already guarantee, trivial logic, copy text, smoke runs, mock-call mirrors, callback wiring, and props rendered to static markup.
 - Extend before you add. When an existing test or table covers the behavior, add a row or an assertion there. Write a new `it` only when no case fits.
 - Test at one layer: the lowest one that fails on `main`. Do not repeat the case in a wrapper test, at each call site, or in copies of the same logic.
 - Write a browser test only for behavior that needs a real browser: layout and scrolling, focus and pointer input, real workers, or a component wired to its hooks. Logic a component calls gets a unit test beside it (`*.logic.test.ts`). A browser test file spends seconds in CI loading its module graph before its first test runs; a unit test takes milliseconds.
-- [Testing](docs/internals/testing.md) carries these same test rules, plus review guidance, for review bots. Change both together.
+- [Testing](docs/internals/testing.md) carries these same test rules, plus a worked browser-test example and review guidance, for review bots. Change both together.
+- A test that was green and turns red from your change means you broke behavior: fix the code, not the expectation. When an expectation truly changes, the PR names the old one, the new one, and why. A deleted case counts as a changed one.
+- A flaky test is fixed at every occurrence of the same cause in its module, not only the one that failed. A test for an error check sends the error through the real encode and decode, not a hand-built object.
 - **Do not run repo-wide checks.** No `vp check`, no `vp run -r test`, no `vp run -r typecheck` unless I ask. CI owns the full suite.
 - Backend behavior changes ship with focused tests for that behavior.
 - Proof for a bug fix depends on the bug. Logic, data, state, and protocol bugs get a failing test first (the fewest that fail on `main` for that reason, in an existing case of the module's test file where one fits), then the fix. Purely visual bugs (spacing, colour, alignment, a layout shift) get before/after captures as their proof and no test: do not add UI tests for nitpicks, and do not ask for one in review when a capture already shows it. A server-only fix with no visible surface ships the test plus a short runtime transcript. For a bug a user can reproduce in the web client, `vp run scenarios:prove` shows it failing on base and passing on the fix in the real app; see [Scenarios](docs/operations/scenarios.md).
@@ -125,16 +126,6 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
   - `rerender` needs a fresh element on every call.
   - No lifecycle hooks and no module-level mutable state. Shared mock state that `vi.mock` factories read is reset by a `setup()` call at the top of the test.
   - `router` is on by default. Pass `router: false` only with a one-line comment saying why.
-
-  ```tsx
-  it("saves on Enter", async () => {
-    const onSave = vi.fn();
-    using _now = vi.spyOn(Date, "now").mockReturnValue(0);
-    await using screen = await render(<TitleEditor onSave={onSave} />, { router: "/threads/1" });
-    await userEvent.type(screen.getByRole("textbox"), "Title{Enter}");
-    expect(onSave).toHaveBeenCalledWith("Title");
-  });
-  ```
 
 - User-visible frontend changes should get one integrated pass in a real client: `test-t3-app` for web. The primary agent does this once after integrating. Subagents do not launch their own dev servers.
 
@@ -194,12 +185,8 @@ Architecture and its constraints: `docs/internals/overview.md`. Glossary: `docs/
 - Client mutations use `createEnvironmentRpcCommand`. Add protected methods to `CLIENT_GUARDED_RPC_SCOPES` in contracts and use the command's `permissionAtom` for UI availability. Grants are checked at execution against the destination environment; the server remains authoritative. Keep raw RPC clients inside `rpc/`, and extend the permission behavior tests when adding a protected method.
 - Server features are services; transports stay thin. A `ws.ts` RPC handler, HTTP route, or MCP tool decodes input, calls one service method, and maps errors. See [Effect services](docs/internals/effect-services.md).
 - `apps/web/src/components/ui` exports own their look. Pick a `variant` or `size`; do not restyle one with `className`. If none fits and the look is a generic concept, add a variant to the component; a look that belongs to one feature stays in that feature's own component, not in `components/ui`. Layout classes (width, flex, margin, position) belong on the parent. `shadcn/no-restyle` fails lint on violations. `@fleet/design/react` is imported only inside `components/ui`. See [Adoption](docs/internals/web-ui.md#adoption).
-- Reusable Effect functions use `Effect.fn("Service.operation")` with a stable span name, not a
-  function wrapping `Effect.gen`. Keep `Effect.gen` for inline programs and layer construction.
-  Use `Effect.fnUntraced` only when spans would be too frequent (stream chunks, per-event
-  projection, tight loops) or duplicate an existing tracing boundary; explain that choice nearby.
-  Named `Effect.fn` creates a span; the unnamed form does not. Preserve existing span names and
-  options, and pass combinators as additional function-builder arguments.
+- Reusable Effect functions use `Effect.fn("Service.operation")`; `Effect.fnUntraced` needs a reason nearby. See [Effect services](docs/internals/effect-services.md#effect-functions-and-tracing).
+- Interface wording, translation, and renaming: read [界面用词规范](docs/internals/ui-terms.md) first (string exits, readers, aliases, anchors).
 - Inferred types over annotations. `any` is the enemy.
 - Default to no comment. Write one only for a constraint, an external quirk, or an invariant the code can't show, in one line where you can and four at most. Don't restate names or signatures, narrate steps, record history, or explain the fix you just made; the PR carries that. `t3code/no-low-value-comments` enforces the length cap and the mechanical cases.
 - React effects are for synchronizing with something outside React. Derive in render and act in handlers instead of syncing state, but don't hide real lifecycle work in refs or stores to dodge one. The `t3code/no-unreasoned-state-sync` lint rule reports every effect; one that stays states its reason with `// oxlint-disable-next-line t3code/no-unreasoned-state-sync -- <why>`.

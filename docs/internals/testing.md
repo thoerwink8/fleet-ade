@@ -11,6 +11,17 @@ Rules for writing tests, and for asking for them in review. AGENTS.md carries th
 - In review, ask for a missing test only when it would catch a real regression. Do not ask for one assertion per constant, label, or `switch` case. Flag a new test that breaks the rules above, and name the fix: fold it into the existing case or table, delete it, keep one layer, or move a browser test whose assertions would pass without rendering into a unit test.
 - Backend behavior changes ship with focused tests for that behavior.
 - Proof for a bug fix depends on the bug. Logic, data, state, and protocol bugs get a failing test first (the fewest that fail on `main` for that reason, in an existing case of the module's test file where one fits), then the fix. Purely visual bugs (spacing, colour, alignment, a layout shift) get before/after captures as their proof and no test: do not add UI tests for nitpicks, and do not ask for one in review when a capture already shows it. A server-only fix with no visible surface ships the test plus a short runtime transcript.
+- A test that was green and turns red from your change means you broke behavior: fix the code, not the expectation. When an expectation truly changes, the PR names the old one, the new one, and why. A deleted case counts as a changed one; list it too.
+- A flaky test is fixed at every occurrence of the same cause in its module, not only the one that failed.
+- A test for an error check sends the error through the real encode and decode (the contract schema, then the client's request wrapper), not a hand-built object: a field that never survives the wire passes in memory and never matches in the app. Text-matching classifiers need a counter-example test for each pattern that is too broad (a bare `401`, `ENOENT`).
+- A rule of the form "do nothing when X" gets one test per trigger: single action, batch, shortcut, menu.
+- Hand-back (`ChildSessionSummary`) only runs when a row exists in `orchestration_v2_projection_runs`; insert one in the fixture.
+
+## Running tests
+
+- Use the Node pinned in `engines`. Never record "main is already red" without a root cause; compare against the same file on `main` before blaming or excusing a change.
+- Server suites that assume POSIX paths are skipped on Windows. CI on Linux decides.
+- `pnpm check:changed` over a very large change can time out browser test files that pass alone. Rerun the red file by itself before judging it.
 
 ## Waiting for work
 

@@ -157,7 +157,11 @@ transport.
 
 Remote servers can outlive several client releases. Clients must use advertised
 capabilities and handle their absence, rather than assume their own version
-describes the server. A service restart drops the connection; the connection
+describes the server. A server method a client newly calls gets a capability flag, and the design
+says what each of the four client and server version pairings shows (an old server must not
+offer a button that always fails). A new value in a wire enum or literal union breaks decoding
+on an older peer: say what the old side does (ignore it, fall back), and test decoding with the old
+value set. A service restart drops the connection; the connection
 runtime handles that disconnect. See [server updates](./server-updates.md).
 
 ### Desktop without a local environment
