@@ -2913,26 +2913,27 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               activeSearchResultIndex={activeSearchResultIndex}
               onClearSearch={clearThreadSearch}
             />
+            {/* Fixed header, not the scrolling list: offline is global and must stay in view. */}
+            {(() => {
+              const offlineBanner = isSearchingThreads
+                ? null
+                : resolveSidebarOfflineBanner({
+                    visibleThreads: searchableThreads,
+                    connectedEnvironmentIds,
+                    environmentLabelById,
+                  });
+              return offlineBanner !== null ? (
+                <div className="mt-1.5" data-testid="sidebar-offline-banner">
+                  <Alert variant="warning">
+                    <AlertDescription>{offlineBanner.message}</AlertDescription>
+                  </Alert>
+                </div>
+              ) : null;
+            })()}
           </SidebarGroup>
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
-          {(() => {
-            const offlineBanner = isSearchingThreads
-              ? null
-              : resolveSidebarOfflineBanner({
-                  visibleThreads: searchableThreads,
-                  connectedEnvironmentIds,
-                  environmentLabelById,
-                });
-            return offlineBanner !== null ? (
-              <div className="mb-1.5" data-testid="sidebar-offline-banner">
-                <Alert variant="warning">
-                  <AlertDescription>{offlineBanner.message}</AlertDescription>
-                </Alert>
-              </div>
-            ) : null;
-          })()}
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider
