@@ -18,7 +18,11 @@ import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button, InlineButton } from "../ui/button";
 import { Spinner } from "../ui/spinner";
-import { presentVersionControlError } from "../versionControlError.logic";
+import { VersionControlErrorDetail } from "../VersionControlErrorDetail";
+import {
+  presentVersionControlError,
+  type VersionControlErrorToastPresentation,
+} from "../versionControlError.logic";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 
 type SignInState =
@@ -27,13 +31,11 @@ type SignInState =
   | { readonly status: "waiting"; readonly prompt: SourceControlSignInPrompt }
   | {
       readonly status: "failed";
-      readonly failure: { readonly title: string; readonly description: string };
+      readonly failure: VersionControlErrorToastPresentation;
     };
 
-const failureOf = (cause: Cause.Cause<unknown>) => {
-  const presentation = presentVersionControlError(Cause.squash(cause), "登录");
-  return { title: presentation.title, description: presentation.description };
-};
+const failureOf = (cause: Cause.Cause<unknown>): VersionControlErrorToastPresentation =>
+  presentVersionControlError(Cause.squash(cause), "登录");
 
 const expiryTime = (expiresAt: number) =>
   new Date(expiresAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -274,6 +276,7 @@ export function SourceControlAppSignInSettings({
         >
           <p className="font-medium">{state.failure.title}</p>
           <p>{state.failure.description}</p>
+          <VersionControlErrorDetail error={state.failure} />
         </div>
       ) : null}
     </div>

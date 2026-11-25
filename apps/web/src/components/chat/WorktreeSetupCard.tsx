@@ -24,7 +24,11 @@ import { observeVisibleAnimation } from "~/lib/visibleAnimation";
 import { cn } from "~/lib/utils";
 import { useNowSecond } from "~/hooks/useNowSecond";
 import { WorkLogRow } from "./WorkLog";
-import { worktreeSetupFailureDescription } from "../versionControlError.logic";
+import {
+  presentVcsSnapshotFailure,
+  worktreeSetupFailureDescription,
+} from "../versionControlError.logic";
+import { ErrorDetailsDisclosure } from "./ErrorDetailsDisclosure";
 
 interface WorktreeSetupCardProps {
   snapshot: WorktreeSetupSnapshot;
@@ -322,6 +326,12 @@ export function WorktreeSetupCard({
   embedded?: boolean;
 }) {
   const running = snapshot.phase === "running";
+  const failurePresentation = snapshot.failure
+    ? presentVcsSnapshotFailure(snapshot.failure, "准备工作树")
+    : null;
+  const failureDescription =
+    failurePresentation?.description ??
+    worktreeSetupFailureDescription(snapshot.failure, snapshot.error);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const setupStage = snapshot.stages.find((stage) => stage.id === "setup-script");
   const showTerminal = onOpenTerminal && setupStage && setupStage.status !== "pending";
@@ -355,11 +365,13 @@ export function WorktreeSetupCard({
         </div>
       )}
 
-      {snapshot.phase === "failed" &&
-      worktreeSetupFailureDescription(snapshot.failure, snapshot.error) ? (
-        <p className="mt-1 ml-8 break-words text-xs text-muted-foreground">
-          {worktreeSetupFailureDescription(snapshot.failure, snapshot.error)}
-        </p>
+      {snapshot.phase === "failed" && failureDescription ? (
+        <div className="mt-1 ml-8 min-w-0">
+          <p className="break-words text-xs text-muted-foreground">{failureDescription}</p>
+          {failurePresentation?.collapseDetail ? (
+            <ErrorDetailsDisclosure detail={failurePresentation.detail} />
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-0.5 ml-[calc(--spacing(6)+2px-(--spacing(2)-1px))] flex flex-wrap items-center gap-0.5">

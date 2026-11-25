@@ -50,11 +50,13 @@ export function describeWorktreeCleanupFailure(input: {
   readonly removalFailed: boolean;
   readonly error: unknown;
   readonly worktreePath?: string;
-}): { readonly title: string; readonly description: string } {
+}): { readonly title: string; readonly description: string; readonly detail: string } {
   if (!input.removalFailed) {
+    const presentation = presentVersionControlError(input.error, "刷新 Git 状态");
     return {
       title: "工作树已删除，但无法刷新 Git 状态",
-      description: presentVersionControlError(input.error, "刷新 Git 状态").description,
+      description: presentation.description,
+      detail: presentation.detail,
     };
   }
   const presentation = presentVersionControlError(input.error, "删除工作树");
@@ -64,5 +66,6 @@ export function describeWorktreeCleanupFailure(input: {
       input.worktreePath === undefined
         ? presentation.description
         : `无法删除 ${input.worktreePath}。${presentation.description}`,
+    detail: presentation.detail,
   };
 }
