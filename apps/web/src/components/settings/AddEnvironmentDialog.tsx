@@ -1,4 +1,6 @@
+import { ConnectionBlockedError } from "@t3tools/client-runtime/connection";
 import { pipe } from "effect/Function";
+import * as Schema from "effect/Schema";
 import { ChevronsLeftRightEllipsisIcon, PlusIcon, TerminalIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
@@ -230,6 +232,10 @@ export function AddEnvironmentDialog({
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         const message = error instanceof Error ? error.message : "无法添加电脑。";
+        if (isPairingCodeRejection(error)) {
+          // The old code is useless now; clearing it lets the user paste a fresh one.
+          setSavedBackendPairingCode("");
+        }
         onErrorChange(message);
         toastManager.add(
           stackedThreadToast({
@@ -608,4 +614,10 @@ export function AddEnvironmentDialog({
       </DialogPopup>
     </Dialog>
   );
+}
+
+const isConnectionBlockedError = Schema.is(ConnectionBlockedError);
+
+function isPairingCodeRejection(error: unknown): boolean {
+  return isConnectionBlockedError(error) && error.reason === "authentication";
 }

@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import type { EnvironmentAuthCredentialFailureReason } from "@t3tools/contracts";
 
 const PAIRING_TOKEN_PARAM = "token";
 const HOSTED_PAIRING_HOST_PARAM = "host";
@@ -69,6 +70,33 @@ export const RemotePairingTargetError = Schema.Union([
   RemotePairingTokenMissingError,
   RemotePairingCodeMissingError,
 ]);
+export const pairingRejectionHint = (computer: "this" | "that"): string =>
+  computer === "this"
+    ? "在这台电脑的 设置 → 连接 里点「创建链接」，或在这台电脑上运行 t3 pair。"
+    : "在那台电脑的 设置 → 连接 里点「创建链接」，或在那台电脑上运行 t3 pair。";
+
+export const pairingRejectionMessage = (
+  reason: EnvironmentAuthCredentialFailureReason | undefined,
+  computer: "this" | "that",
+): string => {
+  const hint = pairingRejectionHint(computer);
+  switch (reason) {
+    case "consumed":
+      return `这个配对码已经用过了。${hint}`;
+    case "expired":
+      return `这个配对码已过期。${hint}`;
+    default:
+      return `配对码无效。${hint}`;
+  }
+};
+
+export const pairingRequestFailureMessage = (computer: "this" | "that"): string =>
+  computer === "this"
+    ? "连不上这台电脑。检查网络，或确认这台电脑上的服务还在运行，再重试。"
+    : "连不上那台电脑。检查网络，或确认那台电脑上的服务还在运行，再重试。";
+
+export const pairingRecoveryNotice = "这台浏览器已经连着，配对链接用过了也没关系。";
+
 export type RemotePairingTargetError = typeof RemotePairingTargetError.Type;
 
 const hasSupportedRemoteBackendProtocol = (url: URL): boolean =>

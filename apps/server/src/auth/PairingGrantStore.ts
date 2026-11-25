@@ -73,6 +73,14 @@ export class UnavailableBootstrapCredentialError extends Schema.TaggedError<Unav
     return "Bootstrap credential is no longer available.";
   }
 }
+export class ConsumedBootstrapCredentialError extends Schema.TaggedError<ConsumedBootstrapCredentialError>()(
+  "ConsumedBootstrapCredentialError",
+  {},
+) {
+  override get message(): string {
+    return "Bootstrap credential was already consumed.";
+  }
+}
 
 export class BootstrapCredentialScopeNotGrantedError extends Schema.TaggedError<BootstrapCredentialScopeNotGrantedError>()(
   "BootstrapCredentialScopeNotGrantedError",
@@ -88,6 +96,7 @@ export const BootstrapCredentialInvalidError = Schema.Union([
   ExpiredBootstrapCredentialError,
   BootstrapCredentialProofKeyMismatchError,
   UnavailableBootstrapCredentialError,
+  ConsumedBootstrapCredentialError,
 ]);
 export type BootstrapCredentialInvalidError = typeof BootstrapCredentialInvalidError.Type;
 
@@ -612,7 +621,7 @@ const make = Effect.gen(function* () {
       }
 
       if (matching.value.consumedAt !== null) {
-        return yield* new UnknownBootstrapCredentialError({});
+        return yield* new ConsumedBootstrapCredentialError({});
       }
 
       if (DateTime.isGreaterThanOrEqualTo(now, matching.value.expiresAt)) {
