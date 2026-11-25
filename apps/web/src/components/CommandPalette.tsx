@@ -148,7 +148,12 @@ import {
   waitForProject,
 } from "../state/entities";
 import { visibleLinkedThreads } from "@t3tools/client-runtime/state/threads";
-import { resolveThreadActionProjectRef, startNewThreadFromContext } from "../lib/chatThreadActions";
+import {
+  resolveCurrentProjectRef,
+  resolveThreadActionProjectRef,
+  startNewThreadFromContext,
+  type CurrentProjectRouteContext,
+} from "../lib/chatThreadActions";
 import {
   appendBrowsePathSegment,
   ensureBrowseDirectoryPath,
@@ -415,7 +420,10 @@ function OpenCommandPaletteDialog(props: {
   readonly initialContext: CommandPaletteReturnContext | undefined;
 }) {
   const navigate = useNavigate();
-  const pathname = useLocation({ select: (location) => location.pathname });
+  const locationState = useLocation({
+    select: (location) => ({ pathname: location.pathname, search: location.search }),
+  });
+  const pathname = locationState.pathname;
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const {
@@ -549,7 +557,15 @@ function OpenCommandPaletteDialog(props: {
   const [isRemoteProjectCloning, setIsRemoteProjectCloning] = useState(false);
   const { environmentLabelById, projectEnvironmentLocationById } = useEnvironmentLookups();
   const projectGroups = useSortedProjectGroups(environmentLabelById);
+  const currentProjectRef = resolveCurrentProjectRef({
+    pathname: locationState.pathname,
+    search: locationState.search as CurrentProjectRouteContext["search"],
+    activeThread,
+    activeDraftThread,
+    projectGroups,
+  });
   const contextualProjectRef = resolveThreadActionProjectRef({
+    currentProjectRef,
     activeDraftThread,
     activeThread: activeThread ?? undefined,
     defaultProjectRef,
@@ -1310,6 +1326,7 @@ function OpenCommandPaletteDialog(props: {
         shortcutCommand: "chat.newLocal",
         run: async () => {
           await startNewThreadFromContext({
+            currentProjectRef,
             activeDraftThread,
             activeThread: activeThread ?? undefined,
             defaultProjectRef,

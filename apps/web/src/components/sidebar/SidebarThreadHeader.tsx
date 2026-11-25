@@ -107,10 +107,11 @@ export interface SidebarHeaderActionsProps {
   onOpenProjectScope: () => void;
   onNewProject: () => void;
   onNewThread: (event: ReactMouseEvent) => void;
+  onNewThreadIn?: (() => void) | undefined;
   newThreadDisabled: boolean;
   newThreadShortcutLabel: string | null | undefined;
-  newThreadInProjectShortcutLabel: string | null | undefined;
-  showNewThreadInProjectHint: boolean;
+  newThreadTooltipTitle?: string | undefined;
+  newThreadSecondaryHint?: string | null | undefined;
 }
 
 export function SidebarHeaderActions({
@@ -121,19 +122,18 @@ export function SidebarHeaderActions({
   onOpenProjectScope,
   onNewProject,
   onNewThread,
+  onNewThreadIn,
   newThreadDisabled,
   newThreadShortcutLabel,
-  newThreadInProjectShortcutLabel,
-  showNewThreadInProjectHint,
+  newThreadTooltipTitle,
+  newThreadSecondaryHint,
 }: SidebarHeaderActionsProps) {
   const hideKeyboardHints = useHideKeyboardShortcutHints();
   const visibleNewThreadShortcutLabel = hideKeyboardHints ? null : newThreadShortcutLabel;
-  const visibleNewThreadInProjectShortcutLabel = hideKeyboardHints
-    ? null
-    : newThreadInProjectShortcutLabel;
+  const newThreadBaseTitle = newThreadTooltipTitle ?? "新建会话";
   const newThreadLabel = visibleNewThreadShortcutLabel
-    ? `新建会话（${visibleNewThreadShortcutLabel}）`
-    : "新建会话";
+    ? `${newThreadBaseTitle}（${visibleNewThreadShortcutLabel}）`
+    : newThreadBaseTitle;
 
   return (
     <div className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center pointer-coarse:gap-3">
@@ -170,6 +170,12 @@ export function SidebarHeaderActions({
                 <ListFilterIcon />
                 按项目筛选会话
               </MenuItem>
+              {onNewThreadIn ? (
+                <MenuItem onClick={onNewThreadIn}>
+                  <SquarePenIcon />
+                  在以下位置新建会话…
+                </MenuItem>
+              ) : null}
               <MenuItem onClick={onNewProject}>
                 <FolderPlusIcon />
                 添加项目
@@ -182,15 +188,10 @@ export function SidebarHeaderActions({
       <SidebarHeaderIconButton
         label="新建会话"
         tooltip={
-          showNewThreadInProjectHint && !hideKeyboardHints ? (
+          newThreadSecondaryHint && !hideKeyboardHints ? (
             <span className="flex flex-col gap-0.5">
               <span>{newThreadLabel}</span>
-              <span className="text-muted-foreground">
-                在当前项目中新建会话：Shift+单击
-                {visibleNewThreadInProjectShortcutLabel
-                  ? ` (${visibleNewThreadInProjectShortcutLabel})`
-                  : ""}
-              </span>
+              <span className="text-muted-foreground">{newThreadSecondaryHint}</span>
             </span>
           ) : (
             newThreadLabel
