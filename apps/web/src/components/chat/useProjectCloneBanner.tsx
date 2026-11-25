@@ -6,7 +6,10 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { DownloadIcon } from "lucide-react";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-import { presentVersionControlError } from "../versionControlError.logic";
+import {
+  presentVersionControlError,
+  projectCloneFailureDescription,
+} from "../versionControlError.logic";
 import { useRemoveClonedProject } from "../../hooks/useRemoveClonedProject";
 import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useProjectClone } from "../../state/projectClones";
@@ -102,7 +105,9 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
       variant: cancelled ? "warning" : "error",
       icon: <DownloadIcon />,
       title: cancelled ? `已取消克隆 ${name}` : `无法克隆 ${name}`,
-      description: cancelled ? "重试即可重新获取仓库。" : activeProjectClone.error,
+      description: cancelled
+        ? "重试即可重新获取仓库。"
+        : projectCloneFailureDescription(activeProjectClone.failure, activeProjectClone.error),
       actions: (
         <>
           <Button

@@ -57,6 +57,7 @@ export interface SettingsSearchItem {
   readonly primaryEnvironmentOnly?: boolean;
   readonly wslAvailableOnly?: boolean;
   readonly peerLinksOnly?: boolean;
+  readonly multiEnvironmentOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
 }
@@ -70,6 +71,7 @@ export interface SettingsSearchAvailability {
   readonly hasThreadAutoSettlement: boolean;
   readonly hasPeerLinkHost?: boolean;
   readonly hasPrimaryEnvironment?: boolean;
+  readonly hasMultipleEnvironments?: boolean;
 }
 
 export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
@@ -843,6 +845,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "connections-environment",
+    multiEnvironmentOnly: true,
     title: "本机",
     to: "/settings/connections",
     searchTerms: [
@@ -853,6 +856,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "linked-environments",
     peerLinksOnly: true,
+    multiEnvironmentOnly: true,
     title: "关联电脑",
     to: "/settings/connections",
     targetId: "linked-environments",
@@ -863,6 +867,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "remote-environments",
+    multiEnvironmentOnly: true,
     title: "电脑",
     to: "/settings/connections",
     searchTerms: [
@@ -872,6 +877,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "load-balancing",
+    multiEnvironmentOnly: true,
     title: "负载均衡",
     to: "/settings/connections",
     searchTerms: [
@@ -880,6 +886,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-routing",
+    multiEnvironmentOnly: true,
     title: "PR 共享",
     to: "/settings/connections",
     searchTerms: [
@@ -1072,7 +1079,8 @@ export function filterAvailableSettingsSearchItems(
       (!item.primaryEnvironmentOnly || availability.hasPrimaryEnvironment === true) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
-      (!item.peerLinksOnly || availability.hasPeerLinkHost === true),
+      (!item.peerLinksOnly || availability.hasPeerLinkHost === true) &&
+      (!item.multiEnvironmentOnly || availability.hasMultipleEnvironments === true),
   );
 }
 

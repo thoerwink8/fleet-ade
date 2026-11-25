@@ -46,6 +46,7 @@ vi.mock(import("~/state/server"), async (original) => ({
   primaryServerKeybindingsAtom: Atom.make([]) as never,
 }));
 
+import { AddComputerControl } from "./AddComputerControl";
 import { AddEnvironmentDialog } from "./AddEnvironmentDialog";
 
 function Owner() {
@@ -88,6 +89,18 @@ async function expectDefaultModeAfterReopen() {
 }
 
 describe("AddEnvironmentDialog", () => {
+  it("opens from the General settings control that owns its own state", async () => {
+    using _bridge = setup();
+    await using _screen = await render(
+      <AppAtomRegistryProvider>
+        <AddComputerControl />
+      </AppAtomRegistryProvider>,
+    );
+
+    await userEvent.click(page.getByRole("button", { name: "添加电脑" }));
+    await expect.element(page.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("reopens on Remote link after adding an SSH environment", async () => {
     using _bridge = setup();
     await using _screen = await render(<Owner />);
