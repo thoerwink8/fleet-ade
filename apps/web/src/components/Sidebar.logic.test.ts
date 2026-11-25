@@ -36,6 +36,7 @@ import {
   type SidebarSection,
   buildMultiSelectThreadMenuItems,
   buildSidebarListItems,
+  countArchivedThreadsInScope,
   isThreadAttentionDismissible,
   isThreadAttentionRowDisabled,
   resolveSidebarDropVerb,
@@ -2410,5 +2411,58 @@ describe("buildMultiSelectThreadMenuItems", () => {
       label: "归档（2）",
       disabled: false,
     });
+  });
+});
+
+describe("countArchivedThreadsInScope", () => {
+  const envA = EnvironmentId.make("env-a");
+  const envB = EnvironmentId.make("env-b");
+  const archivedAt = DateTime.makeUnsafe("2026-03-01T00:00:00.000Z");
+  const snap = (
+    environmentId: EnvironmentId,
+    threads: Array<{
+      id: string;
+      projectId: string;
+      archivedAt: DateTime.Utc | null;
+      deletedAt?: DateTime.Utc | null;
+    }>,
+  ) => ({
+    environmentId,
+    snapshot: {
+      projects: [],
+      threads: threads.map((t) => ({
+        ...makeThreadFixture({
+          environmentId,
+          id: ThreadId.make(t.id),
+          projectId: ProjectId.make(t.projectId),
+        }).source,
+        archivedAt: t.archivedAt,
+        deletedAt: t.deletedAt ?? null,
+      })),
+    },
+  });
+
+  it("counts unique archived non-deleted threads within optional project scope", () => {
+    const snapshots = [
+      snap(envA, [
+        { id: "arch-1", projectId: "p1", archivedAt },
+        { id: "arch-2", projectId: "p2", archivedAt },
+        { id: "active-1", projectId: "p1", archivedAt: null },
+        { id: "deleted-1", projectId: "p1", archivedAt, deletedAt: archivedAt },
+      ]),
+      snap(envB, [
+        { id: "arch-1", projectId: "p1", archivedAt },
+        { id: "arch-3", projectId: "p2", archivedAt },
+      ]),
+    ];
+
+    expect(countArchivedThreadsInScope({ snapshots: [], scopedProjectKeys: null })).toBe(0);
+    expect(countArchivedThreadsInScope({ snapshots, scopedProjectKeys: null })).toBe(4);
+    expect(
+      countArchivedThreadsInScope({
+        snapshots,
+        scopedProjectKeys: new Set(["env-a:p1", "env-b:p1"]),
+      }),
+    ).toBe(2);
   });
 });

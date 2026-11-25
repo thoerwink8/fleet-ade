@@ -343,6 +343,36 @@ export function shouldShowSidebarEmptyState(input: {
   );
 }
 
+export function countArchivedThreadsInScope(input: {
+  readonly snapshots: ReadonlyArray<{
+    readonly environmentId: EnvironmentId;
+    readonly snapshot: {
+      readonly threads: ReadonlyArray<{
+        readonly id: string;
+        readonly projectId: string;
+        readonly archivedAt: unknown;
+        readonly deletedAt?: unknown;
+      }>;
+    };
+  }>;
+  readonly scopedProjectKeys: ReadonlySet<string> | null;
+}): number {
+  const seen = new Set<string>();
+  for (const { environmentId, snapshot } of input.snapshots) {
+    for (const thread of snapshot.threads) {
+      if (thread.archivedAt == null || thread.deletedAt != null) continue;
+      if (
+        input.scopedProjectKeys !== null &&
+        !input.scopedProjectKeys.has(`${environmentId}:${thread.projectId}`)
+      ) {
+        continue;
+      }
+      seen.add(`${environmentId}:${thread.id}`);
+    }
+  }
+  return seen.size;
+}
+
 function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number): SidebarSection {
   let section: SidebarSection = "pinned";
   for (let i = 0; i < index && i < items.length; i += 1) {

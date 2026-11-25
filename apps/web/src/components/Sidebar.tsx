@@ -258,6 +258,7 @@ import {
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
 import { resolveDuplicateEmptyThreadTitleSuffixes } from "./sidebar/SidebarThreadRow.logic";
+import { SidebarArchivedEntry } from "./sidebar/SidebarArchivedEntry";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarDragBoundary,
@@ -3711,6 +3712,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 </SortableContext>
               </DndContext>
             </TooltipProvider>
+          ) : null}
+          {!isSearchingThreads ? (
+            <SidebarArchivedEntry
+              connectedEnvironmentIds={connectedEnvironmentIds}
+              scopedProjectKeys={scopedProjectKeys}
+            />
           ) : null}
         </SidebarGroup>
       </SidebarContent>

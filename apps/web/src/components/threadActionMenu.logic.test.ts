@@ -65,14 +65,28 @@ describe("buildThreadActionMenuItems", () => {
     },
   );
 
-  it("disables archive and turning into a project while the thread is running", () => {
-    const items = buildThreadActionMenuItems({
+  it("disables archive and turning into a project while the thread is running, with an inline reason", () => {
+    const runningItems = buildThreadActionMenuItems({
       ...baseState,
       isRunning: true,
       canTurnIntoProject: true,
     });
-    expect(items.find((item) => item.id === "archive")?.disabled).toBe(true);
-    expect(items.find((item) => item.id === "turn-into-project")?.disabled).toBe(true);
+    expect(runningItems.find((item) => item.id === "archive")).toMatchObject({
+      disabled: true,
+      detail: "运行中，请先停止",
+    });
+    expect(runningItems.find((item) => item.id === "turn-into-project")).toMatchObject({
+      disabled: true,
+      detail: "运行中，请先停止",
+    });
+
+    const idleItems = buildThreadActionMenuItems({
+      ...baseState,
+      isRunning: false,
+      canTurnIntoProject: true,
+    });
+    expect(idleItems.find((item) => item.id === "archive")?.disabled).toBe(false);
+    expect(idleItems.find((item) => item.id === "archive")?.detail).toBeUndefined();
   });
 
   it("toggles mark-commander and unmark-commander independently of pin state", () => {

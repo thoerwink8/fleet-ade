@@ -212,6 +212,7 @@ export function buildThreadActionMenuItems(
             label: "转换为项目",
             icon: "folder-plus",
             disabled: state.isRunning,
+            ...(state.isRunning ? { detail: "运行中，请先停止" } : {}),
           },
         ]
       : []),
@@ -266,6 +267,7 @@ export function buildThreadActionMenuItems(
       label: "归档会话",
       icon: "archive",
       disabled: state.isRunning,
+      ...(state.isRunning ? { detail: "运行中，请先停止" } : {}),
       separatorBefore: true,
     },
     {
