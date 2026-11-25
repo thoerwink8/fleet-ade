@@ -19,6 +19,7 @@ import {
   ResponseStreamingMode,
   ServerSettings,
   ServerSettingsError,
+  type ServerSettingsWriteFailureReason,
   type ServerSettingsPatch,
   globalIdleCompaction,
   withIdleCompaction,
@@ -33,6 +34,7 @@ import * as Effect from "effect/Effect";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
+import * as PlatformError from "effect/PlatformError";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
@@ -668,6 +670,37 @@ function foldLegacyProjectSettings(
   };
 }
 
+const SETTINGS_WRITE_REASON_BY_CODE: Record<string, ServerSettingsWriteFailureReason> = {
+  EACCES: "permission_denied",
+  EPERM: "permission_denied",
+  EROFS: "permission_denied",
+  ENOSPC: "disk_full",
+  EDQUOT: "disk_full",
+};
+
+function nodeErrorCode(cause: unknown, seen = new Set<unknown>()): string | undefined {
+  if (typeof cause !== "object" || cause === null || seen.has(cause)) return undefined;
+  seen.add(cause);
+  const code = "code" in cause && typeof cause.code === "string" ? cause.code : undefined;
+  if (code !== undefined) return code;
+  return "cause" in cause ? nodeErrorCode(cause.cause, seen) : undefined;
+}
+
+function settingsWriteFailureReason(cause: unknown): ServerSettingsWriteFailureReason {
+  const code = nodeErrorCode(cause);
+  return code === undefined
+    ? "write_failed"
+    : (SETTINGS_WRITE_REASON_BY_CODE[code] ?? "write_failed");
+}
+
+function settingsWriteFailureDetail(settingsPath: string, cause: unknown): string {
+  const code = nodeErrorCode(cause);
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return code === undefined
+    ? `${settingsPath}: ${message}`
+    : `${settingsPath}: ${code}: ${message}`;
+}
+
 const make = Effect.gen(function* () {
   const { settingsPath } = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
@@ -723,14 +756,16 @@ const make = Effect.gen(function* () {
         Effect.provideService(Path.Path, pathService),
       );
     },
-    Effect.mapError(
-      (cause) =>
-        new ServerSettingsError({
-          settingsPath,
-          operation: "write-file",
-          cause,
-        }),
-    ),
+    Effect.mapError((cause) => {
+      const filesystemCause = PlatformError.isPlatformError(cause) ? cause.reason.cause : cause;
+      return new ServerSettingsError({
+        settingsPath,
+        operation: "write-file",
+        reason: settingsWriteFailureReason(filesystemCause),
+        detail: settingsWriteFailureDetail(settingsPath, filesystemCause),
+        cause,
+      });
+    }),
   );
 
   const moveInlineSettingsSecrets = Effect.fn("serverSettings.moveInlineSettingsSecrets")(

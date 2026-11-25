@@ -222,14 +222,14 @@ export function SettingsSectionHeader({
       className={cn("flex min-h-6 items-center justify-between gap-4 px-1", className)}
     >
       <div className="flex min-w-0 items-center gap-1">
-        <Heading className="flex min-h-6 items-center gap-2 text-dialog-title font-medium text-foreground">
+        <Heading className="flex min-h-6 min-w-0 items-center gap-2 text-dialog-title font-medium text-foreground">
           {icon}
-          {title}
+          <span className="min-w-0 wrap-break-word">{title}</span>
         </Heading>
         {titleAction}
       </div>
       {headerAction ? (
-        <div className="flex min-h-6 min-w-6 items-center justify-end">{headerAction}</div>
+        <div className="flex min-h-6 min-w-6 shrink-0 items-center justify-end">{headerAction}</div>
       ) : null}
     </div>
   );

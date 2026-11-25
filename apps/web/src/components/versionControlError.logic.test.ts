@@ -269,7 +269,8 @@ describe("describeVersionControlError", () => {
     ["push_rejected_non_fast_forward", "请先拉取远端改动，再重新推送。"],
     ["ref_name_conflict", "请换一个不与现有分支或标签冲突的名称。"],
     ["ref_not_found", "请刷新分支列表，确认分支或标签仍然存在。"],
-    ["remote_unreachable", "请检查网络连接和远端仓库地址，然后重试。"],
+    ["network_unreachable", "请检查网络连接，确认能访问远端仓库所在的主机，然后重试。"],
+    ["remote_unreachable", "请确认远端仓库地址正确、仓库存在且你有访问权限，然后重试。"],
     ["tag_would_be_clobbered", "请先同步远端标签，或保留本地同名标签后重试。"],
   ];
 

@@ -493,6 +493,12 @@ const GIT_FAILURE_REASON_PATTERNS: ReadonlyArray<readonly [RegExp, GitCommandFai
     "authentication_failed",
   ],
   [/host key verification failed/i, "host_key_unverified"],
+  // Transport failures keep no `fatal:` detail of their own on SSH and git://, so these
+  // must run before the generic remote-unreachable patterns below.
+  [
+    /failed(?: to)? connect|connect to host .+ port \d+|(?:connection|operation) timed out|operation too slow|could not resolve (?:host|proxy|hostname)|couldn't connect to|unable to connect (?:to\b|a socket)/i,
+    "network_unreachable",
+  ],
   [
     /(?:could not read from remote repository|does not appear to be a git repository|repository .+ not found)/i,
     "remote_unreachable",
@@ -540,9 +546,9 @@ const GIT_NOT_A_COMMIT_PATTERN = /^error: .+(?:, not a commit|expected commit ty
 // Trust only Git's diagnostic prefixes: local hooks can write indistinguishable text.
 // Exclude `remote:` too, since it prefixes remote hook output as well as server diagnostics.
 const GIT_DIAGNOSTIC_LINE_PATTERN = /^(?:fatal|error):|^!\s|^\s+!\s/;
-// SSH credential refusals are unprefixed; Git's later generic error would otherwise misclassify them as unreachable.
-const SSH_TRANSPORT_REFUSAL_PATTERN =
-  /Permission denied \((?:publickey|password|keyboard-interactive)|Permission denied, please try again|Host key verification failed/i;
+// SSH refusals and transport failures are unprefixed; Git's later generic error would otherwise misclassify them.
+const SSH_TRANSPORT_LINE_PATTERN =
+  /Permission denied \((?:publickey|password|keyboard-interactive)|Permission denied, please try again|Host key verification failed|connect to host .+ port \d+|Could not resolve hostname/i;
 // `git merge`, `git cherry-pick` and `git revert` write conflict banners to stdout with empty stderr.
 const GIT_STDOUT_CONFLICT_PATTERN =
   /^CONFLICT \([^)\r\n]+\):[\s\S]*^Automatic merge failed; fix conflicts/m;
@@ -553,7 +559,7 @@ export function classifyGitFailure(stderr: string, stdout = ""): GitCommandFailu
     .filter(
       (line) =>
         GIT_DIAGNOSTIC_LINE_PATTERN.test(line) ||
-        (!/^remote:/.test(line) && SSH_TRANSPORT_REFUSAL_PATTERN.test(line)),
+        (!/^remote:/.test(line) && SSH_TRANSPORT_LINE_PATTERN.test(line)),
     )
     .join("\n");
   if (diagnostics.length > 0) {
