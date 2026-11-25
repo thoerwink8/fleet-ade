@@ -21,6 +21,7 @@ import {
   gitLines,
   judgeFilteredVitestStep,
   runSteps,
+  shouldRunDocsLinks,
   splitTests,
   type Step,
 } from "./check-changed.ts";
@@ -40,6 +41,18 @@ describe("check:changed", () => {
   it("leaves docs inert", () => {
     const packages = readWorkspace();
     assert.deepStrictEqual(decide(["docs/user/install.md"], packages, false).affected, []);
+  });
+
+  it("runs docs-links only when markdown, docs, scanned client/package sources, or the checker change", () => {
+    assert.isTrue(shouldRunDocsLinks(["README.md"]));
+    assert.isTrue(shouldRunDocsLinks(["docs/user/faq.md"]));
+    assert.isTrue(shouldRunDocsLinks(["docs/assets/diagram.png"]));
+    assert.isTrue(
+      shouldRunDocsLinks(["apps/web/src/components/settings/MultipleAccountsNote.tsx"]),
+    );
+    assert.isTrue(shouldRunDocsLinks(["packages/shared/src/markdownLinks.ts"]));
+    assert.isTrue(shouldRunDocsLinks(["scripts/docs-links.ts"]));
+    assert.isFalse(shouldRunDocsLinks(["apps/server/src/ws.ts", "package.json"]));
   });
 
   it.effect(

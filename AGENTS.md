@@ -96,7 +96,7 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 ## Verifying
 
-- Before you push, run `pnpm check:changed`. It runs the fast checks for changed files: format, lint, knip, typecheck of affected packages and dependents, tests beside changes, and the cross-file checks those miss. CI runs `pnpm check` (lint, the interface English scan, typecheck, and the full Linux test suites).
+- Before you push, run `pnpm check:changed`. It runs the fast checks for changed files: format, lint, knip, typecheck of affected packages and dependents, tests beside changes, and the cross-file checks those miss. CI runs `pnpm check` (lint, the interface English scan, doc links, typecheck, full Linux tests).
 - While you iterate, run `vp test run <files>`. For big files, add `-t "<name>"`.
 - Run commands with the Node pinned in `engines`; the repo refuses other versions. Never write "main is already red" without a root cause. Server suites that assume POSIX paths are skipped on Windows, and CI on Linux decides.
 - Use `vp run typecheck`; it caches per package. Each package runs `effect-tsgo tsrs --noEmit`, the Rust TypeScript 7 checker with Effect's diagnostics built in. There is no `typescript` package to run.

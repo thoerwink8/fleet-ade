@@ -131,7 +131,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check static
-        run: pnpm check fmt lint ui-no-english ui-no-old-terms typecheck
+        run: pnpm check fmt lint ui-no-english ui-no-old-terms docs-links typecheck
 
       - name: Check unused code
         run: pnpm knip:check

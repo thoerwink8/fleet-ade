@@ -220,6 +220,16 @@ export const judgeFilteredVitestStep = (input: {
   return { ok: input.exitOk, output: input.output };
 };
 
+export const shouldRunDocsLinks = (files: ReadonlyArray<string>): boolean =>
+  files.some(
+    (file) =>
+      file.endsWith(".md") ||
+      file.startsWith("docs/") ||
+      file.startsWith("apps/web/src/") ||
+      /^packages\/[^/]+\/src\//.test(file) ||
+      file.startsWith("scripts/docs-links"),
+  );
+
 // A flag wins over its environment variable; either must be a positive integer.
 const override = Effect.fn("checkChanged.override")(function* (
   flagName: string,
@@ -536,6 +546,8 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
           file.startsWith("scripts/ui-no-old-terms") || file === "scripts/lib/ui-copy-scan.ts",
       )) &&
     (yield* fs.exists(inRoot("scripts/ui-no-old-terms.ts")));
+  const runDocsLinks =
+    shouldRunDocsLinks(files) && (yield* fs.exists(inRoot("scripts/docs-links.ts")));
   const steps: Array<Step<never>> = [
     ...(runPatchCheck ? [{ name: "unused patches", run: checkPatches }] : []),
     ...(present.length > 0
@@ -547,6 +559,7 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
     ...(runUiOldTerms
       ? [command("ui-no-old-terms", ["exec", "node", "scripts/ui-no-old-terms.ts"])]
       : []),
+    ...(runDocsLinks ? [command("docs-links", ["exec", "node", "scripts/docs-links.ts"])] : []),
     ...(runKnip
       ? knipPasses.map((args, index) => command(`knip ${index + 1}/${knipPasses.length}`, args))
       : []),
