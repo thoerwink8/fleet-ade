@@ -27,7 +27,10 @@ import { useAtomCommand } from "../state/use-atom-command";
 import { type DraftId, useComposerDraftStore } from "../composerDraftStore";
 import { toastManager } from "./ui/toast";
 import { stackedThreadToast } from "./ui/toastHelpers";
-import { presentVersionControlError } from "./versionControlError.logic";
+import {
+  presentVersionControlError,
+  projectCloneFailureDescription,
+} from "./versionControlError.logic";
 
 export function ProjectCloneToastCoordinator() {
   const { environments } = useEnvironments();
@@ -46,7 +49,7 @@ interface TrackedToast {
 }
 
 function renderKey(clone: ProjectCloneSnapshot): string {
-  return `${clone.phase}:${clone.stage}:${clone.percent ?? ""}:${clone.detail ?? ""}:${clone.stalled === true}:${clone.error ?? ""}`;
+  return `${clone.phase}:${clone.stage}:${clone.percent ?? ""}:${clone.detail ?? ""}:${clone.stalled === true}:${clone.failure?._tag ?? ""}:${clone.failure?.reason ?? ""}:${clone.failure?.action ?? ""}:${clone.error ?? ""}`;
 }
 
 async function runCloneAction(
@@ -173,7 +176,9 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
       const options = stackedThreadToast({
         type: cancelled ? "info" : "error",
         title: cancelled ? `已取消克隆 ${name}` : `无法克隆 ${name}`,
-        description: cancelled ? clone.destinationPath : (clone.error ?? "克隆失败。"),
+        description: cancelled
+          ? clone.destinationPath
+          : projectCloneFailureDescription(clone.failure, clone.error),
         timeout: 0,
         actionProps: {
           children: "重试",
