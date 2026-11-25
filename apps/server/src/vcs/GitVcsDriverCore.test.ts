@@ -43,6 +43,7 @@ import {
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
 import * as ServerConfig from "../config.ts";
 import {
+  classifyGitFailure,
   isNonRepositoryGitStderr,
   makeGitVcsDriverCore,
   parseGitCheckoutProgressLine,
@@ -8316,42 +8317,74 @@ it.layer(layerTest)("GitVcsDriverCore stable reason and action classification", 
       }),
   );
 
-  it.effect("classifies network_unreachable when the remote hostname cannot be resolved", () =>
+  // Real name resolution and unroutable addresses depend on the CI network (DNS hijacking, proxies),
+  // so these transport failures come from a fake ssh that prints what OpenSSH prints.
+  it.effect.each([
+    {
+      label: "an unresolvable hostname",
+      sshMessage: "ssh: Could not resolve hostname git.fleet.test: Name or service not known",
+    },
+    {
+      label: "a connect timeout",
+      sshMessage: "ssh: connect to host git.fleet.test port 22: Connection timed out",
+    },
+    {
+      label: "a refused connection",
+      sshMessage: "ssh: connect to host git.fleet.test port 22: Connection refused",
+    },
+  ])("classifies network_unreachable for $label over ssh", ({ sshMessage }) =>
     Effect.gen(function* () {
+      const parent = yield* makeTmpDir();
+      const pathService = yield* Path.Path;
+      const fileSystem = yield* FileSystem.FileSystem;
       const driver = yield* GitVcsDriver.GitVcsDriver;
-      const cloneParent = yield* makeTmpDir("git-network-dns-");
+      const fakeSsh = pathService.join(parent, "fake-ssh");
+      yield* writeTextFile(
+        parent,
+        "fake-ssh",
+        `#!/bin/sh
+echo "${sshMessage}" >&2
+echo "fatal: Could not read from remote repository." >&2
+exit 255
+`,
+      );
+      yield* fileSystem.chmod(fakeSsh, 0o755);
+
       const error = yield* driver
         .execute({
           operation: "SourceControlRepositoryService.cloneRepository",
-          cwd: cloneParent,
-          args: ["clone", "https://no-such-host-fleettest.invalid/repo.git", "repo"],
+          cwd: parent,
+          args: ["clone", "ssh://git@git.fleet.test/repo.git", "repo"],
+          env: { LC_ALL: "C", GIT_SSH_COMMAND: fakeSsh.replaceAll("\\", "/") },
         })
         .pipe(Effect.flip);
-      assert.equal(error._tag, "GitCommandError");
       assert.equal(error.action, "clone");
       assert.equal(error.reason, "network_unreachable");
     }),
   );
 
-  it.effect("classifies network_unreachable when the ssh connect to the remote times out", () =>
-    Effect.gen(function* () {
-      const driver = yield* GitVcsDriver.GitVcsDriver;
-      const cloneParent = yield* makeTmpDir("git-network-timeout-");
-      // TEST-NET-1 never routes, so ssh itself reports the connect timeout.
-      const error = yield* driver
-        .execute({
-          operation: "SourceControlRepositoryService.cloneRepository",
-          cwd: cloneParent,
-          args: ["clone", "ssh://git@192.0.2.1/repo.git", "repo"],
-          env: { GIT_SSH_COMMAND: "ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no" },
-          timeoutMs: 30_000,
-        })
-        .pipe(Effect.flip);
-      assert.equal(error._tag, "GitCommandError");
-      assert.equal(error.action, "clone");
-      assert.equal(error.reason, "network_unreachable");
-    }),
-  );
+  it("classifies curl's resolve and timeout diagnostics as network_unreachable", () => {
+    for (const stderr of [
+      "fatal: unable to access 'https://git.fleet.test/repo.git/': Could not resolve host: git.fleet.test",
+      "fatal: unable to access 'https://git.fleet.test/repo.git/': Failed to connect to git.fleet.test port 443 after 21000 ms: Timed out",
+      "fatal: unable to access 'https://git.fleet.test/repo.git/': Connection timed out after 300001 milliseconds",
+    ]) {
+      assert.equal(classifyGitFailure(stderr), "network_unreachable", stderr);
+    }
+    // Refusals by the remote are not network failures.
+    assert.equal(
+      classifyGitFailure(
+        "git@git.fleet.test: Permission denied (publickey).\nfatal: Could not read from remote repository.",
+      ),
+      "authentication_failed",
+    );
+    assert.notEqual(
+      classifyGitFailure(
+        "fatal: unable to access 'https://git.fleet.test/repo.git/': The requested URL returned error: 403",
+      ),
+      "network_unreachable",
+    );
+  });
 
   it.effect("does not classify an HTTP 403 reply from the remote as network_unreachable", () =>
     Effect.gen(function* () {
