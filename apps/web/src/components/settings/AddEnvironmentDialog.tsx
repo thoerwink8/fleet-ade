@@ -393,7 +393,7 @@ export function AddEnvironmentDialog({
           <Input
             value={savedBackendHost}
             onChange={(event) => handleSavedBackendHostChange(event.target.value)}
-            placeholder="backend.example.com"
+            placeholder="my-computer.example.com"
             disabled={isAddingSavedBackend}
             spellCheck={false}
           />

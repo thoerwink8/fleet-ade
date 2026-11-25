@@ -62,8 +62,8 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
   },
   {
     scope: AuthSourceControlWriteScope,
-    title: "修改源代码管理",
-    description: "提交、推送，管理分支和仓库，以及修改 PR。",
+    title: "修改版本控制",
+    description: "提交、推送，管理分支、工作树和仓库，以及修改 PR。",
   },
   {
     scope: AuthFilesystemReadScope,

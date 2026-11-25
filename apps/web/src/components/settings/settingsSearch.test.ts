@@ -415,3 +415,35 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/appearance", "theme")).toBeNull();
   });
 });
+
+describe("settings search keeps the names it used before the vocabulary change", () => {
+  const OLD_NAME_CASES: ReadonlyArray<readonly [query: string, id: string]> = [
+    ["聊天宽度", "chat-width"],
+    ["提供方", "providers"],
+    ["提供方实例", "providers"],
+    ["账号", "providers"],
+    ["用量数据提供方", "usage-providers"],
+    ["环境图标", "environment-icon"],
+    ["本地环境", "local-environment"],
+    ["关联环境", "linked-environments"],
+    ["环境", "remote-environments"],
+    ["机器", "remote-environments"],
+    ["主机", "remote-environments"],
+    ["服务器", "remote-environments"],
+    ["令牌", "connections-environment"],
+    ["引导凭据", "connections-environment"],
+    ["配对码", "connections-environment"],
+    ["已授权的客户端", "connections-environment"],
+    ["关联电脑", "remote-environments"],
+  ];
+
+  it.each(OLD_NAME_CASES)("finds the old name %s on %s", (query, id) => {
+    desktop.enabled = true;
+    try {
+      const ids = searchSettings(query, SETTINGS_SEARCH_ITEMS).map((item) => item.id);
+      expect(ids).toContain(id);
+    } finally {
+      desktop.enabled = false;
+    }
+  });
+});

@@ -273,7 +273,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         <DialogHeader>
           <DialogTitle>关联电脑</DialogTitle>
           <DialogDescription>
-            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在这台电脑的「连接」里的已授权客户端中，可以在那里撤销。
+            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在这台电脑「连接」页的已授权客户端里，可以在那里撤销。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
