@@ -34,6 +34,7 @@ import { useClosedViewStore } from "../../closedViewStore";
 import {
   buildEmptyPathQueryEntries,
   collectRecentThreadFilePaths,
+  filterRecentPathsMissingFromRoot,
   getRecentComposerPaths,
   resolveComposerPathMenuState,
 } from "./composerPathSuggestions.logic";
@@ -252,9 +253,18 @@ export function useComposerMenuItems({
             closedSurfaces,
           })
         : [];
+      // Once the root listing has loaded, anything whose first segment is gone no longer exists.
+      // Before that, or after a failed read, the recents stay as they are rather than vanishing.
+      const survivingRecentFilePaths =
+        rootEntries.isSuccess && rootEntries.error === null
+          ? filterRecentPathsMissingFromRoot({
+              recentFilePaths,
+              rootEntries: rootEntries.entries,
+            })
+          : recentFilePaths;
       const suggestedPathEntries = isEmptyPathQuery
         ? buildEmptyPathQueryEntries({
-            recentFilePaths,
+            recentFilePaths: survivingRecentFilePaths,
             rootEntries: rootEntries.entries,
           })
         : workspaceEntries.entries;
@@ -458,6 +468,8 @@ export function useComposerMenuItems({
     query: pathTriggerQuery,
     isRootPending: rootEntries.isPending,
     isSearchPending: workspaceEntries.isPending,
+    hasRootError: isEmptyPathQuery && rootEntries.error !== null,
+    hasSearchError: !isEmptyPathQuery && workspaceEntries.error !== null,
   });
   const isLoading =
     (composerTriggerKind === "path" && pathMenuState.isLoading) ||
@@ -492,5 +504,19 @@ export function useComposerMenuItems({
     return composerTriggerKind === "path" ? pathMenuState.emptyStateText : "没有匹配的命令。";
   })();
 
-  return { items, isLoading, loadingState, emptyState };
+  const emptyStateError =
+    composerTriggerKind === "path" && pathMenuState.hasError
+      ? {
+          message: pathMenuState.emptyStateText,
+          retry: () => {
+            if (isEmptyPathQuery) {
+              rootEntries.refresh();
+            } else {
+              workspaceEntries.refresh();
+            }
+          },
+        }
+      : null;
+
+  return { items, isLoading, loadingState, emptyState, emptyStateError };
 }

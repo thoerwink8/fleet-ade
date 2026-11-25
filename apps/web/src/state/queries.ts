@@ -380,6 +380,7 @@ export function useComposerRootEntries(target: {
           ? result.error
           : (fileAccess.error ?? "此连接无法读取电脑文件。"),
     isPending: hasTarget && (fileAccess.isPending || result.isPending),
+    isSuccess: canReadFiles && result.isSuccess,
     refresh: result.refresh,
   };
 }
