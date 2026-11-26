@@ -54,9 +54,16 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
           ? "自动"
           : key === "sourceControlWriterModelSelection"
             ? "文本生成模型"
-            : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
-              ? "继承"
-              : "未设置";
+            : key === "dispatchCodeModelSelection" ||
+                key === "dispatchReviewModelSelection" ||
+                key === "dispatchReadonlyModelSelection" ||
+                key === "dispatchPlanModelSelection"
+              ? "跟随默认模型"
+              : key === "dispatchConcurrencyLimit"
+                ? "不限制"
+                : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
+                  ? "继承"
+                  : "未设置";
   }
   if (typeof value === "boolean") return value ? "开" : "关";
   if (typeof value === "number") {

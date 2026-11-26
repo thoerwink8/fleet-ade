@@ -6,6 +6,7 @@ import type * as HttpClient from "effect/http/HttpClient";
 import type { Atom } from "effect/reactivity";
 import type * as Socket from "effect/socket/Socket";
 
+import { describeRequestFailure } from "../errors/transport.ts";
 import { updateOutdatedHost } from "../connection/outdatedHostUpdate.ts";
 import type * as ConnectionResolver from "../connection/resolver.ts";
 import type * as EnvironmentRegistry from "../connection/registry.ts";
@@ -65,7 +66,7 @@ export function createOutdatedServerUpdateCommand<E>(
               stage: currentStage,
               fromVersion,
               targetVersion,
-              message: serverUpdateFailureMessage(Cause.squash(exit.cause)),
+              message: serverUpdateFailureMessage(describeRequestFailure(exit.cause)),
             });
           }),
         ),

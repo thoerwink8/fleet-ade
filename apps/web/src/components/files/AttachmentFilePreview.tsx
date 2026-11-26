@@ -1,10 +1,10 @@
 import { filePreviewDelimiter } from "@t3tools/shared/delimitedPreview";
 import type { AssetResource, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { readFilePreviewResponse } from "@t3tools/client-runtime/file-preview";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import * as Cause from "effect/Cause";
 import {
   filePreviewKind,
   officePreviewKind,
@@ -262,7 +262,7 @@ export function AttachmentFilePreview(props: {
       anchor.click();
     }).then((result) => {
       if (!AsyncResult.isSuccess(result)) {
-        const cause = Cause.squash(result.cause);
+        const cause = describeRequestFailure(result.cause);
         toastManager.add({
           type: "error",
           title: "无法保存文件",

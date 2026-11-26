@@ -1,6 +1,7 @@
 import * as Cause from "effect/Cause";
 import { isAtomCommandInterrupted, runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import { EnvironmentId, type ScheduledTask } from "@t3tools/contracts";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { serverEnvironment } from "../../state/server";
@@ -19,7 +20,7 @@ function scheduledTaskDeletedNotice(title: string, undo: (() => void) | null) {
 }
 
 function squashMessage(cause: Cause.Cause<unknown>): string {
-  const failure = Cause.squash(cause);
+  const failure = describeRequestFailure(cause);
   return failure instanceof Error && failure.message.trim().length > 0
     ? failure.message
     : String(failure);

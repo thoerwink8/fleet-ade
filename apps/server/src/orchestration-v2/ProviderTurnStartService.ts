@@ -84,6 +84,7 @@ const isProviderAdapterProtocolError = Schema.is(ProviderAdapter.ProviderAdapter
 const isProviderAdapterOpenSessionError = Schema.is(
   ProviderAdapter.ProviderAdapterOpenSessionError,
 );
+const isProviderAdapterTurnStartError = Schema.is(ProviderAdapter.ProviderAdapterTurnStartError);
 const isAcpRequestError = Schema.is(EffectAcpErrors.AcpRequestError);
 const START_FAILURE_MAX_CAUSE_DEPTH = 6;
 
@@ -141,6 +142,7 @@ const PROMPT_REFUSAL_TAGS = [
 
 const refusedBeforePrompt = (error: unknown): boolean =>
   PROMPT_REFUSAL_TAGS.some((tag) => Predicate.isTagged(error, tag)) ||
+  (isProviderAdapterTurnStartError(error) && error.refusedBeforePrompt === true) ||
   (isProviderAdapterProtocolError(error) &&
     error.driver === CLAUDE_PROVIDER &&
     error.detail === CLAUDE_QUERY_ENDED_BEFORE_TURN_DETAIL) ||
