@@ -1,3 +1,4 @@
+import * as SharedObservability from "@t3tools/shared/observability";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import {
@@ -1399,7 +1400,7 @@ export const layerWithOptions = (
           if (Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)) return yield* exit;
           yield* Effect.logWarning("orchestration-v2.provider-session-release-settlement-failed", {
             providerSessionId,
-            cause: exit.cause,
+            errorTypes: SharedObservability.loggableErrorTypes(exit.cause),
           });
           return yield* Effect.fail(exit.cause);
         });
@@ -1424,7 +1425,7 @@ export const layerWithOptions = (
             Effect.catchCause((cause) =>
               Effect.logWarning("orchestration-v2.provider-session-release-failed", {
                 providerSessionId,
-                cause,
+                errorTypes: SharedObservability.loggableErrorTypes(cause),
               }).pipe(Effect.andThen(retryLostWorkSettlement(providerSessionId, settlement))),
             ),
           );

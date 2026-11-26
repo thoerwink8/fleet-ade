@@ -1,4 +1,5 @@
 import * as DocumentText from "../../provider/DocumentText.ts";
+import { loggableErrorTypes } from "@t3tools/shared/observability";
 import {
   compactDynamicToolOutput,
   mcpToolResultOutput,
@@ -9337,7 +9338,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             }).pipe(
               Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS),
               Effect.catch((cause) =>
-                Effect.logWarning("orchestration-v2.claude-stalled-turn-stop-failed", { cause }),
+                Effect.logWarning("orchestration-v2.claude-stalled-turn-stop-failed", {
+                  providerTurnId: context.providerTurnId,
+                  errorTypes: loggableErrorTypes(cause),
+                }),
               ),
             );
             if ((yield* Ref.get(activeTurn)) !== context || context.steersClosed) return;
