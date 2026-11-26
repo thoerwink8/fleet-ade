@@ -437,6 +437,75 @@ describe("VcsProcess.run", () => {
     }),
   );
 
+  it.effect("passes gc.auto=0 and maintenance.auto=false to git without touching user config", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-vcs-gc-config-" });
+      yield* run({ operation: "test.gc-config", command: "git", cwd, args: ["init"] });
+      // The repository config keeps its own (default) values; server config arrives only
+      // through the child process environment, so a user's own git is unaffected.
+      yield* run({
+        operation: "test.gc-config",
+        command: "git",
+        cwd,
+        args: ["config", "gc.auto", "6700"],
+      });
+
+      const readConfig = (key: string) =>
+        run({
+          operation: "test.gc-config",
+          command: "git",
+          cwd,
+          args: ["config", key],
+        }).pipe(Effect.map((result) => result.stdout.trim()));
+
+      expect(yield* readConfig("gc.auto")).toBe("0");
+      expect(yield* readConfig("maintenance.auto")).toBe("false");
+
+      // Proof the override is process-local: the stored repository config is untouched.
+      const stored = yield* fileSystem.readFileString(path.join(cwd, ".git", "config"));
+      expect(stored).toContain("6700");
+      expect(stored).not.toMatch(/gc\.?auto\s*=\s*0/);
+
+      // The exact config handed to the spawned child: appended env entries, not argv,
+      // so a user's own git (and the stored repository config) is unaffected.
+      const seen = yield* Ref.make<ProcessRunner.ProcessRunInput | undefined>(undefined);
+      const service = yield* VcsProcess.make.pipe(
+        Effect.provideService(
+          ProcessRunner.ProcessRunner,
+          ProcessRunner.ProcessRunner.of({
+            run: (input) =>
+              Ref.set(seen, input).pipe(
+                Effect.as({
+                  stdout: "",
+                  stderr: "",
+                  code: ChildProcessSpawner.ExitCode(0),
+                  timedOut: false,
+                  stdoutTruncated: false,
+                  stderrTruncated: false,
+                  stdoutInvalidUtf8: false,
+                  stderrInvalidUtf8: false,
+                }),
+              ),
+          }),
+        ),
+      );
+      yield* service.run(baseInput);
+      const spawned = yield* Ref.get(seen);
+      assert.isDefined(spawned);
+      const env = spawned!.env as Record<string, string>;
+      const pairs = Object.keys(env)
+        .filter((key) => /^GIT_CONFIG_KEY_\d+$/.test(key))
+        .map((key) => [env[key], env[`GIT_CONFIG_VALUE_${key.slice("GIT_CONFIG_KEY_".length)}`]]);
+      // Entries append after any inherited ones, so assert presence, not fixed indices.
+      expect(pairs).toContainEqual(["safe.bareRepository", "explicit"]);
+      expect(pairs).toContainEqual(["maintenance.auto", "false"]);
+      expect(pairs).toContainEqual(["gc.auto", "0"]);
+      expect(spawned!.args.join(" ")).not.toContain("gc.auto");
+    }).pipe(Effect.scoped, provideLive, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("keeps git from opening a folder laid out as a bare repository", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
