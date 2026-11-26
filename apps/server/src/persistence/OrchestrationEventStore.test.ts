@@ -565,22 +565,22 @@ layer("OrchestrationEventStore", (it) => {
       const threadId = ThreadId.make("thread:replay-spec");
       const projectId = ProjectId.make("project:replay-spec");
       const baseline = yield* store.latestApplicationSequence;
-      const decodeStoredEventSpec = Schema.decodeUnknownSync(OrchestrationV2StoredEvent);
-      const decodeEventSpec = Schema.decodeUnknownSync(OrchestrationV2DomainEventJson);
-      const decodeProjectSpec = Schema.decodeUnknownSync(ApplicationProjectEvent);
+      const decodeStoredEventSpec = Schema.decodeUnknownEffect(OrchestrationV2StoredEvent);
+      const decodeEventSpec = Schema.decodeUnknownEffect(OrchestrationV2DomainEventJson);
+      const decodeProjectSpec = Schema.decodeUnknownEffect(ApplicationProjectEvent);
       // The spec mirrors what the rows commit to: the domain event as stored, then the stored
       // event around it. Any decode drift in the implementation drifts from this, independent of
       // how many times the implementation decodes each row.
-      const agentSpec = (row: {
+      const agentSpec = Effect.fnUntraced(function* (row: {
         readonly sequence: number;
         readonly event_id: string;
         readonly command_id: string | null;
         readonly occurred_at: string;
         readonly payload_json: string;
         readonly metadata_json: string;
-      }) => {
+      }) {
         const metadata = JSON.parse(row.metadata_json) as Record<string, unknown>;
-        const event = decodeEventSpec({
+        const event = yield* decodeEventSpec({
           id: row.event_id,
           threadId,
           type: "provider-session.detached",
@@ -594,8 +594,12 @@ layer("OrchestrationEventStore", (it) => {
             : { providerInstanceId: metadata.providerInstanceId }),
           ...(metadata.rawEventId === undefined ? {} : { rawEventId: metadata.rawEventId }),
         });
-        return decodeStoredEventSpec({ sequence: row.sequence, commandId: row.command_id, event });
-      };
+        return yield* decodeStoredEventSpec({
+          sequence: row.sequence,
+          commandId: row.command_id,
+          event,
+        });
+      });
       const now = "2026-02-01T00:00:00.000Z";
       const insertAgent = Effect.fnUntraced(function* (index: number) {
         const metadata: Record<string, string> = {};
@@ -622,7 +626,7 @@ layer("OrchestrationEventStore", (it) => {
           ) RETURNING sequence
         `;
         const row = rows[0]!;
-        return agentSpec({
+        return yield* agentSpec({
           sequence: row.sequence,
           event_id: `event:spec-${index}`,
           command_id: commandId,
@@ -650,7 +654,7 @@ layer("OrchestrationEventStore", (it) => {
             ${JSON.stringify(payload)}, '{}', 2
           ) RETURNING sequence
         `;
-        return decodeProjectSpec({
+        return yield* decodeProjectSpec({
           sequence: rows[0]!.sequence,
           eventId: `event:spec-project-${index}`,
           type: "project.meta-updated",
