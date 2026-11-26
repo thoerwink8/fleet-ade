@@ -45,6 +45,17 @@ import {
 import packageJson from "../../package.json" with { type: "json" };
 import { buildPairingAppLink } from "@t3tools/shared/remote";
 
+// TestClock freezes logical time at the epoch; a runtime record for a live process needs the
+// wall-clock start time the verify path compares against the process creation time.
+const makeLiveServerRuntimeState = (
+  input: Parameters<typeof makePersistedServerRuntimeState>[0],
+): Effect.Effect<PersistedServerRuntimeState> =>
+  Effect.map(makePersistedServerRuntimeState(input), (state) => ({
+    ...state,
+    // oxlint-disable-next-line t3code/no-wall-clock-in-tests -- process creation time is wall-clock; TestClock freezes it at the epoch
+    startedAt: new Date().toISOString(),
+  }));
+
 const layerCliRuntime = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer);
 
 const makeTempDir = (prefix: string) =>
@@ -176,7 +187,7 @@ describe("t3 pair", () => {
           const baseDir = yield* makeTempDir("t3-pair-ipv6-test-");
           yield* persistServerRuntimeState({
             path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-            state: yield* makePersistedServerRuntimeState({
+            state: yield* makeLiveServerRuntimeState({
               config: { host: "::1", devUrl: undefined },
               port: Number(new URL(origin).port),
             }),
@@ -257,7 +268,7 @@ describe("t3 pair", () => {
             const baseDir = yield* makeTempDir("t3-pair-ts-held-");
             yield* persistServerRuntimeState({
               path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-              state: yield* makePersistedServerRuntimeState({
+              state: yield* makeLiveServerRuntimeState({
                 config: { host: "127.0.0.1", devUrl: undefined },
                 port: Number(new URL(origin).port),
               }),
@@ -294,7 +305,7 @@ describe("t3 pair", () => {
         const statePath = NodePath.join(baseDir, "userdata", "server-runtime.json");
         yield* persistServerRuntimeState({
           path: statePath,
-          state: yield* makePersistedServerRuntimeState({
+          state: yield* makeLiveServerRuntimeState({
             config: { host: "127.0.0.1", devUrl: undefined },
             port,
           }),
@@ -348,7 +359,7 @@ describe("t3 pair", () => {
         const statePath = NodePath.join(baseDir, "dev", "server-runtime.json");
         yield* persistServerRuntimeState({
           path: statePath,
-          state: yield* makePersistedServerRuntimeState({
+          state: yield* makeLiveServerRuntimeState({
             config: { host: undefined, devUrl: new URL("http://localhost:5733") },
             port,
           }),
@@ -366,7 +377,7 @@ describe("t3 pair", () => {
       Effect.gen(function* () {
         const baseDir = yield* makeTempDir("t3 pair pid test-");
         const statePath = NodePath.join(baseDir, "userdata", "server-runtime.json");
-        const state = yield* makePersistedServerRuntimeState({
+        const state = yield* makeLiveServerRuntimeState({
           config: { host: "127.0.0.1", devUrl: undefined },
           port: Number(new URL(origin).port),
         });
@@ -404,7 +415,7 @@ describe("t3 pair", () => {
         const sharedHome = NodePath.join(root, "shared");
         yield* persistServerRuntimeState({
           path: NodePath.join(sharedHome, "userdata", "server-runtime.json"),
-          state: yield* makePersistedServerRuntimeState({
+          state: yield* makeLiveServerRuntimeState({
             config: { host: "127.0.0.1", devUrl: undefined },
             port: Number(new URL(origin).port),
           }),
@@ -438,7 +449,7 @@ describe("t3 pair", () => {
           const baseDir = yield* makeTempDir("t3-pair-protocol-test-");
           yield* persistServerRuntimeState({
             path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-            state: yield* makePersistedServerRuntimeState({
+            state: yield* makeLiveServerRuntimeState({
               config: { host: "127.0.0.1", devUrl: undefined },
               port: Number(new URL(origin).port),
             }),
@@ -473,7 +484,7 @@ describe("t3 pair", () => {
         const baseDir = yield* makeTempDir("t3-pair-ts-test-");
         yield* persistServerRuntimeState({
           path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-          state: yield* makePersistedServerRuntimeState({
+          state: yield* makeLiveServerRuntimeState({
             config: { host: "127.0.0.1", devUrl: undefined },
             port: Number(new URL(origin).port),
           }),
@@ -524,7 +535,7 @@ describe("t3 pair", () => {
       const baseDir = yield* makeTempDir("t3-pair-remote-");
       yield* persistServerRuntimeState({
         path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-        state: yield* makePersistedServerRuntimeState({
+        state: yield* makeLiveServerRuntimeState({
           config: { host: "127.0.0.2", devUrl: undefined },
           port: 3773,
         }),

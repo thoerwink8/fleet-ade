@@ -9,7 +9,10 @@ import { Command, Flag, GlobalFlag, Prompt } from "effect/cli";
 import * as BootService from "../cloud/bootService.ts";
 import * as DatabaseMaintenance from "../persistence/DatabaseMaintenance.ts";
 import * as ServerOwnership from "../serverOwnership.ts";
-import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
+import {
+  readPersistedServerRuntimeState,
+  verifyRecordedServerProcess,
+} from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import * as CliService from "./service.ts";
 
@@ -42,7 +45,13 @@ const lockServerHome = Effect.fn("runDoctor.lockServerHome")(function* (paths: {
     Effect.catchTags({
       ServerAlreadyRunningError: Effect.fn("runDoctor.nameServerHolder")(function* (cause) {
         const owner = yield* readPersistedServerRuntimeState(paths.serverRuntimeStatePath).pipe(
-          Effect.map(Option.filter((state) => isProcessAlive(state.pid))),
+          Effect.flatMap((state) =>
+            Option.isNone(state)
+              ? Effect.succeed(state)
+              : verifyRecordedServerProcess(state.value, paths.serverRuntimeStatePath).pipe(
+                  Effect.map((verified) => (verified ? state : Option.none())),
+                ),
+          ),
           Effect.orElseSucceed(() => Option.none()),
         );
         return yield* new DatabaseMaintenance.DatabaseInUseError({

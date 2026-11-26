@@ -1,3 +1,8 @@
+// @effect-diagnostics nodeBuiltinImport:off - The ownership probe opens the lock file directly.
+import * as NodeChildProcess from "node:child_process";
+import * as NodePath from "node:path";
+import * as NodeSqlite from "node:sqlite";
+
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -8,6 +13,11 @@ import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { formatHostForUrl, isWildcardHost } from "@t3tools/shared/hostClassification";
 import packageJson from "../package.json" with { type: "json" };
 import type * as ServerConfig from "./config.ts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
+import {
+  legacyOwnerStartedBeforeRecord,
+  legacyOwnerStartTimeCommand,
+} from "./legacyServerOwner.ts";
 
 export const PersistedServerRuntimeState = Schema.Struct({
   version: Schema.Literal(1),
@@ -116,6 +126,58 @@ export const clearPersistedServerRuntimeState = Effect.fn(
   );
 });
 
+const isSqliteBusy = (cause: unknown) =>
+  cause instanceof Error &&
+  (("errcode" in cause && cause.errcode === 5) ||
+    ("code" in cause && cause.code === "SQLITE_BUSY"));
+
+/** Whether a running server holds the ownership lock. Read-only, so it never creates the lock file. */
+const isServerOwnershipHeld = (statePath: string): boolean => {
+  let db: NodeSqlite.DatabaseSync | undefined;
+  try {
+    db = new NodeSqlite.DatabaseSync(
+      NodePath.join(NodePath.dirname(statePath), "server-owner.sqlite"),
+      { readOnly: true, timeout: 0 },
+    );
+    db.prepare("SELECT 1 FROM sqlite_schema").get();
+    return false;
+  } catch (cause) {
+    return isSqliteBusy(cause);
+  } finally {
+    db?.close();
+  }
+};
+
+/**
+ * The recorded server process, only while this exact process still runs. A lock-aware record is
+ * live while its owner holds `server-owner.sqlite`, which the OS releases even on SIGKILL. A
+ * pre-lock record needs process start-time proof: signal 0 cannot tell a reused PID apart.
+ */
+export const verifyRecordedServerProcess = Effect.fn("verifyRecordedServerProcess")(function* (
+  state: Pick<PersistedServerRuntimeState, "pid" | "ownerId" | "startedAt">,
+  statePath: string,
+) {
+  if (!isProcessAlive(state.pid)) return false;
+  if (state.ownerId !== undefined) return isServerOwnershipHeld(statePath);
+  const recordedAt = Date.parse(state.startedAt);
+  if (!Number.isFinite(recordedAt)) return true;
+  const platform = yield* HostProcess.Platform;
+  const { command, args, env } = legacyOwnerStartTimeCommand(state.pid, platform);
+  // Raw execFile: the CLI runtime does not carry a process runner everywhere this is read.
+  const output = yield* Effect.promise(
+    () =>
+      new Promise<string | undefined>((resolve) =>
+        NodeChildProcess.execFile(
+          command,
+          args,
+          { env: { ...process.env, ...env }, timeout: 2_000, maxBuffer: 16_384 },
+          (error, stdout) => resolve(error === null ? stdout : undefined),
+        ),
+      ),
+  );
+  return legacyOwnerStartedBeforeRecord(output, recordedAt, platform);
+});
+
 /** Signal 0 only probes existence; EPERM still means alive. */
 export const isProcessAlive = (pid: number): boolean => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -188,8 +250,9 @@ export const readPersistedServerRuntimeState = Effect.fn(
  */
 export const readLiveServerRuntimeState = Effect.fn(
   "serverRuntimeState.readLiveServerRuntimeState",
-)((path: string) =>
-  readPersistedServerRuntimeState(path).pipe(
-    Effect.map(Option.filter((state) => isProcessAlive(state.pid))),
-  ),
-);
+)(function* (path: string) {
+  const state = yield* readPersistedServerRuntimeState(path);
+  if (Option.isNone(state)) return state;
+  if (state.value.pid === process.pid) return state;
+  return (yield* verifyRecordedServerProcess(state.value, path)) ? state : Option.none();
+});

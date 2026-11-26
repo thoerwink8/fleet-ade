@@ -35,6 +35,7 @@ import {
   resolveSpawnCommand,
   resolveWindowsEnvironment,
   runsGitWithoutConsole,
+  windowsEnvironmentValueCommand,
   SpawnExecutableResolution,
   WindowsShellEnvironment,
   withPathDirectoryListings,
@@ -240,6 +241,24 @@ describe("mergePathEntries", () => {
     expect(
       mergePathEntries("/opt/homebrew/bin:/usr/bin", "/Users/test/.local/bin:/usr/bin", "darwin"),
     ).toBe("/opt/homebrew/bin:/usr/bin:/Users/test/.local/bin");
+  });
+});
+
+describe("windowsEnvironmentValueCommand", () => {
+  it("joins PATH as Process, then Machine, then User so prepends win and User installs still appear", () => {
+    const command = windowsEnvironmentValueCommand("PATH");
+    const processAt = command.indexOf("[Environment]::GetEnvironmentVariable('PATH','Process')");
+    const machineAt = command.indexOf("[Environment]::GetEnvironmentVariable('PATH','Machine')");
+    const userAt = command.indexOf("[Environment]::GetEnvironmentVariable('PATH','User')");
+    expect(processAt).toBeGreaterThan(-1);
+    expect(processAt).toBeLessThan(machineAt);
+    expect(machineAt).toBeLessThan(userAt);
+  });
+
+  it("reads non-PATH names unchanged", () => {
+    expect(windowsEnvironmentValueCommand("JAVA_HOME")).toBe(
+      "$value = [Environment]::GetEnvironmentVariable('JAVA_HOME')",
+    );
   });
 });
 

@@ -1,4 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off - Injects a real file replacement during the native SQLite transaction.
+import * as NodeChildProcess from "node:child_process";
+import * as NodeEvents from "node:events";
 import * as NodeFS from "node:fs";
 import * as NodeSqlite from "node:sqlite";
 
@@ -500,4 +502,98 @@ describe("server ownership", () => {
       }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
     );
   });
+});
+
+describe("readLiveServerRuntimeState", () => {
+  const layerIdentity = Layer.mergeAll(
+    ProcessRunner.layer,
+    Layer.succeed(HostProcess.Environment, {}),
+  ).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
+  const liveProcess = Effect.acquireRelease(
+    Effect.promise(async () => {
+      const child = NodeChildProcess.spawn(process.execPath, ["-e", "process.stdin.resume()"], {
+        stdio: ["pipe", "ignore", "ignore"],
+      });
+      await NodeEvents.EventEmitter.once(child, "spawn");
+      return child;
+    }),
+    (child) =>
+      Effect.promise(async () => {
+        const exited = NodeEvents.EventEmitter.once(child, "exit");
+        child.kill();
+        await exited;
+      }),
+  );
+  const recordFor = (pid: number, overrides: Record<string, unknown> = {}) => ({
+    version: 1,
+    pid,
+    port: 3773,
+    origin: "http://127.0.0.1:3773",
+    // oxlint-disable-next-line t3code/no-wall-clock-in-tests -- process creation time is wall-clock; TestClock freezes it at the epoch
+    startedAt: new Date().toISOString(),
+    ...overrides,
+  });
+
+  it.effect("reads a record while its owner still holds the lock", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-held-" });
+      const statePath = path.join(root, "server-runtime.json");
+      const state = yield* ServerRuntimeState.makePersistedServerRuntimeState({
+        config: { host: undefined, devUrl: undefined },
+        port: 3773,
+      });
+      const owner = yield* ServerOwnership.acquireServerOwnership(statePath);
+      yield* owner.publish({ ...state, pid: process.pid });
+
+      assert.isTrue(Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)));
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("filters a lock-aware record whose owner is gone even while its PID lives", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-reused-" });
+      const statePath = path.join(root, "server-runtime.json");
+      const child = yield* liveProcess;
+      assert(child.pid !== undefined);
+      // The killed owner's lock is released; another process owns the PID now.
+      yield* Effect.scoped(ServerOwnership.acquireServerOwnership(statePath));
+      yield* fs.writeFileString(
+        statePath,
+        JSON.stringify(recordFor(child.pid, { ownerId: "4ec9f94a-0000-4000-8000-000000000000" })),
+      );
+
+      assert.isTrue(Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)));
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("filters a pre-lock record whose PID was reused, keeps one its owner still runs", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-legacy-" });
+      const child = yield* liveProcess;
+      assert(child.pid !== undefined);
+
+      const reusedPath = path.join(root, "reused", "server-runtime.json");
+      yield* fs.makeDirectory(path.dirname(reusedPath), { recursive: true });
+      // The process started long after this record: the PID belongs to someone else.
+      yield* fs.writeFileString(
+        reusedPath,
+        JSON.stringify(recordFor(child.pid, { startedAt: "2026-10-01T00:00:00.000Z" })),
+      );
+      assert.isTrue(
+        Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(reusedPath)),
+      );
+
+      const livePath = path.join(root, "live", "server-runtime.json");
+      yield* fs.makeDirectory(path.dirname(livePath), { recursive: true });
+      // Written while the process runs: the recorded start matches the process start.
+      yield* fs.writeFileString(livePath, JSON.stringify(recordFor(child.pid)));
+      assert.isTrue(Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(livePath)));
+    }).pipe(Effect.provide(layerIdentity)),
+  );
 });

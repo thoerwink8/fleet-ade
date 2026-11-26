@@ -7,6 +7,7 @@ import * as NodeNet from "node:net";
 
 import * as Effect from "effect/Effect";
 import { Argument, Command } from "effect/cli";
+import { verifyRecordedServerProcess } from "../serverRuntimeState.ts";
 
 const canBind = (port: number) =>
   new Promise<boolean>((resolve) => {
@@ -96,11 +97,13 @@ const runtimePort = Command.make("runtime-port", {
   runtimeFile: Argument.String("runtime-file"),
 }).pipe(
   Command.withHandler(({ runtimeFile }) =>
-    Effect.sync(() => {
+    Effect.gen(function* () {
       try {
         // @effect-diagnostics-next-line globalJsonInEffect:off - mirrors the shell snippet's loose parse.
         const runtime = JSON.parse(NodeFS.readFileSync(runtimeFile, "utf8")) as {
           pid?: unknown;
+          ownerId?: unknown;
+          startedAt?: unknown;
           port?: unknown;
           origin?: unknown;
         };
@@ -115,7 +118,18 @@ const runtimePort = Command.make("runtime-port", {
           process.exitCode = 1;
           return;
         }
-        process.kill(pid, 0);
+        const verified = yield* verifyRecordedServerProcess(
+          {
+            pid,
+            ownerId: typeof runtime.ownerId === "string" ? runtime.ownerId : undefined,
+            startedAt: typeof runtime.startedAt === "string" ? runtime.startedAt : "",
+          },
+          runtimeFile,
+        );
+        if (!verified) {
+          process.exitCode = 1;
+          return;
+        }
         process.stdout.write(`${pid} ${port}`);
       } catch {
         process.exitCode = 1;
