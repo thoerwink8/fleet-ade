@@ -605,6 +605,65 @@ it("lists an ignored nested worktree whose .git is a valid gitdir file as a dire
   ]);
 });
 
+it("lists an ignored nested linked worktree as a directory entry", async () => {
+  using nested = ignoredFixture(() => {});
+  nested.write("seed.txt");
+  nested.git("add", ".");
+  nested.git("commit", "-m", "seed");
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+  });
+  // A real `git worktree add`: the linked worktree's gitdir has a commondir
+  // file and no objects of its own, sharing the main repository's store.
+  project.git(
+    "-C",
+    nested.root,
+    "worktree",
+    "add",
+    "--detach",
+    NodePath.join(project.root, "build", "wt"),
+    "HEAD",
+  );
+  project.write("build/wt/types.d.ts");
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/wt/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/wt/"]);
+});
+
+it("descends into a nested repository whose HEAD does not parse", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/leaf/types.d.ts");
+  });
+  project.git("-C", "build/leaf", "init");
+  NodeFS.writeFileSync(NodePath.join(project.root, "build/leaf/.git/HEAD"), "ordinary file\n");
+  project.write("build/leaf/.git/inside.d.ts");
+  // HEAD is the boundary test git applies: objects and refs survive, but a
+  // HEAD that is neither a reference nor a commit id makes the directory
+  // plain. Even then git never descends into the `.git` directory itself.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/leaf/types.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/leaf/types.d.ts",
+  ]);
+});
+
+it("descends into a nested repository missing its object store", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/hollow/types.d.ts");
+  });
+  project.git("-C", "build/hollow", "init");
+  NodeFS.rmSync(NodePath.join(project.root, "build/hollow/.git/objects"), {
+    recursive: true,
+    force: true,
+  });
+  // A valid HEAD is not enough: without the object store git treats the
+  // directory as plain content.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/hollow/types.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/hollow/types.d.ts",
+  ]);
+});
+
 it("opens no dependency directory with readdir or git at any nesting depth", async () => {
   using project = ignoredFixture((write) => {
     write(".gitignore", "build/\nnode_modules/\n");

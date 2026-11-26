@@ -193,40 +193,79 @@ const recoverNotFound = <A, R, F>(
     () => Effect.succeed(fallback),
   );
 
-// Git's is_git_directory: a symlink is followed, HEAD must parse as a reference
-// and the object store must exist. A `.git` file names the real directory
-// through a `gitdir:` line, resolved against the directory holding it.
-const isNestedRepository = Effect.fnUntraced(function* (absolute: string) {
-  const stat = (path: string) =>
+// Git's is_git_directory: HEAD must parse as a reference and the object
+// store and refs must exist, possibly shared through commondir. A `.git`
+// file names the real directory, resolved against the directory holding it.
+// HEAD is a symbolic reference or a detached commit id (SHA-1 or SHA-256).
+const headContent = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\r?\n?$/;
+
+const isGitDirectory = Effect.fnUntraced(function* (directory: string) {
+  const lstat = (path: string) =>
     recoverNotFound(
       Effect.tryPromise({
-        try: () => NodeFSP.stat(path),
-        catch: systemError("stat"),
+        try: () => NodeFSP.lstat(path),
+        catch: systemError("lstat"),
       }),
       undefined,
     );
-  const dotGit = NodePath.join(absolute, ".git");
-  let directory = dotGit;
-  const info = yield* stat(dotGit);
-  if (info === undefined) return false;
-  if (!info.isDirectory()) {
-    if (!info.isFile()) return false;
-    const content = yield* recoverNotFound(
+  const readTextFile = (path: string) =>
+    recoverNotFound(
       Effect.tryPromise({
-        try: () => NodeFSP.readFile(dotGit, "utf8"),
+        try: () => NodeFSP.readFile(path, "utf8"),
         catch: systemError("readFile"),
       }),
-      "",
+      undefined,
     );
-    if (!content.trimStart().startsWith("gitdir:")) return false;
-    const target = content.slice(content.indexOf("gitdir:") + 7).trim();
-    if (target.length === 0) return false;
-    directory = NodePath.resolve(absolute, target);
+  const headPath = NodePath.join(directory, "HEAD");
+  const headInfo = yield* lstat(headPath);
+  let headValid = false;
+  if (headInfo !== undefined) {
+    if (headInfo.isSymbolicLink()) {
+      const target = yield* Effect.tryPromise({
+        try: () => NodeFSP.readlink(headPath),
+        catch: systemError("readlink"),
+      });
+      headValid = target.startsWith("refs/");
+    } else if (headInfo.isFile()) {
+      const content = yield* readTextFile(headPath);
+      headValid =
+        content !== undefined && (content.startsWith("ref: refs/") || headContent.test(content));
+    }
   }
-  const head = yield* stat(NodePath.join(directory, "HEAD"));
-  if (head === undefined || !head.isFile()) return false;
-  const objects = yield* stat(NodePath.join(directory, "objects"));
-  return objects !== undefined && objects.isDirectory();
+  if (!headValid) return false;
+  // A linked worktree's gitdir shares the object store and refs of the main
+  // repository through its commondir file.
+  const commondir = yield* readTextFile(NodePath.join(directory, "commondir"));
+  const store = commondir === undefined ? directory : NodePath.resolve(directory, commondir.trim());
+  const objects = yield* lstat(NodePath.join(store, "objects"));
+  if (objects === undefined || !objects.isDirectory()) return false;
+  const refs = yield* lstat(NodePath.join(store, "refs"));
+  return refs !== undefined && refs.isDirectory();
+});
+
+const isNestedRepository = Effect.fnUntraced(function* (absolute: string) {
+  const dotGit = NodePath.join(absolute, ".git");
+  const info = yield* recoverNotFound(
+    Effect.tryPromise({
+      try: () => NodeFSP.stat(dotGit),
+      catch: systemError("stat"),
+    }),
+    undefined,
+  );
+  if (info === undefined) return false;
+  if (info.isDirectory()) return yield* isGitDirectory(dotGit);
+  if (!info.isFile()) return false;
+  const content = yield* recoverNotFound(
+    Effect.tryPromise({
+      try: () => NodeFSP.readFile(dotGit, "utf8"),
+      catch: systemError("readFile"),
+    }),
+    undefined,
+  );
+  if (content === undefined || !content.startsWith("gitdir:")) return false;
+  const target = content.slice(7).trim();
+  if (target.length === 0) return false;
+  return yield* isGitDirectory(NodePath.resolve(absolute, target));
 });
 
 // Expanding a collapsed directory with `git ls-files` descends into its nested
@@ -271,7 +310,8 @@ const walkIgnoredDirectory = Effect.fnUntraced(function* (
     for (const entry of entries) {
       const relative = current.relative + entry.name;
       if (entry.isDirectory()) {
-        if (entry.name !== "node_modules") {
+        // git never descends into a `.git` directory, valid or not.
+        if (entry.name !== "node_modules" && entry.name !== ".git") {
           pending.push({
             relative: relative + "/",
             absolute: NodePath.join(current.absolute, entry.name),
