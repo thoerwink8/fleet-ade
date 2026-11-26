@@ -6805,6 +6805,98 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
     }),
   );
 
+  it.effect("promotes another thread's queued run while a thread lock is held", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const executor = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+      const startWithQueuedRun = Effect.fn("test.startWithQueuedRun")(function* (
+        threadId: ThreadId,
+      ) {
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(`${threadId}:create`),
+          threadId,
+          projectId: ProjectId.make("run-update-isolation-project"),
+          title: threadId,
+          createdBy: "user",
+          creationSource: "web",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: process.cwd(),
+        });
+        for (const type of ["start_immediately", "queue_after_active"] as const) {
+          yield* orchestrator.dispatch({
+            type: "message.dispatch",
+            commandId: CommandId.make(`${threadId}:${type}`),
+            messageId: MessageId.make(`${threadId}:${type}`),
+            threadId,
+            createdBy: "user",
+            creationSource: "web",
+            text: type,
+            attachments: [],
+            dispatchMode: { type },
+          });
+        }
+        const { runs } = yield* orchestrator.getThreadProjection(threadId);
+        const active = runs.find((run) => run.status === "starting");
+        const queued = runs.find((run) => run.status === "queued");
+        assert.isDefined(active);
+        assert.isDefined(queued);
+        return { active, queued };
+      });
+
+      const busyThreadId = ThreadId.make("run-update-isolation-busy");
+      const otherThreadId = ThreadId.make("run-update-isolation-other");
+      const busy = yield* startWithQueuedRun(busyThreadId);
+      const other = yield* startWithQueuedRun(otherThreadId);
+      const held = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      yield* executor
+        .withLock(
+          busyThreadId,
+          Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))),
+        )
+        .pipe(Effect.forkScoped);
+      yield* Deferred.await(held);
+
+      const now = yield* DateTime.now;
+      const afterSequence = yield* eventSink.latestSequence();
+      yield* eventSink.write({
+        events: [busy.active, other.active].map((run) => ({
+          id: EventId.make(`${run.threadId}:completed`),
+          type: "run.updated",
+          threadId: run.threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "completed", completedAt: now },
+        })),
+      });
+      yield* TestClock.adjust(0);
+      for (const [threadId, runId, expected] of [
+        [busyThreadId, busy.queued.id, "queued"],
+        [otherThreadId, other.queued.id, "starting"],
+      ] as const) {
+        const { runs } = yield* orchestrator.getThreadProjection(threadId);
+        assert.equal(runs.find((run) => run.id === runId)?.status, expected, threadId);
+      }
+
+      yield* Deferred.succeed(release, undefined);
+      yield* eventSink.stream({ threadId: busyThreadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) =>
+            event.type === "run.updated" &&
+            event.runId === busy.queued.id &&
+            event.payload.status === "starting",
+        ),
+        Stream.take(1),
+        Stream.runDrain,
+      );
+    }),
+  );
+
   it.effect.each([false, true])(
     "promotes only one queued run after each terminal run (notification: %s)",
     (automatic) =>

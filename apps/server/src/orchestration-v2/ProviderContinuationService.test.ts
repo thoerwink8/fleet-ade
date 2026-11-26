@@ -18,6 +18,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Scheduler from "effect/Scheduler";
 import * as Semaphore from "effect/Semaphore";
 import * as TestClock from "effect/testing/TestClock";
 
@@ -95,10 +96,15 @@ const makeGuard = Effect.fnUntraced(function* (completed?: Deferred.Deferred<voi
 function layerTest(input: {
   readonly dispatched: Queue.Queue<unknown>;
   readonly getThreadRecords: () => Effect.Effect<OrchestrationV2ThreadProjection>;
+  readonly beforeDispatch?: (threadId: ThreadId) => Effect.Effect<void>;
 }) {
   const layerThreads = Layer.mock(ThreadManagementService.ThreadManagementService)({
     getThreadRecords: input.getThreadRecords,
-    dispatch: (command) => Queue.offer(input.dispatched, command).pipe(Effect.as({} as never)),
+    dispatch: (command) =>
+      (
+        ("threadId" in command ? input.beforeDispatch?.(command.threadId) : undefined) ??
+        Effect.void
+      ).pipe(Effect.andThen(Queue.offer(input.dispatched, command)), Effect.as({} as never)),
   });
   const layerWorker = ProviderContinuationService.layer.pipe(
     Layer.provide(
@@ -109,6 +115,50 @@ function layerTest(input: {
 }
 
 describe("ProviderContinuationService", () => {
+  it.effect("dispatches another thread's wake while a child waits on its parent lock", () =>
+    Effect.gen(function* () {
+      const dispatched = yield* Queue.unbounded<unknown>();
+      const childThreadId = ThreadId.make("thread-provider-continuation-blocked-child");
+      const releaseDispatch = yield* Deferred.make<void>();
+      const childDispatches = yield* Ref.make(0);
+      const scheduler = new Scheduler.MixedScheduler("sync");
+      const dispatcher = scheduler.makeDispatcher();
+      yield* Effect.gen(function* () {
+        const requests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+        yield* requests.offer({ ...request(undefined, "first"), threadId: childThreadId });
+        yield* requests.offer({ ...request(undefined, "second"), threadId: childThreadId });
+        yield* requests.offer(request());
+        yield* Effect.sync(() => dispatcher.flush());
+        assert.equal(yield* Queue.size(dispatched), 1);
+        assert.include(yield* Queue.take(dispatched), { threadId });
+        assert.equal(yield* Ref.get(childDispatches), 1);
+
+        yield* Deferred.succeed(releaseDispatch, undefined);
+        assert.include(yield* Queue.take(dispatched), { threadId: childThreadId, text: "first" });
+        assert.include(yield* Queue.take(dispatched), { threadId: childThreadId, text: "second" });
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            dispatched,
+            getThreadRecords: () => Effect.succeed(projection),
+            beforeDispatch: (dispatchThreadId) =>
+              dispatchThreadId === childThreadId
+                ? Ref.update(childDispatches, (count) => count + 1).pipe(
+                    Effect.andThen(Deferred.await(releaseDispatch)),
+                  )
+                : Effect.void,
+          }),
+        ),
+        Effect.provideService(Scheduler.Scheduler, {
+          executionMode: scheduler.executionMode,
+          shouldYield: (fiber) => scheduler.shouldYield(fiber),
+          makeDispatcher: () => dispatcher,
+        }),
+        Effect.scoped,
+      );
+    }),
+  );
+
   it.effect("recovers an unaccepted persisted steer using the same delivery identity", () =>
     Effect.gen(function* () {
       const dispatched = yield* Queue.unbounded<unknown>();
