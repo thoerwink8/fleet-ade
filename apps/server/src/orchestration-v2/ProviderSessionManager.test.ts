@@ -10,6 +10,7 @@ import {
   NodeId,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
+  type OrchestrationV2ExecutionNode,
   type OrchestrationV2PromptSuggestion,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2ProviderSession,
@@ -3012,7 +3013,7 @@ it.effect(
     }),
 );
 
-const openSessionWithBackgroundCommand = (fixtureName: string) =>
+const openSessionWithBackgroundCommand = (fixtureName: string, seedReplacement = true) =>
   Effect.gen(function* () {
     const eventSink = yield* EventSink.EventSinkV2;
     const idAllocator = yield* IdAllocator.IdAllocatorV2;
@@ -3120,7 +3121,12 @@ const openSessionWithBackgroundCommand = (fixtureName: string) =>
           ],
         });
       });
-    yield* Effect.forEach(Object.values(seededToolCalls), writeToolCall);
+    yield* Effect.forEach(
+      seedReplacement
+        ? Object.values(seededToolCalls)
+        : [seededToolCalls.cutOff, seededToolCalls.finished, seededToolCalls.otherSession],
+      writeToolCall,
+    );
     yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
     const toolCallStatus = (id: OrchestrationV2TurnItem["id"]) =>
       Effect.gen(function* () {
@@ -3280,113 +3286,307 @@ it.effect.each(["a runtime whose tasks can outlive it", "server shutdown"] as co
 it.effect("ProviderSessionManagerV2 ends open tool calls when the provider process dies", () =>
   Effect.gen(function* () {
     const state = yield* Ref.make(emptyState);
+    const beforeUnchangedWrite = yield* Ref.make(Effect.void);
+    const beforeTurnItemsWrite = yield* Ref.make<ReadonlyArray<Effect.Effect<void>>>([]);
     yield* Effect.gen(function* () {
       const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
-      const { threadId, providerSessionId, seededToolCalls, toolCalls } =
-        yield* openSessionWithBackgroundCommand("provider-session-manager-process-exit");
+      const { threadId, providerSessionId, seededToolCalls, toolCalls, writeToolCall } =
+        yield* openSessionWithBackgroundCommand("provider-session-manager-process-exit", false);
       const eventSink = yield* EventSink.EventSinkV2;
       const afterSequence = yield* eventSink.latestSequence({ threadId });
       const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
-      const subscription = yield* runtime.subscribeEvents!;
+      const first = yield* runtime.subscribeEvents!;
+      const second = yield* runtime.subscribeEvents!;
       const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const now = yield* DateTime.now;
+      const lateCompletion = { ...seededToolCalls.cutOff, id: TurnItemId.make("late-completion") };
+      const queuedCall = { ...seededToolCalls.cutOff, id: TurnItemId.make("queued-before-exit") };
+      const consuming = yield* Deferred.make<void>();
+      const resume = yield* Deferred.make<void>();
+      const firstConsumer = yield* first.events.pipe(
+        Stream.tap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.id === seededToolCalls.cutOff.id
+            ? writeToolCall(event.turnItem)
+            : Effect.void,
+        ),
+        Stream.runDrain,
+        Effect.ensuring(first.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      const secondConsumer = yield* second.events.pipe(
+        Stream.tap((event) =>
+          event.type !== "turn_item.updated"
+            ? Effect.void
+            : Deferred.succeed(consuming, undefined).pipe(
+                Effect.andThen(Deferred.await(resume)),
+                Effect.andThen(writeToolCall(event.turnItem)),
+              ),
+        ),
+        Stream.runDrain,
+        Effect.ensuring(second.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      yield* writeToolCall(lateCompletion);
+      yield* Ref.set(beforeTurnItemsWrite, [
+        manager
+          .open({ threadId, providerSessionId, modelSelection, runtimePolicy })
+          .pipe(
+            Effect.andThen(
+              writeToolCall({ ...seededToolCalls.replacement, startedAt: now, updatedAt: now }),
+            ),
+            Effect.andThen(
+              writeToolCall({ ...lateCompletion, status: "completed", completedAt: now }),
+            ),
+            Effect.orDie,
+          ),
+      ]);
       const error = new ProviderAdapter.ProviderAdapterEventStreamError({
         driver: CODEX_DRIVER,
         providerSessionId,
         cause: "Provider process exited.",
       });
 
+      yield* Queue.offerAll(
+        queue,
+        [seededToolCalls.cutOff, queuedCall].map((turnItem) => ({
+          type: "turn_item.updated" as const,
+          driver: CODEX_DRIVER,
+          turnItem,
+        })),
+      );
+      yield* Deferred.await(consuming);
       yield* Queue.fail(queue, error);
-      assert.deepEqual(yield* Stream.runDrain(subscription.events).pipe(Effect.flip), error);
-      yield* TestClock.adjust(1);
-
+      assert.deepEqual(yield* Fiber.join(firstConsumer), error);
+      yield* Deferred.succeed(resume, undefined);
+      assert.deepEqual(yield* Fiber.join(secondConsumer), error);
+      const update = yield* eventSink.stream({ threadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) =>
+            event.type === "turn-item.updated" &&
+            event.payload.id === seededToolCalls.cutOff.id &&
+            event.payload.status === "interrupted",
+        ),
+        Stream.runHead,
+      );
+      const { event } = Option.getOrThrow(update);
+      assert.equal(event.type === "turn-item.updated" && event.payload.status, "interrupted");
       assert.deepStrictEqual(yield* toolCalls, {
         cutOff: "interrupted",
         finished: "completed",
         otherSession: "running",
         replacement: "running",
       });
-      const update = yield* eventSink.stream({ threadId, afterSequence }).pipe(
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const { turnItems } = yield* store.getThreadRecords(threadId, ["turnItems"]);
+      assert.equal(turnItems.find((item) => item.id === lateCompletion.id)?.status, "completed");
+      const eventStore = yield* EventStore.EventStoreV2;
+      const interrupted = yield* eventStore.read({ threadId, afterSequence }).pipe(
+        Stream.runCollect,
+        Effect.map((events) =>
+          events.flatMap(({ event }) =>
+            event.type === "turn-item.updated" && event.payload.status === "interrupted"
+              ? [event.payload.id]
+              : [],
+          ),
+        ),
+      );
+      assert.lengthOf(interrupted, 2);
+      assert.sameMembers(interrupted, [seededToolCalls.cutOff.id, queuedCall.id]);
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          state,
+          idleTimeoutMs: 60_000,
+          backgroundTasksEndWithProcess: false,
+          beforeUnchangedWrite,
+          beforeTurnItemsWrite,
+        }),
+      ),
+    );
+  }),
+);
+
+it.effect("ProviderSessionManagerV2 ends native background subagents after process exit", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    yield* Effect.gen(function* () {
+      const { manager, parent, childProviderThread } = yield* makeNativeChildFixture();
+      const threadId = childProviderThread.appThreadId!;
+      const now = yield* DateTime.now;
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const { subagents } = yield* store.getThreadRecords(parent.threadId, ["subagents"]);
+      const task = { ...subagents[0]!, status: "running", completedAt: null } as const;
+      const parentRunId = task.runId!;
+      const taskItem = {
+        ...task,
+        id: TurnItemId.make("native-subagent-item"),
+        subagentId: task.id,
+        nodeId: task.id,
+        providerTurnId: null,
+        nativeItemRef: task.nativeTaskRef,
+        parentItemId: null,
+        ordinal: 1,
+        type: "subagent",
+      } satisfies OrchestrationV2TurnItem;
+      const childRootId = NodeId.make("native-child-root");
+      const node = {
+        id: task.id,
+        threadId: parent.threadId,
+        runId: parentRunId,
+        parentNodeId: task.parentNodeId,
+        rootNodeId: task.parentNodeId!,
+        kind: "subagent",
+        status: "running",
+        countsForRun: false,
+        providerThreadId: childProviderThread.id,
+        providerTurnId: null,
+        nativeItemRef: task.nativeTaskRef,
+        runtimeRequestId: null,
+        checkpointScopeId: null,
+        startedAt: now,
+        completedAt: null,
+      } satisfies OrchestrationV2ExecutionNode;
+      const childRoot = {
+        ...node,
+        id: childRootId,
+        threadId,
+        runId: null,
+        parentNodeId: null,
+        rootNodeId: childRootId,
+        kind: "root_turn",
+      } satisfies OrchestrationV2ExecutionNode;
+      const childCall = {
+        id: TurnItemId.make("native-child-tool-call"),
+        threadId,
+        runId: null,
+        nodeId: null,
+        providerThreadId: childProviderThread.id,
+        providerTurnId: null,
+        nativeItemRef: null,
+        parentItemId: null,
+        ordinal: 1,
+        type: "dynamic_tool",
+        toolName: "native-child-tool",
+        input: {},
+        title: null,
+        status: "running",
+        startedAt: now,
+        completedAt: null,
+        updatedAt: now,
+      } satisfies OrchestrationV2TurnItem;
+      yield* eventSink.write({
+        events: [
+          {
+            id: yield* idAllocator.allocate.event({ threadId: parent.threadId }),
+            type: "run.updated",
+            threadId: parent.threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: {
+              id: parentRunId,
+              threadId: parent.threadId,
+              ordinal: 1,
+              providerInstanceId: modelSelection.instanceId,
+              modelSelection,
+              providerThreadId: null,
+              userMessageId: MessageId.make("finished-native-parent"),
+              rootNodeId: task.parentNodeId,
+              activeAttemptId: null,
+              status: "completed",
+              requestedAt: now,
+              startedAt: now,
+              completedAt: now,
+              checkpointId: null,
+              contextHandoffId: null,
+            },
+          },
+          {
+            id: yield* idAllocator.allocate.event({ threadId: parent.threadId }),
+            type: "subagent.updated",
+            threadId: parent.threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: task,
+          },
+          {
+            id: yield* idAllocator.allocate.event({ threadId: parent.threadId }),
+            type: "turn-item.updated",
+            threadId: parent.threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: taskItem,
+          },
+          ...(yield* Effect.forEach([node, childRoot], (payload) =>
+            idAllocator.allocate.event({ threadId: payload.threadId }).pipe(
+              Effect.map((id) => ({
+                id,
+                type: "node.updated" as const,
+                threadId: payload.threadId,
+                driver: CODEX_DRIVER,
+                occurredAt: now,
+                payload,
+              })),
+            ),
+          )),
+          {
+            id: yield* idAllocator.allocate.event({ threadId }),
+            type: "turn-item.updated",
+            threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: childCall,
+          },
+        ],
+      });
+      assert.isNotEmpty((yield* store.getThreadShell(parent.threadId))!.pendingBackgroundTasks);
+      const afterSequence = yield* eventSink.latestSequence({ threadId });
+      const runtime = Option.getOrThrow(yield* manager.get(parent.providerSessionId));
+      const subscription = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(parent.providerSessionId))!;
+      yield* Queue.fail(
+        queue,
+        new ProviderAdapter.ProviderAdapterEventStreamError({
+          driver: CODEX_DRIVER,
+          providerSessionId: parent.providerSessionId,
+          cause: "Provider process exited.",
+        }),
+      );
+      yield* Stream.runDrain(subscription.events).pipe(
+        Effect.ensuring(subscription.close),
+        Effect.flip,
+      );
+      yield* eventSink.stream({ threadId, afterSequence }).pipe(
         Stream.filter(
-          ({ event }) =>
-            event.type === "turn-item.updated" && event.payload.id === seededToolCalls.cutOff.id,
+          ({ event }) => event.type === "turn-item.updated" && event.payload.id === childCall.id,
         ),
         Stream.runHead,
       );
-      const { event } = Option.getOrThrow(update);
-      assert.equal(event.type === "turn-item.updated" && event.payload.status, "interrupted");
+
+      const { turnItems, nodes } = yield* store.getThreadRecords(threadId, ["turnItems", "nodes"]);
+      const root = yield* store.getThreadRecords(parent.threadId, [
+        "runs",
+        "subagents",
+        "turnItems",
+        "nodes",
+      ]);
+      assert.equal(turnItems.find((item) => item.id === childCall.id)?.status, "interrupted");
+      assert.equal(root.subagents.find((item) => item.id === task.id)?.status, "interrupted");
+      assert.equal(root.turnItems.find((item) => item.id === taskItem.id)?.status, "interrupted");
+      assert.equal(root.nodes.find((item) => item.id === node.id)?.status, "interrupted");
+      assert.equal(nodes.find((item) => item.id === childRoot.id)?.status, "interrupted");
+      assert.equal(root.runs.find((run) => run.id === parentRunId)?.status, "completed");
+      assert.isEmpty((yield* store.getThreadShell(parent.threadId))!.pendingBackgroundTasks);
+      assert.isEmpty((yield* store.getThreadShell(threadId))!.pendingBackgroundTasks);
     }).pipe(
       Effect.provide(
         layerTest({ state, idleTimeoutMs: 60_000, backgroundTasksEndWithProcess: false }),
       ),
     );
   }),
-);
-
-it.effect(
-  "ProviderSessionManagerV2 ends tool calls on native child threads after process exit",
-  () =>
-    Effect.gen(function* () {
-      const state = yield* Ref.make(emptyState);
-      yield* Effect.gen(function* () {
-        const { manager, parent, childProviderThread } = yield* makeNativeChildFixture();
-        const threadId = childProviderThread.appThreadId!;
-        const now = yield* DateTime.now;
-        const idAllocator = yield* IdAllocator.IdAllocatorV2;
-        const eventSink = yield* EventSink.EventSinkV2;
-        const childCall = {
-          id: TurnItemId.make("native-child-tool-call"),
-          threadId,
-          runId: null,
-          nodeId: null,
-          providerThreadId: childProviderThread.id,
-          providerTurnId: null,
-          nativeItemRef: null,
-          parentItemId: null,
-          ordinal: 1,
-          type: "dynamic_tool",
-          toolName: "native-child-tool",
-          input: {},
-          title: null,
-          status: "running",
-          startedAt: now,
-          completedAt: null,
-          updatedAt: now,
-        } satisfies OrchestrationV2TurnItem;
-        yield* eventSink.write({
-          events: [
-            {
-              id: yield* idAllocator.allocate.event({ threadId }),
-              type: "turn-item.updated",
-              threadId,
-              driver: CODEX_DRIVER,
-              occurredAt: now,
-              payload: childCall,
-            },
-          ],
-        });
-        const runtime = Option.getOrThrow(yield* manager.get(parent.providerSessionId));
-        const subscription = yield* runtime.subscribeEvents!;
-        const queue = (yield* Ref.get(state)).eventQueues.get(String(parent.providerSessionId))!;
-        yield* Queue.fail(
-          queue,
-          new ProviderAdapter.ProviderAdapterEventStreamError({
-            driver: CODEX_DRIVER,
-            providerSessionId: parent.providerSessionId,
-            cause: "Provider process exited.",
-          }),
-        );
-        yield* Stream.runDrain(subscription.events).pipe(Effect.flip);
-        yield* TestClock.adjust(1);
-
-        const store = yield* ProjectionStore.ProjectionStoreV2;
-        const { turnItems } = yield* store.getThreadRecords(threadId, ["turnItems"]);
-        assert.equal(turnItems.find((item) => item.id === childCall.id)?.status, "interrupted");
-      }).pipe(
-        Effect.provide(
-          layerTest({ state, idleTimeoutMs: 60_000, backgroundTasksEndWithProcess: false }),
-        ),
-      );
-    }),
 );
 
 // regression: #19355 settled and idle-released threads stayed Waiting
