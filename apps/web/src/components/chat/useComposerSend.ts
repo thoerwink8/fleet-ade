@@ -1142,8 +1142,7 @@ export function useComposerSend(input: ComposerSendInput) {
     // Keep new-thread flows from reusing this draft while attachments and worktree setup settle.
     if (sentDraftThreadRef) markPromotedDraftThreadByRef(sentDraftThreadRef);
     resetSentComposerPrompt({
-      currentRouteThreadKey: currentRouteThreadKeyRef.current,
-      sentRouteThreadKey: routeThreadKey,
+      promptUnchanged: promptRef.current === promptAtSend || promptRef.current === promptForSend,
       clearPrompt: () => {
         promptRef.current = "";
       },

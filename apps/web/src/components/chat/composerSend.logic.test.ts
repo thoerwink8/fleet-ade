@@ -125,46 +125,21 @@ describe("approvalRedirectNotice", () => {
 });
 
 describe("resetSentComposerPrompt", () => {
-  it("preserves the visible prompt after navigating during a send", () => {
+  it("preserves a prompt changed after the send started", () => {
     const clearPrompt = vi.fn();
     const resetCursor = vi.fn();
 
-    resetSentComposerPrompt({
-      currentRouteThreadKey: "environment:test:thread:other",
-      sentRouteThreadKey: "environment:test:thread:sent",
-      clearPrompt,
-      resetCursor,
-    });
+    resetSentComposerPrompt({ promptUnchanged: false, clearPrompt, resetCursor });
 
     expect(clearPrompt).not.toHaveBeenCalled();
     expect(resetCursor).not.toHaveBeenCalled();
   });
 
-  it("resets the prompt when the sent thread is still visible", () => {
+  it("resets the prompt that was sent", () => {
     const clearPrompt = vi.fn();
     const resetCursor = vi.fn();
 
-    resetSentComposerPrompt({
-      currentRouteThreadKey: "environment:test:thread:sent",
-      sentRouteThreadKey: "environment:test:thread:sent",
-      clearPrompt,
-      resetCursor,
-    });
-
-    expect(clearPrompt).toHaveBeenCalledOnce();
-    expect(resetCursor).toHaveBeenCalledOnce();
-  });
-
-  it("resets an unmounted route without touching a newly visible thread", () => {
-    const clearPrompt = vi.fn();
-    const resetCursor = vi.fn();
-
-    resetSentComposerPrompt({
-      currentRouteThreadKey: null,
-      sentRouteThreadKey: "environment:test:thread:sent",
-      clearPrompt,
-      resetCursor,
-    });
+    resetSentComposerPrompt({ promptUnchanged: true, clearPrompt, resetCursor });
 
     expect(clearPrompt).toHaveBeenCalledOnce();
     expect(resetCursor).toHaveBeenCalledOnce();

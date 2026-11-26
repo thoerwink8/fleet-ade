@@ -81,17 +81,11 @@ export function approvalRedirectNotice(input: {
 }
 
 export function resetSentComposerPrompt(input: {
-  readonly currentRouteThreadKey: string | null;
-  readonly sentRouteThreadKey: string;
+  readonly promptUnchanged: boolean;
   readonly clearPrompt: () => void;
   readonly resetCursor: () => void;
 }) {
-  if (
-    input.currentRouteThreadKey !== null &&
-    input.currentRouteThreadKey !== input.sentRouteThreadKey
-  ) {
-    return;
-  }
+  if (!input.promptUnchanged) return;
   input.clearPrompt();
   input.resetCursor();
 }
