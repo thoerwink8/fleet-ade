@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
+import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { expect } from "vite-plus/test";
@@ -19,6 +20,7 @@ import {
   comparisonBase,
   defaultConcurrency,
   gitLines,
+  ignoredCheckInputs,
   judgeFilteredVitestStep,
   runSteps,
   shouldRunCssFontWeightTest,
@@ -370,16 +372,22 @@ function fixture(remotes: Record<string, "A" | "B">) {
   };
 }
 
-const compare = (root: string, ref: Option.Option<string>) =>
+const inFixture = <A, E>(
+  effect: Effect.Effect<A, E, ChildProcessSpawner.ChildProcessSpawner>,
+  extraEnv?: Record<string, string>,
+) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    return yield* comparisonBase(root, ref).pipe(
+    return yield* effect.pipe(
       Effect.provideService(
         ChildProcessSpawner.ChildProcessSpawner,
-        ChildProcessSpawner.make((command) => spawner.spawn(ChildProcess.setEnv(command, env))),
+        ChildProcessSpawner.make((command) =>
+          spawner.spawn(ChildProcess.setEnv(command, { ...env, ...extraEnv })),
+        ),
       ),
     );
   }).pipe(Effect.provide(NodeServices.layer), Effect.runPromise);
+const compare = (root: string, ref: Option.Option<string>) => inFixture(comparisonBase(root, ref));
 
 it.each(["upstream", "team/upstream"])(
   "compares against %s/main when the fork's origin/main lags it",
@@ -396,6 +404,314 @@ it("compares against an explicit ref instead of the closest remote main", async 
   const result = await compare(project.root, Option.some("origin/main"));
   assert.strictEqual(result.base, project.commits.A);
   assert.strictEqual(result.ref, "origin/main");
+});
+
+// The oracle is the pathspec command the input hash used before, so each scenario proves the
+// rewritten listing hashes the same ignored inputs.
+const oldIgnoredListing = (root: string) =>
+  NodeChildProcess.execFileSync(
+    "git",
+    [
+      "ls-files",
+      "-o",
+      "-i",
+      "--exclude-standard",
+      "--",
+      ":(glob)**/.generated/**",
+      ":(glob)**/.astro/**",
+      ":(glob)**/*.d.ts",
+      ":(glob)**/.env*",
+      ":(exclude,glob)**/node_modules/**",
+    ],
+    { cwd: root, encoding: "utf8", env },
+  )
+    .split("\n")
+    .filter(Boolean)
+    .sort();
+
+function ignoredFixture(setup: (write: (file: string, content?: string) => void) => void) {
+  const root = NodeFS.realpathSync(
+    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-ignored-inputs-")),
+  );
+  const write = (file: string, content = "") => {
+    const path = NodePath.join(root, file);
+    NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
+    NodeFS.writeFileSync(path, content);
+  };
+  try {
+    setup(write);
+    NodeChildProcess.execFileSync("git", ["init"], { cwd: root, encoding: "utf8", env });
+  } catch (error) {
+    NodeFS.rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    root,
+    write,
+    git: (...args: Array<string>) =>
+      NodeChildProcess.execFileSync("git", args, { cwd: root, encoding: "utf8", env }),
+    [Symbol.dispose]() {
+      NodeFS.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+it("lists the same ignored inputs as the old pathspecs at the root and nested", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\ndist/\n.generated/\n.env*\n*.gen.d.ts\n");
+    write(".env.local");
+    write("src/types.gen.d.ts");
+    write("src/.generated/routes.ts");
+    write("dist/index.d.ts");
+    write("node_modules/pkg/index.d.ts");
+    write("packages/x/src/deep.gen.d.ts");
+  });
+  const old = oldIgnoredListing(project.root);
+  assert.includeMembers(old, [
+    ".env.local",
+    "dist/index.d.ts",
+    "packages/x/src/deep.gen.d.ts",
+    "src/types.gen.d.ts",
+  ]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
+});
+
+it("lists the same ignored inputs as the old pathspecs in directories replacing tracked files", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\nreplaced/\nskipped/\n");
+  });
+  const { git, write } = project;
+  write("replaced");
+  write("skipped");
+  git("init");
+  git("add", ".");
+  git("commit", "-m", "files that directories replace");
+  git("update-index", "--skip-worktree", "skipped");
+  for (const file of ["replaced", "skipped"]) {
+    NodeFS.rmSync(NodePath.join(project.root, file));
+  }
+  write("replaced/sub/a.d.ts");
+  write("skipped/a.d.ts");
+  const old = oldIgnoredListing(project.root);
+  assert.includeMembers(old, ["replaced/sub/a.d.ts", "skipped/a.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
+});
+
+it("lists the same ignored inputs as the old pathspecs in a leftover package folder", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\ndist/\n.generated/\n.env*\n");
+    // A package folder left behind by a branch switch: git collapses it, and its
+    // node_modules must not be walked.
+    write("old/dist/a.d.ts");
+    write("old/node_modules/pkg/index.d.ts");
+    write("old/src/index.ts");
+  });
+  const old = oldIgnoredListing(project.root);
+  assert.includeMembers(old, ["old/dist/a.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
+});
+
+it("ignores an unignored file sitting where an index directory is expected", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\n");
+    write("path.d.ts/child.ts");
+  });
+  const { git, write } = project;
+  git("add", "path.d.ts/child.ts");
+  NodeFS.rmSync(NodePath.join(project.root, "path.d.ts"), { recursive: true });
+  write("path.d.ts");
+  // The blocker is neither ignored nor inside an ignored directory, so the old
+  // pathspecs never listed it even though it matches *.d.ts.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), []);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), []);
+});
+
+it("excludes nested repositories inside node_modules from the inputs", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\n");
+  });
+  const { git } = project;
+  NodeFS.mkdirSync(NodePath.join(project.root, "node_modules"), { recursive: true });
+  NodeFS.mkdirSync(NodePath.join(project.root, "app/node_modules"), { recursive: true });
+  git("-C", "node_modules", "init");
+  git("-C", "app/node_modules", "init");
+  // The contract change: nothing under any node_modules is a cache input. The
+  // old pathspecs listed nested repositories as directory entries even here,
+  // but their content is never read by any check, so the inputs are empty.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["app/node_modules/", "node_modules/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), []);
+});
+
+it("does not walk a nested node_modules inside an ignored directory", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\nnode_modules/\n");
+    write("build/normal.d.ts");
+    write("build/node_modules/pkg/ignored.d.ts");
+  });
+  const { git } = project;
+  git("-C", "build/node_modules/pkg", "init");
+  // git does walk the nested dependency tree and finds the repository root,
+  // which the expansion must not reproduce: walking it is what froze Windows.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), [
+    "build/node_modules/pkg/",
+    "build/normal.d.ts",
+  ]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/normal.d.ts"]);
+});
+
+it("descends into a plain .git file inside an ignored directory as the old pathspecs did", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/leaf/.git", "ordinary file\n");
+    write("build/leaf/types.d.ts");
+  });
+  // `.git` must be a directory or a valid `gitdir:` file to stop git; ordinary
+  // content makes the directory plain, so the declarations inside count.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/leaf/types.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/leaf/types.d.ts",
+  ]);
+});
+
+it("lists ignored nested repositories outside node_modules as directory entries", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/repo/types.d.ts");
+  });
+  const { git } = project;
+  git("-C", "build/repo", "init");
+  // A nested repository boundary stands for its content in both listings.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/repo/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/repo/"]);
+});
+
+it("lists an ignored nested worktree whose .git is a valid gitdir file as a directory entry", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("separate/types.d.ts");
+  });
+  const { git, write, root } = project;
+  git("init", "--separate-git-dir", NodePath.join(root, "separate.git"), "separate");
+  write("build/wt/.git", "gitdir: ../../separate.git\n");
+  write("build/wt/types.d.ts");
+  // A gitdir file pointing at a real git directory is a repository boundary;
+  // a garbage or missing target is not and gets descended.
+  write("build/notwt/.git", "gitdir: ../missing.git\n");
+  write("build/notwt/types.d.ts");
+  // `gitdir:` without the space git requires is not a gitfile even when the
+  // target would be a valid git directory; the control above keeps the space.
+  write("build/nospace/.git", "gitdir:../../separate.git\n");
+  write("build/nospace/types.d.ts");
+  assert.deepStrictEqual(oldIgnoredListing(project.root), [
+    "build/nospace/types.d.ts",
+    "build/notwt/types.d.ts",
+    "build/wt/",
+  ]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/nospace/types.d.ts",
+    "build/notwt/types.d.ts",
+    "build/wt/",
+  ]);
+});
+
+it("lists an ignored nested linked worktree as a directory entry", async () => {
+  using nested = ignoredFixture(() => {});
+  nested.write("seed.txt");
+  nested.git("add", ".");
+  nested.git("commit", "-m", "seed");
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+  });
+  // A real `git worktree add`: the linked worktree's gitdir has a commondir
+  // file and no objects of its own, sharing the main repository's store.
+  project.git(
+    "-C",
+    nested.root,
+    "worktree",
+    "add",
+    "--detach",
+    NodePath.join(project.root, "build", "wt"),
+    "HEAD",
+  );
+  project.write("build/wt/types.d.ts");
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/wt/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/wt/"]);
+});
+
+it("descends into a nested repository whose HEAD does not parse", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/leaf/types.d.ts");
+  });
+  project.git("-C", "build/leaf", "init");
+  NodeFS.writeFileSync(NodePath.join(project.root, "build/leaf/.git/HEAD"), "ordinary file\n");
+  project.write("build/leaf/.git/inside.d.ts");
+  // HEAD is the boundary test git applies: objects and refs survive, but a
+  // HEAD that is neither a reference nor a commit id makes the directory
+  // plain. Even then git never descends into the `.git` directory itself.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/leaf/types.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/leaf/types.d.ts",
+  ]);
+});
+
+it("descends into a nested repository missing its object store", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/hollow/types.d.ts");
+  });
+  project.git("-C", "build/hollow", "init");
+  NodeFS.rmSync(NodePath.join(project.root, "build/hollow/.git/objects"), {
+    recursive: true,
+    force: true,
+  });
+  // A valid HEAD is not enough: without the object store git treats the
+  // directory as plain content.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/hollow/types.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/hollow/types.d.ts",
+  ]);
+});
+
+it("opens no dependency directory with readdir or git at any nesting depth", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\nnode_modules/\n");
+    write("build/normal.d.ts");
+    write("build/node_modules/pkg/deep/deeper/ignored.js");
+  });
+  const trace = NodePath.join(project.root, "trace.json").replaceAll("\\", "/");
+  const run = async () => {
+    const visited: Array<string> = [];
+    NodeFS.writeFileSync(trace, "");
+    const readDirectory = async (absolute: string) => {
+      visited.push(NodePath.relative(project.root, absolute).replaceAll("\\", "/"));
+      return NodeFSP.readdir(absolute, { withFileTypes: true });
+    };
+    const inputs = await inFixture(ignoredCheckInputs(project.root, { readDirectory }), {
+      GIT_TRACE2_EVENT: trace,
+    });
+    const directories = NodeFS.readFileSync(trace, "utf8")
+      .split(/\r?\n/)
+      .filter((line) => line.includes('"read_directory"'))
+      .map((line) => {
+        const event = JSON.parse(line) as { key?: string; value?: string };
+        return /directories-visited/.test(event.key ?? "") ? Number(event.value) : 0;
+      })
+      .reduce((total, count) => total + count, 0);
+    return { inputs, visited, directories };
+  };
+  const shallow = await run();
+  assert.deepStrictEqual(shallow.inputs, ["build/normal.d.ts"]);
+  assert.deepStrictEqual(shallow.visited, ["build"]);
+  assert.isAbove(shallow.directories, 0);
+  // Descending into node_modules is what froze Windows: the dependency tree
+  // grows by four levels and neither the readdir list nor the git count may.
+  project.write("build/node_modules/pkg/deep/deeper/deepest/more/most/ignored.js");
+  const deep = await run();
+  assert.deepStrictEqual(deep.inputs, shallow.inputs);
+  assert.deepStrictEqual(deep.visited, shallow.visited);
+  assert.strictEqual(deep.directories, shallow.directories);
+  assert.isFalse(shallow.visited.some((entry) => entry.includes("node_modules")));
 });
 
 function launcherFixture() {
