@@ -623,8 +623,9 @@ it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32" || process.getu
           ]).pipe(Effect.orDie),
       );
 
-      yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
+      const capture = yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
 
+      assert.deepEqual([...capture.skippedPaths].sort(), ["locked.txt", "secret.txt"]);
       assert.strictEqual((yield* git(["show", `${checkpointRef}:file.txt`])).stdout, "unstaged\n");
       assert.strictEqual((yield* git(["show", `${checkpointRef}:untracked.txt`])).stdout, "new\n");
       assert.strictEqual(

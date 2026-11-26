@@ -560,6 +560,8 @@ const gitCommand = Effect.fn("GitVcsDriver.gitCommand")(
       readonly maxOutputBytes?: number;
       readonly outputMode?: VcsProcess.VcsProcessInput["outputMode"];
       readonly appendTruncationMarker?: boolean;
+      readonly onStdoutChunk?: (chunk: Uint8Array) => void;
+      readonly onStderrChunk?: (chunk: Uint8Array) => void;
     },
   ) =>
     process.run({
@@ -579,6 +581,8 @@ const gitCommand = Effect.fn("GitVcsDriver.gitCommand")(
       ...(options?.appendTruncationMarker !== undefined
         ? { appendTruncationMarker: options.appendTruncationMarker }
         : {}),
+      ...(options?.onStdoutChunk !== undefined ? { onStdoutChunk: options.onStdoutChunk } : {}),
+      ...(options?.onStderrChunk !== undefined ? { onStderrChunk: options.onStderrChunk } : {}),
     }),
 );
 
@@ -644,6 +648,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       ...(input.appendTruncationMarker !== undefined
         ? { appendTruncationMarker: input.appendTruncationMarker }
         : {}),
+      ...(input.onStdoutChunk !== undefined ? { onStdoutChunk: input.onStdoutChunk } : {}),
+      ...(input.onStderrChunk !== undefined ? { onStderrChunk: input.onStderrChunk } : {}),
     });
 
   const detectRepository: VcsDriver.VcsDriver["Service"]["detectRepository"] = Effect.fn(
@@ -1030,7 +1036,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         { discard: true },
       );
 
-      yield* Effect.gen(function* () {
+      return yield* Effect.gen(function* () {
         const sparseConfig = yield* execute({
           operation,
           cwd: input.cwd,
@@ -1267,6 +1273,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           }
         }
 
+        // stderr arrives in chunks that can split a line; buffer everything and parse after.
+        const skippedChunks: Array<Uint8Array> = [];
         const stageFiles = (exclusions: ReadonlyArray<string>, ignoreErrors = false) =>
           execute({
             operation,
@@ -1289,6 +1297,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               ...exclusions,
             ],
             env: commitEnv,
+            ...(ignoreErrors
+              ? { onStderrChunk: (chunk: Uint8Array) => skippedChunks.push(chunk) }
+              : {}),
           }).pipe(
             // With --ignore-errors, exit 1 only reports the files it skipped.
             Effect.catchIf(
@@ -1353,6 +1364,16 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               ),
           }),
         );
+
+        const skippedPaths = [
+          ...new Set(
+            [
+              ...Buffer.concat(skippedChunks)
+                .toString("utf8")
+                .matchAll(/^error: unable to index file '(.+)'\r?$/gm),
+            ].map((match) => match[1]!),
+          ),
+        ];
 
         const writeTreeResult = yield* execute({
           operation,
@@ -1489,6 +1510,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           cwd: input.cwd,
           args: [...durableWrite, "update-ref", input.checkpointRef, commitOid],
         });
+        return { skippedPaths };
       }).pipe(Effect.ensuring(cleanupTempIndex));
     }, Effect.scoped),
 

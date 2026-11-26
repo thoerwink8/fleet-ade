@@ -35,6 +35,7 @@ export interface VcsProcessInput {
   readonly spawnCwd?: string;
   readonly stdin?: string;
   readonly onStdoutChunk?: (chunk: Uint8Array) => void;
+  readonly onStderrChunk?: (chunk: Uint8Array) => void;
   readonly env?: NodeJS.ProcessEnv;
   readonly allowNonZeroExit?: boolean;
   readonly timeoutMs?: number;
@@ -277,6 +278,7 @@ export const make = Effect.gen(function* () {
         ...(input.spawnCwd !== undefined ? { spawnCwd: input.spawnCwd } : {}),
         ...(input.stdin !== undefined ? { stdin: input.stdin } : {}),
         ...(input.onStdoutChunk !== undefined ? { onStdoutChunk: input.onStdoutChunk } : {}),
+        ...(input.onStderrChunk !== undefined ? { onStderrChunk: input.onStderrChunk } : {}),
         env: {
           ...(input.command === "git"
             ? unsetInheritedRepositoryEnv(process.env, hostPlatform)
@@ -428,10 +430,13 @@ export const make = Effect.gen(function* () {
 
   const run = Effect.fn("VcsProcess.run")(function* (input: VcsProcessInput) {
     const bounded = vcsProcesses.withPermits(1)(runUnbounded(input));
+    // Streamed chunks can't be replayed; a retry would append duplicates, so
+    // streaming commands skip the transient retry lane.
     if (
       input.command === "git" &&
       input.operation === CHECKPOINT_CAPTURE_OPERATION &&
-      input.onStdoutChunk === undefined
+      input.onStdoutChunk === undefined &&
+      input.onStderrChunk === undefined
     ) {
       return yield* bounded.pipe(
         Effect.tapError((error) =>
