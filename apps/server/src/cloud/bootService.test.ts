@@ -186,10 +186,11 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
   xdgConfigHome?: string,
   managerXdgConfigHome = xdgConfigHome,
   installBinDir?: string,
+  homeName = "t3-boot-service-test-",
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-boot-service-test-" });
+  const home = yield* fs.makeTempDirectoryScoped({ prefix: homeName });
   const managerUnitDir = path.join(
     managerXdgConfigHome !== undefined && path.isAbsolute(managerXdgConfigHome)
       ? managerXdgConfigHome
@@ -205,6 +206,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
   yield* fs.writeFileString(runtime.sentinelPath, "1.2.3\n");
 
   const commands: string[] = [];
+  const taskRegistrations: Array<{ readonly xmlPath: string; readonly bytes: Uint8Array }> = [];
   const invocations: ProcessRunner.ProcessRunInput[] = [];
   const timeouts = new Map<string, unknown>();
   const control: {
@@ -249,7 +251,9 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
         input.command === "schtasks" && input.args[0] !== "/Create" && control.task === undefined;
       if (input.command === "schtasks" && !failed) {
         if (input.args[0] === "/Create") {
-          const xml = decodeServiceUnit(yield* fs.readFile(input.args[2] ?? ""));
+          const bytes = yield* fs.readFile(input.args[2] ?? "");
+          taskRegistrations.push({ xmlPath: input.args[2] ?? "", bytes });
+          const xml = decodeServiceUnit(bytes);
           control.task = { xml, enabled: !serviceTaskIsDisabled(xml) };
         }
         if (control.task !== undefined && input.args[0] === "/Change") {
@@ -390,6 +394,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
     fs,
     home,
     baseDir,
+    taskRegistrations,
     statePath,
     commands,
     invocations,
@@ -1540,6 +1545,52 @@ process.disconnect();
       commands.length = 0;
       expect(yield* inside.restart).toBe("queued");
       expect(commands).toEqual(handoff);
+    }),
+  );
+
+  it.effect("registers a legacy UTF-8 task file as UTF-16LE on service restarts on Windows", () =>
+    Effect.gen(function* () {
+      const { service, fs, taskRegistrations, control, makeService } = yield* makeHarness(
+        "win32",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "t3-boot-service-测试-",
+      );
+      const plan = yield* service.install();
+      expect(plan.baseDir).toContain("测试");
+
+      // A unit written before UTF-16LE task files: restarting must not hand it to
+      // Task Scheduler unchanged, where it decodes in the ANSI code page.
+      const utf8Text = decodeServiceUnit(yield* fs.readFile(plan.unitPath));
+      const expectUtf16Registration = (index: number) => {
+        const registration = taskRegistrations[index];
+        expect(registration).toBeDefined();
+        expect([...registration!.bytes.subarray(0, 2)]).toEqual([0xff, 0xfe]);
+        expect(BootService.bootServiceBaseDirOf(decodeServiceUnit(registration!.bytes))).toBe(
+          plan.baseDir,
+        );
+      };
+
+      // From outside the service: stop, register, run.
+      yield* fs.writeFileString(plan.unitPath, utf8Text);
+      taskRegistrations.length = 0;
+      expect(yield* service.restart).toBe("restarted");
+      expect(taskRegistrations.length).toBe(1);
+      expectUtf16Registration(0);
+      expect(control.task).toMatchObject({ enabled: true });
+      // The migration rewrites the unit in place, so later restarts register it as is.
+      expect([...(yield* fs.readFile(plan.unitPath)).subarray(0, 2)]).toEqual([0xff, 0xfe]);
+
+      // From inside the service: the handoff registers the replacement.
+      yield* fs.writeFileString(plan.unitPath, utf8Text);
+      taskRegistrations.length = 0;
+      const inside = yield* makeService(undefined, "1.2.3", undefined, true);
+      expect(yield* inside.restart).toBe("queued");
+      expect(taskRegistrations.length).toBe(1);
+      expectUtf16Registration(0);
+      expect(control.task).toMatchObject({ enabled: true });
     }),
   );
 

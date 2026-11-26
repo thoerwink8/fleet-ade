@@ -1427,14 +1427,21 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
 
   const restart: BootService["Service"]["restart"] = Effect.gen(function* () {
     const manager = yield* requireManager;
-    const unit = yield* readUnit().pipe(Effect.option);
-    if (Option.isNone(unit)) return "skipped" as const;
-    const installedBaseDir = bootServiceBaseDirOf(unit.value);
+    const rawUnit = yield* fs.readFile(unitPath).pipe(Effect.option);
+    if (Option.isNone(rawUnit)) return "skipped" as const;
+    const unit = decodeServiceUnit(rawUnit.value);
+    const installedBaseDir = bootServiceBaseDirOf(unit);
     if (
       installedBaseDir === undefined ||
       path.resolve(installedBaseDir) !== path.resolve(input.baseDir)
     ) {
       return "skipped" as const;
+    }
+    // schtasks decodes undeclared XML in the ANSI code page, so a legacy UTF-8 task file
+    // registers garbled paths. Both registration paths below hand the unit itself to
+    // `/Create /XML`; migrate it in place first, and never touch other managers' units.
+    if (manager.kind === "schtasks" && !(rawUnit.value[0] === 0xff && rawUnit.value[1] === 0xfe)) {
+      yield* writeDurably(unitPath, encodeServiceTask(unit));
     }
     // Writes no state, and the launcher lets an update transition in flight
     // finish before the queued stop tears it down.

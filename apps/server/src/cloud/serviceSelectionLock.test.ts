@@ -85,16 +85,22 @@ it.layer(NodeServices.layer)("service selection lock", (it) => {
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
       const selectionPath = path.join(root, "service-state.json");
 
-      const clock = expiringNow();
-      let renameAttempts = 0;
+      // Time passes only inside the waits: 600 rename/50ms cycles spend the whole budget.
+      let time = 1_000_000;
+      const delays: number[] = [];
+      const renameTimes: number[] = [];
       const outcome = yield* Effect.promise(() =>
         acquireServiceSelectionLock(selectionPath, {
           platform: "win32",
-          now: clock.now,
-          waitForRetry: () => Promise.resolve(),
+          now: () => time,
+          waitForRetry: (ms) => {
+            delays.push(ms ?? 50);
+            time += ms ?? 50;
+            return Promise.resolve();
+          },
           renameSync: (from, to) => {
             if (String(from).includes(".selection-lock.")) {
-              renameAttempts += 1;
+              renameTimes.push(time);
               throw errnoException("EPERM", "rename");
             }
             return NodeFS.renameSync(from, to);
@@ -106,10 +112,57 @@ it.layer(NodeServices.layer)("service selection lock", (it) => {
       );
       assert.instanceOf(outcome, Error);
       assert.match((outcome as Error).message, /Service selection is locked/);
-      // The deadline check sees 1,030,030 past 1,030,000 on the 30th retry: every attempt
-      // and its delay count toward the same budget, none runs past it.
-      assert.equal(renameAttempts, 30);
-      assert.equal(clock.calls(), 31);
+      // The 50ms rhythm holds the whole way and no rename runs at or past the deadline.
+      assert.equal(renameTimes.length, 600);
+      assert.equal(delays.length, 600);
+      assert.isTrue(delays.every((delay) => delay === 50));
+      assert.equal(renameTimes[599], 1_029_950);
+    }),
+  );
+
+  it.effect("never renames again once the acquisition deadline passed while waiting", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+      const lock = `${selectionPath}.selection-lock`;
+
+      // Contention strikes at 29,990ms into the budget; the lock frees just after 30,000ms.
+      let time = 1_000_000;
+      const delays: number[] = [];
+      let renameAttempts = 0;
+      const outcome = yield* Effect.promise(() =>
+        acquireServiceSelectionLock(selectionPath, {
+          platform: "win32",
+          now: () => time,
+          waitForRetry: (ms) => {
+            delays.push(ms ?? 50);
+            time += ms ?? 50;
+            return Promise.resolve();
+          },
+          renameSync: (from, to) => {
+            if (String(from).includes(".selection-lock.")) {
+              renameAttempts += 1;
+              if (renameAttempts === 1) {
+                time = 1_029_990;
+                throw errnoException("EPERM", "rename");
+              }
+            }
+            return NodeFS.renameSync(from, to);
+          },
+        }).then(
+          () => "acquired" as const,
+          (error: unknown) => error,
+        ),
+      );
+      assert.instanceOf(outcome, Error);
+      assert.match((outcome as Error).message, /Service selection is locked/);
+      // 10ms remained, so the wait is capped to it; waking exactly at the deadline, the
+      // acquisition fails before any further rename even though the lock is now free.
+      assert.deepEqual(delays, [10]);
+      assert.equal(renameAttempts, 1);
+      assert.isFalse(yield* fs.exists(lock));
     }),
   );
 

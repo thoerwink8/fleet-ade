@@ -10,8 +10,8 @@ import * as NodePath from "node:path";
 const bootEpochSeconds = () => Math.round(Date.now() / 1000 - NodeOS.uptime());
 
 export interface ServiceSelectionLockOptions {
-  /** Retry delay; acquisition is bounded by its 30s deadline, not by a retry count. */
-  readonly waitForRetry?: () => Promise<void>;
+  /** Retry delay in milliseconds, capped to the time left in the 30 second budget. */
+  readonly waitForRetry?: (ms: number) => Promise<void>;
   /** Drives the error classification Windows file operations need. */
   readonly platform?: NodeJS.Platform;
   readonly now?: () => number;
@@ -25,7 +25,12 @@ export async function acquireServiceSelectionLock(
   options?: ServiceSelectionLockOptions,
 ): Promise<() => void> {
   const waitForRetry =
-    options?.waitForRetry ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 50)));
+    options?.waitForRetry ??
+    ((ms) => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, ms);
+      return promise;
+    });
   // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
   const platform = options?.platform ?? NodeOS.platform();
   const windows = platform === "win32";
@@ -55,6 +60,12 @@ export async function acquireServiceSelectionLock(
   try {
     NodeFS.writeFileSync(NodePath.join(candidate, owner), "", { mode: 0o600 });
     while (true) {
+      // Checked before every rename, so a wake at or past the deadline fails instead of
+      // acquiring a lock that only freed after the budget was spent.
+      if (now() >= deadline)
+        throw new Error(
+          `Service selection is locked at ${lock}. Retry when the other operation finishes.`,
+        );
       try {
         // Publish the owner atomically; rename cannot replace another populated directory.
         renameSync(candidate, lock);
@@ -108,11 +119,12 @@ export async function acquireServiceSelectionLock(
         }
       }
       removeEmptyLock();
-      if (now() >= deadline)
+      const remaining = deadline - now();
+      if (remaining <= 0)
         throw new Error(
           `Service selection is locked at ${lock}. Retry when the other operation finishes.`,
         );
-      await waitForRetry();
+      await waitForRetry(Math.min(50, remaining));
     }
   } finally {
     NodeFS.rmSync(candidate, { recursive: true, force: true });
