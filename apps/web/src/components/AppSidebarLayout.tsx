@@ -24,7 +24,7 @@ import {
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import {
   isRichTextBoldShortcut,
-  resolveShortcutCommand,
+  isSidebarToggleShortcut,
   shortcutLabelForCommand,
 } from "../keybindings";
 import { useVisibleShortcutLabel } from "../hooks/useKeyboardShortcutHints";
@@ -334,8 +334,9 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
         return;
       }
       if (
-        resolveShortcutCommand(event, keybindings, { context: { usagePageOpen } }) !==
-        "sidebar.toggle"
+        !isSidebarToggleShortcut(event, keybindings, {
+          context: { terminalFocus: isTerminalFocused(), usagePageOpen },
+        })
       )
         return;
 
