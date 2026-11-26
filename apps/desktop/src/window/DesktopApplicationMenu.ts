@@ -197,6 +197,12 @@ export const make = Effect.gen(function* () {
             click: mainContentsClick("toggleDevTools"),
           },
           { type: "separator" },
+          {
+            label: "切换主侧栏",
+            accelerator: "CmdOrCtrl+B",
+            registerAccelerator: false,
+            click: () => runMenuEffect("sidebar.toggle", dispatchMenuAction("sidebar.toggle")),
+          },
           { label: "实际大小", accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
           { label: "放大", accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
           {

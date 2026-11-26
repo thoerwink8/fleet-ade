@@ -254,7 +254,7 @@ export function AcpRegistrySearchStep({
       ) : null}
       {results ? (
         results.length === 0 ? (
-          <div className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-dashed px-4 text-center">
+          <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed px-4 text-center">
             <p className="text-row font-medium">未找到兼容的智能体</p>
             <p className="mt-1 text-xs text-muted-foreground">试试更宽泛的搜索词。</p>
           </div>

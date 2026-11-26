@@ -97,6 +97,8 @@ describe("command palette shell", () => {
     expect(getComputedStyle(footer).fontSize).toBe("12px");
 
     const fieldStyle = getComputedStyle(field);
+    // The whole 48px row (less its 1px border) is the click target, not just the text line.
+    expect(field.getBoundingClientRect().height).toBe(inputRow.getBoundingClientRect().height - 1);
     expect(fieldStyle.borderTopWidth).toBe("0px");
     expect(fieldStyle.borderBottomWidth).toBe("0px");
     expect(fieldStyle.outlineStyle).toBe("none");
@@ -119,7 +121,7 @@ describe("command palette shell", () => {
     expect(getComputedStyle(row.querySelector(".l1")!).fontSize).toBe("14px");
     expect(heading!.getBoundingClientRect().height).toBe(28);
     expect(getComputedStyle(heading!).fontSize).toBe("12px");
-    expect(list!.getBoundingClientRect().height).toBe(428);
+    expect(list!.getBoundingClientRect().height).toBe(448);
     expect(getComputedStyle(list!).fontSize).toBe("16px");
   });
 

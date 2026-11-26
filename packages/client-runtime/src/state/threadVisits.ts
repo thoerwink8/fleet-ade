@@ -43,12 +43,14 @@ export interface ThreadVisitTrackerOptions {
    * that keeps its own watermark for them records the visit here instead.
    */
   readonly markLocalVisit?: (ref: ScopedThreadRef, visitedAt: string) => void;
+  /** No visits are recorded while false; returning resumes from the current shell. */
+  readonly viewingAtom?: Atom.Atom<boolean>;
 }
 
 /**
- * While mounted, a tracker counts as the user viewing the thread: mounting it
- * records one open (which also feeds search ranking), and every shell update
- * after that advances the visit watermark, throttled while a run streams.
+ * While mounted and `viewingAtom` holds, a tracker counts as the user viewing the thread: mounting
+ * it records one open (which also feeds search ranking), and every shell update after that advances
+ * the visit watermark, throttled while a run streams.
  */
 export function createThreadVisitTracker(options: ThreadVisitTrackerOptions) {
   const family = Atom.family((key: string) => {
@@ -95,6 +97,7 @@ export function createThreadVisitTracker(options: ThreadVisitTrackerOptions) {
       const onShell = (shell: VisitedShell | null) => {
         clearTimer();
         if (shell === null) return;
+        if (options.viewingAtom && !registry.get(options.viewingAtom)) return;
 
         const shellUpdatedAtMs = Date.parse(shell.updatedAt);
         if (Number.isNaN(shellUpdatedAtMs)) return;
@@ -143,6 +146,10 @@ export function createThreadVisitTracker(options: ThreadVisitTrackerOptions) {
       // `subscribe`, not `get`: a rebuild would reset the open and throttle
       // state on every streaming tick.
       get.subscribe(options.threadShellAtom(ref), onShell, { immediate: true });
+      if (options.viewingAtom)
+        get.subscribe(options.viewingAtom, () =>
+          onShell(registry.get(options.threadShellAtom(ref))),
+        );
     }).pipe(Atom.withLabel(`thread-visit-tracker:${key}`));
   });
   return (ref: ScopedThreadRef | null) => (ref === null ? IDLE_TRACKER : family(threadKey(ref)));

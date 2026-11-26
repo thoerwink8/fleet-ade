@@ -1234,6 +1234,18 @@ export function chatActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "发生错误。";
 }
 
+/** A local copy of the runtime error shares its source, so one dismissal covers both. */
+export function threadErrorIsServerRuntime(input: {
+  readonly isServerThread: boolean;
+  readonly localServerError: string | null;
+  readonly runtimeError: string | null;
+}): boolean {
+  return (
+    input.isServerThread &&
+    (input.localServerError === null || input.localServerError === input.runtimeError)
+  );
+}
+
 export function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | null }>(
   current: T,
 ): T {

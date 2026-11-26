@@ -125,7 +125,7 @@ export function SidebarHeaderActions({
     : newThreadBaseTitle;
 
   return (
-    <div className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center pointer-coarse:gap-3">
+    <div className="ade-touch-row ade-touch-row--gap-3 flex min-w-0 items-center pointer-coarse:gap-3">
       {hasProjects ? (
         <span ref={projectScopeAnchorRef} className="flex min-w-0">
           <Tooltip>

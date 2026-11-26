@@ -87,7 +87,7 @@ export function ThemeLibrary({
                 />
                 <span
                   className={cn(
-                    "flex items-center justify-center text-xs font-medium",
+                    "flex items-center justify-center text-sm font-medium",
                     isActive ? "text-foreground" : "text-muted-foreground",
                   )}
                 >

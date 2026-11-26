@@ -84,6 +84,7 @@ import {
   PlugIcon,
   SquarePenIcon,
   TextSearchIcon,
+  PanelLeftIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
 import {
@@ -168,6 +169,7 @@ import {
   resolveProjectPathForDispatch,
 } from "@t3tools/client-runtime/state/projects";
 import { resolvePastedPath } from "@t3tools/shared/path";
+import { dispatchMenuAction } from "../shortcuts/dispatcher";
 import {
   dispatchCommandPalette,
   getCommandPaletteReturnFocus,
@@ -1306,7 +1308,6 @@ function OpenCommandPaletteDialog(props: {
   };
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
-
   if (projects.length > 0) {
     const activeProjectTitle =
       projectPickerEntries.find((entry) => entry.isPreferred)?.group.displayName ??
@@ -1360,8 +1361,19 @@ function OpenCommandPaletteDialog(props: {
       run: () => startScratchThread(scratchTargetEnvironmentId),
     });
   }
+  actionItems.push({
+    kind: "action",
+    value: "action:toggle-sidebar",
+    searchTerms: ["sidebar", "main sidebar", "toggle sidebar", "panel"],
+    title: "切换主侧栏",
+    icon: <PanelLeftIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "sidebar.toggle",
+    run: async () => {
+      dispatchMenuAction("sidebar.toggle");
+    },
+  });
 
-  if (activeThreadKey !== null && supportsThreadFind) {
+  if (supportsThreadFind && activeThreadKey !== null) {
     actionItems.push({
       kind: "action",
       value: "find-current-thread",
