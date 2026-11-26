@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
+import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { expect } from "vite-plus/test";
@@ -371,13 +372,18 @@ function fixture(remotes: Record<string, "A" | "B">) {
   };
 }
 
-const inFixture = <A, E>(effect: Effect.Effect<A, E, ChildProcessSpawner.ChildProcessSpawner>) =>
+const inFixture = <A, E>(
+  effect: Effect.Effect<A, E, ChildProcessSpawner.ChildProcessSpawner>,
+  extraEnv?: Record<string, string>,
+) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     return yield* effect.pipe(
       Effect.provideService(
         ChildProcessSpawner.ChildProcessSpawner,
-        ChildProcessSpawner.make((command) => spawner.spawn(ChildProcess.setEnv(command, env))),
+        ChildProcessSpawner.make((command) =>
+          spawner.spawn(ChildProcess.setEnv(command, { ...env, ...extraEnv })),
+        ),
       ),
     );
   }).pipe(Effect.provide(NodeServices.layer), Effect.runPromise);
@@ -597,6 +603,47 @@ it("lists an ignored nested worktree whose .git is a valid gitdir file as a dire
     "build/notwt/types.d.ts",
     "build/wt/",
   ]);
+});
+
+it("opens no dependency directory with readdir or git at any nesting depth", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\nnode_modules/\n");
+    write("build/normal.d.ts");
+    write("build/node_modules/pkg/deep/deeper/ignored.js");
+  });
+  const trace = NodePath.join(project.root, "trace.json").replaceAll("\\", "/");
+  const run = async () => {
+    const visited: Array<string> = [];
+    NodeFS.writeFileSync(trace, "");
+    const readDirectory = async (absolute: string) => {
+      visited.push(NodePath.relative(project.root, absolute).replaceAll("\\", "/"));
+      return NodeFSP.readdir(absolute, { withFileTypes: true });
+    };
+    const inputs = await inFixture(ignoredCheckInputs(project.root, { readDirectory }), {
+      GIT_TRACE2_EVENT: trace,
+    });
+    const directories = NodeFS.readFileSync(trace, "utf8")
+      .split(/\r?\n/)
+      .filter((line) => line.includes('"read_directory"'))
+      .map((line) => {
+        const event = JSON.parse(line) as { key?: string; value?: string };
+        return /directories-visited/.test(event.key ?? "") ? Number(event.value) : 0;
+      })
+      .reduce((total, count) => total + count, 0);
+    return { inputs, visited, directories };
+  };
+  const shallow = await run();
+  assert.deepStrictEqual(shallow.inputs, ["build/normal.d.ts"]);
+  assert.deepStrictEqual(shallow.visited, ["build"]);
+  assert.isAbove(shallow.directories, 0);
+  // Descending into node_modules is what froze Windows: the dependency tree
+  // grows by four levels and neither the readdir list nor the git count may.
+  project.write("build/node_modules/pkg/deep/deeper/deepest/more/most/ignored.js");
+  const deep = await run();
+  assert.deepStrictEqual(deep.inputs, shallow.inputs);
+  assert.deepStrictEqual(deep.visited, shallow.visited);
+  assert.strictEqual(deep.directories, shallow.directories);
+  assert.isFalse(shallow.visited.some((entry) => entry.includes("node_modules")));
 });
 
 function launcherFixture() {
