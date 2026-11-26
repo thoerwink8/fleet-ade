@@ -1387,8 +1387,9 @@ export const layerWithOptions = (
           );
 
       // Subscribers drain after the release commit, so their settlement cannot join
-      // writeReleaseRecords. A failed settlement still retries with the same
-      // attribution: the captured work keys and conditional writes are unchanged.
+      // writeReleaseRecords. Only lost-process work may retry: it settles the ids captured
+      // at release, while the detach scan re-reads by time window and would interrupt tools
+      // a replacement session started after the release.
       const retryLostWorkSettlement = <E>(
         providerSessionId: ProviderSessionId,
         settlement: Effect.Effect<void, E>,
@@ -1416,7 +1417,7 @@ export const layerWithOptions = (
         );
       };
 
-      const settleAfterDrain =
+      const settleLostWorkAfterDrain =
         (providerSessionId: ProviderSessionId) =>
         <E>(settlement: Effect.Effect<void, E>) =>
           settlement.pipe(
@@ -1626,14 +1627,14 @@ export const layerWithOptions = (
                     release.work === undefined
                       ? undefined
                       : writeLostProcessWork(entry, release.work);
-                  const afterDrain = (
-                    settleLostWork ??
-                    Effect.forEach(
-                      releasedProviderThreads,
-                      (thread) => writeReleasedToolCallEvents(thread, releasedAt),
-                      { discard: true },
-                    )
-                  ).pipe(settleAfterDrain(input.providerSessionId));
+                  const afterDrain =
+                    settleLostWork === undefined
+                      ? Effect.forEach(
+                          releasedProviderThreads,
+                          (thread) => writeReleasedToolCallEvents(thread, releasedAt),
+                          { discard: true },
+                        ).pipe(logReleaseFailure(input.providerSessionId))
+                      : settleLostWork.pipe(settleLostWorkAfterDrain(input.providerSessionId));
                   let subscriberCount = 0;
                   if (input.gracefulSubscribers === true) {
                     subscriberCount = yield* endSubscribers(entry, afterDrain);

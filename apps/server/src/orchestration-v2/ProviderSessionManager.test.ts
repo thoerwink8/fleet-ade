@@ -3545,6 +3545,74 @@ it.effect("ProviderSessionManagerV2 retries a failed settlement write after proc
   }),
 );
 
+// regression: the after-drain retry must not extend the manual-close scan, which
+// re-reads by time window; a retrying scan interrupts a replacement session's tools.
+it.effect(
+  "ProviderSessionManagerV2 keeps replacement tool calls running when a manual-close settlement write fails",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const beforeUnchangedWrite = yield* Ref.make(Effect.void);
+      const beforeTurnItemsWrite = yield* Ref.make<ReadonlyArray<Effect.Effect<void>>>([]);
+      yield* Effect.gen(function* () {
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const { threadId, providerSessionId, seededToolCalls, toolCalls, writeToolCall } =
+          yield* openSessionWithBackgroundCommand("provider-session-manager-manual-close", false);
+        const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+        const subscription = yield* runtime.subscribeEvents!;
+        const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+        const now = yield* DateTime.now;
+        const consuming = yield* Deferred.make<void>();
+        const resume = yield* Deferred.make<void>();
+        // The blocked consumer holds the dead session's stale write of the old tool; once
+        // released it re-opens the item the release scan already interrupted.
+        const consumer = yield* subscription.events.pipe(
+          Stream.tap((event) =>
+            event.type === "turn_item.updated" && event.turnItem.id === seededToolCalls.cutOff.id
+              ? Deferred.succeed(consuming, undefined).pipe(
+                  Effect.andThen(Deferred.await(resume)),
+                  Effect.andThen(writeToolCall(event.turnItem)),
+                )
+              : Effect.void,
+          ),
+          Stream.runDrain,
+          Effect.ensuring(subscription.close),
+          Effect.flip,
+          Effect.forkScoped,
+        );
+
+        yield* Queue.offer(queue, {
+          type: "turn_item.updated",
+          driver: CODEX_DRIVER,
+          turnItem: seededToolCalls.cutOff,
+        });
+        yield* Deferred.await(consuming);
+        yield* manager.close(providerSessionId);
+        // The release scan interrupted the seeded tool; only now does the after-drain
+        // settlement write fail.
+        yield* Ref.set(beforeTurnItemsWrite, [Effect.die(new Error("simulated commit failure"))]);
+        // The replacement session opens the same provider session and thread before the
+        // blocked subscriber finishes draining, so the after-drain scan meets both items.
+        yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+        yield* writeToolCall({ ...seededToolCalls.replacement, startedAt: now, updatedAt: now });
+        yield* Deferred.succeed(resume, undefined);
+        yield* Fiber.join(consumer);
+        yield* TestClock.adjust("30 seconds");
+        // A retried scan would find the replacement's running tool by its time window.
+        assert.equal((yield* toolCalls).replacement, "running");
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            beforeUnchangedWrite,
+            beforeTurnItemsWrite,
+          }),
+        ),
+      );
+    }),
+);
+
 it.effect("ProviderSessionManagerV2 ends native background subagents after process exit", () =>
   Effect.gen(function* () {
     const state = yield* Ref.make(emptyState);
