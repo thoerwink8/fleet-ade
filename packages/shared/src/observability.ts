@@ -573,6 +573,31 @@ export function redactCauseCredentials(cause: Cause.Cause<unknown>): Cause.Cause
   return redacted === pretty ? cause : Cause.die(new Error(redacted));
 }
 
+// Error messages can carry provider-process output and user data; only the type chain is
+// stable enough for logs. Walks Cause reasons and `.cause` chains, messages never included.
+export function loggableErrorTypes(error: unknown): ReadonlyArray<string> {
+  const types: Array<string> = [];
+  const visit = (value: unknown, depth: number): void => {
+    if (depth > 6 || value === null || typeof value !== "object") return;
+    if (Cause.isCause(value)) {
+      for (const reason of value.reasons) {
+        if (Cause.isFailReason(reason)) visit(reason.error, depth + 1);
+        else if (Cause.isDieReason(reason)) visit(reason.defect, depth + 1);
+      }
+      return;
+    }
+    const record = value as Record<string, unknown>;
+    const tag = typeof record._tag === "string" ? record._tag : undefined;
+    const name = value instanceof Error ? value.constructor.name : undefined;
+    if (tag !== undefined || name !== undefined) {
+      types.push([tag, name].filter((part) => part !== undefined).join(":"));
+    }
+    visit(record.cause, depth + 1);
+  };
+  visit(error, 0);
+  return types.filter((type) => type.length > 0);
+}
+
 function redactExitCredentials(exit: Exit.Exit<unknown, unknown>): Exit.Exit<unknown, unknown> {
   if (ExitRuntime.isSuccess(exit)) {
     return exit;

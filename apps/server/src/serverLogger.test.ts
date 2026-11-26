@@ -16,7 +16,7 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as TestConsole from "effect/testing/TestConsole";
 
-import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
+import { DEFAULT_SIGNAL_EXPORT, loggableErrorTypes } from "@t3tools/shared/observability";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
 
 import * as ServerConfig from "./config.ts";
@@ -238,6 +238,52 @@ describe("ServerLoggerLive", () => {
       assert.include(output, "token: '<redacted>'");
       assert.include(output, "cause: 'cause'");
       assert.notInclude(output, "secret-token-value");
+    }),
+  );
+
+  // regression: release-settlement and stalled-turn logs must not print inner exception text;
+  // SDK and SQL failures can carry provider output and user data in their messages.
+  it.effect("prints only error type chains from loggableErrorTypes fields", () =>
+    Effect.gen(function* () {
+      const sdkInner = new Error("SDK-INNER-MARKER provider stderr tail");
+      const sdkFailure = {
+        _tag: "ClaudeAgentSdkQueryRunnerError",
+        method: "interrupt",
+        cause: sdkInner,
+      };
+      const sdkOutput = yield* printThroughConsole({
+        providerTurnId: "provider-turn:test",
+        errorTypes: loggableErrorTypes(sdkFailure),
+      });
+      assert.notInclude(sdkOutput, "SDK-INNER-MARKER");
+      assert.include(sdkOutput, "ClaudeAgentSdkQueryRunnerError");
+      assert.include(sdkOutput, "Error");
+      assert.include(sdkOutput, "provider-turn:test");
+
+      const sqliteDefect = new Error("SQLITE-MARKER database is locked");
+      const settlementCause = Cause.die(sqliteDefect);
+      const settlementOutput = yield* printThroughConsole({
+        providerSessionId: "provider-session:test",
+        errorTypes: loggableErrorTypes(settlementCause),
+      });
+      assert.notInclude(settlementOutput, "SQLITE-MARKER");
+      assert.include(settlementOutput, "Error");
+      assert.include(settlementOutput, "provider-session:test");
+      // Same chain as ProviderSessionManager's release-work read failure: the tagged
+      // projection error wraps the inner exception its message must never reach logs.
+      const projectionInner = new Error("R4-PROJECTION-READ-MARKER projection decode failed");
+      const projectionFailure = {
+        _tag: "ProjectionStoreReadError",
+        threadId: "thread:test",
+        cause: projectionInner,
+      };
+      const readOutput = yield* printThroughConsole({
+        providerSessionId: "provider-session:test",
+        errorTypes: loggableErrorTypes(projectionFailure),
+      });
+      assert.notInclude(readOutput, "R4-PROJECTION-READ-MARKER");
+      assert.include(readOutput, "ProjectionStoreReadError");
+      assert.include(readOutput, "provider-session:test");
     }),
   );
 

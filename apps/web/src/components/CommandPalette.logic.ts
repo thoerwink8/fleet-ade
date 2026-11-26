@@ -195,6 +195,8 @@ export interface CommandPaletteItem {
   readonly description?: ReactNode;
   readonly threadContentMatch?: CommandPaletteThreadContentMatch;
   readonly timestamp?: string;
+  /** A third line under the description: last activity. */
+  readonly meta?: string;
   /** Thread rows rank by this, with use history, instead of by `searchTerms`. */
   readonly threadSearch?: ThreadSearchSubject;
   readonly threadRef?: ScopedThreadRef;
@@ -215,14 +217,15 @@ export function commandPaletteDisabledReason(
   return item.disabled ? (item.disabledReason ?? null) : null;
 }
 
-/** A description or message excerpt is the second line. A hint alone stays on the title line. */
+/** A description or message excerpt is the second line, a meta line the third. A hint alone stays on the title line. */
 export function commandPaletteItemLineCount(
-  item: Pick<CommandPaletteItem, "description" | "threadContentMatch">,
-): 1 | 2 {
+  item: Pick<CommandPaletteItem, "description" | "threadContentMatch" | "meta">,
+): 1 | 2 | 3 {
+  if (item.meta) return 3;
   return item.description || item.threadContentMatch ? 2 : 1;
 }
 
-export type CommandPaletteRowMetric = "label" | "item-1" | "item-2";
+export type CommandPaletteRowMetric = "label" | "item-1" | "item-2" | "item-3";
 
 export interface CommandPaletteActionItem extends CommandPaletteItem {
   readonly kind: "action";
@@ -318,7 +321,7 @@ export type CommandPaletteRow =
 
 export function commandPaletteRowMetric(row: CommandPaletteRow): CommandPaletteRowMetric {
   if (row.kind === "label") return "label";
-  return commandPaletteItemLineCount(row.item) === 2 ? "item-2" : "item-1";
+  return `item-${commandPaletteItemLineCount(row.item)}`;
 }
 
 export function buildCommandPaletteRows(groups: ReadonlyArray<CommandPaletteGroup>) {
@@ -500,6 +503,9 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
     const description = input.renderDescription
       ? input.renderDescription(thread, { projectTitle })
       : descriptionParts.join(` · `);
+    const activityAt = formatRelativeTimeLabel(
+      thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,
+    );
 
     return Object.assign(
       {
@@ -518,9 +524,8 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
         ),
         title: thread.title,
         description,
-        timestamp: formatRelativeTimeLabel(
-          thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,
-        ),
+        timestamp: activityAt,
+        ...(activityAt ? { meta: activityAt } : {}),
         icon: input.icon,
       },
       leadingContent ? { titleLeadingContent: leadingContent } : {},

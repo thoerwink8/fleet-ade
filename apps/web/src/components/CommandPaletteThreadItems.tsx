@@ -203,7 +203,7 @@ export function useCommandPaletteThreadItems(input: {
     const item = itemForMatch(match);
     if (!item) return [];
     // The snippet replaces the project line, so a message row is as tall as a title row.
-    const { description: _description, ...rest } = item;
+    const { description: _description, meta: _meta, ...rest } = item;
     return [
       {
         ...rest,

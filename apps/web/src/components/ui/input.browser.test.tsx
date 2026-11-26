@@ -114,7 +114,7 @@ describe("Input, Textarea, and InputGroup", () => {
         expect(style.outlineColor, `${appearance} focus ring color`).toBe(expectedRing);
 
         expect(getComputedStyle(smallInput).height, `${appearance} sm size height`).toBe(
-          getComputedStyle(root).getPropertyValue("--fa-ctrl-sm").trim(),
+          getComputedStyle(root).getPropertyValue("--fa-ctrl").trim(),
         );
         expect(getComputedStyle(compactInput).height, `${appearance} compact size height`).toBe(
           getComputedStyle(root).getPropertyValue("--fa-ctrl-sm").trim(),
@@ -148,12 +148,10 @@ describe("Input, Textarea, and InputGroup", () => {
       expect(getComputedStyle(groupFrame).outlineStyle).toBe("solid");
       expect(getComputedStyle(groupFrame).outlineWidth).toBe("2px");
 
-      // Narrow viewport (<640px) keeps taller touch-friendly heights without shrinking mobile inputs.
+      // Narrow viewport (<768px) keeps taller touch-friendly heights without shrinking mobile inputs.
       await page.viewport(390, 844);
       expect(getComputedStyle(defaultInput).height, "narrow default height").toBe("36px");
-      expect(getComputedStyle(smallInput).height, "narrow sm height").toBe(
-        getComputedStyle(root).getPropertyValue("--fa-ctrl").trim(),
-      );
+      expect(getComputedStyle(smallInput).height, "narrow sm height").toBe("36px");
       expect(getComputedStyle(compactInput).height, "narrow compact height").toBe(
         getComputedStyle(root).getPropertyValue("--fa-ctrl-sm").trim(),
       );
@@ -319,7 +317,7 @@ describe("Input, Textarea, and InputGroup", () => {
     }
   });
 
-  it("uses 16px type below 640px and today's type from 640px up", async () => {
+  it("uses 16px type below 768px and today's type from 768px up", async () => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     await page.viewport(1280, 800);
     await using _viewport = {

@@ -76,7 +76,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
         <InputGroupInput
           ref={inputRef}
           type="search"
-          size="sm"
+          size="compact"
           value={props.query}
           aria-label="在会话中查找"
           placeholder="在会话中查找"
