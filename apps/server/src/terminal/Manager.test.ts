@@ -1221,10 +1221,22 @@ it.layer(
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
             // The bounded file lands atomically: its temp file is the only write
-            // target, so filling the disk there is the write failure.
+            // target. The write failure fills the disk after some bytes already
+            // landed, so the failure carries a half-written temp file.
             open: (file, options) =>
               failure === "write" && !failed && file.includes("t3-write-")
-                ? fail()
+                ? fs.open(file, options).pipe(
+                    Effect.map((opened): FileSystem.File =>
+                      Object.create(opened, {
+                        writeAll: {
+                          value: (buffer: Uint8Array) =>
+                            opened
+                              .writeAll(buffer.subarray(0, Math.max(1, buffer.length / 2)))
+                              .pipe(Effect.andThen(fail())),
+                        },
+                      }),
+                    ),
+                  )
                 : fs.open(file, options),
             rename: (from, to) => (failure === "rename" && !failed ? fail() : fs.rename(from, to)),
           }),
@@ -1781,14 +1793,28 @@ it.layer(
         open: (filePath, options) => {
           if (!failNextWrite || !filePath.includes("t3-write-")) return fs.open(filePath, options);
           failNextWrite = false;
-          return Effect.fail(
-            PlatformError.systemError({
-              _tag: "Unknown",
-              module: "FileSystem",
-              method: "open",
-              pathOrDescriptor: filePath,
-              cause: { code: "ENOSPC" },
-            }),
+          // The disk fills after the first bytes of the temp file already landed.
+          return fs.open(filePath, options).pipe(
+            Effect.map((opened): FileSystem.File =>
+              Object.create(opened, {
+                writeAll: {
+                  value: (buffer: Uint8Array) =>
+                    opened.writeAll(buffer.subarray(0, Math.max(1, buffer.length / 2))).pipe(
+                      Effect.andThen(
+                        Effect.fail(
+                          PlatformError.systemError({
+                            _tag: "Unknown",
+                            module: "FileSystem",
+                            method: "write",
+                            pathOrDescriptor: filePath,
+                            cause: { code: "ENOSPC" },
+                          }),
+                        ),
+                      ),
+                    ),
+                },
+              }),
+            ),
           );
         },
       });

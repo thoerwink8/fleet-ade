@@ -1,4 +1,5 @@
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -1000,24 +1001,11 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       : undefined;
   };
   const writeDurably = (filePath: string, contents: string) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const directory = path.dirname(filePath);
-        yield* fs.makeDirectory(directory, { recursive: true });
-        const tempPath = yield* fs.makeTempFileScoped({ directory, prefix: ".service-write-" });
-        yield* fs.writeFileString(tempPath, contents, { mode: 0o600 });
-        // Opened read-write: Windows refuses to flush a handle without write access.
-        yield* (yield* fs.open(tempPath, { flag: "r+" })).sync;
-        yield* fs.rename(tempPath, filePath);
-        // Windows has no directory fsync (EPERM); NTFS journals the rename.
-        yield* (yield* fs.open(directory, { flag: "r" })).sync.pipe(
-          Effect.catchIf(
-            (error) => (error.reason.cause as NodeJS.ErrnoException | undefined)?.code === "EPERM",
-            () => Effect.void,
-          ),
-        );
-      }),
-    ).pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+    writeFileStringAtomically({ filePath, contents }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, path),
+      Effect.mapError((cause) => new BootServiceInstallError({ cause })),
+    );
   const planForUnit = (unit: string): BootServicePlan => {
     const effectiveInstallBinDir =
       installBinDir || serviceUnitEnvironmentValueOf(unit, "T3CODE_INSTALL_BIN_DIR");

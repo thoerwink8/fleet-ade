@@ -13,11 +13,6 @@ const isWindowsRenameLock = (error: PlatformError.PlatformError) => {
   return code === "EBUSY" || code === "EPERM" || code === "EACCES";
 };
 
-const isUnsupportedSync = (error: PlatformError.PlatformError) => {
-  const code = (error.reason.cause as NodeJS.ErrnoException | undefined)?.code;
-  return code === "EINVAL" || code === "ENOTSUP" || code === "ENOSYS";
-};
-
 // Saves keep the replaced file's mode and create new files owner-only; chmod, since the umask narrows an open mode.
 const replacedMode = (fs: FileSystem.FileSystem, targetPath: string) =>
   fs.stat(targetPath).pipe(
@@ -34,9 +29,12 @@ const LOCKED_RENAME_RETRY_DELAY = "100 millis";
 const CHUNK_WRITE_LENGTH = 1 << 20;
 
 /** Resolves symlink targets before renaming so writes preserve the link. Iterable contents stream in bounded batches. */
-export const writeFileStringAtomically = (input: {
+export const writeFileStringAtomically = <E = never>(input: {
   readonly filePath: string;
   readonly contents: string | Iterable<string>;
+  // Runs after the temp file is durable and before every rename attempt, so a
+  // publisher can veto the release it is about to make visible.
+  readonly beforePublish?: Effect.Effect<void, E>;
 }) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -87,17 +85,19 @@ export const writeFileStringAtomically = (input: {
         }),
       );
       if (platform !== "win32") {
+        yield* input.beforePublish ?? Effect.void;
         yield* fs.rename(tempPath, targetPath);
-        // Persists the rename itself. Windows cannot open a directory to sync it, and a
-        // filesystem without directory sync answers ENOTSUP, EINVAL or ENOSYS: the rename
-        // already landed, so the save stands.
+        // The rename published the write and cannot be unpublished, so a directory
+        // sync failure must not surface as a failed write; the warning keeps the
+        // durability doubt visible. Windows cannot open a directory to sync it, and
+        // a filesystem without directory sync answers ENOTSUP, EINVAL or ENOSYS.
         return yield* fs.open(targetDirectory, { flag: "r" }).pipe(
           Effect.flatMap((directory) => directory.sync),
           Effect.scoped,
-          Effect.catchIf(
-            (error) => error.reason._tag === "PermissionDenied" || isUnsupportedSync(error),
-            (error) => Effect.logWarning(error),
-          ),
+          Effect.matchEffect({
+            onFailure: (error) => Effect.logWarning(error),
+            onSuccess: () => Effect.void,
+          }),
         );
       }
 
@@ -114,7 +114,13 @@ export const writeFileStringAtomically = (input: {
         Effect.option,
       );
       const before = yield* targetVersion;
-      const firstAttempt = yield* Effect.result(fs.rename(tempPath, targetPath));
+      // The veto runs before every attempt; only rename failures retry, so a
+      // failing veto surfaces immediately instead of looping for two seconds.
+      const attemptPublish = Effect.fn("atomicWrite.attemptPublish")(function* () {
+        yield* input.beforePublish ?? Effect.void;
+        return yield* Effect.result(fs.rename(tempPath, targetPath));
+      });
+      const firstAttempt = yield* attemptPublish();
       if (Result.isSuccess(firstAttempt)) return;
       const lockError = firstAttempt.failure;
       if (!isWindowsRenameLock(lockError) || Option.isNone(before) || before.value.readOnly) {
@@ -124,7 +130,7 @@ export const writeFileStringAtomically = (input: {
         yield* Effect.sleep(LOCKED_RENAME_RETRY_DELAY);
         const current = yield* targetVersion;
         if (Option.isNone(current) || current.value.id !== before.value.id) break;
-        const attempt = yield* Effect.result(fs.rename(tempPath, targetPath));
+        const attempt = yield* attemptPublish();
         if (Result.isSuccess(attempt)) return;
         if (!isWindowsRenameLock(attempt.failure)) return yield* attempt.failure;
       }

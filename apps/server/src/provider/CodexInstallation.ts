@@ -551,10 +551,12 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
       const activate = Effect.fn("CodexInstallation.activate")(
         function* () {
           const executable = yield* completedRelease(release.version);
-          yield* ensureEligible();
           yield* writeFileStringAtomically({
             filePath: activePath,
             contents: yield* encodeActive({ version: release.version }),
+            // Checked again at the rename: a version withdrawn while the temp
+            // file was written must not become the published pointer.
+            beforePublish: ensureEligible(),
           }).pipe(
             Effect.provideService(FileSystem.FileSystem, fs),
             Effect.provideService(Path.Path, path),

@@ -12,6 +12,7 @@ import * as TestClock from "effect/testing/TestClock";
 
 import { writeFileStringAtomically } from "./atomicWrite.ts";
 import * as HostProcess from "./HostProcess.ts";
+import { synchronousFileSystem } from "./testing/syncFileSystem.ts";
 
 it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
   it.effect.each(HostProcess.Platform.defaultValue() === "linux" ? [39, 40, 41] : [])(
@@ -136,49 +137,46 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
     }),
   );
 
-  // ENOTSUP means this filesystem cannot sync directories at all; EIO means the rename may not survive a crash.
-  it.effect.each(
-    HostProcess.Platform.defaultValue() === "win32"
-      ? []
-      : [
-          { code: "ENOTSUP", saved: true },
-          { code: "EIO", saved: false },
-        ],
-  )("reports a directory sync failing with $code after the rename", ({ code, saved }) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
-      const filePath = path.join(root, "settings.json");
-      const syncFailure = PlatformError.systemError({
-        _tag: "Unknown",
-        module: "FileSystem",
-        method: "sync",
-        pathOrDescriptor: root,
-        cause: Object.assign(new Error(`${code}, fsync`), { code }),
-      });
-      const failingDirectorySync = FileSystem.make({
-        ...fs,
-        open: (openedPath, options) =>
-          fs
-            .open(openedPath, options)
-            .pipe(
-              Effect.map((file): FileSystem.File =>
-                openedPath === root
-                  ? Object.create(file, { sync: { value: Effect.fail(syncFailure) } })
-                  : file,
+  // ENOTSUP means this filesystem cannot sync directories at all; EIO means the rename may
+  // not survive a crash. Either way the rename already published the write, so the caller
+  // must not be told the write failed.
+  it.effect.each(HostProcess.Platform.defaultValue() === "win32" ? [] : ["ENOTSUP", "EIO"])(
+    "a published write still succeeds when directory sync fails with $code after the rename",
+    (code) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+        const filePath = path.join(root, "settings.json");
+        const syncFailure = PlatformError.systemError({
+          _tag: "Unknown",
+          module: "FileSystem",
+          method: "sync",
+          pathOrDescriptor: root,
+          cause: Object.assign(new Error(`${code}, fsync`), { code }),
+        });
+        const failingDirectorySync = FileSystem.make({
+          ...fs,
+          open: (openedPath, options) =>
+            fs
+              .open(openedPath, options)
+              .pipe(
+                Effect.map((file): FileSystem.File =>
+                  openedPath === root
+                    ? Object.create(file, { sync: { value: Effect.fail(syncFailure) } })
+                    : file,
+                ),
               ),
-            ),
-      });
+        });
 
-      const exit = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
-        Effect.provideService(FileSystem.FileSystem, failingDirectorySync),
-        Effect.exit,
-      );
+        const exit = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
+          Effect.provideService(FileSystem.FileSystem, failingDirectorySync),
+          Effect.exit,
+        );
 
-      assert.deepStrictEqual(exit, saved ? Exit.void : Exit.fail(syncFailure));
-      assert.strictEqual(yield* fs.readFileString(filePath), "after");
-    }),
+        assert.deepStrictEqual(exit, Exit.void);
+        assert.strictEqual(yield* fs.readFileString(filePath), "after");
+      }),
   );
 
   // Read-only and unreadable targets still save, since the mode lands after the temp file opens.
@@ -359,25 +357,31 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
   );
 });
 
-// The retry fiber leaves the scheduler on every real fs call, so TestClock
-// adjustments finish while the fiber is still between steps and the chain
-// breaks. The full retry budget is two seconds of wall time.
-it.live("retries a locked rename until the lock clears", () =>
+// stat and rename are the only filesystem operations the retry loop performs. Wrapping
+// them in synchronous node calls keeps each retry round inside the task the TestClock
+// wake resumes, so one adjustment drains the chain deterministically.
+it.effect("retries a locked rename until the lock clears", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
     const filePath = path.join(root, "settings.json");
     yield* fs.writeFileString(filePath, "before");
+    const syncFs = synchronousFileSystem(fs);
+    const firstAttempt = yield* Deferred.make<void>();
     let attempts = 0;
-    const lockedTwice = FileSystem.make({
-      ...fs,
+    const lockedTwice: FileSystem.FileSystem = {
+      ...syncFs,
       rename: (from, to) =>
         Effect.suspend(() => {
           attempts += 1;
-          return attempts <= 2 ? Effect.fail(renameError("EPERM", to)) : fs.rename(from, to);
+          return attempts <= 2
+            ? (attempts === 1 ? Deferred.succeed(firstAttempt, undefined) : Effect.void).pipe(
+                Effect.andThen(Effect.fail(renameError("EPERM", to))),
+              )
+            : syncFs.rename(from, to);
         }),
-    });
+    };
 
     const write = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
       Effect.provideService(FileSystem.FileSystem, lockedTwice),
@@ -385,23 +389,36 @@ it.live("retries a locked rename until the lock clears", () =>
       Effect.exit,
       Effect.forkChild,
     );
+    yield* Deferred.await(firstAttempt);
+    yield* TestClock.adjust("500 millis");
+
     assert.deepStrictEqual(yield* Fiber.join(write), Exit.void);
+    assert.strictEqual(attempts, 3);
     assert.strictEqual(yield* fs.readFileString(filePath), "after");
     assert.deepStrictEqual(yield* fs.readDirectory(root), ["settings.json"]);
-  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  }).pipe(Effect.provide(NodeServices.layer)),
 );
 
-it.live("fails after the retries run out and removes its temp file", () =>
+it.effect("fails after the retries run out and removes its temp file", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
     const filePath = path.join(root, "settings.json");
     yield* fs.writeFileString(filePath, "before");
-    const alwaysLocked = FileSystem.make({
-      ...fs,
-      rename: (_from, to) => Effect.fail(renameError("EBUSY", to)),
-    });
+    const syncFs = synchronousFileSystem(fs);
+    const firstAttempt = yield* Deferred.make<void>();
+    let attempts = 0;
+    const alwaysLocked: FileSystem.FileSystem = {
+      ...syncFs,
+      rename: (_from, to) =>
+        Effect.suspend(() => {
+          attempts += 1;
+          return (attempts === 1 ? Deferred.succeed(firstAttempt, undefined) : Effect.void).pipe(
+            Effect.andThen(Effect.fail(renameError("EBUSY", to))),
+          );
+        }),
+    };
 
     const write = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
       Effect.provideService(FileSystem.FileSystem, alwaysLocked),
@@ -409,11 +426,16 @@ it.live("fails after the retries run out and removes its temp file", () =>
       Effect.exit,
       Effect.forkChild,
     );
+    yield* Deferred.await(firstAttempt);
+    // One first try plus twenty retries at a hundred milliseconds each.
+    yield* TestClock.adjust("2100 millis");
+
     const exit = yield* Fiber.join(write);
     assert.isTrue(Exit.isFailure(exit));
+    assert.strictEqual(attempts, 21);
     assert.strictEqual(yield* fs.readFileString(filePath), "before");
     assert.deepStrictEqual(yield* fs.readDirectory(root), ["settings.json"]);
-  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  }).pipe(Effect.provide(NodeServices.layer)),
 );
 
 const renameError = (code: string, path: string) =>

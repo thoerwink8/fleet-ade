@@ -13,6 +13,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
+import * as TestClock from "effect/testing/TestClock";
+import { synchronousFileSystem } from "@t3tools/shared/testing/syncFileSystem";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Sink from "effect/Sink";
@@ -1234,60 +1236,77 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       expect(requests).toEqual([]);
     }),
   );
-});
 
-// The retry fiber leaves the scheduler on every real fs call, so TestClock
-// adjustments finish while the fiber is still between steps and the chain
-// breaks. The full retry budget is two seconds of wall time.
-it.live("reuses an immutable Windows release and preserves the pointer when rename is denied", () =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const archive = Buffer.from(zipFixtures.windows, "base64");
-    const asset = yield* releaseAsset(archive, "win32");
-    let denyPointerRename = true;
-    const renameTargets: string[] = [];
-    const { installation, requests, validations } = yield* makeHarness({
-      previous: true,
-      platform: "win32",
-      archive,
-      fileSystem: FileSystem.FileSystem.of({
-        ...fs,
-        rename: (source, target) => {
-          renameTargets.push(target);
-          return denyPointerRename
-            ? Effect.fail(
-                PlatformError.systemError({
-                  _tag: "Unknown",
-                  module: "FileSystem",
-                  method: "rename",
-                  pathOrDescriptor: target,
-                  cause: Object.assign(new Error("EPERM: file is in use"), { code: "EPERM" }),
-                }),
-              )
-            : fs.rename(source, target);
-        },
+  it.effect(
+    "reuses an immutable Windows release and preserves the pointer when rename is denied",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const archive = Buffer.from(zipFixtures.windows, "base64");
+        const asset = yield* releaseAsset(archive, "win32");
+        let denyPointerRename = true;
+        const renameTargets: string[] = [];
+        const firstAttempt = yield* Deferred.make<void>();
+        const syncFs = synchronousFileSystem(fs);
+        const { installation, requests, validations } = yield* makeHarness({
+          previous: true,
+          platform: "win32",
+          archive,
+          fileSystem: FileSystem.FileSystem.of({
+            ...syncFs,
+            rename: (source, target) =>
+              // Suspended so each run of atomicWrite's reused publish effect is a fresh
+              // attempt, like the real rename.
+              Effect.suspend(() => {
+                renameTargets.push(target);
+                return denyPointerRename
+                  ? (renameTargets.length === 1
+                      ? Deferred.succeed(firstAttempt, undefined)
+                      : Effect.void
+                    ).pipe(
+                      Effect.andThen(
+                        Effect.fail(
+                          PlatformError.systemError({
+                            _tag: "Unknown",
+                            module: "FileSystem",
+                            method: "rename",
+                            pathOrDescriptor: target,
+                            cause: Object.assign(new Error("EPERM: file is in use"), {
+                              code: "EPERM",
+                            }),
+                          }),
+                        ),
+                      ),
+                    )
+                  : syncFs.rename(source, target);
+              }),
+          }),
+        });
+        yield* writeRelease(installation.managedDirectory, asset, false);
+        // atomicWrite reads the platform from the context start runs in, not from
+        // the harness's construction-time override, so pin win32 at the call site.
+        yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
+        yield* Deferred.await(firstAttempt);
+        // One first try plus twenty retries at a hundred milliseconds each, all on the
+        // synchronous stat and rename the wrap provides, so one adjustment drains them.
+        yield* TestClock.adjust("2100 millis");
+        // The install work runs in its own fiber, so the state stream is the
+        // completion signal: wait for the failure, then confirm the retries stopped.
+        expect(yield* terminalState(installation)).toMatchObject({ phase: "failed" });
+        yield* expectPreviousRelease(installation);
+        expect(new Set(renameTargets)).toEqual(
+          new Set([path.join(installation.managedDirectory, "active.json")]),
+        );
+        expect(renameTargets.length).toBe(21);
+
+        denyPointerRename = false;
+        yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
+        expect((yield* terminalState(installation)).phase).toBe("succeeded");
+        expect((yield* installation.resolve()).version).toBe("fixture-new");
+        expect(requests).toEqual([]);
+        expect(validations).toHaveLength(2);
+        expect(renameTargets.at(-1)).toBe(path.join(installation.managedDirectory, "active.json"));
       }),
-    });
-    yield* writeRelease(installation.managedDirectory, asset, false);
-    // atomicWrite reads the platform from the context start runs in, not from
-    // the harness's construction-time override, so pin win32 at the call site.
-    yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
-    // The install work runs in its own fiber, so the state stream is the
-    // completion signal: wait for the failure, then confirm the retries stopped.
-    expect((yield* terminalState(installation)).phase).toBe("failed");
-    yield* expectPreviousRelease(installation);
-    expect(new Set(renameTargets)).toEqual(
-      new Set([path.join(installation.managedDirectory, "active.json")]),
-    );
-    expect(renameTargets.length).toBeGreaterThan(1);
-
-    denyPointerRename = false;
-    yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
-    expect((yield* terminalState(installation)).phase).toBe("succeeded");
-    expect((yield* installation.resolve()).version).toBe("fixture-new");
-    expect(requests).toEqual([]);
-    expect(validations).toHaveLength(2);
-    expect(renameTargets.at(-1)).toBe(path.join(installation.managedDirectory, "active.json"));
-  }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
-);
+  );
+});
