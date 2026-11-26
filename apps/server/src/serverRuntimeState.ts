@@ -15,7 +15,7 @@ import { formatHostForUrl, isWildcardHost } from "@t3tools/shared/hostClassifica
 import packageJson from "../package.json" with { type: "json" };
 import type * as ServerConfig from "./config.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
-import { probeProcessStartTime, processStartedBeforeTimestamp } from "./legacyServerOwner.ts";
+import { processIdentity } from "./legacyServerOwner.ts";
 
 export const PersistedServerRuntimeState = Schema.Struct({
   version: Schema.Literal(1),
@@ -28,6 +28,9 @@ export const PersistedServerRuntimeState = Schema.Struct({
   // Dev is single-origin: browsers must pair through this URL, not `origin`.
   devUrl: Schema.optional(Schema.String),
   startedAt: Schema.String,
+  // The raw process start time the writer probed for its own PID. Verification replays the same
+  // probe and requires exact equality — a reused PID never matches, whatever the wall clock says.
+  processIdentity: Schema.optional(Schema.String),
   serviceManaged: Schema.optional(Schema.Boolean),
   serverVersion: Schema.optional(Schema.String),
 });
@@ -186,50 +189,51 @@ const probeServerOwnershipLock = (statePath: string): OwnershipLockState => {
  * Injectable for tests: the real probe shells out to `ps` or PowerShell and can fail on hosts
  * without them, so verification distinguishes that failure from proof of PID reuse.
  */
-export const ProcessStartTimeProbe = Context.Reference<
-  (pid: number, platform: NodeJS.Platform) => Promise<number | undefined>
->("serverRuntimeState/ProcessStartTimeProbe", {
-  defaultValue: () => probeProcessStartTime,
+export const ProcessIdentityProbe = Context.Reference<
+  (pid: number, platform: NodeJS.Platform) => Promise<string | undefined>
+>("serverRuntimeState/ProcessIdentityProbe", {
+  defaultValue: () => processIdentity,
 });
 
 export type RecordedServerLiveness = "live" | "stale" | "unknown";
 
 /**
- * Whether the record describes a server that still runs and still owns its home. "stale" when
- * the PID is dead, provably reused, or the lock is provably free; "unknown" when identity cannot
- * be determined — startup refuses it, readers of the origin must not trust it. Lock-aware records
- * are never live on the lock alone: it proves the home is held, not that the PID is the holder.
+ * Whether the record describes a server that still runs and still owns its home. The stored
+ * process identity must equal a fresh probe of the recorded PID exactly — no wall clock, no
+ * tolerance. Unverifiable identity is "unknown", never "live".
  */
 export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServerProcessLiveness")(
   function* (
-    state: Pick<PersistedServerRuntimeState, "pid" | "ownerId" | "startedAt">,
+    state: Pick<PersistedServerRuntimeState, "pid" | "ownerId" | "processIdentity">,
     statePath: string,
   ): Effect.fn.Return<RecordedServerLiveness, never, never> {
     if (!isProcessAlive(state.pid)) return "stale";
 
-    const probeStartTime = yield* ProcessStartTimeProbe;
-    const recordedAt = Date.parse(state.startedAt);
-    let startTimeConsistent = true;
-    const inProcessMatch =
-      state.pid === process.pid && inProcessOwners.get(statePath) === state.ownerId;
-    if (Number.isFinite(recordedAt)) {
-      if (!inProcessMatch) {
-        const platform = yield* HostProcess.Platform;
-        const startedAtMs = yield* Effect.promise(() => probeStartTime(state.pid, platform));
-        if (startedAtMs === undefined) return "unknown";
-        startTimeConsistent = processStartedBeforeTimestamp(startedAtMs, recordedAt, platform);
-      }
-    } else if (!inProcessMatch) {
-      // A record without a readable start time cannot prove the PID was not reused.
-      return "unknown";
+    // The in-process registry is authoritative for this process's own ownership: POSIX SQLite
+    // locks are invisible to their own process, and a registered owner never needs to re-prove
+    // itself. Only a defined ownerId with a matching registration binds the record; a missing
+    // ownerId or an empty registry never matches, not even on undefined === undefined.
+    if (
+      state.pid === process.pid &&
+      state.ownerId !== undefined &&
+      inProcessOwners.get(statePath) === state.ownerId
+    ) {
+      return "live";
     }
-    if (!startTimeConsistent) return "stale";
-    if (state.ownerId === undefined) return "live";
 
-    if (state.pid === process.pid) {
-      if (inProcessOwners.get(statePath) === state.ownerId) return "live";
-      if (inProcessOwners.has(statePath)) return "stale";
-    }
+    // Records written before identity tracking carry no proof. While their PID lives, a reused
+    // PID and the real legacy server are indistinguishable, so they are never live.
+    if (state.processIdentity === undefined) return "unknown";
+
+    const probeIdentity = yield* ProcessIdentityProbe;
+    const platform = yield* HostProcess.Platform;
+    const liveIdentity = yield* Effect.promise(() => probeIdentity(state.pid, platform));
+    if (liveIdentity === undefined) return "unknown";
+    if (liveIdentity !== state.processIdentity) return "stale";
+
+    // The identity match proves this process is the recorded owner instance. In-system it holds
+    // the lock until it dies; a free lock means it lost the home, and the probe cannot identify
+    // another holder, so held plus identity is the binding proof.
     switch (probeServerOwnershipLock(statePath)) {
       case "held":
         return "live";

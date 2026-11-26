@@ -38,6 +38,7 @@ import { acquireServerOwnership } from "../serverOwnership.ts";
 import { deriveServerPaths } from "../config.ts";
 import { resolveServerConfig } from "./config.ts";
 
+import { processIdentity } from "../legacyServerOwner.ts";
 const deriveExplicitServerPaths = (baseDir: string, devUrl: URL | undefined) =>
   deriveServerPaths(baseDir, devUrl, { baseDirIsExplicit: true });
 
@@ -90,6 +91,41 @@ const liveProcess = Effect.acquireRelease(
     }),
 );
 
+const probeIdentityOf = async (pid: number) => {
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+  const identity = await processIdentity(pid, process.platform);
+  assert(identity !== undefined, "the test host must answer the process start-time probe");
+  return identity;
+};
+
+/** A child holding `BEGIN EXCLUSIVE` on the lock path; resolves only after it reports the lock. */
+const lockHoldingProcess = (lockPath: string) =>
+  Effect.acquireRelease(
+    Effect.promise(async () => {
+      const lockScript =
+        'const s=require("node:sqlite");const fs=require("node:fs");fs.mkdirSync(require("node:path").dirname(process.env.T3_LOCK_PATH),{recursive:true});const db=new s.DatabaseSync(process.env.T3_LOCK_PATH);db.exec("BEGIN EXCLUSIVE");process.stdout.write("locked\\n");process.stdin.resume();';
+      const child = NodeChildProcess.spawn(process.execPath, ["-e", lockScript], {
+        stdio: ["pipe", "pipe", "ignore"],
+        env: { ...process.env, T3_LOCK_PATH: lockPath },
+        windowsHide: true,
+      });
+      const locked = Promise.race([
+        NodeEvents.EventEmitter.once(child.stdout, "data"),
+        NodeEvents.EventEmitter.once(child, "exit").then(() => {
+          throw new Error("lock holder exited before locking");
+        }),
+      ]);
+      await NodeEvents.EventEmitter.once(child, "spawn");
+      await locked;
+      return child;
+    }),
+    (child) =>
+      Effect.promise(async () => {
+        const exited = NodeEvents.EventEmitter.once(child, "exit");
+        child.kill();
+        await exited;
+      }),
+  );
 it.layer(NodeServices.layer)("cli config resolution", (it) => {
   const defaultObservabilityConfig = {
     traceMinLevel: "Info",
@@ -248,7 +284,9 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-preflight-reused-" });
       const child = yield* liveProcess;
       assert(child.pid !== undefined);
-      // The killed server's lock file stays behind, released.
+      // The killed server's lock file stays behind, released. Its record still carries the
+      // original owner's process identity: the live process answering for this PID proves the
+      // reuse by mismatch.
       yield* Effect.scoped(acquireOwnership(baseDir));
       yield* fs.writeFileString(
         path.join(baseDir, "userdata", "server-runtime.json"),
@@ -256,6 +294,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           version: 1,
           pid: child.pid,
           ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+          processIdentity: "the original owner, dead with its boot",
           port: 3773,
           origin: "http://127.0.0.1:3773",
           startedAt: "2026-10-01T00:00:00.000Z",
@@ -272,26 +311,33 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-preflight-held-" });
-      const child = yield* liveProcess;
-      assert(child.pid !== undefined);
-      const owner = yield* acquireOwnership(baseDir);
-      yield* owner.publish({
-        version: 1,
-        pid: child.pid,
-        port: 3773,
-        origin: "http://127.0.0.1:3773",
-        startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
-      });
+      // A real cross-process holder: same-process locks are invisible to the lock probe.
+      const holder = yield* lockHoldingProcess(
+        path.join(baseDir, "userdata", "server-owner.sqlite"),
+      );
+      assert(holder.pid !== undefined);
+      const holderIdentity = yield* Effect.promise(() => probeIdentityOf(holder.pid!));
+      yield* fs.writeFileString(
+        path.join(baseDir, "userdata", "server-runtime.json"),
+        yield* encodeUnknownJson({
+          version: 1,
+          pid: holder.pid,
+          ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+          processIdentity: holderIdentity,
+          port: 3773,
+          origin: "http://127.0.0.1:3773",
+          startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
+        }),
+      );
       const cwd = path.join(baseDir, "project");
       const result = yield* resolveManualWebLaunch(baseDir, cwd);
       assert(Result.isFailure(result));
       expect(result.failure).toContain("A Fleet ADE server is already running");
-      expect(result.failure).toContain(`pid ${child.pid}`);
+      expect(result.failure).toContain(`pid ${holder.pid}`);
       expect(yield* fs.exists(cwd)).toBe(false);
     }),
   );
-
-  it.effect("allows a manual web launch when a pre-lock record's PID was reused", () =>
+  it.effect("refuses a manual web launch over a pre-lock record whose PID is alive", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -300,7 +346,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       assert(child.pid !== undefined);
       const stateDir = path.join(baseDir, "userdata");
       yield* fs.makeDirectory(stateDir, { recursive: true });
-      // The live process started long after the killed server's record: the PID is reused.
+      // Pre-lock records carry no identity proof: while their PID lives, a reused PID and the
+      // real legacy server are indistinguishable, so startup conservatively refuses.
       yield* fs.writeFileString(
         path.join(stateDir, "server-runtime.json"),
         yield* encodeUnknownJson({
@@ -308,12 +355,13 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           pid: child.pid,
           port: 3773,
           origin: "http://127.0.0.1:3773",
-          startedAt: "2026-10-01T00:00:00.000Z",
+          startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
         }),
       );
       const cwd = path.join(baseDir, "project");
       const result = yield* resolveManualWebLaunch(baseDir, cwd);
-      assert(Result.isSuccess(result), `expected success, got ${String(result)}`);
+      assert(Result.isFailure(result));
+      expect(result.failure).toContain("A Fleet ADE server is already running");
     }),
   );
 

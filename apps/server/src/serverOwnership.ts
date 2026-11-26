@@ -31,6 +31,7 @@ import * as ProcessRunner from "./processRunner.ts";
 import {
   clearPersistedServerRuntimeState,
   persistServerRuntimeState,
+  ProcessIdentityProbe,
   readPersistedServerRuntimeState,
   registerInProcessOwner,
   verifyRecordedServerProcessLiveness,
@@ -271,7 +272,21 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
   }).pipe(Effect.forkScoped);
 
   return {
-    publish: (state: PersistedServerRuntimeState) =>
-      persistServerRuntimeState({ path: statePath, state: { ...state, ownerId } }),
+    publish: Effect.fn("serverOwnership.publish")(function* (state: PersistedServerRuntimeState) {
+      // The record proves its writer by the probe's exact answer for this PID. When the probe
+      // cannot answer, the record is still published without one: nothing on this host could
+      // verify an identity anyway, and verification falls back to unknown.
+      const probeIdentity = yield* ProcessIdentityProbe;
+      const platform = yield* HostProcess.Platform;
+      const identity = yield* Effect.promise(() => probeIdentity(process.pid, platform));
+      yield* persistServerRuntimeState({
+        path: statePath,
+        state: {
+          ...state,
+          ownerId,
+          ...(identity === undefined ? {} : { processIdentity: identity }),
+        },
+      });
+    }),
   };
 });

@@ -100,7 +100,7 @@ export const runtimePortOutput = Effect.fn("runtimePortOutput")(function* (
   const runtime = JSON.parse(NodeFS.readFileSync(runtimeFile, "utf8")) as {
     pid?: unknown;
     ownerId?: unknown;
-    startedAt?: unknown;
+    processIdentity?: unknown;
     port?: unknown;
     origin?: unknown;
   };
@@ -117,7 +117,8 @@ export const runtimePortOutput = Effect.fn("runtimePortOutput")(function* (
     {
       pid,
       ownerId: typeof runtime.ownerId === "string" ? runtime.ownerId : undefined,
-      startedAt: typeof runtime.startedAt === "string" ? runtime.startedAt : "",
+      processIdentity:
+        typeof runtime.processIdentity === "string" ? runtime.processIdentity : undefined,
     },
     runtimeFile,
   );

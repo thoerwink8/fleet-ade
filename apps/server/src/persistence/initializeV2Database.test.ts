@@ -17,7 +17,8 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as ServerConfig from "../config.ts";
 import * as SqlitePersistence from "./Sqlite.ts";
 import { runMigrations } from "./Migrations.ts";
-import { initializeV2Database, ProcessStartTimeProbe } from "./initializeV2Database.ts";
+import { initializeV2Database, ProcessIdentityProbe } from "./initializeV2Database.ts";
+import { processIdentity } from "../legacyServerOwner.ts";
 import * as EventStore from "../orchestration-v2/EventStore.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as EventSink from "../orchestration-v2/EventSink.ts";
@@ -192,10 +193,20 @@ it.effect("removes copies left by a killed start, but not one that is still runn
   const running = `.v2-import-${process.pid}-Kq81Zx`;
   const unrelated = ".v2-import-not-a-copy";
   return Effect.gen(function* () {
-    for (const name of [`.v2-import-${killed}-Wm3nPa`, ".v2-import-Q3xZ9a", running]) {
+    for (const name of [`.v2-import-${killed}-Wm3nPa`, ".v2-import-Q3xZ9a"]) {
       NodeFS.mkdirSync(NodePath.join(directory, name));
       NodeFS.writeFileSync(NodePath.join(directory, name, "snapshot.sqlite"), "partial copy");
     }
+    // A live copy proves its owner with the identity the importer recorded at creation.
+    NodeFS.mkdirSync(NodePath.join(directory, running));
+    NodeFS.writeFileSync(NodePath.join(directory, running, "snapshot.sqlite"), "partial copy");
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+    const ownIdentity = yield* Effect.promise(() => processIdentity(process.pid, process.platform));
+    assert(ownIdentity !== undefined, "the test host must answer the process start-time probe");
+    NodeFS.writeFileSync(
+      NodePath.join(directory, running, "owner.json"),
+      JSON.stringify({ pid: process.pid, processIdentity: ownIdentity }),
+    );
     NodeFS.mkdirSync(NodePath.join(directory, unrelated));
     const destinationPath = NodePath.join(directory, "statev2.sqlite");
     NodeFS.writeFileSync(destinationPath, "existing V2 database");
@@ -211,56 +222,102 @@ it.effect("removes copies left by a killed start, but not one that is still runn
   );
 });
 
-it.effect("removes a copy whose PID now belongs to a process started after the copy", () => {
-  const directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-v2-reused-pid-"));
-  return Effect.gen(function* () {
-    // The original owner is gone and its PID was reused: the copy predates the process that now
-    // owns the PID. Creation and process start are milliseconds apart in a fixture, so the
-    // start-time probe is injected instead of guessed from wall-clock gaps.
-    const staging = NodePath.join(directory, ".v2-import-000000-Ab3dEf");
-    NodeFS.mkdirSync(staging);
-    NodeFS.writeFileSync(NodePath.join(staging, "snapshot.sqlite"), "partial copy");
-    const copyCreatedAtMs = NodeFS.statSync(staging).birthtimeMs;
-    const child = NodeChildProcess.spawn(process.execPath, ["-e", "process.stdin.resume()"], {
-      stdio: ["pipe", "ignore", "ignore"],
-    });
-    try {
-      assert(child.pid !== undefined);
-      const copyName = `.v2-import-${child.pid}-Ab3dEf`;
-      NodeFS.renameSync(staging, NodePath.join(directory, copyName));
-      const destinationPath = NodePath.join(directory, "statev2.sqlite");
-      NodeFS.writeFileSync(destinationPath, "existing V2 database");
-      // The reused PID belongs to a live process started well after the copy was made.
-      yield* Effect.provideService(
-        initializeV2Database(destinationPath),
-        ProcessStartTimeProbe,
-        () => Promise.resolve(copyCreatedAtMs + 60_000),
-      );
-      assert.notInclude(
-        NodeFS.readdirSync(directory),
-        copyName,
-        "a process started after the copy was made never wrote it, so the copy is abandoned",
-      );
+it.effect(
+  "keeps a live copy regardless of file times, removes identity mismatches and dead PIDs",
+  () => {
+    const directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-v2-reused-pid-"));
+    return Effect.gen(function* () {
+      // Staged before the child process starts: after the rename the copy predates its PID owner,
+      // the same shape a rolled-back or low-precision creation time produces.
+      const keepStaging = NodePath.join(directory, ".v2-import-000000-Zx81Qm");
+      NodeFS.mkdirSync(keepStaging);
+      NodeFS.writeFileSync(NodePath.join(keepStaging, "snapshot.sqlite"), "partial copy");
+      const child = NodeChildProcess.spawn(process.execPath, ["-e", "process.stdin.resume()"], {
+        stdio: ["pipe", "ignore", "ignore"],
+        windowsHide: true,
+      });
+      try {
+        assert(child.pid !== undefined);
+        const childIdentity = yield* Effect.promise(() =>
+          // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+          processIdentity(child.pid!, process.platform),
+        );
+        assert(
+          childIdentity !== undefined,
+          "the test host must answer the process start-time probe",
+        );
+        const writeCopy = (name: string, owner: unknown) => {
+          NodeFS.mkdirSync(NodePath.join(directory, name));
+          NodeFS.writeFileSync(NodePath.join(directory, name, "snapshot.sqlite"), "partial copy");
+          if (owner !== undefined) {
+            NodeFS.writeFileSync(
+              NodePath.join(directory, name, "owner.json"),
+              JSON.stringify(owner),
+            );
+          }
+        };
 
-      // The same PID started before the copy was made keeps it: a running import must survive.
-      const keepName = `.v2-import-${child.pid}-Zx81Qm`;
-      NodeFS.mkdirSync(NodePath.join(directory, keepName));
-      const keepCreatedAtMs = NodeFS.statSync(NodePath.join(directory, keepName)).birthtimeMs;
-      yield* Effect.provideService(
-        initializeV2Database(destinationPath),
-        ProcessStartTimeProbe,
-        () => Promise.resolve(keepCreatedAtMs - 60_000),
-      );
-      assert.include(
-        NodeFS.readdirSync(directory),
-        keepName,
-        "a copy whose process started before it was made is still being written",
-      );
-    } finally {
-      child.kill();
-    }
-  }).pipe(
-    Effect.provide(NodeServices.layer),
-    Effect.ensuring(Effect.sync(() => NodeFS.rmSync(directory, { recursive: true, force: true }))),
-  );
-});
+        // The copy predates the process — a creation-time comparison would call the process a
+        // reuse — but the recorded identity matches exactly, so the live import survives.
+        NodeFS.writeFileSync(
+          NodePath.join(keepStaging, "owner.json"),
+          JSON.stringify({ pid: child.pid, processIdentity: childIdentity }),
+        );
+        const keepName = `.v2-import-${child.pid}-Zx81Qm`;
+        NodeFS.renameSync(keepStaging, NodePath.join(directory, keepName));
+
+        // A live PID whose real identity differs from the recorded one never wrote this copy.
+        const mismatchName = `.v2-import-${child.pid}-Ab3dEf`;
+        writeCopy(mismatchName, { pid: child.pid, processIdentity: "some other boot entirely" });
+
+        // The same live PID without identity proof (old format) is kept: reuse cannot be ruled out.
+        const legacyName = `.v2-import-${child.pid}-Lg71Po`;
+        writeCopy(legacyName, undefined);
+
+        const destinationPath = NodePath.join(directory, "statev2.sqlite");
+        NodeFS.writeFileSync(destinationPath, "existing V2 database");
+        yield* initializeV2Database(destinationPath);
+
+        const remaining = NodeFS.readdirSync(directory);
+        assert.include(
+          remaining,
+          keepName,
+          "an identity match proves the writer still runs, whatever the file times say",
+        );
+        assert.include(
+          remaining,
+          legacyName,
+          "a live PID without identity proof cannot be told apart from the writer",
+        );
+        assert.notInclude(
+          remaining,
+          mismatchName,
+          "an identity mismatch proves the PID was reused, so the copy is abandoned",
+        );
+
+        // A dead PID is abandoned even when its copy carried a complete identity record.
+        const deadName = `.v2-import-2147483647-Dd42Tx`;
+        writeCopy(deadName, { pid: 2_147_483_647, processIdentity: childIdentity });
+        yield* initializeV2Database(destinationPath);
+        assert.notInclude(NodeFS.readdirSync(directory), deadName);
+
+        // When the probe cannot answer, live copies stay: cleanup never guesses a reuse.
+        const probeFailName = `.v2-import-${child.pid}-Pf19Wz`;
+        writeCopy(probeFailName, { pid: child.pid, processIdentity: childIdentity });
+        yield* Effect.provideService(
+          initializeV2Database(destinationPath),
+          ProcessIdentityProbe,
+          () => Promise.resolve(undefined),
+        );
+        assert.include(NodeFS.readdirSync(directory), probeFailName);
+      } finally {
+        child.kill();
+      }
+    }).pipe(
+      Effect.provide(NodeServices.layer),
+      Effect.ensuring(
+        Effect.sync(() => NodeFS.rmSync(directory, { recursive: true, force: true })),
+      ),
+    );
+  },
+);

@@ -367,8 +367,8 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
   if (options?.rejectRunningServer && mode === "web") {
     const runtime = yield* readPersistedServerRuntimeState(derivedPaths.serverRuntimeStatePath);
     // A killed container can leave a record whose PID is now ours or an unrelated process's.
-    // Lock-aware records are live only while their owner still holds the lock; pre-lock records
-    // need start-time proof, or a reused PID would block this start forever.
+    // Identity-verified records prove their owner; anything unprovable stays conservative:
+    // unknown blocks the start just like live, and only a proven reuse or a dead PID clears it.
     if (
       Option.isSome(runtime) &&
       runtime.value.pid > 0 &&
