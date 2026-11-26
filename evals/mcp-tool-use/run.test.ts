@@ -1653,10 +1653,13 @@ it("leaves errored samples out of pass rates and lists them in the summary", () 
   assert.include(summary, "input 30");
 });
 
-it("grades thread links as chat renders them: exact targets, plain mentions, no invented ones", () => {
+it("grades thread links as chat renders them: exact labeled targets, plain mentions, no invented ones", () => {
   const expect = {
     threadLinks: {
-      linked: ["t3-thread://v2/env-1/thread-aaa", "t3-thread://v2/env-1/thread-bbb"],
+      linked: [
+        { label: "Fix parser crash", href: "t3-thread://v2/env-1/thread-aaa" },
+        { label: "Stabilize flaky cart test", href: "t3-thread://v2/env-1/thread-bbb" },
+      ],
       plainText: ["Settings sync audit", "#123"],
     },
   };
@@ -1664,8 +1667,8 @@ it("grades thread links as chat renders them: exact targets, plain mentions, no 
     gradeSample(expect, { calls: [], text, finalText: text, stopReason: "end_turn" })
       .filter((c) => !c.pass)
       .map((c) => c.check);
-  // Both threads linked to their exact targets, the file a working pill, the unlinked thread
-  // and the PR plain.
+  // Both threads linked to their exact targets under their own names, the file a working pill,
+  // the unlinked thread and the PR plain.
   const good = [
     "Both fixes are in:",
     "- [Fix parser crash](t3-thread://v2/env-1/thread-aaa) — the crash fix landed in [src/parser.ts](src/parser.ts).",
@@ -1676,7 +1679,6 @@ it("grades thread links as chat renders them: exact targets, plain mentions, no 
   // Links inside a code fence do not count.
   const fenced =
     "Copy these:\n\n```\n[Fix parser crash](t3-thread://v2/env-1/thread-aaa)\n[Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb)\n```\n\nSettings sync audit and PR #123 are plain.";
-  for (const check of grade(fenced)) void check;
   assert.includeMembers(grade(fenced), [
     "threadLinks t3-thread://v2/env-1/thread-aaa",
     "threadLinks t3-thread://v2/env-1/thread-bbb",
@@ -1685,6 +1687,64 @@ it("grades thread links as chat renders them: exact targets, plain mentions, no 
   const spanned =
     "`[Fix parser crash](t3-thread://v2/env-1/thread-aaa)` and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
   assert.includeMembers(grade(spanned), ["threadLinks t3-thread://v2/env-1/thread-aaa"]);
+  // Links inside a four-space indented code block render no anchors.
+  const indented =
+    "    [Fix parser crash](t3-thread://v2/env-1/thread-aaa)\n    [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb)\n\nSettings sync audit and PR #123 are plain.";
+  assert.includeMembers(grade(indented), [
+    "threadLinks t3-thread://v2/env-1/thread-aaa",
+    "threadLinks t3-thread://v2/env-1/thread-bbb",
+  ]);
+  // Links inside an HTML comment render nothing the reader can click.
+  const commented =
+    "<!-- [Fix parser crash](t3-thread://v2/env-1/thread-aaa) [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb) -->\nSettings sync audit, PR #123.";
+  assert.includeMembers(grade(commented), [
+    "threadLinks t3-thread://v2/env-1/thread-aaa",
+    "threadLinks t3-thread://v2/env-1/thread-bbb",
+  ]);
+  // Mentions visible only inside an HTML comment are missing: the reader never sees them.
+  const commentedMentions =
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb).\n<!-- Settings sync audit and PR #123 -->";
+  const commentedMentionFailures = grade(commentedMentions);
+  assert.isTrue(
+    commentedMentionFailures.some((c) => c.startsWith("threadLinks plain Settings sync audit")),
+    commentedMentionFailures.join(","),
+  );
+  assert.isTrue(
+    commentedMentionFailures.some((c) => c.startsWith("threadLinks plain #123")),
+    commentedMentionFailures.join(","),
+  );
+  // Escaping the opening bracket keeps the link literal text; the second link still works.
+  const escaped =
+    "\\[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
+  assert.includeMembers(grade(escaped), ["threadLinks t3-thread://v2/env-1/thread-aaa"]);
+  assert.notInclude(grade(escaped), "threadLinks t3-thread://v2/env-1/thread-bbb");
+  // A reference-style link is a real link; pointing one at a fabricated target fails.
+  const inventedReference =
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). See [the audit][x]. Settings sync audit, PR #123.\n\n[x]: t3-thread://v2/env-1/thread-zzz";
+  assert.isTrue(
+    grade(inventedReference).some((c) => c.startsWith("threadLinks none invented")),
+    grade(inventedReference).join(","),
+  );
+  // Swapping the two names across each other's targets fails both: a label must carry its own thread.
+  const swapped =
+    "[Stabilize flaky cart test](t3-thread://v2/env-1/thread-aaa) and [Fix parser crash](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
+  assert.includeMembers(grade(swapped), [
+    "threadLinks t3-thread://v2/env-1/thread-aaa (label missing the thread name)",
+    "threadLinks t3-thread://v2/env-1/thread-bbb (label missing the thread name)",
+  ]);
+  // The thread name linked to some other target fails the same way.
+  const mislabeled =
+    "[here](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
+  assert.includeMembers(grade(mislabeled), [
+    "threadLinks t3-thread://v2/env-1/thread-aaa (label missing the thread name)",
+  ]);
+  // The PR number as any link's label — here a reference-style link — is not plain text.
+  const linkedPR =
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, [PR #123][pr].\n\n[pr]: https://github.com/acme/app/pull/123";
+  assert.isTrue(
+    grade(linkedPR).some((c) => c.startsWith("threadLinks plain #123")),
+    grade(linkedPR).join(","),
+  );
   // A mention that is missing fails; so does one written as a link label.
   const labeled =
     "[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). [Settings sync audit](t3-thread://v2/env-1/thread-ccc). PR #123.";
@@ -1707,7 +1767,9 @@ it("grades thread links as chat renders them: exact targets, plain mentions, no 
   // Exact targets only: a wrong environment or thread id fails the positive check.
   const wrongTarget =
     "[Fix parser crash](t3-thread://v2/env-1/thread-aaX), [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
-  assert.includeMembers(grade(wrongTarget), ["threadLinks t3-thread://v2/env-1/thread-aaa"]);
+  assert.includeMembers(grade(wrongTarget), [
+    "threadLinks t3-thread://v2/env-1/thread-aaa (linked to the wrong target)",
+  ]);
   // An array mention is satisfied by any one of its forms.
   const alternates = {
     threadLinks: {

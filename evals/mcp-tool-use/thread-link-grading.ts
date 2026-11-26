@@ -1,128 +1,36 @@
+import { scanChatMarkdown } from "@t3tools/shared/markdownPipeline";
 import * as Schema from "effect/Schema";
+
+const LinkedThread = Schema.Struct({
+  /** The thread's name as the wake presented it; an exact-target link must carry it as label. */
+  label: Schema.String,
+  /** The exact href the final answer must render clickable for this thread. */
+  href: Schema.String,
+});
 
 export const ThreadLinksExpect = Schema.Struct({
   /**
-   * Thread links the final answer must render clickable, each as its exact href, in a Markdown
-   * link or autolink outside code. Bare thread hrefs never count: clients don't autolink them.
+   * Thread links the final answer must render as real chat anchors, each with its exact target
+   * and the thread's name in the label. Only rendered anchors count: links inside code or
+   * comments are invisible, and bare thread hrefs never count because clients don't autolink
+   * them.
    */
-  linked: Schema.optional(Schema.Array(Schema.String)),
+  linked: Schema.optional(Schema.Array(LinkedThread)),
   /**
-   * Mentions the final answer must carry as plain text: present in what the reader sees, and not
-   * the label of any Markdown link. Inline code around a mention is fine.
+   * Mentions the final answer must carry as plain text: present in what the reader sees, and
+   * never the label of any anchor. Inline code around a mention is fine.
    */
   plainText: Schema.optional(
     Schema.Array(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
   ),
 });
 
-interface MarkdownLink {
-  readonly label: string;
-  readonly href: string;
-}
-
-type Range = readonly [start: number, end: number];
-
-const inRanges = (ranges: ReadonlyArray<Range>, index: number) =>
-  ranges.some(([start, end]) => index >= start && index < end);
-
-/** Lines from an opening run of 3+ backticks or tildes to a closing run of the same character. */
-const fenceRanges = (markdown: string): Array<Range> => {
-  const ranges: Array<Range> = [];
-  let open: { char: string; length: number; start: number } | null = null;
-  let lineStart = 0;
-  for (const line of markdown.split("\n")) {
-    const end = lineStart + line.length;
-    const trimmed = line.trimStart();
-    if (open === null) {
-      const opening = /^(`{3,}|~{3,})/.exec(trimmed);
-      if (opening) open = { char: opening[1]![0]!, length: opening[1]!.length, start: lineStart };
-    } else if (new RegExp(`^\\${open.char}{${open.length},}\\s*$`).test(trimmed)) {
-      ranges.push([open.start, end]);
-      open = null;
-    }
-    lineStart = end + 1;
-  }
-  if (open !== null) ranges.push([open.start, markdown.length]);
-  return ranges;
-};
-
-const INLINE_CODE = /(?<ticks>`+)[^\n]*?\k<ticks>/g;
-const LABELED_LINK = /\[(?<label>[^\]\n]*)\]\((?:<(?<angleHref>[^\s<>]+)>|(?<href>[^\s>)]+))\)/g;
-const AUTOLINK = /<(?<auto>\w[\w+.-]*:\/\/[^\s<>]+)>/g;
-
-/** Backslash escapes keep punctuation literal, so masked scanning never opens code on `\``. */
-const maskEscapes = (markdown: string) =>
-  markdown.replace(/\\[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, (pair) => " ".repeat(pair.length));
-
-interface ScannedMarkdown {
-  /** Labeled links and autolinks outside code, in reading order. */
-  readonly links: ReadonlyArray<MarkdownLink>;
-  /** The prose with every link replaced by its visible text: its label, or an autolink's href. */
-  readonly visibleText: string;
-}
-
-/** The chat renderer's link semantics, closely enough for grading: code wins over links. */
-const scanMarkdownLinks = (markdown: string): ScannedMarkdown => {
-  const masked = maskEscapes(markdown);
-  const ranges: Array<Range> = fenceRanges(markdown);
-  INLINE_CODE.lastIndex = 0;
-  for (const match of masked.matchAll(INLINE_CODE)) {
-    if (match.index !== undefined && !inRanges(ranges, match.index))
-      ranges.push([match.index, match.index + match[0].length]);
-  }
-  const inCode = (index: number) => inRanges(ranges, index);
-
-  interface Segment {
-    readonly start: number;
-    readonly end: number;
-    readonly visible: string;
-    readonly href: string;
-  }
-  const segments: Array<Segment> = [];
-  LABELED_LINK.lastIndex = 0;
-  for (const match of markdown.matchAll(LABELED_LINK)) {
-    if (match.index === undefined || inCode(match.index)) continue;
-    const href = match.groups?.["angleHref"] ?? match.groups?.["href"];
-    if (href === undefined) continue;
-    segments.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      visible: match.groups?.["label"] ?? "",
-      href,
-    });
-  }
-  const labeledRanges = segments.map(({ start, end }): Range => [start, end]);
-  AUTOLINK.lastIndex = 0;
-  for (const match of markdown.matchAll(AUTOLINK)) {
-    if (match.index === undefined || inCode(match.index) || inRanges(labeledRanges, match.index))
-      continue;
-    const href = match.groups?.["auto"] ?? "";
-    segments.push({ start: match.index, end: match.index + match[0].length, visible: href, href });
-  }
-  segments.sort((a, b) => a.start - b.start);
-
-  const links = segments.map(({ visible: label, href }) => ({ label, href }));
-  let visibleText = "";
-  let cursor = 0;
-  for (const segment of segments) {
-    visibleText += markdown.slice(cursor, segment.start) + segment.visible;
-    cursor = segment.end;
-  }
-  visibleText += markdown.slice(cursor);
-  // Backslash escapes are markup, not visible text.
-  return {
-    links,
-    visibleText: visibleText.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1"),
-  };
-};
-
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * Thread links in the final answer, graded the way chat renders them: code spans and fences
- * never yield links, a link's target is exact, and a mention written as a link's label is
- * clickable, never plain. Every `t3-thread://` target the answer carries must be one the case
- * allows; inventing targets for threads, files, or PRs fails even when `linked` is unset.
+ * Graded on the anchors and visible text the ChatMarkdown pipeline itself produces. Every
+ * `t3-thread://` target the answer renders must be one the case allows; invented targets fail
+ * even when `linked` is unset.
  */
 export const gradeThreadLinks = (
   expect: typeof ThreadLinksExpect.Type | undefined,
@@ -132,21 +40,23 @@ export const gradeThreadLinks = (
   if (finalText === undefined) {
     return [
       { check: "threadLinks final answer present", pass: false },
-      ...(expect.linked ?? []).map((href) => ({ check: `threadLinks ${href}`, pass: false })),
+      ...(expect.linked ?? []).map(({ href }) => ({ check: `threadLinks ${href}`, pass: false })),
     ];
   }
-  const { links, visibleText } = scanMarkdownLinks(finalText);
+  const { anchors, visibleText } = scanChatMarkdown(finalText);
   const checks: Array<{ check: string; pass: boolean }> = [];
-  const allowed = new Set(expect.linked ?? []);
-  for (const href of expect.linked ?? []) {
+  const allowed = new Set((expect.linked ?? []).map(({ href }) => href));
+  for (const { label, href } of expect.linked ?? []) {
+    const linked = anchors.some((anchor) => anchor.href === href && anchor.label.includes(label));
     checks.push({
-      check: `threadLinks ${href}`,
-      pass: links.some((link) => link.href === href),
+      check: `threadLinks ${href}${linked ? "" : labelInAnchors(anchors, label, href)}`,
+      pass: linked,
     });
   }
-  const invented = [...new Set(links.map((link) => link.href))].filter(
-    (href) => href.startsWith("t3-thread://") && !allowed.has(href),
+  const rendered = [...new Set(anchors.map(({ href }) => href))].filter(
+    (href): href is string => href !== undefined && href.startsWith("t3-thread://"),
   );
+  const invented = rendered.filter((href) => !allowed.has(href));
   checks.push({
     check: `threadLinks none invented${invented.length ? `: ${invented.join(", ")}` : ""}`,
     pass: invented.length === 0,
@@ -157,7 +67,7 @@ export const gradeThreadLinks = (
     const forms = Array.isArray(mention) ? mention : [mention];
     const name = forms[0] ?? "";
     const present = forms.some((form) => new RegExp(escapeRegExp(form)).test(visibleText));
-    const asLabel = forms.some((form) => links.some((link) => link.label.includes(form)));
+    const asLabel = forms.some((form) => anchors.some((anchor) => anchor.label.includes(form)));
     checks.push({
       check: `threadLinks plain ${name}${!present ? " (missing)" : asLabel ? " (a link label)" : ""}`,
       pass: present && !asLabel,
@@ -165,3 +75,14 @@ export const gradeThreadLinks = (
   }
   return checks;
 };
+
+function labelInAnchors(
+  anchors: ReadonlyArray<{ readonly href: string | undefined; readonly label: string }>,
+  label: string,
+  href: string,
+) {
+  if (anchors.some((anchor) => anchor.href === href)) return " (label missing the thread name)";
+  if (anchors.some((anchor) => anchor.label.includes(label)))
+    return ` (linked to the wrong target)`;
+  return "";
+}
