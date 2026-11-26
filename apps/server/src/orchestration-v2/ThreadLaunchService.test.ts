@@ -1346,8 +1346,8 @@ it.effect("shows the fetch diagnosis when preparing a worktree from origin fails
       projection.turnItems.find((item) => item.type === "command_execution")?.status,
       "failed",
     );
-    assert.include(
-      projection.turnItems.find((item) => item.type === "error")?.failure.message ?? "",
+    assert.equal(
+      projection.turnItems.find((item) => item.type === "error")?.failure.message,
       detail,
     );
     assert.equal(harness.createWorktree.mock.calls.length, 0);
@@ -2388,6 +2388,7 @@ it.effect("cancels tracked setup before provider work is released", () =>
       assert.equal((yield* tracker.get(launched.threadId))?.phase, "running");
       assert.isTrue(yield* tracker.cancel(launched.threadId));
       assert.equal((yield* tracker.get(launched.threadId))?.phase, "cancelled");
+      assert.isUndefined((yield* tracker.get(launched.threadId))?.failure);
       const projection = yield* threads.getThreadProjection(launched.threadId);
       assert.equal(projection.runs[0]?.status, "failed");
       assert.isNull(projection.thread.worktreePath);
@@ -2397,6 +2398,94 @@ it.effect("cancels tracked setup before provider work is released", () =>
         force: true,
       });
       assert.isEmpty(yield* outbox.listByCommandId(CommandId.make(`${input.commandId}:release`)));
+    }).pipe(Effect.provide(harness.layer));
+  }),
+);
+
+it.effect.each([
+  { reason: "index_locked", detail: "Another Git process holds the index lock." },
+  { reason: "branch_already_exists", detail: "A branch named like this already exists." },
+] as const)(
+  "records the structured Git failure when worktree creation fails with $reason",
+  ({ reason, detail }) =>
+    Effect.gen(function* () {
+      const harness = makeHarness({
+        createWorktree: () =>
+          Effect.fail(
+            new GitCommandError({
+              operation: "GitVcsDriver.createWorktree",
+              command: "git",
+              cwd: project.workspaceRoot,
+              detail,
+              exitCode: 128,
+              reason,
+            }),
+          ),
+      });
+      yield* Effect.gen(function* () {
+        const launches = yield* ThreadLaunch.ThreadLaunchService;
+        const tracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
+        const launched = yield* launches.launch(
+          launchInput({
+            command: `command:launch:worktree-${reason}`,
+            thread: `thread:launch:worktree-${reason}`,
+            message: "Start",
+            workspace: { type: "worktree", baseRef: "main" },
+          }),
+        );
+        yield* tracker.stream(launched.threadId).pipe(
+          Stream.filter((snapshot) => snapshot?.phase === "failed"),
+          Stream.runHead,
+        );
+        const snapshot = yield* tracker.get(launched.threadId);
+        assert.deepEqual(snapshot?.failure, {
+          _tag: "GitCommandError",
+          operation: "GitVcsDriver.createWorktree",
+          action: "create_worktree",
+          reason,
+          detail,
+        });
+        assert.isNotNull(snapshot?.error);
+      }).pipe(Effect.provide(harness.layer));
+    }),
+);
+
+it.effect("records the structured failure when the setup script exits non-zero", () =>
+  Effect.gen(function* () {
+    const harness = makeHarness({
+      runSetup: () =>
+        Effect.succeed({
+          status: "started" as const,
+          async: false,
+          scriptId: "setup",
+          scriptName: "Setup",
+          scriptCommand: "vp install",
+          terminalId: "setup",
+          cwd: "/repo-worktrees/feature",
+          completion: Effect.succeed({ exitCode: 128, durationMs: 1 }),
+        }),
+    });
+    yield* Effect.gen(function* () {
+      const launches = yield* ThreadLaunch.ThreadLaunchService;
+      const tracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
+      const launched = yield* launches.launch(
+        launchInput({
+          command: "command:launch:script-exit",
+          thread: "thread:launch:script-exit",
+          message: "Start",
+          workspace: { type: "worktree", baseRef: "main" },
+        }),
+      );
+      yield* tracker.stream(launched.threadId).pipe(
+        Stream.filter((snapshot) => snapshot?.phase === "failed"),
+        Stream.runHead,
+      );
+      const snapshot = yield* tracker.get(launched.threadId);
+      assert.deepEqual(snapshot?.failure, {
+        _tag: "WorktreeSetupScriptExitError",
+        reason: "script_exited_nonzero",
+        detail: "准备脚本以退出码 128 结束。",
+      });
     }).pipe(Effect.provide(harness.layer));
   }),
 );
