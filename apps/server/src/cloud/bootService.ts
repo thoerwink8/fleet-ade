@@ -1438,10 +1438,29 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       return "skipped" as const;
     }
     // schtasks decodes undeclared XML in the ANSI code page, so a legacy UTF-8 task file
-    // registers garbled paths. Both registration paths below hand the unit itself to
-    // `/Create /XML`; migrate it in place first, and never touch other managers' units.
+    // registers garbled paths. The re-read inside the lock keeps a concurrent install's
+    // newer unit from being overwritten by the stale snapshot read above.
     if (manager.kind === "schtasks" && !(rawUnit.value[0] === 0xff && rawUnit.value[1] === 0xfe)) {
-      yield* writeDurably(unitPath, encodeServiceTask(unit));
+      yield* withSelectionLock(
+        unitPath,
+        Effect.gen(function* () {
+          const currentUnit = yield* fs.readFile(unitPath).pipe(Effect.option);
+          if (Option.isNone(currentUnit)) return;
+          const currentBaseDir = bootServiceBaseDirOf(decodeServiceUnit(currentUnit.value));
+          if (
+            currentBaseDir === undefined ||
+            path.resolve(currentBaseDir) !== path.resolve(input.baseDir) ||
+            (currentUnit.value[0] === 0xff && currentUnit.value[1] === 0xfe)
+          ) {
+            return;
+          }
+          yield* writeDurably(
+            unitPath,
+            encodeServiceTask(decodeServiceUnit(currentUnit.value)),
+            "replace",
+          );
+        }),
+      );
     }
     // Writes no state, and the launcher lets an update transition in flight
     // finish before the queued stop tears it down.

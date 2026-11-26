@@ -6,6 +6,7 @@ import { expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Clock from "effect/Clock";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -224,6 +225,8 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
     launcher?: { readonly close: () => void };
     /** Task Scheduler's own copy of the task. */
     task?: { xml: string; enabled: boolean };
+    /** Runs after a service reads a file and before the bytes reach its caller. */
+    readFileInterceptor?: (file: string) => Effect.Effect<void>;
   } = {
     failCommand: undefined,
     linger: "yes",
@@ -350,6 +353,14 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
       });
     }).pipe(
       Effect.provideService(ProcessRunner.ProcessRunner, runner),
+      Effect.provideService(
+        FileSystem.FileSystem,
+        // `pipe` and the iterator live on the implementation's prototype, so a spread loses them.
+        Object.assign(Object.create(Object.getPrototypeOf(fs)), fs, {
+          readFile: (file: string) =>
+            Effect.tap(fs.readFile(file), () => control.readFileInterceptor?.(file) ?? Effect.void),
+        }),
+      ),
       Effect.provide(
         Layer.mergeAll(
           Layer.succeed(HostProcess.Platform, platform),
@@ -1592,6 +1603,64 @@ process.disconnect();
       expectUtf16Registration(0);
       expect(control.task).toMatchObject({ enabled: true });
     }),
+  );
+
+  it.effect(
+    "keeps a concurrently published unit when a legacy restart migrates it on Windows",
+    () =>
+      Effect.gen(function* () {
+        const { service, fs, taskRegistrations, control, makeService, statePath } =
+          yield* makeHarness(
+            "win32",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            "t3-boot-service-测试-",
+          );
+        const plan = yield* service.install();
+        // A unit written before UTF-16LE task files, which the restart below picks up.
+        yield* fs.writeFileString(
+          plan.unitPath,
+          decodeServiceUnit(yield* fs.readFile(plan.unitPath)),
+        );
+
+        // The restart reads the legacy bytes, then stalls before using them; meanwhile a
+        // 1.2.4 install publishes its own unit under the selection lock.
+        const readStalled = yield* Deferred.make<void>();
+        const proceed = yield* Deferred.make<void>();
+        let stalled = false;
+        control.readFileInterceptor = (file) =>
+          file === plan.unitPath && !stalled
+            ? Effect.gen(function* () {
+                stalled = true;
+                yield* Deferred.succeed(readStalled, undefined);
+                yield* Deferred.await(proceed);
+              })
+            : Effect.void;
+
+        const restarting = yield* Effect.forkChild(service.restart);
+        yield* Deferred.await(readStalled);
+
+        const newer = yield* makeService(undefined, "1.2.4");
+        yield* newer.install({ start: false });
+
+        yield* Deferred.succeed(proceed, undefined);
+        expect(yield* Fiber.join(restarting)).toBe("restarted");
+
+        // The migration must not roll the published 1.2.4 unit back to 1.2.3.
+        const newerRuntime = pinnedRuntimePaths(yield* Path.Path, plan.baseDir, "1.2.4", "win32");
+        expect(
+          BootService.bootServiceProgramOf(decodeServiceUnit(yield* fs.readFile(plan.unitPath))),
+        ).toBe(newerRuntime.entryPath);
+        expect(BootService.bootServiceProgramOf(control.task?.xml ?? "")).toBe(
+          newerRuntime.entryPath,
+        );
+        expect(parseServiceState(yield* fs.readFileString(statePath))?.activeVersion).toBe("1.2.4");
+        const registration = taskRegistrations.at(-1);
+        expect(registration).toBeDefined();
+        expect([...registration!.bytes.subarray(0, 2)]).toEqual([0xff, 0xfe]);
+      }),
   );
 
   // regression: #8173 keep provider CLIs available in the macOS service
