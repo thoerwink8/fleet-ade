@@ -13,8 +13,8 @@ import { createMarkdownRenderer } from "./markdownRenderer";
 // A wake message as Orchestrator.delegatedCompletionWakeDetail writes it: each finished
 // subagent's thread is a formatThreadLink in parentheses after its task id, its result inline.
 const wakeText = [
-  `Delegated task node:parser (${formatThreadLink({ environmentId: EnvironmentId.make("environment"), threadId: ThreadId.make("thread-parser") }, "Fix [the] (parser) `crash`")}) [completed]:`,
-  "The crash came from an empty token stream.",
+  `Delegated task node:parser (${formatThreadLink({ environmentId: EnvironmentId.make("environment"), threadId: ThreadId.make("thread-parser") }, "Fix [the] (parser) crash`")}) [completed]:`,
+  "Use `parser` for details.",
   "",
   `Delegated task node:cart (${formatThreadLink({ environmentId: EnvironmentId.make("environment"), threadId: ThreadId.make("thread-cart") })}) [failed]. Use task_status with taskId node:cart to read the result.`,
 ].join("\n");
@@ -38,8 +38,11 @@ describe("delegated completion wake links through the chat markdown pipeline", (
       environmentId: EnvironmentId.make("environment"),
       threadId: ThreadId.make("thread-parser"),
     });
-    // Brackets and backslashes left the label; parens stay, and a backtick pair typesets code.
-    expect(labeled![2]).toBe("Fix the (parser) <code>crash</code>");
+    // Brackets left the label; parens stay, and the title's trailing backtick renders literally
+    // instead of opening a code span that would eat the link.
+    expect(labeled![2]).toBe("Fix the (parser) crash`");
+    expect(markup).toContain(">parser</code> for details.");
+    expect(markup.match(/<a /g)?.length).toBe(2);
     expect(parseThreadLinkHref(autolink![1]!)).toEqual({
       environmentId: EnvironmentId.make("environment"),
       threadId: ThreadId.make("thread-cart"),

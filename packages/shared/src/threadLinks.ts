@@ -93,9 +93,11 @@ function threadLinkHref(link: ThreadLink): string {
     : `${V2_PREFIX}${link.environmentId}/${link.threadId}`;
 }
 
+// A backtick starts a code span that eats the link; escaped, it typesets the literal character.
 const linkLabel = (label: string | undefined) =>
   label
     ?.replace(/[[\]\\\r\n]/g, " ")
+    .replace(/`/g, "\\`")
     .replace(/\s+/g, " ")
     .trim();
 

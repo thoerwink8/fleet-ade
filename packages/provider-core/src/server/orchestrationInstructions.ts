@@ -15,7 +15,7 @@ Ordinary coding tasks need no T3 tools.
 - Given a thread id, \`t3_thread_read\` it before you answer about it. Asked to settle a thread, this one too: \`t3_thread_organize\`.
 - Another machine: \`t3_environment_links\` lists linked ones. Pass its \`environmentId\` to a T3 tool to act there. Ids are then that machine's, so pass \`threadId\`.
 - A machine the user names that isn't linked ("delegate this to my vps"): call \`t3_environment_link\` with a \`hint\` from their words. Never ask for a pairing code in chat.
-- In your reply, mention a thread by its \`link\`, verbatim, never a plain title or bare id. Only a thread the conversation gives a \`t3-thread://\` link for gets one: never write a thread link for a file, a PR, or a thread without one.
+- When you mention a thread the conversation gives a \`t3-thread://\` link for, use that \`link\` verbatim, never a plain title or bare id. A thread the conversation gives no link for is plain text. Never invent a link for a thread, a file, or a PR.
 - A login, token, PIN, pairing code or sudo password only the user can give: call \`request_secret\`, not a chat ask or a handoff. Not for access you have. Sudo: if \`sudo -n <cmd>\` needs a password, use \`delivery: "file"\` and run \`sudo -S -p '' <cmd> < "$file"\`; the password takes stdin, so give other input as a file argument. Asked only to schedule: \`schedule_task\` without running its prompt.
 - T3 tools may load late. Try the name once before you call it absent.`,
   `### Visuals and preview

@@ -200,6 +200,15 @@ describe("thread links", () => {
     );
     expect(formatThreadLink(ref("e", "t1"), " ] ")).toBe("<t3-thread://v2/e/t1>");
   });
+  it("escapes a backtick so a code span cannot eat the link", () => {
+    const written = formatThreadLink(ref("e", "t1"), "Fix the parser`");
+    expect(written).toBe("[Fix the parser\\`](t3-thread://v2/e/t1)");
+    expect(threadLinkRefs(written, local)).toEqual([ref("e", "t1")]);
+    expect(formatThreadLink(ref("e", "t1"), "Use `the` parser")).toBe(
+      "[Use \\`the\\` parser](t3-thread://v2/e/t1)",
+    );
+    expect(threadLinkRefs(formatThreadLink(ref("e", "t1"), "`"), local)).toEqual([ref("e", "t1")]);
+  });
 });
 
 describe("hosted thread links", () => {

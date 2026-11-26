@@ -67,6 +67,7 @@ import { proxyConfig } from "../shared/proxy.ts";
 import { changeRequestsCreatedBy } from "../../apps/server/src/orchestration-v2/PullRequestSyncReactor.ts";
 import { type BackgroundWait, makeBackgroundWait } from "./backgroundWait.ts";
 import { FileLinksExpect, gradeFileLinks } from "./file-link-grading.ts";
+import { ThreadLinksExpect, gradeThreadLinks } from "./thread-link-grading.ts";
 import {
   argvForm,
   gradeSecret,
@@ -210,6 +211,11 @@ const McpToolUseExpect = Schema.Struct({
   secret: Schema.optional(SecretExpect),
   /** File pills in the final answer resolve against the thread cwd to `world.files` entries. */
   fileLinks: Schema.optional(FileLinksExpect),
+  /**
+   * Thread links in the final answer, graded as chat renders them: `linked` hrefs clickable
+   * outside code, `plainText` mentions never a link's label, and no invented thread target.
+   */
+  threadLinks: Schema.optional(ThreadLinksExpect),
 });
 
 /**
@@ -1779,6 +1785,12 @@ export const gradeSample = (
       run.stopReason === "end_turn" ? run.finalText : undefined,
       run.cwd,
       worldFiles,
+    ),
+  );
+  checks.push(
+    ...gradeThreadLinks(
+      expect.threadLinks,
+      run.stopReason === "end_turn" ? run.finalText : undefined,
     ),
   );
   checks.push(...gradeSecret(expect.secret, run, pasted));

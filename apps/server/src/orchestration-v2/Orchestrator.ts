@@ -1002,7 +1002,8 @@ function delegatedCompletionWakeDetail(
   environmentId: EnvironmentId,
 ): string {
   let remainingBytes = DELEGATED_RESULT_INLINE_BYTES;
-  const linkedThreadIds = new Set<string>();
+  // The thread identity the client opens is environment and thread id together.
+  const linkedThreads = new Set<string>();
   const threadMention = (task: OrchestrationV2Subagent): string | null => {
     // A remote child names its own environment; a child thread here names this server's.
     const ref =
@@ -1011,8 +1012,10 @@ function delegatedCompletionWakeDetail(
         : task.childThreadId !== null
           ? { environmentId, threadId: task.childThreadId }
           : null;
-    if (ref === null || linkedThreadIds.has(ref.threadId)) return null;
-    linkedThreadIds.add(ref.threadId);
+    if (ref === null) return null;
+    const identity = JSON.stringify([ref.environmentId, ref.threadId]);
+    if (linkedThreads.has(identity)) return null;
+    linkedThreads.add(identity);
     const label = (task.remoteChild?.title ?? task.title)?.trim() || undefined;
     return formatThreadLink(ref, label);
   };

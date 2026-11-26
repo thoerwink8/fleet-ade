@@ -1652,3 +1652,68 @@ it("leaves errored samples out of pass rates and lists them in the summary", () 
   // Errored samples' tokens still count: 3 rows of 10 input tokens each.
   assert.include(summary, "input 30");
 });
+
+it("grades thread links as chat renders them: exact targets, plain mentions, no invented ones", () => {
+  const expect = {
+    threadLinks: {
+      linked: ["t3-thread://v2/env-1/thread-aaa", "t3-thread://v2/env-1/thread-bbb"],
+      plainText: ["Settings sync audit", "#123"],
+    },
+  };
+  const grade = (text) =>
+    gradeSample(expect, { calls: [], text, finalText: text, stopReason: "end_turn" })
+      .filter((c) => !c.pass)
+      .map((c) => c.check);
+  // Both threads linked to their exact targets, the file a working pill, the unlinked thread
+  // and the PR plain.
+  const good = [
+    "Both fixes are in:",
+    "- [Fix parser crash](t3-thread://v2/env-1/thread-aaa) — the crash fix landed in [src/parser.ts](src/parser.ts).",
+    "- [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb) — up as PR #123.",
+    "- Settings sync audit finished with no fix: keys written during a reconnect are dropped.",
+  ].join("\n");
+  assert.deepEqual(grade(good), []);
+  // Links inside a code fence do not count.
+  const fenced =
+    "Copy these:\n\n```\n[Fix parser crash](t3-thread://v2/env-1/thread-aaa)\n[Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb)\n```\n\nSettings sync audit and PR #123 are plain.";
+  for (const check of grade(fenced)) void check;
+  assert.includeMembers(grade(fenced), [
+    "threadLinks t3-thread://v2/env-1/thread-aaa",
+    "threadLinks t3-thread://v2/env-1/thread-bbb",
+  ]);
+  // Links inside an inline code span do not count either.
+  const spanned =
+    "`[Fix parser crash](t3-thread://v2/env-1/thread-aaa)` and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
+  assert.includeMembers(grade(spanned), ["threadLinks t3-thread://v2/env-1/thread-aaa"]);
+  // A mention that is missing fails; so does one written as a link label.
+  const labeled =
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). [Settings sync audit](t3-thread://v2/env-1/thread-ccc). PR #123.";
+  const labeledFailures = grade(labeled);
+  assert.isTrue(
+    labeledFailures.some((c) => c.startsWith("threadLinks plain Settings sync audit")),
+    labeledFailures.join(","),
+  );
+  assert.isTrue(
+    labeledFailures.some((c) => c.startsWith("threadLinks none invented")),
+    labeledFailures.join(","),
+  );
+  // A fabricated v2 target fails even with both required links present.
+  const invented =
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaa), [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb), [audit](t3-thread://v2/env-1/thread-zzz). Settings sync audit, PR #123.";
+  assert.isTrue(
+    grade(invented).some((c) => c.startsWith("threadLinks none invented")),
+    grade(invented).join(","),
+  );
+  // Exact targets only: a wrong environment or thread id fails the positive check.
+  const wrongTarget =
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaX), [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
+  assert.includeMembers(grade(wrongTarget), ["threadLinks t3-thread://v2/env-1/thread-aaa"]);
+  // No final answer yet: every positive check fails.
+  for (const c of gradeSample(expect, {
+    calls: [],
+    text: "working",
+    stopReason: "tool_use",
+  }).filter((c) => !c.pass)) {
+    assert.match(c.check, /^threadLinks/);
+  }
+});
