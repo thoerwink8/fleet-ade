@@ -598,8 +598,17 @@ it("lists an ignored nested worktree whose .git is a valid gitdir file as a dire
   // a garbage or missing target is not and gets descended.
   write("build/notwt/.git", "gitdir: ../missing.git\n");
   write("build/notwt/types.d.ts");
-  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/notwt/types.d.ts", "build/wt/"]);
+  // `gitdir:` without the space git requires is not a gitfile even when the
+  // target would be a valid git directory; the control above keeps the space.
+  write("build/nospace/.git", "gitdir:../../separate.git\n");
+  write("build/nospace/types.d.ts");
+  assert.deepStrictEqual(oldIgnoredListing(project.root), [
+    "build/nospace/types.d.ts",
+    "build/notwt/types.d.ts",
+    "build/wt/",
+  ]);
   assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/nospace/types.d.ts",
     "build/notwt/types.d.ts",
     "build/wt/",
   ]);

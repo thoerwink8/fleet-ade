@@ -262,8 +262,10 @@ const isNestedRepository = Effect.fnUntraced(function* (absolute: string) {
     }),
     undefined,
   );
-  if (content === undefined || !content.startsWith("gitdir:")) return false;
-  const target = content.slice(7).trim();
+  if (content === undefined || !content.startsWith("gitdir: ")) return false;
+  // git's read_gitfile_raw: the prefix is exactly `gitdir: `, the rest of the
+  // line is the path, and only the trailing newline is not part of it.
+  const target = content.slice(8).replace(/\r?\n$/, "");
   if (target.length === 0) return false;
   return yield* isGitDirectory(NodePath.resolve(absolute, target));
 });
@@ -295,9 +297,9 @@ const walkIgnoredDirectory = Effect.fnUntraced(function* (
       [],
     );
     // Whether a directory is a repository is git's own rule: .git must be a
-    // directory, or a file whose trimmed content starts with `gitdir:` and
-    // whose target validates as a git directory. Anything else is ordinary
-    // content git descends into, and so does the walker.
+    // directory, or a file with exactly the `gitdir: ` prefix whose target
+    // validates as a git directory. Anything else is ordinary content git
+    // descends into, and so does the walker.
     const repository = entries.some((entry) => entry.name === ".git")
       ? yield* isNestedRepository(current.absolute)
       : false;
