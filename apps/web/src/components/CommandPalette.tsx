@@ -1373,7 +1373,7 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
-  if (activeThreadKey !== null && supportsThreadFind) {
+  if (supportsThreadFind && activeThreadKey !== null) {
     actionItems.push({
       kind: "action",
       value: "find-current-thread",

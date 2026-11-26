@@ -155,11 +155,7 @@ describe("DesktopApplicationMenu", () => {
           throw new Error("Expected Toggle Sidebar menu item to have a click handler.");
         }
 
-        toggleSidebar.click(
-          {} as Electron.MenuItem,
-          {} as Electron.BrowserWindow,
-          {} as KeyboardEvent,
-        );
+        toggleSidebar.click({} as Electron.MenuItem, undefined, {} as KeyboardEvent);
         assert.equal(yield* Deferred.await(selectedAction), "sidebar.toggle", platform);
       }
     }),
