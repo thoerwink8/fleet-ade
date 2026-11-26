@@ -1,4 +1,5 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   type EnvironmentId,
   type ProjectListEntriesResult,
@@ -6,7 +7,6 @@ import {
   type ProjectReadFileResult,
   T3_PROJECT_FILE_NAME,
 } from "@t3tools/contracts";
-import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/reactivity";
@@ -181,7 +181,7 @@ export function clearProjectFileQueryData(
 }
 
 function failureCause<A>(result: AsyncResult.AsyncResult<A, unknown>): unknown {
-  return result._tag === "Failure" ? Cause.squash(result.cause) : null;
+  return result._tag === "Failure" ? describeRequestFailure(result.cause) : null;
 }
 
 function errorMessage(cause: unknown): string | null {

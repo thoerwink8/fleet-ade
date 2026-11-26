@@ -1,7 +1,6 @@
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import type { DesktopSshPasswordPromptRequest } from "@t3tools/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import * as Cause from "effect/Cause";
 import { useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { useDeadlinePassed } from "../../hooks/useDeadline";
@@ -18,6 +17,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { sshPromptErrorMessage } from "./SshPasswordPromptDialog.logic";
 
 function describeSshTarget(request: DesktopSshPasswordPromptRequest): string {
   return request.username ? `${request.username}@${request.destination}` : request.destination;
@@ -25,13 +25,6 @@ function describeSshTarget(request: DesktopSshPasswordPromptRequest): string {
 
 function formatRemainingSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-function getPromptErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "SSH 验证提示失败。";
-  return message.includes("expired") || message.includes("no longer pending")
-    ? "此 SSH 验证提示已过期，请重新连接。"
-    : message;
 }
 
 let promptQueue: readonly DesktopSshPasswordPromptRequest[] = [];
@@ -130,7 +123,7 @@ function ActiveSshPasswordPrompt({
     if (AsyncResult.isSuccess(result) || nextPassword === null) {
       removeSshPasswordPrompt(requestId);
     } else {
-      setResponseError(getPromptErrorMessage(Cause.squash(result.cause)));
+      setResponseError(sshPromptErrorMessage(result.cause));
     }
     isRespondingRef.current = false;
     setIsResponding(false);

@@ -5,6 +5,7 @@ import {
   type SourceControlDefinition,
 } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomValue } from "@effect/atom-react";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import * as Cause from "effect/Cause";
 import { CheckIcon, ExternalLinkIcon, CopyIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -35,7 +36,7 @@ type SignInState =
     };
 
 const failureOf = (cause: Cause.Cause<unknown>): VersionControlErrorToastPresentation =>
-  presentVersionControlError(Cause.squash(cause), "登录");
+  presentVersionControlError(describeRequestFailure(cause), "登录");
 
 const expiryTime = (expiresAt: number) =>
   new Date(expiresAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

@@ -283,25 +283,31 @@ function claudeAutoCompactThreshold(autoCompactWindow: string, maxTokens: number
     : {};
 }
 
+function optionalClaudeUsageTokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.round(value)
+    : undefined;
+}
+
 function claudeMessageInputTokens(usage: {
-  readonly input_tokens: number;
-  readonly cache_creation_input_tokens?: number | null;
-  readonly cache_read_input_tokens?: number | null;
+  readonly input_tokens?: number | null | undefined;
+  readonly cache_creation_input_tokens?: number | null | undefined;
+  readonly cache_read_input_tokens?: number | null | undefined;
 }): number {
   return (
-    usage.input_tokens +
-    (usage.cache_creation_input_tokens ?? 0) +
-    (usage.cache_read_input_tokens ?? 0)
+    (optionalClaudeUsageTokenCount(usage.input_tokens) ?? 0) +
+    (optionalClaudeUsageTokenCount(usage.cache_creation_input_tokens) ?? 0) +
+    (optionalClaudeUsageTokenCount(usage.cache_read_input_tokens) ?? 0)
   );
 }
 
 export function claudeProviderTurnTokenUsage(
   usage: {
-    readonly input_tokens: number;
-    readonly cache_creation_input_tokens?: number | null;
-    readonly cache_read_input_tokens?: number | null;
-    readonly cache_creation?: ClaudeCacheCreation | null;
-    readonly output_tokens: number;
+    readonly input_tokens?: number | null | undefined;
+    readonly cache_creation_input_tokens?: number | null | undefined;
+    readonly cache_read_input_tokens?: number | null | undefined;
+    readonly cache_creation?: ClaudeCacheCreation | null | undefined;
+    readonly output_tokens?: number | null | undefined;
   },
   maxTokens: number | null,
   updatedAt: string,
@@ -309,7 +315,8 @@ export function claudeProviderTurnTokenUsage(
   requestedAt?: DateTime.Utc,
 ) {
   const inputTokens = claudeMessageInputTokens(usage);
-  const outputTokens = usage.output_tokens;
+  const outputTokens = optionalClaudeUsageTokenCount(usage.output_tokens) ?? 0;
+  const cachedInputTokens = optionalClaudeUsageTokenCount(usage.cache_read_input_tokens) ?? 0;
   const promptCacheTtlMs = claudePromptCacheTtlMs(usage.cache_creation);
   // The cache lifetime starts with the request, not when its response ends.
   const promptCacheExpiresAt =
@@ -320,7 +327,7 @@ export function claudeProviderTurnTokenUsage(
     usedTokens: inputTokens + outputTokens,
     maxTokens,
     inputTokens,
-    cachedInputTokens: usage.cache_read_input_tokens ?? 0,
+    cachedInputTokens,
     outputTokens,
     reasoningOutputTokens: 0,
     ...(promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs }),
@@ -336,20 +343,30 @@ type ClaudeMessageUsage = Parameters<typeof claudeProviderTurnTokenUsage>[0];
 function mergeClaudeStreamUsage(
   current: ClaudeMessageUsage,
   delta: {
-    readonly input_tokens?: number | null;
-    readonly cache_creation_input_tokens?: number | null;
-    readonly cache_read_input_tokens?: number | null;
-    readonly output_tokens: number;
+    readonly input_tokens?: number | null | undefined;
+    readonly cache_creation_input_tokens?: number | null | undefined;
+    readonly cache_read_input_tokens?: number | null | undefined;
+    readonly output_tokens?: number | null | undefined;
   },
 ): ClaudeMessageUsage {
   return {
     ...current,
-    input_tokens: delta.input_tokens ?? current.input_tokens,
+    input_tokens:
+      optionalClaudeUsageTokenCount(delta.input_tokens) ??
+      optionalClaudeUsageTokenCount(current.input_tokens) ??
+      0,
     cache_creation_input_tokens:
-      delta.cache_creation_input_tokens ?? current.cache_creation_input_tokens ?? null,
+      optionalClaudeUsageTokenCount(delta.cache_creation_input_tokens) ??
+      optionalClaudeUsageTokenCount(current.cache_creation_input_tokens) ??
+      null,
     cache_read_input_tokens:
-      delta.cache_read_input_tokens ?? current.cache_read_input_tokens ?? null,
-    output_tokens: delta.output_tokens,
+      optionalClaudeUsageTokenCount(delta.cache_read_input_tokens) ??
+      optionalClaudeUsageTokenCount(current.cache_read_input_tokens) ??
+      null,
+    output_tokens:
+      optionalClaudeUsageTokenCount(delta.output_tokens) ??
+      optionalClaudeUsageTokenCount(current.output_tokens) ??
+      0,
   };
 }
 export const CLAUDE_DEFAULT_INSTANCE_ID = defaultInstanceIdForDriver(CLAUDE_PROVIDER);
@@ -437,6 +454,37 @@ export function spawnClaudeProcessGroup(
   }
   // Node's typings make stdin and stdout nullable once stdio has a fourth entry; both are pipes.
   return child as ClaudeSpawnedProcess & Pick<NodeChildProcess.ChildProcess, "pid">;
+}
+
+/**
+ * Windows has no process groups, and `taskkill` ends a tree only while its root is running, so
+ * ending the CLI goes through taskkill instead of Node's leader-only kill. The SDK forwards its
+ * abort signal after the graceful shutdown window; the adapter ends the tree itself when it
+ * fires, instead of handing the signal to `spawn`, which would also report an AbortError.
+ */
+export const ClaudeWindowsProcessTreeTerminator = Context.Reference<(pid: number) => void>(
+  "t3/claude-adapter-v2/ClaudeWindowsProcessTreeTerminator",
+  { defaultValue: () => killWindowsProcessTree },
+);
+
+function killWindowsProcessTree(pid: number): void {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return;
+  NodeChildProcess.execFile("taskkill", ["/PID", String(pid), "/T", "/F"], {
+    windowsHide: true,
+  }).unref();
+}
+
+function patchClaudeWindowsKill(
+  child: ClaudeSpawnedProcess,
+  terminateTree: (pid: number) => void,
+): void {
+  child.kill = () => {
+    if (child.exitCode === null && child.signalCode == null) {
+      const pid = "pid" in child && typeof child.pid === "number" ? child.pid : undefined;
+      if (pid !== undefined) terminateTree(pid);
+    }
+    return true;
+  };
 }
 
 interface ClaudeProcessRow {
@@ -1285,6 +1333,7 @@ export const layerQueryRunner: Layer.Layer<
     const agentScope = yield* AgentScope;
     const providerProcesses = yield* ProviderProcesses.ProviderProcesses;
     const platform = yield* HostProcess.Platform;
+    const terminateWindowsProcessTree = yield* ClaudeWindowsProcessTreeTerminator;
     const hostEnvironment = yield* HostProcess.Environment;
     const runFork = Effect.runForkWith(yield* Effect.context<never>());
     const processRunner = yield* ProcessRunner.make();
@@ -1413,7 +1462,6 @@ export const layerQueryRunner: Layer.Layer<
               const child = NodeChildProcess.spawn(spawnOptions.command, spawnOptions.args, {
                 cwd: spawnOptions.cwd,
                 env: spawnOptions.env,
-                signal: spawnOptions.signal,
                 windowsHide: true,
                 stdio: ["pipe", "pipe", "pipe"],
               });
@@ -1427,6 +1475,15 @@ export const layerQueryRunner: Layer.Layer<
           let processExit: Promise<void> | undefined;
           const spawnClaudeCodeProcess = (spawnOptions: ClaudeSpawnOptions) => {
             const child = spawnProcess(spawnOptions);
+            if (platform === "win32") {
+              patchClaudeWindowsKill(child, terminateWindowsProcessTree);
+              // The forwarded signal aborts once the CLI's graceful window ends; kill() then ends
+              // the tree through the patched kill.
+              const endTree = () => child.kill("SIGKILL");
+              spawnOptions.signal.addEventListener("abort", endTree, { once: true });
+              child.once("exit", () => spawnOptions.signal.removeEventListener("abort", endTree));
+              if (spawnOptions.signal.aborted) child.kill("SIGKILL");
+            }
             spawnedProcess = child;
             // A spawn that fails emits only "error".
             processExited = child.exitCode !== null || child.signalCode != null;
@@ -10122,14 +10179,13 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               reasoning.messageId = event.message.id;
               reasoning.streamBlocks.clear();
               context.assistant.streamBlocks.clear();
-              const usage: ClaudeMessageUsage | undefined = event.message.usage;
-              context.streamUsage =
-                usage === undefined ? null : { messageId: event.message.id, usage };
-              if (usage !== undefined) yield* emitContextUsage(context, usage, true);
+              const usage: ClaudeMessageUsage = event.message.usage ?? {};
+              context.streamUsage = { messageId: event.message.id, usage };
+              yield* emitContextUsage(context, usage, true);
             } else if (event.type === "message_delta") {
-              const usage: typeof event.usage | undefined = event.usage;
+              const usage: typeof event.usage | null | undefined = event.usage;
               const stream = context.streamUsage;
-              if (stream?.usage && usage !== undefined) {
+              if (stream?.usage && usage != null) {
                 stream.usage = mergeClaudeStreamUsage(stream.usage, usage);
                 yield* emitContextUsage(context, stream.usage);
               }
@@ -10600,7 +10656,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             // CLI-generated <synthetic> frames report zero usage, not context usage.
             if (
               message.parent_tool_use_id === null &&
-              message.message.usage !== undefined &&
+              message.message.usage != null &&
               message.message.model !== "<synthetic>"
             ) {
               const snapshotUsage = message.message.usage;
@@ -10615,7 +10671,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ) {
                 stream.usage = {
                   ...snapshotUsage,
-                  output_tokens: Math.max(snapshotUsage.output_tokens, stream.usage.output_tokens),
+                  output_tokens: Math.max(
+                    optionalClaudeUsageTokenCount(snapshotUsage.output_tokens) ?? 0,
+                    optionalClaudeUsageTokenCount(stream.usage.output_tokens) ?? 0,
+                  ),
                 };
                 yield* emitContextUsage(context, stream.usage);
               }

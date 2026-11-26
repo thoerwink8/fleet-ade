@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import {
   type CheckpointDiffTarget,
   type ComposerPathSearchTarget,
@@ -29,7 +30,6 @@ import type {
   VcsListRefsResult,
   VcsRef,
 } from "@t3tools/contracts";
-import * as Cause from "effect/Cause";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useEffect, useState } from "react";
 
@@ -232,7 +232,7 @@ export function usePaginatedBranches(target: VcsRefTarget) {
           totalCount: Math.max(...values.map((value) => value.totalCount)),
         };
   const failed = results.find((result) => result._tag === "Failure");
-  const failure = failed?._tag === "Failure" ? Cause.squash(failed.cause) : null;
+  const failure = failed?._tag === "Failure" ? describeRequestFailure(failed.cause) : null;
   const isFetchingNextPage = isPaginatedBranchesNextPagePending(results);
   const error =
     failure === null

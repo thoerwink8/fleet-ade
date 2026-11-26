@@ -1,7 +1,7 @@
 import type { EnvironmentId, ProjectEntry } from "@t3tools/contracts";
 import { useAtomMount, useAtomSubscribe } from "@effect/atom-react";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { executeAtomQuery } from "@t3tools/client-runtime/state/runtime";
-import * as Cause from "effect/Cause";
 import { useEffect, useRef, useState } from "react";
 
 import { environmentCatalog } from "~/connection/catalog";
@@ -61,7 +61,7 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
           });
         } else {
           loaded.current.delete(directoryPath);
-          const cause = Cause.squash(result.cause);
+          const cause = describeRequestFailure(result.cause);
           setErrors((previous) =>
             new Map(previous).set(
               directoryPath,

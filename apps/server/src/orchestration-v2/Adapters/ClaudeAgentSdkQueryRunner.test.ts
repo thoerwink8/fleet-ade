@@ -29,6 +29,7 @@ import { signalProcessGroup } from "@t3tools/provider-core/server/processGroup";
 import {
   ClaudeAgentSdkQueryRunner,
   type ClaudeAgentSdkQueryOpenInput,
+  ClaudeWindowsProcessTreeTerminator,
   layerQueryRunner,
   spawnClaudeProcessGroup,
 } from "./ClaudeAdapterV2.ts";
@@ -391,7 +392,165 @@ it.effect.each([true, false])("only retries after confirmed process exit: %s", (
     if (Exit.isSuccess(result)) yield* result.value.close;
     assert.equal(querySpy.mock.calls.length, exits ? 2 : 1);
     assert.equal(disposed.mock.calls.length, 1);
-  }).pipe(Effect.provide(realQueryRunner)),
+  }).pipe(
+    Effect.provide(
+      // Pinned to POSIX: on Windows the tree kill replaces the leader kill this test's spy observes.
+      realQueryRunner.pipe(Layer.provide(Layer.succeed(HostProcess.Platform, "linux"))),
+    ),
+  ),
+);
+
+it.effect("ends the Windows CLI's process tree when the SDK aborts the query", () => {
+  const terminateWindowsProcessTree = vi.fn();
+  return Effect.gen(function* () {
+    const events = new NodeEvents.EventEmitter();
+    const stdin = new NodeStream.PassThrough();
+    const stdout = new NodeStream.PassThrough();
+    const child = {
+      stdin,
+      stdout,
+      pid: 4321,
+      killed: false,
+      exitCode: null,
+      kill: vi.fn(() => true),
+      on: events.on.bind(events),
+      once: events.once.bind(events),
+      off: events.off.bind(events),
+    } satisfies ClaudeSdk.SpawnedProcess & { pid: number };
+    // @effect-diagnostics-next-line abortControllerInEffect:off - The forwarded SDK signal is not the test fiber's cancellation.
+    const forwarded = new AbortController();
+    const querySpy = vi.spyOn(ClaudeSdk, "query").mockImplementation(({ options }) => {
+      options?.spawnClaudeCodeProcess?.({
+        command: "claude",
+        args: [],
+        env: {},
+        signal: forwarded.signal,
+      });
+      return {
+        close: vi.fn(),
+        next: () => new Promise(() => {}),
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+        [Symbol.asyncDispose]: async () => {},
+      } as unknown as ClaudeSdk.Query;
+    });
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        querySpy.mockRestore();
+        stdin.destroy();
+        stdout.destroy();
+      }),
+    );
+    const runner = yield* ClaudeAgentSdkQueryRunner;
+    const session = yield* runner.open({
+      threadId: ThreadId.make("thread-windows-tree-abort"),
+      providerSessionId: ProviderSessionId.make("session-windows-tree-abort"),
+      options: {
+        sessionId: "native-session-windows-tree-abort",
+        model: "claude-sonnet-4-6",
+        tools: [],
+        permissionMode: "default",
+        spawnClaudeCodeProcess: () => child,
+      },
+    });
+    yield* Effect.addFinalizer(() => session.close.pipe(Effect.orDie));
+
+    forwarded.abort();
+    assert.deepEqual(terminateWindowsProcessTree.mock.calls, [[child.pid]]);
+    assert.equal("mock" in child.kill, false);
+  }).pipe(
+    Effect.provide(
+      realQueryRunner.pipe(
+        Layer.provide(Layer.succeed(HostProcess.Platform, "win32")),
+        Layer.provide(
+          Layer.succeed(ClaudeWindowsProcessTreeTerminator, terminateWindowsProcessTree),
+        ),
+      ),
+    ),
+  );
+});
+
+it.effect.each([
+  { platform: "linux", killsTree: false },
+  { platform: "win32", killsTree: true },
+] as const)(
+  "ends a failed Windows CLI with its process tree, a POSIX one alone: $platform",
+  (testCase) => {
+    const terminateWindowsProcessTree = vi.fn();
+    return Effect.gen(function* () {
+      const registrationStarted = Promise.withResolvers<void>();
+      const events = new NodeEvents.EventEmitter();
+      const stdin = new NodeStream.PassThrough();
+      const stdout = new NodeStream.PassThrough();
+      const child = {
+        stdin,
+        stdout,
+        pid: 4321,
+        killed: false,
+        exitCode: null,
+        kill: vi.fn(() => true),
+        on: events.on.bind(events),
+        once: events.once.bind(events),
+        off: events.off.bind(events),
+      } satisfies ClaudeSdk.SpawnedProcess & { pid: number };
+      const signal = yield* Effect.abortSignal;
+      const querySpy = vi.spyOn(ClaudeSdk, "query").mockImplementation(({ options }) => {
+        options?.spawnClaudeCodeProcess?.({ command: "claude", args: [], env: {}, signal });
+        return {
+          initializationResult: async () => ({}),
+          setMcpServers: () => {
+            registrationStarted.resolve();
+            return new Promise<ClaudeSdk.McpSetServersResult>(() => {});
+          },
+          close: vi.fn(),
+          [Symbol.asyncDispose]: async () => {},
+        } as unknown as ClaudeSdk.Query;
+      });
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          querySpy.mockRestore();
+          stdin.destroy();
+          stdout.destroy();
+        }),
+      );
+      const runner = yield* ClaudeAgentSdkQueryRunner;
+      // Without a resume ID the runner fails instead of retrying, so its cleanup ends the CLI.
+      const { resume: _resume, ...freshOptions } = resumedMcpQueryInput.options;
+      const opening = yield* runner
+        .open({
+          ...resumedMcpQueryInput,
+          options: {
+            ...freshOptions,
+            sessionId: "native-session-tree-kill",
+            spawnClaudeCodeProcess: () => child,
+          },
+        })
+        .pipe(Effect.exit, Effect.forkChild);
+      yield* Effect.promise(() => registrationStarted.promise);
+      yield* TestClock.adjust("90 seconds");
+      events.emit("exit", null, "SIGKILL");
+      const result = yield* Fiber.join(opening);
+
+      assert.equal(Exit.isFailure(result), true);
+      if (testCase.killsTree) {
+        assert.deepEqual(terminateWindowsProcessTree.mock.calls, [[child.pid]]);
+        assert.equal("mock" in child.kill, false);
+      } else {
+        assert.equal(terminateWindowsProcessTree.mock.calls.length, 0);
+        assert.deepEqual(child.kill.mock.calls, [["SIGKILL"]]);
+      }
+    }).pipe(
+      Effect.provide(
+        realQueryRunner.pipe(
+          Layer.provide(Layer.succeed(HostProcess.Platform, testCase.platform)),
+          Layer.provide(
+            Layer.succeed(ClaudeWindowsProcessTreeTerminator, terminateWindowsProcessTree),
+          ),
+        ),
+      ),
+    );
+  },
 );
 
 it.effect("stops retrying MCP registration after two timeouts and reports the cause", () =>
