@@ -115,7 +115,7 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof AutocompleteInput>) {
   return (
-    <div className="fa-cmd__in" data-slot="command-input-row">
+    <div className="fa-cmd__in *:h-full [&_input]:h-full" data-slot="command-input-row">
       <AutocompleteInput
         autoFocus
         className={cn(
@@ -166,7 +166,7 @@ function CommandPanel({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "relative min-h-0 overflow-hidden rounded-t-xl not-has-[+[data-slot=command-footer]]:rounded-b-2xl bg-transparent **:data-[slot=scroll-area-scrollbar]:mt-2 [touch-action:pan-y]",
+        "relative min-h-0 overflow-hidden rounded-t-xl not-has-[+[data-slot=command-footer]]:rounded-b-xl bg-transparent **:data-[slot=scroll-area-scrollbar]:mt-2 [touch-action:pan-y]",
         className,
       )}
       {...props}
@@ -201,7 +201,7 @@ function CommandItem({
   ...props
 }: React.ComponentProps<typeof AutocompleteItem> & {
   active?: boolean;
-  lines?: 1 | 2;
+  lines?: 1 | 2 | 3;
   hasLead?: boolean;
 }) {
   const composer = "data-composer-item-id" in props;
@@ -215,11 +215,7 @@ function CommandItem({
                 "cursor-pointer hover:bg-transparent hover:text-inherit data-highlighted:bg-transparent data-highlighted:text-inherit data-selected:bg-transparent data-selected:text-inherit [&[data-highlighted][data-selected]]:bg-transparent [&[data-highlighted][data-selected]]:text-inherit",
               active && "bg-accent! text-accent-foreground!",
             )
-          : cn(
-              "fa-cmd__row",
-              lines === 2 ? "fa-cmd__row--2" : "fa-cmd__row--1",
-              hasLead && "has-lead",
-            ),
+          : cn("fa-cmd__row", `fa-cmd__row--${lines}`, hasLead && "has-lead"),
         className,
       )}
       data-active={composer ? active || undefined : undefined}
