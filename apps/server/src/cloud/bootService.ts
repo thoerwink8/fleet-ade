@@ -1362,7 +1362,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             .makeDirectory(path.dirname(unitPath), { recursive: true })
             .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
           // Files can match the new version even when activation fails; keep that install retryable.
-          yield* fs.writeFileString(restartPendingPath, `${input.cliVersion}\n`, { mode: 0o600 });
+          yield* writeDurably(restartPendingPath, `${input.cliVersion}\n`);
           const plan = planForUnit(currentlyInstalled ? yield* fs.readFileString(unitPath) : "");
           yield* writeDurably(
             statePath,

@@ -18,6 +18,16 @@ const isUnsupportedSync = (error: PlatformError.PlatformError) => {
   return code === "EINVAL" || code === "ENOTSUP" || code === "ENOSYS";
 };
 
+// Saves keep the replaced file's mode and create new files owner-only; chmod, since the umask narrows an open mode.
+const replacedMode = (fs: FileSystem.FileSystem, targetPath: string) =>
+  fs.stat(targetPath).pipe(
+    Effect.map((info) => info.mode & 0o777),
+    Effect.catchIf(
+      (error) => error.reason._tag === "NotFound",
+      () => Effect.succeed(0o600),
+    ),
+  );
+
 // Bound denial delays to about two seconds because settings saves hold their write lock.
 const LOCKED_RENAME_RETRIES = 20;
 const LOCKED_RENAME_RETRY_DELAY = "100 millis";
@@ -69,6 +79,9 @@ export const writeFileStringAtomically = (input: {
               batchLength = 0;
             }
             if (batchLength > 0) yield* file.writeAll(encoder.encode(batch.join("")));
+          }
+          if (platform !== "win32") {
+            yield* fs.chmod(tempPath, yield* replacedMode(fs, targetPath));
           }
           yield* file.sync;
         }),

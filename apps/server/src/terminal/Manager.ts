@@ -36,6 +36,7 @@ import {
   CodexSettings,
   ProviderInstanceId,
 } from "@t3tools/contracts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { makeKeyedCoalescingWorker } from "@t3tools/shared/KeyedCoalescingWorker";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { AgentScope } from "@t3tools/shared/AgentScope";
@@ -2127,15 +2128,9 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       const history = new BoundedTerminalHistory(historyLineLimit, raw, historyByteLimit);
       const capped = history.value();
       if (migrating || truncated || capped !== raw) {
-        const write = Effect.gen(function* () {
-          const temporaryPath = yield* fileSystem.makeTempFileScoped({
-            directory: logsDir,
-            prefix: ".history-",
-          });
-          yield* fileSystem.writeFileString(temporaryPath, capped);
-          yield* fileSystem.rename(temporaryPath, nextPath);
-        }).pipe(
-          Effect.scoped,
+        const write = writeFileStringAtomically({ filePath: nextPath, contents: capped }).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
           Effect.mapError(
             (cause) =>
               new TerminalHistoryError({

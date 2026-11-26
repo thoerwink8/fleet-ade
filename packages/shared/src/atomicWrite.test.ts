@@ -181,6 +181,66 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
     }),
   );
 
+  // Read-only and unreadable targets still save, since the mode lands after the temp file opens.
+  // Windows reports modes that ignore the write bit, so these checks are POSIX-only.
+  it.effect.each(HostProcess.Platform.defaultValue() === "win32" ? [] : ["644", "444", "000"])(
+    "keeps the %s permissions of the file it replaces",
+    (octal) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+        const filePath = path.join(root, "settings.json");
+        const mode = Number.parseInt(octal, 8);
+        yield* fs.writeFileString(filePath, "before");
+        yield* fs.chmod(filePath, mode);
+
+        yield* writeFileStringAtomically({ filePath, contents: "after" });
+
+        assert.strictEqual((yield* fs.stat(filePath)).mode & 0o777, mode);
+        yield* fs.chmod(filePath, 0o600);
+        assert.strictEqual(yield* fs.readFileString(filePath), "after");
+      }),
+  );
+
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "creates a new file readable only by its owner",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+        const filePath = path.join(root, "settings.json");
+
+        yield* writeFileStringAtomically({ filePath, contents: "fresh" });
+
+        assert.strictEqual(((yield* fs.stat(filePath)).mode & 0o777).toString(8), "600");
+      }),
+  );
+
+  // Root ignores the missing read bit, so only a regular user sees the failure.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32" || process.getuid?.() === 0)(
+    "saves when the umask removes owner read access",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+        const filePath = path.join(root, "settings.json");
+        yield* fs.writeFileString(filePath, "before");
+        yield* fs.chmod(filePath, 0o600);
+        yield* Effect.acquireRelease(
+          Effect.sync(() => process.umask(0o400)),
+          (previous) => Effect.sync(() => process.umask(previous)),
+        );
+
+        yield* writeFileStringAtomically({ filePath, contents: "after" });
+
+        assert.strictEqual(yield* fs.readFileString(filePath), "after");
+        assert.strictEqual((yield* fs.stat(filePath)).mode & 0o777, 0o600);
+      }),
+  );
+
   it.effect("keeps a symlinked file linked and rewrites its destination", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -298,6 +358,63 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
     }),
   );
 });
+
+// The retry fiber leaves the scheduler on every real fs call, so TestClock
+// adjustments finish while the fiber is still between steps and the chain
+// breaks. The full retry budget is two seconds of wall time.
+it.live("retries a locked rename until the lock clears", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+    const filePath = path.join(root, "settings.json");
+    yield* fs.writeFileString(filePath, "before");
+    let attempts = 0;
+    const lockedTwice = FileSystem.make({
+      ...fs,
+      rename: (from, to) =>
+        Effect.suspend(() => {
+          attempts += 1;
+          return attempts <= 2 ? Effect.fail(renameError("EPERM", to)) : fs.rename(from, to);
+        }),
+    });
+
+    const write = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
+      Effect.provideService(FileSystem.FileSystem, lockedTwice),
+      Effect.provideService(HostProcess.Platform, "win32"),
+      Effect.exit,
+      Effect.forkChild,
+    );
+    assert.deepStrictEqual(yield* Fiber.join(write), Exit.void);
+    assert.strictEqual(yield* fs.readFileString(filePath), "after");
+    assert.deepStrictEqual(yield* fs.readDirectory(root), ["settings.json"]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
+
+it.live("fails after the retries run out and removes its temp file", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+    const filePath = path.join(root, "settings.json");
+    yield* fs.writeFileString(filePath, "before");
+    const alwaysLocked = FileSystem.make({
+      ...fs,
+      rename: (_from, to) => Effect.fail(renameError("EBUSY", to)),
+    });
+
+    const write = yield* writeFileStringAtomically({ filePath, contents: "after" }).pipe(
+      Effect.provideService(FileSystem.FileSystem, alwaysLocked),
+      Effect.provideService(HostProcess.Platform, "win32"),
+      Effect.exit,
+      Effect.forkChild,
+    );
+    const exit = yield* Fiber.join(write);
+    assert.isTrue(Exit.isFailure(exit));
+    assert.strictEqual(yield* fs.readFileString(filePath), "before");
+    assert.deepStrictEqual(yield* fs.readDirectory(root), ["settings.json"]);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+);
 
 const renameError = (code: string, path: string) =>
   PlatformError.systemError({

@@ -4,6 +4,7 @@ import {
   type ProviderInstallState,
   type ServerProviderCompatibilityAdvisory,
 } from "@t3tools/contracts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { cliArchiveTarCommand, parseChecksums } from "@t3tools/shared/cliRelease";
 import { compareSemverVersions } from "@t3tools/shared/semver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -550,17 +551,14 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
       const activate = Effect.fn("CodexInstallation.activate")(
         function* () {
           const executable = yield* completedRelease(release.version);
-          const temporary = yield* fs.makeTempDirectoryScoped({
-            directory: managedDirectory,
-            prefix: ".active-",
-          });
-          const pointer = path.join(temporary, "active.json");
-          yield* fs.writeFileString(pointer, yield* encodeActive({ version: release.version }), {
-            mode: 0o600,
-            flag: "wx",
-          });
           yield* ensureEligible();
-          yield* fs.rename(pointer, activePath);
+          yield* writeFileStringAtomically({
+            filePath: activePath,
+            contents: yield* encodeActive({ version: release.version }),
+          }).pipe(
+            Effect.provideService(FileSystem.FileSystem, fs),
+            Effect.provideService(Path.Path, path),
+          );
           yield* SubscriptionRef.update(
             state,
             (current) =>

@@ -2,6 +2,7 @@
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import * as ModelManifest from "./ModelManifest.ts";
 import { resolveProviderCompatibility } from "./providerCompatibility.ts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { cliArchiveTarCommand } from "@t3tools/shared/cliRelease";
 import { compareSemverVersions } from "@t3tools/shared/semver";
 import * as EffectNodeStream from "@effect/platform-node/NodeStream";
@@ -564,16 +565,13 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
       const activate = Effect.fn("AntigravityInstallation.activate")(
         function* () {
           yield* ensureEligible(asset.version);
-          const pointerDirectory = yield* fs.makeTempDirectoryScoped({
-            directory: managedDirectory,
-            prefix: "active.json.",
-          });
-          const pointerPath = path.join(pointerDirectory, "contents.tmp");
-          yield* fs.writeFileString(pointerPath, yield* encodeActiveRelease({ releaseId }), {
-            flag: "wx",
-            mode: 0o600,
-          });
-          yield* fs.rename(pointerPath, activePath);
+          yield* writeFileStringAtomically({
+            filePath: activePath,
+            contents: yield* encodeActiveRelease({ releaseId }),
+          }).pipe(
+            Effect.provideService(FileSystem.FileSystem, fs),
+            Effect.provideService(Path.Path, path),
+          );
           yield* SubscriptionRef.update(
             state,
             (current) =>

@@ -2,10 +2,10 @@ import {
   DesktopServerExposureModeSchema,
   type DesktopServerExposureMode,
 } from "@t3tools/contracts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import { resolveSymlinkTarget } from "@t3tools/shared/symlink";
 import * as Context from "effect/Context";
-import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -115,11 +115,9 @@ const settingsChange = (settings: DesktopSettings, changed: boolean): DesktopSet
 });
 
 const DesktopSettingsWriteOperation = Schema.Literals([
-  "create-temporary-file-name",
   "resolve-symlink",
   "encode-document",
   "create-directory",
-  "write-temporary-file",
   "replace-settings-file",
 ]);
 type DesktopSettingsWriteOperation = typeof DesktopSettingsWriteOperation.Type;
@@ -369,7 +367,6 @@ const writeSettings = Effect.fn("desktop.settings.writeSettings")(function* (inp
   readonly settingsPath: string;
   readonly settings: DesktopSettings;
   readonly defaultSettings: DesktopSettings;
-  readonly suffix: string;
 }): Effect.fn.Return<void, DesktopSettingsWriteError> {
   const targetPath = yield* resolveSymlinkTarget(input.settingsPath).pipe(
     Effect.provideService(FileSystem.FileSystem, input.fileSystem),
@@ -384,7 +381,6 @@ const writeSettings = Effect.fn("desktop.settings.writeSettings")(function* (inp
     ),
   );
   const directory = input.path.dirname(targetPath);
-  const tempPath = `${targetPath}.${process.pid}.${input.suffix}.tmp`;
   const encoded = yield* encodeDesktopSettingsJson(
     toDesktopSettingsDocument(input.settings, input.defaultSettings),
   ).pipe(
@@ -407,28 +403,18 @@ const writeSettings = Effect.fn("desktop.settings.writeSettings")(function* (inp
         }),
     ),
   );
-  yield* Effect.gen(function* () {
-    yield* input.fileSystem.writeFileString(tempPath, `${encoded}\n`).pipe(
-      Effect.mapError(
-        (cause) =>
-          new DesktopSettingsWriteError({
-            operation: "write-temporary-file",
-            path: tempPath,
-            cause,
-          }),
-      ),
-    );
-    yield* input.fileSystem.rename(tempPath, targetPath).pipe(
-      Effect.mapError(
-        (cause) =>
-          new DesktopSettingsWriteError({
-            operation: "replace-settings-file",
-            path: input.settingsPath,
-            cause,
-          }),
-      ),
-    );
-  }).pipe(Effect.ensuring(input.fileSystem.remove(tempPath, { force: true }).pipe(Effect.ignore)));
+  yield* writeFileStringAtomically({ filePath: targetPath, contents: `${encoded}\n` }).pipe(
+    Effect.provideService(FileSystem.FileSystem, input.fileSystem),
+    Effect.provideService(Path.Path, input.path),
+    Effect.mapError(
+      (cause) =>
+        new DesktopSettingsWriteError({
+          operation: "replace-settings-file",
+          path: input.settingsPath,
+          cause,
+        }),
+    ),
+  );
 });
 
 /** @public */
@@ -436,7 +422,6 @@ export const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const random = yield* SecureRandom.SecureRandom;
   const settingsRef = yield* SynchronizedRef.make(environment.defaultDesktopSettings);
   // Writing over a settings file we could not read would erase the preferences it holds.
   const persistenceEnabled = yield* Ref.make(true);
@@ -459,19 +444,13 @@ export const make = Effect.gen(function* () {
       return Ref.get(persistenceEnabled).pipe(
         Effect.flatMap((enabled) =>
           enabled
-            ? random.uuidV4().pipe(
-                Effect.map((uuid) => uuid.replace(/-/g, "")),
-                Effect.flatMap((suffix) =>
-                  writeSettings({
-                    fileSystem,
-                    path,
-                    settingsPath: environment.desktopSettingsPath,
-                    settings: nextSettings,
-                    defaultSettings: environment.defaultDesktopSettings,
-                    suffix,
-                  }),
-                ),
-              )
+            ? writeSettings({
+                fileSystem,
+                path,
+                settingsPath: environment.desktopSettingsPath,
+                settings: nextSettings,
+                defaultSettings: environment.defaultDesktopSettings,
+              })
             : Effect.void,
         ),
         Effect.as([settingsChange(nextSettings, true), nextSettings] as const),
