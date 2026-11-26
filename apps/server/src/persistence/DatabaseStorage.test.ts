@@ -122,10 +122,18 @@ it.effect("remembers completion only after the paced pass finishes", () =>
       Effect.provide(compactionLayer(compact)),
       Effect.provideService(FileSystem.FileSystem, {
         ...fs,
-        writeFileString: (file, content, options) =>
+        // The timestamp lands atomically: its rename, not the temp-file write,
+        // is the moment readers can observe it.
+        rename: (source, target) =>
           fs
-            .writeFileString(file, content, options)
-            .pipe(Effect.ensuring(Deferred.succeed(timestampWritten, undefined))),
+            .rename(source, target)
+            .pipe(
+              Effect.ensuring(
+                target === timestampPath
+                  ? Deferred.succeed(timestampWritten, undefined)
+                  : Effect.void,
+              ),
+            ),
       }),
     );
   }).pipe(Effect.provide(testConfig.pipe(Layer.provideMerge(NodeServices.layer)))),

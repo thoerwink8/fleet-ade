@@ -1270,7 +1270,9 @@ it.live("reuses an immutable Windows release and preserves the pointer when rena
       }),
     });
     yield* writeRelease(installation.managedDirectory, asset, false);
-    yield* installation.start;
+    // atomicWrite reads the platform from the context start runs in, not from
+    // the harness's construction-time override, so pin win32 at the call site.
+    yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
     // The install work runs in its own fiber, so the state stream is the
     // completion signal: wait for the failure, then confirm the retries stopped.
     expect((yield* terminalState(installation)).phase).toBe("failed");
@@ -1281,7 +1283,7 @@ it.live("reuses an immutable Windows release and preserves the pointer when rena
     expect(renameTargets.length).toBeGreaterThan(1);
 
     denyPointerRename = false;
-    yield* installation.start;
+    yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
     expect((yield* terminalState(installation)).phase).toBe("succeeded");
     expect((yield* installation.resolve()).version).toBe("fixture-new");
     expect(requests).toEqual([]);
