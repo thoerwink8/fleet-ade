@@ -19,7 +19,9 @@
 // TIMEOUT. A rerun on exactly the files of the last passing run prints that
 // run's summary.
 import * as NodeCrypto from "node:crypto";
+import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -153,9 +155,65 @@ export const gitLines = (cwd: string, args: ReadonlyArray<string>) =>
 // Ignored files that checks read: generated sources, declarations, and env files.
 const checkInput = /(^|\/)\.(generated|astro)\/|\.d\.ts$|(^|\/)\.env[^/]*$/;
 const inNodeModules = /(^|\/)node_modules\//;
+// Expanding a collapsed directory with `git ls-files` descends into its nested
+// node_modules (only --directory skips ignored directories, and expansion cannot
+// use it). A readdir walk loses nothing: collapsed directories hold only ignored
+// entries, and checks never read node_modules.
+const walkIgnoredDirectory = Effect.fnUntraced(function* (
+  root: string,
+  directory: string,
+  into: Set<string>,
+) {
+  interface Pending {
+    readonly relative: string;
+    readonly absolute: string;
+  }
+  const pending: Array<Pending> = [
+    { relative: directory, absolute: NodePath.join(root, directory) },
+  ];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    const entries = yield* Effect.tryPromise({
+      try: () => NodeFSP.readdir(current.absolute, { withFileTypes: true }),
+      catch: (cause) => cause,
+    }).pipe(
+      Effect.catch((cause) =>
+        // A directory removed mid-scan or replaced by a file is not an input;
+        // anything else (EACCES, EMFILE) must fail the listing, not skip inputs.
+        typeof cause === "object" &&
+        cause !== null &&
+        "code" in cause &&
+        (cause.code === "ENOENT" || cause.code === "ENOTDIR")
+          ? Effect.succeed([])
+          : Effect.fail(cause),
+      ),
+    );
+    let isRepository = false;
+    for (const entry of entries) {
+      if (entry.name === ".git") isRepository = true;
+    }
+    if (isRepository) {
+      // A nested repository stands for its content in the hash, as the old
+      // pathspecs listed it; git never descends into one either.
+      into.add(current.relative);
+      continue;
+    }
+    for (const entry of entries) {
+      const relative = current.relative + entry.name;
+      if (entry.isDirectory()) {
+        if (entry.name !== "node_modules") {
+          pending.push({
+            relative: relative + "/",
+            absolute: NodePath.join(current.absolute, entry.name),
+          });
+        }
+      } else if (checkInput.test(relative)) {
+        into.add(relative);
+      }
+    }
+  }
+});
 
-// Pathspecs don't stop git from walking an ignored directory, and on Windows it follows pnpm's
-// junctions in node_modules until MAX_PATH. `--directory` lists one without entering it.
 export const ignoredCheckInputs = Effect.fn("checkChanged.ignoredCheckInputs")(function* (
   root: string,
 ) {
@@ -165,30 +223,36 @@ export const ignoredCheckInputs = Effect.fn("checkChanged.ignoredCheckInputs")(f
     );
   const ignored = ["--others", "--ignored", "--exclude-standard"];
   // `--directory` hides a directory where the index has a file; `-k` lists those.
+  // The `-o -i` filter keeps unignored blockers (an untracked file sitting where
+  // a directory is expected) out of the ignored inputs.
   const [listed, replaced] = yield* Effect.all(
-    [list([...ignored, "--directory"]), list(["-k", "--directory"])],
+    [list([...ignored, "--directory"]), list(["-k", ...ignored, "--directory"])],
     { concurrency: 2 },
   );
-  const entries = [...new Set([...listed, ...replaced])].sort();
-  // git lists an untracked directory whose contents are all ignored together with them;
-  // listing it again would walk its node_modules.
-  const directories = entries.filter(
-    (entry, index) =>
-      entry.endsWith("/") && !inNodeModules.test(entry) && !entries[index + 1]?.startsWith(entry),
+  const files = new Set(
+    [...listed, ...replaced].filter(
+      (entry) => !entry.endsWith("/") && !inNodeModules.test(entry) && checkInput.test(entry),
+    ),
   );
-  const files = entries.filter((entry) => !entry.endsWith("/"));
-  // Calls fit Windows' 32,767-character command line: 16 covers `:(literal)`, quotes, a space.
-  // `.git/` matches nothing; it stops git starting its walk inside a nested repository.
-  const longest = directories.reduce((max, dir) => Math.max(max, dir.length), 0);
-  const size = Math.max(1, Math.floor(30_000 / (longest + 16)));
-  for (let start = 0; start < directories.length; start += size) {
-    const batch = directories.slice(start, start + size).map((dir) => `:(literal)${dir}`);
-    files.push(...(yield* list([...ignored, "--", ":(literal).git/", ...batch])));
-  }
-  // A nested repository is listed by its directory, as the old pathspecs listed it.
-  return files
-    .filter((file) => !inNodeModules.test(file) && (file.endsWith("/") || checkInput.test(file)))
+  const directories = [...new Set([...listed, ...replaced])]
+    .filter((entry) => entry.endsWith("/"))
     .sort();
+  for (const directory of directories) {
+    if (inNodeModules.test(directory)) {
+      // Its files are never inputs, but a nested repository root counts as one:
+      // the old listing emitted the entry itself, never its content.
+      const isRepository = yield* Effect.promise(() =>
+        NodeFSP.stat(NodePath.join(root, directory, ".git")).then(
+          () => true,
+          () => false,
+        ),
+      );
+      if (isRepository) files.add(directory);
+      continue;
+    }
+    yield* walkIgnoredDirectory(root, directory, files);
+  }
+  return [...files].sort();
 });
 
 export const comparisonBase = Effect.fn("checkChanged.comparisonBase")(function* (

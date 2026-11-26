@@ -505,6 +505,56 @@ it("lists the same ignored inputs as the old pathspecs in a leftover package fol
   assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
 });
 
+it("ignores an unignored file sitting where an index directory is expected", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\n");
+    write("path.d.ts/child.ts");
+  });
+  const { git, write } = project;
+  git("add", "path.d.ts/child.ts");
+  NodeFS.rmSync(NodePath.join(project.root, "path.d.ts"), { recursive: true });
+  write("path.d.ts");
+  // The blocker is neither ignored nor inside an ignored directory, so the old
+  // pathspecs never listed it even though it matches *.d.ts.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), []);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), []);
+});
+
+it("lists ignored nested repositories inside node_modules as directory entries", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\n");
+  });
+  const { git } = project;
+  NodeFS.mkdirSync(NodePath.join(project.root, "node_modules"), { recursive: true });
+  NodeFS.mkdirSync(NodePath.join(project.root, "app/node_modules"), { recursive: true });
+  git("-C", "node_modules", "init");
+  git("-C", "app/node_modules", "init");
+  // Nested repositories appear in the old listing as their root path with a
+  // trailing slash, and `ls-files -o` lists them again as untracked input.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["app/node_modules/", "node_modules/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "app/node_modules/",
+    "node_modules/",
+  ]);
+});
+
+it("does not walk a nested node_modules inside an ignored directory", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\nnode_modules/\n");
+    write("build/normal.d.ts");
+    write("build/node_modules/pkg/ignored.d.ts");
+  });
+  const { git } = project;
+  git("-C", "build/node_modules/pkg", "init");
+  // git does walk the nested dependency tree and finds the repository root,
+  // which the expansion must not reproduce: walking it is what froze Windows.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), [
+    "build/node_modules/pkg/",
+    "build/normal.d.ts",
+  ]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/normal.d.ts"]);
+});
+
 function launcherFixture() {
   const root = NodeFS.realpathSync(
     NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3 checks & (fixture) ")),
