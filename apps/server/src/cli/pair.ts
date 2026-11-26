@@ -34,7 +34,7 @@ import { resolveBaseDirSelection } from "../os-jank.ts";
 import {
   type PersistedServerRuntimeState,
   readPersistedServerRuntimeState,
-  verifyRecordedServerProcess,
+  verifyRecordedServerProcessLiveness,
 } from "../serverRuntimeState.ts";
 import {
   buildPairingUrl,
@@ -276,7 +276,7 @@ const discoverPairTarget = Effect.fn("pair.discoverPairTarget")(function* (
         continue;
       }
       // A dead server's port may be reused; do not mint tokens in its old database for another server.
-      if (!(yield* verifyRecordedServerProcess(state.value, statePath))) {
+      if ((yield* verifyRecordedServerProcessLiveness(state.value, statePath)) !== "live") {
         continue;
       }
       const probed = yield* probeEnvironmentDescriptor(state.value.origin);

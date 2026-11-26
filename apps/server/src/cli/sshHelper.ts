@@ -7,7 +7,7 @@ import * as NodeNet from "node:net";
 
 import * as Effect from "effect/Effect";
 import { Argument, Command } from "effect/cli";
-import { verifyRecordedServerProcess } from "../serverRuntimeState.ts";
+import { verifyRecordedServerProcessLiveness } from "../serverRuntimeState.ts";
 
 const canBind = (port: number) =>
   new Promise<boolean>((resolve) => {
@@ -92,44 +92,50 @@ const waitReady = Command.make("wait-ready", {
   ),
 );
 
+/** `<pid> <port>` for a live default-home server, undefined for any record it cannot verify. */
+export const runtimePortOutput = Effect.fn("runtimePortOutput")(function* (
+  runtimeFile: string,
+): Effect.fn.Return<string | undefined, never, never> {
+  // @effect-diagnostics-next-line globalJsonInEffect:off - mirrors the shell snippet's loose parse.
+  const runtime = JSON.parse(NodeFS.readFileSync(runtimeFile, "utf8")) as {
+    pid?: unknown;
+    ownerId?: unknown;
+    startedAt?: unknown;
+    port?: unknown;
+    origin?: unknown;
+  };
+  const pid = Number(runtime.pid);
+  const port = Number(runtime.port);
+  if (!Number.isInteger(pid) || pid <= 0 || !Number.isInteger(port)) {
+    return undefined;
+  }
+  const origin = new URL(String(runtime.origin ?? ""));
+  if (origin.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(origin.hostname)) {
+    return undefined;
+  }
+  const liveness = yield* verifyRecordedServerProcessLiveness(
+    {
+      pid,
+      ownerId: typeof runtime.ownerId === "string" ? runtime.ownerId : undefined,
+      startedAt: typeof runtime.startedAt === "string" ? runtime.startedAt : "",
+    },
+    runtimeFile,
+  );
+  return liveness === "live" ? `${pid} ${port}` : undefined;
+});
+
 /** Prints `<pid> <port>` for a live default-home server, or exits 1. */
 const runtimePort = Command.make("runtime-port", {
   runtimeFile: Argument.String("runtime-file"),
 }).pipe(
   Command.withHandler(({ runtimeFile }) =>
     Effect.gen(function* () {
-      // @effect-diagnostics-next-line globalJsonInEffect:off - mirrors the shell snippet's loose parse.
-      const runtime = JSON.parse(NodeFS.readFileSync(runtimeFile, "utf8")) as {
-        pid?: unknown;
-        ownerId?: unknown;
-        startedAt?: unknown;
-        port?: unknown;
-        origin?: unknown;
-      };
-      const pid = Number(runtime.pid);
-      const port = Number(runtime.port);
-      if (!Number.isInteger(pid) || pid <= 0 || !Number.isInteger(port)) {
+      const output = yield* runtimePortOutput(runtimeFile);
+      if (output === undefined) {
         process.exitCode = 1;
         return;
       }
-      const origin = new URL(String(runtime.origin ?? ""));
-      if (origin.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(origin.hostname)) {
-        process.exitCode = 1;
-        return;
-      }
-      const verified = yield* verifyRecordedServerProcess(
-        {
-          pid,
-          ownerId: typeof runtime.ownerId === "string" ? runtime.ownerId : undefined,
-          startedAt: typeof runtime.startedAt === "string" ? runtime.startedAt : "",
-        },
-        runtimeFile,
-      );
-      if (!verified) {
-        process.exitCode = 1;
-        return;
-      }
-      process.stdout.write(`${pid} ${port}`);
+      process.stdout.write(output);
     }).pipe(Effect.catchDefect(() => Effect.sync(() => void (process.exitCode = 1)))),
   ),
 );

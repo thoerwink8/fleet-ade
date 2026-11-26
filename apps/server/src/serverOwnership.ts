@@ -27,16 +27,13 @@ import {
   compareExactServiceVersions,
   serviceStateActiveVersion,
 } from "./cloud/serviceProtocol.ts";
-import {
-  legacyOwnerStartedBeforeRecord,
-  legacyOwnerStartTimeCommand,
-} from "./legacyServerOwner.ts";
 import * as ProcessRunner from "./processRunner.ts";
 import {
   clearPersistedServerRuntimeState,
-  isProcessAlive,
   persistServerRuntimeState,
   readPersistedServerRuntimeState,
+  registerInProcessOwner,
+  verifyRecordedServerProcessLiveness,
   type PersistedServerRuntimeState,
 } from "./serverRuntimeState.ts";
 
@@ -77,27 +74,13 @@ const isSqliteBusy = (cause: unknown) =>
   (("errcode" in cause && cause.errcode === 5) ||
     ("code" in cause && cause.code === "SQLITE_BUSY"));
 
-// Pre-lock servers publish only runtime state; require start-time proof of PID reuse before treating it as stale.
+// Pre-lock servers publish only runtime state. An unsure identity refuses startup: the
+// ownership lock cannot prove anything about a server that predates it.
 const legacyOwnerIsLive = Effect.fn("legacyOwnerIsLive")(function* (
   state: PersistedServerRuntimeState,
+  statePath: string,
 ) {
-  if (!isProcessAlive(state.pid)) return false;
-  const recordedAt = Date.parse(state.startedAt);
-  if (!Number.isFinite(recordedAt)) return true;
-  const platform = yield* HostProcess.Platform;
-  const runner = yield* ProcessRunner.ProcessRunner;
-  const result = yield* runner
-    .run({
-      ...legacyOwnerStartTimeCommand(state.pid, platform),
-      timeout: Duration.seconds(2),
-      maxOutputBytes: 16_384,
-    })
-    .pipe(Effect.option);
-  return legacyOwnerStartedBeforeRecord(
-    Option.isSome(result) && result.value.code === 0 ? result.value.stdout : undefined,
-    recordedAt,
-    platform,
-  );
+  return (yield* verifyRecordedServerProcessLiveness(state, statePath)) !== "stale";
 });
 
 // Pre-lock services become invisible when another server replaces their runtime
@@ -237,6 +220,7 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
       Effect.ensuring(Effect.sync(() => db.close())),
     ),
   );
+  yield* registerInProcessOwner(statePath, ownerId);
 
   const previous = yield* readPersistedServerRuntimeState(statePath).pipe(
     Effect.orElseSucceed(() => Option.none<PersistedServerRuntimeState>()),
@@ -244,7 +228,7 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
   if (
     Option.isSome(previous) &&
     previous.value.ownerId === undefined &&
-    (yield* legacyOwnerIsLive(previous.value))
+    (yield* legacyOwnerIsLive(previous.value, statePath))
   ) {
     return yield* new ServerAlreadyRunningError({ stateDir });
   }

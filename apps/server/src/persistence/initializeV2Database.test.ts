@@ -17,7 +17,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as ServerConfig from "../config.ts";
 import * as SqlitePersistence from "./Sqlite.ts";
 import { runMigrations } from "./Migrations.ts";
-import { initializeV2Database } from "./initializeV2Database.ts";
+import { initializeV2Database, ProcessStartTimeProbe } from "./initializeV2Database.ts";
 import * as EventStore from "../orchestration-v2/EventStore.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as EventSink from "../orchestration-v2/EventSink.ts";
@@ -205,6 +205,60 @@ it.effect("removes copies left by a killed start, but not one that is still runn
       [running, unrelated, "statev2.sqlite"].sort(),
     );
     assert.equal(NodeFS.readFileSync(destinationPath, "utf8"), "existing V2 database");
+  }).pipe(
+    Effect.provide(NodeServices.layer),
+    Effect.ensuring(Effect.sync(() => NodeFS.rmSync(directory, { recursive: true, force: true }))),
+  );
+});
+
+it.effect("removes a copy whose PID now belongs to a process started after the copy", () => {
+  const directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-v2-reused-pid-"));
+  return Effect.gen(function* () {
+    // The original owner is gone and its PID was reused: the copy predates the process that now
+    // owns the PID. Creation and process start are milliseconds apart in a fixture, so the
+    // start-time probe is injected instead of guessed from wall-clock gaps.
+    const staging = NodePath.join(directory, ".v2-import-000000-Ab3dEf");
+    NodeFS.mkdirSync(staging);
+    NodeFS.writeFileSync(NodePath.join(staging, "snapshot.sqlite"), "partial copy");
+    const copyCreatedAtMs = NodeFS.statSync(staging).birthtimeMs;
+    const child = NodeChildProcess.spawn(process.execPath, ["-e", "process.stdin.resume()"], {
+      stdio: ["pipe", "ignore", "ignore"],
+    });
+    try {
+      assert(child.pid !== undefined);
+      const copyName = `.v2-import-${child.pid}-Ab3dEf`;
+      NodeFS.renameSync(staging, NodePath.join(directory, copyName));
+      const destinationPath = NodePath.join(directory, "statev2.sqlite");
+      NodeFS.writeFileSync(destinationPath, "existing V2 database");
+      // The reused PID belongs to a live process started well after the copy was made.
+      yield* Effect.provideService(
+        initializeV2Database(destinationPath),
+        ProcessStartTimeProbe,
+        () => Promise.resolve(copyCreatedAtMs + 60_000),
+      );
+      assert.notInclude(
+        NodeFS.readdirSync(directory),
+        copyName,
+        "a process started after the copy was made never wrote it, so the copy is abandoned",
+      );
+
+      // The same PID started before the copy was made keeps it: a running import must survive.
+      const keepName = `.v2-import-${child.pid}-Zx81Qm`;
+      NodeFS.mkdirSync(NodePath.join(directory, keepName));
+      const keepCreatedAtMs = NodeFS.statSync(NodePath.join(directory, keepName)).birthtimeMs;
+      yield* Effect.provideService(
+        initializeV2Database(destinationPath),
+        ProcessStartTimeProbe,
+        () => Promise.resolve(keepCreatedAtMs - 60_000),
+      );
+      assert.include(
+        NodeFS.readdirSync(directory),
+        keepName,
+        "a copy whose process started before it was made is still being written",
+      );
+    } finally {
+      child.kill();
+    }
   }).pipe(
     Effect.provide(NodeServices.layer),
     Effect.ensuring(Effect.sync(() => NodeFS.rmSync(directory, { recursive: true, force: true }))),

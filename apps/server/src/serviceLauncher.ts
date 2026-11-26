@@ -39,10 +39,7 @@ import {
   SERVICE_UNIT_ENV,
   systemdUnitDirectoryOf,
 } from "./cloud/serviceProtocol.ts";
-import {
-  legacyOwnerStartedBeforeRecord,
-  legacyOwnerStartTimeCommand,
-} from "./legacyServerOwner.ts";
+import { probeProcessStartTime, processStartedBeforeTimestamp } from "./legacyServerOwner.ts";
 
 const HANDOFF_DELAY_MS = 2_000;
 /**
@@ -824,16 +821,9 @@ export async function stateDirOwned(baseDir: string): Promise<boolean> {
   if (!Number.isFinite(recordedAt)) return true;
   // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
   const platform = process.platform;
-  const { command, args, env } = legacyOwnerStartTimeCommand(pid, platform);
-  const output = await new Promise<string | undefined>((resolve) =>
-    NodeChildProcess.execFile(
-      command,
-      args,
-      { env: { ...process.env, ...env }, timeout: 2_000, maxBuffer: 16_384 },
-      (error, stdout) => resolve(error === null ? stdout : undefined),
-    ),
-  );
-  return legacyOwnerStartedBeforeRecord(output, recordedAt, platform);
+  const startedAtMs = await probeProcessStartTime(pid, platform);
+  if (startedAtMs === undefined) return true;
+  return processStartedBeforeTimestamp(startedAtMs, recordedAt, platform);
 }
 
 const stopMarkerPath = (baseDir: string) =>

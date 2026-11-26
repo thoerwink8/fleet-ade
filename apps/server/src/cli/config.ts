@@ -28,7 +28,7 @@ import * as ServerConfig from "../config.ts";
 import { expandHomePath, resolveBaseDir } from "../os-jank.ts";
 import {
   readPersistedServerRuntimeState,
-  verifyRecordedServerProcess,
+  verifyRecordedServerProcessLiveness,
 } from "../serverRuntimeState.ts";
 
 const modeFlag = Flag.Literals("mode", ServerConfig.RuntimeMode.literals).pipe(
@@ -373,7 +373,10 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
       Option.isSome(runtime) &&
       runtime.value.pid > 0 &&
       runtime.value.pid !== process.pid &&
-      (yield* verifyRecordedServerProcess(runtime.value, derivedPaths.serverRuntimeStatePath))
+      (yield* verifyRecordedServerProcessLiveness(
+        runtime.value,
+        derivedPaths.serverRuntimeStatePath,
+      )) !== "stale"
     ) {
       return yield* new CliError.UserError({
         cause: `A Fleet ADE server is already running for ${baseDir} (pid ${runtime.value.pid}, ${runtime.value.origin}). Connect to that server, stop it before starting another, or use a different --base-dir.`,

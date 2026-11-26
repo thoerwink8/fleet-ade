@@ -26,6 +26,7 @@ import { SERVICE_LAUNCHER_CONTEXT_ENV } from "./cloud/serviceProtocol.ts";
 import * as ProcessRunner from "./processRunner.ts";
 import * as ServerOwnership from "./serverOwnership.ts";
 import * as ServerRuntimeState from "./serverRuntimeState.ts";
+import { processStartedBeforeTimestamp } from "./legacyServerOwner.ts";
 
 const startBesideBootService = Effect.fn("test.startBesideBootService")(function* (input: {
   readonly platform: "darwin" | "linux";
@@ -596,4 +597,214 @@ describe("readLiveServerRuntimeState", () => {
       assert.isTrue(Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(livePath)));
     }).pipe(Effect.provide(layerIdentity)),
   );
+
+  it.effect(
+    "rejects a lock-aware record whose PID was reused while another process holds the lock",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-crossproc-" });
+        const statePath = path.join(root, "server-runtime.json");
+        // The stand-in for the reused PID: alive, but started long after this record was written.
+        const pidStandIn = yield* liveProcess;
+        assert(pidStandIn.pid !== undefined);
+        // A different process holds the ownership lock, like a server still acquiring its home.
+        const lockScript =
+          'const s=require("node:sqlite");const db=new s.DatabaseSync(process.env.T3_LOCK_PATH);db.exec("BEGIN EXCLUSIVE");process.stdout.write("locked\\n");process.stdin.resume();';
+        const holder = yield* Effect.acquireRelease(
+          Effect.promise(async () => {
+            const child = NodeChildProcess.spawn(process.execPath, ["-e", lockScript], {
+              stdio: ["pipe", "pipe", "ignore"],
+              env: {
+                ...process.env,
+                T3_LOCK_PATH: path.join(root, "server-owner.sqlite"),
+              },
+            });
+            const locked = Promise.race([
+              NodeEvents.EventEmitter.once(child.stdout, "data"),
+              NodeEvents.EventEmitter.once(child, "exit").then(() => {
+                throw new Error("lock holder exited before locking");
+              }),
+            ]);
+            await NodeEvents.EventEmitter.once(child, "spawn");
+            await locked;
+            return child;
+          }),
+          (child) =>
+            Effect.promise(async () => {
+              const exited = NodeEvents.EventEmitter.once(child, "exit");
+              child.kill();
+              await exited;
+            }),
+        );
+        assert(holder.pid !== undefined);
+        assert.notEqual(holder.pid, pidStandIn.pid);
+        // The killed server's record: predates both processes, but the lock is held and its PID lives.
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(
+            recordFor(pidStandIn.pid, {
+              ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+              startedAt: "2026-10-01T00:00:00.000Z",
+            }),
+          ),
+        );
+
+        assert.isTrue(
+          Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+        );
+
+        // The same holder passes once its record is dated consistently with its own process start.
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(
+            recordFor(holder.pid, { ownerId: "4ec9f94a-0000-4000-8000-000000000000" }),
+          ),
+        );
+        assert.isTrue(
+          Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+        );
+      }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("rejects a stale lock-aware record that names this process's PID", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-ownpid-" });
+      const statePath = path.join(root, "server-runtime.json");
+      // The lock was released when this process's PID belonged to a server that has since died.
+      yield* Effect.scoped(ServerOwnership.acquireServerOwnership(statePath));
+      yield* fs.writeFileString(
+        statePath,
+        JSON.stringify(
+          recordFor(process.pid, {
+            ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+            startedAt: "2026-10-01T00:00:00.000Z",
+          }),
+        ),
+      );
+
+      assert.isTrue(Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)));
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("rejects a record whose start time cannot be parsed instead of trusting its PID", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-badtime-" });
+      const child = yield* liveProcess;
+      assert(child.pid !== undefined);
+      const reusedPath = path.join(root, "server-runtime.json");
+      yield* fs.writeFileString(
+        reusedPath,
+        JSON.stringify(recordFor(child.pid, { startedAt: "not-a-timestamp" })),
+      );
+
+      assert.isTrue(
+        Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(reusedPath)),
+      );
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect(
+    "reports an unknown record when the process start-time probe fails: connectors drop it, startup still refuses",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-probefail-" });
+        const statePath = path.join(root, "server-runtime.json");
+        const child = yield* liveProcess;
+        assert(child.pid !== undefined);
+        const failingProbe = Effect.provideService(ServerRuntimeState.ProcessStartTimeProbe, () =>
+          Promise.resolve(undefined),
+        );
+
+        // A pre-lock record: the probe is the only identity proof available.
+        yield* fs.writeFileString(statePath, JSON.stringify(recordFor(child.pid)));
+        assert.equal(
+          yield* failingProbe(
+            ServerRuntimeState.verifyRecordedServerProcessLiveness(
+              {
+                pid: child.pid,
+                ownerId: undefined,
+                startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
+              },
+              statePath,
+            ),
+          ),
+          "unknown",
+        );
+        assert.isTrue(
+          Option.isNone(
+            yield* failingProbe(ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+          ),
+        );
+
+        // Startup stays conservative over an unknown record: the same home refuses a second owner.
+        const state = yield* ServerRuntimeState.makePersistedServerRuntimeState({
+          config: { host: undefined, devUrl: undefined },
+          port: 3773,
+        });
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify({ ...state, pid: child.pid, ownerId: undefined }),
+        );
+        const refused = yield* failingProbe(
+          Effect.scoped(ServerOwnership.acquireServerOwnership(statePath)).pipe(Effect.result),
+        );
+        assert.equal(refused._tag, "Failure");
+        if (refused._tag === "Failure") {
+          assert.equal(refused.failure._tag, "ServerAlreadyRunningError");
+        }
+      }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("distinguishes held, free, and unreadable ownership locks for lock-aware records", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      for (const [name, lockContents] of [
+        ["missing", undefined],
+        ["corrupt", "this is not a sqlite database"],
+      ] as const) {
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: `t3-livestate-lock-${name}-` });
+        const statePath = path.join(root, "server-runtime.json");
+        if (lockContents !== undefined) {
+          yield* fs.writeFileString(path.join(root, "server-owner.sqlite"), lockContents);
+        }
+        const child = yield* liveProcess;
+        assert(child.pid !== undefined);
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(recordFor(child.pid, { ownerId: "4ec9f94a-0000-4000-8000-000000000000" })),
+        );
+        const liveness = yield* ServerRuntimeState.verifyRecordedServerProcessLiveness(
+          JSON.parse(yield* fs.readFileString(statePath)),
+          statePath,
+        );
+        assert.equal(liveness, name === "missing" ? "stale" : "unknown");
+        assert.isTrue(
+          Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+        );
+      }
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+  it("compares process start times with sub-second precision on Windows and whole seconds elsewhere", () => {
+    const recordedAt = Date.parse("2026-06-20T10:00:00.000Z");
+    assert.isFalse(
+      processStartedBeforeTimestamp(recordedAt + 500, recordedAt, "win32"),
+      "a Windows process started 500ms after the record must not pass for it",
+    );
+    assert.isTrue(
+      processStartedBeforeTimestamp(recordedAt - 10, recordedAt, "win32"),
+      "a Windows process started moments before the record is consistent with it",
+    );
+    // ps reports whole seconds: a start one second after the record still passes on POSIX.
+    assert.isTrue(processStartedBeforeTimestamp(recordedAt + 1_000, recordedAt, "linux"));
+    assert.isFalse(processStartedBeforeTimestamp(recordedAt + 2_000, recordedAt, "linux"));
+  });
 });

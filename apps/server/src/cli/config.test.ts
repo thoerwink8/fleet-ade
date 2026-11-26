@@ -280,7 +280,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         pid: child.pid,
         port: 3773,
         origin: "http://127.0.0.1:3773",
-        startedAt: "2026-10-01T00:00:00.000Z",
+        startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
       });
       const cwd = path.join(baseDir, "project");
       const result = yield* resolveManualWebLaunch(baseDir, cwd);

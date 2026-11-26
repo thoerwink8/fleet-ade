@@ -1,6 +1,8 @@
+// @effect-diagnostics nodeBuiltinImport:off - The probe is a hidden, bounded child process in effect-free helpers.
 // Effect-free so the service launcher shares the pre-lock owner identity check with server startup.
+import * as NodeChildProcess from "node:child_process";
 
-export const legacyOwnerStartTimeCommand = (pid: number, platform: NodeJS.Platform) => {
+const legacyOwnerStartTimeCommand = (pid: number, platform: NodeJS.Platform) => {
   const windows = platform === "win32";
   return {
     command: windows ? "powershell.exe" : "ps",
@@ -16,14 +18,45 @@ export const legacyOwnerStartTimeCommand = (pid: number, platform: NodeJS.Platfo
   };
 };
 
-// ps reports whole seconds. Unknown identity (no output) stays conservative.
-export const legacyOwnerStartedBeforeRecord = (
-  output: string | undefined,
-  recordedAt: number,
+/**
+ * The process start time in milliseconds since the epoch, or undefined when the probe fails or
+ * its output cannot be parsed. Undefined is not proof of reuse: callers decide per surface.
+ */
+export const probeProcessStartTime = (
+  pid: number,
   platform: NodeJS.Platform,
-): boolean => {
-  if (output === undefined) return true;
-  const trimmed = output.trim();
-  const startedAt = Date.parse(platform === "win32" ? trimmed : `${trimmed} UTC`);
-  return !Number.isFinite(startedAt) || startedAt <= recordedAt + 1_000;
+): Promise<number | undefined> => {
+  const { command, args, env } = legacyOwnerStartTimeCommand(pid, platform);
+  return new Promise((resolve) =>
+    NodeChildProcess.execFile(
+      command,
+      args,
+      {
+        env: { ...process.env, ...env },
+        timeout: 2_000,
+        maxBuffer: 16_384,
+        windowsHide: true,
+      },
+      (error, stdout) => {
+        if (error !== null) {
+          resolve(undefined);
+          return;
+        }
+        const trimmed = stdout.trim();
+        const parsed = Date.parse(platform === "win32" ? trimmed : `${trimmed} UTC`);
+        resolve(Number.isFinite(parsed) ? parsed : undefined);
+      },
+    ),
+  );
 };
+
+/**
+ * Whether the process start is consistent with having written a record or copy at `referenceAt`.
+ * Windows reports sub-second precision, so it needs only clock-jitter tolerance; POSIX `ps`
+ * reports whole seconds, which cannot separate a reuse within the same second.
+ */
+export const processStartedBeforeTimestamp = (
+  startedAtMs: number,
+  referenceAtMs: number,
+  platform: NodeJS.Platform,
+): boolean => startedAtMs <= referenceAtMs + (platform === "win32" ? 250 : 1_000);
