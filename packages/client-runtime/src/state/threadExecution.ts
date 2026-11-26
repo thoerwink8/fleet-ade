@@ -370,6 +370,8 @@ export function deriveThreadStructureRuntime(
   if (latestRun === null && !backgroundWorkHoldsRun) return null;
   const activeRunId =
     latestMatchingRun(projection, (run) => INTERRUPTIBLE_RUN_STATUSES.has(run.status))?.id ?? null;
+  const failureItem = latestRootProviderFailureItem(latestRunProjection, projection.turnItems);
+  const sessionError = providerSession?.lastError ?? null;
   return {
     status: usageLimitedRun
       ? "failed"
@@ -384,11 +386,39 @@ export function deriveThreadStructureRuntime(
         : DateTime.formatIso(orchestrationV2RunWorkStartedAt(liveActivityRun)),
     providerInstanceId: projection.thread.providerInstanceId,
     providerName: providerSession?.driver ?? null,
-    ...threadErrorSummary(
-      latestRootProviderFailureItem(latestRunProjection, projection.turnItems),
-      providerSession?.lastError ?? null,
-    ),
+    ...threadErrorSummary(failureItem, sessionError),
+    lastErrorSource: threadErrorSource(failureItem, sessionError, projection),
   };
+}
+
+/** Session timestamps change on unrelated updates, so source identity follows the ended run. */
+function threadErrorSource(
+  failureItem: Extract<ThreadStructureTurnItem, { type: "error" }> | null,
+  sessionError: string | null,
+  projection: Pick<ThreadStructure, "runs" | "turnItems">,
+): string | null {
+  const itemSource = (item: NonNullable<typeof failureItem>) =>
+    `${item.id}@${item.completedAt === null ? "" : DateTime.formatIso(item.completedAt)}`;
+  if (
+    failureItem !== null &&
+    (sessionError === null || sessionError === failureItem.failure.message)
+  ) {
+    return itemSource(failureItem);
+  }
+  if (sessionError === null) return null;
+  let ended: ThreadStructure["runs"][number] | null = null;
+  for (const run of projection.runs) {
+    if (run.status !== "failed" && run.status !== "completed") continue;
+    if (ended === null || run.ordinal > ended.ordinal) ended = run;
+  }
+  if (ended === null) return null;
+  const endedFailure =
+    failureItem?.runId === ended.id
+      ? failureItem
+      : latestRootProviderFailureItem(ended, projection.turnItems);
+  return endedFailure?.failure.message === sessionError
+    ? itemSource(endedFailure)
+    : `${ended.id}@${ended.completedAt === null ? "" : DateTime.formatIso(ended.completedAt)}`;
 }
 
 export interface UsageLimitNoticeRows {

@@ -24,6 +24,7 @@ import {
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import {
   isRichTextBoldShortcut,
+  isSidebarToggleShortcut,
   resolveShortcutCommand,
   shortcutLabelForCommand,
 } from "../keybindings";
@@ -334,8 +335,9 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
         return;
       }
       if (
-        resolveShortcutCommand(event, keybindings, { context: { usagePageOpen } }) !==
-        "sidebar.toggle"
+        !isSidebarToggleShortcut(event, keybindings, {
+          context: { terminalFocus: isTerminalFocused(), usagePageOpen },
+        })
       )
         return;
 
@@ -345,12 +347,10 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
     };
 
     window.addEventListener("keydown", onKeyDown, true);
-    const unsubscribe = window.desktopBridge?.onMenuAction((action) => {
-      if (action === "sidebar.toggle") toggleSidebar();
-    });
+    const unregisterSidebarToggle = registerMenuAction("sidebar.toggle", toggleSidebar);
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
-      unsubscribe?.();
+      unregisterSidebarToggle();
     };
   }, [keybindings, showSidebar, toggleSidebar, usagePageOpen]);
 

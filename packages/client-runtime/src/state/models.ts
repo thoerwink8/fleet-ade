@@ -111,6 +111,8 @@ export interface ThreadRuntimeSummary {
   readonly lastError: string | null;
   readonly lastErrorClass?: OrchestrationV2ProviderFailureClass | null;
   readonly lastErrorCode?: string | null;
+  /** Identifies the failure occurrence so repeating the same message is a new banner. */
+  readonly lastErrorSource?: string | null;
   readonly lastErrorRetryCount?: number | null;
   readonly usageLimitResetAt?: string | null;
   readonly updatedAt: string;
