@@ -1239,13 +1239,15 @@ export const resumeThreadQueue = Effect.fn("EnvironmentCommands.resumeThreadQueu
 export const promoteQueuedRun = Effect.fn("EnvironmentCommands.promoteQueuedRun")(function* (
   input: PromoteQueuedRunInput,
 ) {
-  return yield* dispatch({
-    type: "queued-message.promote-to-steer",
-    commandId: yield* allocateCommandId(input),
-    threadId: input.threadId,
-    queuedRunId: input.queuedRunId,
-    targetRunId: input.targetRunId,
-  });
+  return yield* resendAfterSocketLoss(
+    dispatch({
+      type: "queued-message.promote-to-steer",
+      commandId: yield* allocateCommandId(input),
+      threadId: input.threadId,
+      queuedRunId: input.queuedRunId,
+      targetRunId: input.targetRunId,
+    }),
+  );
 });
 
 export const cancelQueuedRun = Effect.fn("EnvironmentCommands.cancelQueuedRun")(function* (

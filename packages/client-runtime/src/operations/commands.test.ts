@@ -46,6 +46,7 @@ import { v2Now, v2Projection, v2ThreadId } from "../state/orchestrationV2TestFix
 import {
   archiveThread,
   interruptThreadTurn,
+  promoteQueuedRun,
   revertThreadCheckpoint,
   stopAndRollbackThread,
   cancelPendingRollback,
@@ -605,6 +606,17 @@ describe("V2 environment commands", () => {
       method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
       send: (commandId: CommandId) =>
         resumeThreadQueue({ commandId, threadId: v2ThreadId, runId: RunId.make("queued") }),
+    },
+    {
+      name: "queued message steered",
+      method: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+      send: (commandId: CommandId) =>
+        promoteQueuedRun({
+          commandId,
+          threadId: v2ThreadId,
+          queuedRunId: RunId.make("queued"),
+          targetRunId: RunId.make("running"),
+        }),
     },
   ] as const;
 
