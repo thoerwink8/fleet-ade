@@ -68,7 +68,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   return (
     <div
       className={cn(
-        "relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-2 pr-3",
+        "relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-1 pr-2",
         isElectron && "drag-region",
       )}
     >
@@ -182,7 +182,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     <Link
       aria-label="Fleet ADE 首页"
       className={cn(
-        "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex pointer-coarse:min-h-8 pointer-coarse:min-w-8",
+        "relative z-10 ml-[calc(var(--workspace-controls-left)+var(--workspace-titlebar-control-size)+var(--fa-space-1))] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex pointer-coarse:min-h-8 pointer-coarse:min-w-8",
         onBackdrop ? "text-white" : "text-foreground",
       )}
       to="/"

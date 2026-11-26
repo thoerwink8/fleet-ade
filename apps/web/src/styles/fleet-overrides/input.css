@@ -61,7 +61,7 @@
     min-height: var(--fa-ctrl-lg);
   }
 
-  /* @fleet/design switches the field to 16px below 480px; this app's narrow layout starts at 768px. */
+  /* @fleet/design switches the field to 16px below 480px; standalone inputs here use 16px up to 767.98px. */
   .fa-input,
   .fa-input__control {
     font-size: 16px;

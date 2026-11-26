@@ -242,7 +242,7 @@ describe("buildThreadActionItems", () => {
     await remoteItem?.run();
     expect(runThread).toHaveBeenCalledWith(remote);
     expect(remoteItem?.timestamp).toBeTruthy();
-    expect(remoteItem?.meta).toBe(`Remote project · ${remoteItem?.timestamp}`);
+    expect(remoteItem?.meta).toBe(remoteItem?.timestamp);
     expect(commandPaletteItemLineCount(remoteItem!)).toBe(3);
   });
 

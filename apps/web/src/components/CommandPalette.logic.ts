@@ -195,7 +195,7 @@ export interface CommandPaletteItem {
   readonly description?: ReactNode;
   readonly threadContentMatch?: CommandPaletteThreadContentMatch;
   readonly timestamp?: string;
-  /** A third line under the description: project and last activity. */
+  /** A third line under the description: last activity. */
   readonly meta?: string;
   /** Thread rows rank by this, with use history, instead of by `searchTerms`. */
   readonly threadSearch?: ThreadSearchSubject;
@@ -506,7 +506,6 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
     const activityAt = formatRelativeTimeLabel(
       thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,
     );
-    const meta = [projectTitle, activityAt].filter(Boolean).join(" · ");
 
     return Object.assign(
       {
@@ -526,7 +525,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
         title: thread.title,
         description,
         timestamp: activityAt,
-        ...(meta ? { meta } : {}),
+        ...(activityAt ? { meta: activityAt } : {}),
         icon: input.icon,
       },
       leadingContent ? { titleLeadingContent: leadingContent } : {},
