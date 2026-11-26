@@ -71,6 +71,7 @@ import {
   restoreFailedDraftThread,
   checkoutPullRequestUrlToLink,
   composerDraftHasUserContent,
+  composerTargetKey,
   type ComposerFileAttachment,
   type ComposerImageAttachment,
   type DraftThreadEnvMode,
@@ -1142,7 +1143,8 @@ export function useComposerSend(input: ComposerSendInput) {
     // Keep new-thread flows from reusing this draft while attachments and worktree setup settle.
     if (sentDraftThreadRef) markPromotedDraftThreadByRef(sentDraftThreadRef);
     resetSentComposerPrompt({
-      promptUnchanged: promptRef.current === promptAtSend || promptRef.current === promptForSend,
+      currentDraftTargetKey: composerRef.current?.getDraftTargetKey() ?? null,
+      sentDraftTargetKey: composerTargetKey(composerDraftTarget),
       clearPrompt: () => {
         promptRef.current = "";
       },

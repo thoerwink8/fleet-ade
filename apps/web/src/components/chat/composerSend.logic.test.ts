@@ -125,21 +125,31 @@ describe("approvalRedirectNotice", () => {
 });
 
 describe("resetSentComposerPrompt", () => {
-  it("preserves a prompt changed after the send started", () => {
+  it("preserves the visible prompt after navigating during a send", () => {
     const clearPrompt = vi.fn();
     const resetCursor = vi.fn();
 
-    resetSentComposerPrompt({ promptUnchanged: false, clearPrompt, resetCursor });
+    resetSentComposerPrompt({
+      currentDraftTargetKey: "thread:other",
+      sentDraftTargetKey: "thread:sent",
+      clearPrompt,
+      resetCursor,
+    });
 
     expect(clearPrompt).not.toHaveBeenCalled();
     expect(resetCursor).not.toHaveBeenCalled();
   });
 
-  it("resets the prompt that was sent", () => {
+  it("resets the prompt when the sent draft is still visible", () => {
     const clearPrompt = vi.fn();
     const resetCursor = vi.fn();
 
-    resetSentComposerPrompt({ promptUnchanged: true, clearPrompt, resetCursor });
+    resetSentComposerPrompt({
+      currentDraftTargetKey: "thread:sent",
+      sentDraftTargetKey: "thread:sent",
+      clearPrompt,
+      resetCursor,
+    });
 
     expect(clearPrompt).toHaveBeenCalledOnce();
     expect(resetCursor).toHaveBeenCalledOnce();

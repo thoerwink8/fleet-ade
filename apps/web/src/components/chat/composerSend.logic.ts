@@ -81,11 +81,12 @@ export function approvalRedirectNotice(input: {
 }
 
 export function resetSentComposerPrompt(input: {
-  readonly promptUnchanged: boolean;
+  readonly currentDraftTargetKey: string | null;
+  readonly sentDraftTargetKey: string;
   readonly clearPrompt: () => void;
   readonly resetCursor: () => void;
 }) {
-  if (!input.promptUnchanged) return;
+  if (input.currentDraftTargetKey !== input.sentDraftTargetKey) return;
   input.clearPrompt();
   input.resetCursor();
 }
