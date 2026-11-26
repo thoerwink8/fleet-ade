@@ -1364,7 +1364,7 @@ function OpenCommandPaletteDialog(props: {
   actionItems.push({
     kind: "action",
     value: "action:toggle-sidebar",
-    searchTerms: ["sidebar", "toggle sidebar", "panel"],
+    searchTerms: ["sidebar", "main sidebar", "toggle sidebar", "panel"],
     title: "切换主侧栏",
     icon: <PanelLeftIcon className={ITEM_ICON_CLASS} />,
     shortcutCommand: "sidebar.toggle",

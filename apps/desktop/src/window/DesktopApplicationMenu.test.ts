@@ -135,7 +135,7 @@ describe("DesktopApplicationMenu", () => {
     }),
   );
 
-  it.effect("shows the sidebar shortcut without registering a native accelerator", () =>
+  it.effect("displays the sidebar shortcut without registering a native accelerator", () =>
     Effect.gen(function* () {
       for (const platform of ["darwin", "linux", "win32"] as const) {
         const selectedAction = yield* Deferred.make<string>();
