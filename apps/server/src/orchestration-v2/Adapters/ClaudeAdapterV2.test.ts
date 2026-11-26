@@ -10899,102 +10899,175 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     ),
   );
 
-  it.effect.each(["started", "requesting", "retrying", "forked skill"] as const)(
-    "bounds unanswered Claude requests after %s",
-    (phase) =>
-      Effect.gen(function* () {
-        const harness = yield* makeWakeHarnessWithOptions({
-          close: Queue.shutdown,
-          ...(phase === "requesting" ? { interrupt: Effect.never } : {}),
-        });
-        yield* harness.runtime.startTurn(
-          makeClaudeTestTurnInput({
-            threadId: harness.threadId,
-            providerThread: harness.providerThread,
-            now: yield* DateTime.now,
-            attemptId: RunAttemptId.make("attempt-claude-request-timeout"),
-            text: "Continue.",
-            attachments: [],
+  it.effect.each([
+    "started",
+    "requesting",
+    "new request",
+    "background frame",
+    "root response",
+    "synthetic root frame",
+    "retrying",
+    "retry after request",
+    "concurrent Stop",
+    "forked skill",
+  ] as const)("bounds unanswered Claude requests after %s", (phase) =>
+    Effect.gen(function* () {
+      const interruptStarted = yield* Deferred.make<void>();
+      const allowInterrupt = yield* Deferred.make<void>();
+      const harness = yield* makeWakeHarnessWithOptions({
+        close: Queue.shutdown,
+        ...(phase === "requesting" ? { interrupt: Effect.never } : {}),
+        ...(phase === "concurrent Stop"
+          ? {
+              interrupt: Deferred.succeed(interruptStarted, undefined).pipe(
+                Effect.andThen(Deferred.await(allowInterrupt)),
+              ),
+            }
+          : {}),
+      });
+      const attemptId = RunAttemptId.make("attempt-claude-request-timeout");
+      yield* harness.runtime.startTurn(
+        makeClaudeTestTurnInput({
+          threadId: harness.threadId,
+          providerThread: harness.providerThread,
+          now: yield* DateTime.now,
+          attemptId,
+          text: "Continue.",
+          attachments: [],
+        }),
+      );
+      const offerRetry = (attempt: number) =>
+        harness.offerAndWait(
+          claudeSdkFrame({
+            type: "system",
+            subtype: "api_retry",
+            attempt,
+            max_retries: 10,
+            retry_delay_ms: 1_500,
+            error_status: 503,
+            error: "unknown",
+            uuid: `00000000-0000-4000-8000-00000000021${attempt}`,
+            session_id: WAKE_NATIVE_SESSION,
           }),
         );
-        const offerRetry = (attempt: number) =>
-          harness.offerAndWait(
-            claudeSdkFrame({
-              type: "system",
-              subtype: "api_retry",
-              attempt,
-              max_retries: 10,
-              retry_delay_ms: 1_500,
-              error_status: 503,
-              error: "unknown",
-              uuid: `00000000-0000-4000-8000-00000000021${attempt}`,
-              session_id: WAKE_NATIVE_SESSION,
-            }),
-          );
-        if (phase === "retrying") {
-          yield* offerRetry(1);
-        } else if (phase === "requesting") {
-          yield* harness.offerAndWait(
-            claudeSdkFrame({
-              type: "system",
-              subtype: "status",
-              status: "requesting",
-              uuid: "00000000-0000-4000-8000-000000000213",
-              session_id: WAKE_NATIVE_SESSION,
-            }),
-          );
-        } else {
-          yield* harness.offerAndWait(
-            claudeSdkFrame({
-              type: "command_lifecycle",
-              command_uuid: harness.promptUuid(0),
-              state: "started",
-              uuid: "00000000-0000-4000-8000-000000000214",
-              session_id: WAKE_NATIVE_SESSION,
-            }),
-          );
-          yield* harness.offerAndWait(
-            claudeSdkFrame({
-              type: "system",
-              subtype: "task_started",
-              task_id: "background-task",
-              description: "Running a skill",
-              spawn_depth: phase === "forked skill" ? 1 : 2,
-              uuid: "00000000-0000-4000-8000-000000000215",
-              session_id: WAKE_NATIVE_SESSION,
-            }),
-          );
-        }
-        yield* TestClock.adjust("9 minutes");
-        assert.isEmpty(harness.terminalEvents());
-        if (phase === "retrying") yield* offerRetry(2);
-        yield* TestClock.adjust("1 minute");
-        if (phase === "requesting") yield* TestClock.adjust("10 seconds");
-
-        if (phase === "forked skill") {
-          assert.isEmpty(harness.terminalEvents());
-          return;
-        }
-        assert.lengthOf(harness.terminalEvents(), 1);
-        const [terminal] = harness.terminalEvents();
-        assert.equal(terminal?.status, "failed");
-        if (terminal?.status !== "failed") return;
-        assert.equal(
-          terminal.failure.code,
-          phase === "retrying" ? "api_error_503" : "claude_request_unanswered",
+      const offerRequesting = harness.offerAndWait(
+        claudeSdkFrame({
+          type: "system",
+          subtype: "status",
+          status: "requesting",
+          uuid: "00000000-0000-4000-8000-000000000213",
+          session_id: WAKE_NATIVE_SESSION,
+        }),
+      );
+      if (phase === "retrying") {
+        yield* offerRetry(1);
+      } else if (phase === "requesting") {
+        yield* offerRequesting;
+      } else {
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "command_lifecycle",
+            command_uuid: harness.promptUuid(0),
+            state: "started",
+            uuid: "00000000-0000-4000-8000-000000000214",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
         );
-        assert.isFalse(terminal.failure.retryable);
-        if (phase === "retrying") assert.equal(terminal.retry?.attempt, 2);
-      }).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            IdAllocator.layer,
-            McpProviderSessions.layer,
-            NodeServices.layer,
-            NodeCrypto.layer,
-          ),
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "system",
+            subtype: "task_started",
+            task_id: "background-task",
+            description: "Running a skill",
+            spawn_depth: phase === "forked skill" ? 1 : 2,
+            uuid: "00000000-0000-4000-8000-000000000215",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+      }
+      yield* TestClock.adjust("9 minutes");
+      assert.isEmpty(harness.terminalEvents());
+      if (phase === "retrying") yield* offerRetry(2);
+      if (phase === "new request") yield* offerRequesting;
+      if (phase === "retry after request") yield* offerRetry(1);
+      if (phase === "synthetic root frame") {
+        yield* harness.offerAndWait(
+          makeAssistantTextFrame({
+            uuid: "00000000-0000-4000-8000-000000000217",
+            text: "Internal notice",
+            model: "<synthetic>",
+          }),
+        );
+      }
+      if (phase === "background frame" || phase === "root response") {
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "stream_event",
+            event: { type: "message_start", message: { id: "request-response" } },
+            parent_tool_use_id: phase === "background frame" ? "previous-agent-tool" : null,
+            uuid: "00000000-0000-4000-8000-000000000216",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+      }
+      if (phase === "concurrent Stop") {
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        yield* TestClock.adjust("59 seconds");
+        const stop = yield* harness.runtime
+          .interruptTurn({
+            providerThread: harness.providerThread,
+            providerTurnId: idAllocator.derive.providerTurn({
+              driver: ClaudeAdapterV2.CLAUDE_PROVIDER,
+              nativeTurnId: `turn:${attemptId}`,
+            }),
+          })
+          .pipe(Effect.forkScoped);
+        yield* Deferred.await(interruptStarted);
+        yield* TestClock.adjust("1 second");
+        assert.isEmpty(harness.terminalEvents());
+        yield* Deferred.succeed(allowInterrupt, undefined);
+        assert.equal((yield* Queue.take(harness.terminalReceipts)).status, "interrupted");
+        yield* Fiber.join(stop);
+        assert.lengthOf(harness.terminalEvents(), 1);
+        return;
+      }
+      yield* TestClock.adjust("1 minute");
+      if (phase === "requesting") yield* TestClock.adjust("10 seconds");
+      if (phase === "new request") {
+        assert.isEmpty(harness.terminalEvents());
+        yield* TestClock.adjust("9 minutes");
+      }
+      if (phase === "retry after request") {
+        assert.isEmpty(harness.terminalEvents());
+        yield* offerRetry(2);
+        yield* TestClock.adjust("9 minutes");
+      }
+
+      if (phase === "forked skill" || phase === "root response") {
+        assert.isEmpty(harness.terminalEvents());
+        return;
+      }
+      assert.lengthOf(harness.terminalEvents(), 1);
+      const [terminal] = harness.terminalEvents();
+      assert.equal(terminal?.status, "failed");
+      if (terminal?.status !== "failed") return;
+      const fromRetry = phase === "retrying" || phase === "retry after request";
+      assert.equal(
+        terminal.failure.code,
+        fromRetry ? "api_error_503" : "claude_request_unanswered",
+      );
+      assert.isFalse(terminal.failure.retryable);
+      if (fromRetry) assert.equal(terminal.retry?.attempt, 2);
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
         ),
       ),
+    ),
   );
 
   it.effect("fails immediately without retrying when api_retry reports an auth error", () =>

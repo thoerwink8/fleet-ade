@@ -9306,7 +9306,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           liveQuery: ClaudeLiveQueryContext,
           key: "requestTimeout" | "retryTimeout",
         ) {
-          if (context[key] !== undefined || context.steersClosed) return;
+          if (context[key] !== undefined || context.steersClosed || context.stallFailure) return;
           context[key] = yield* Effect.gen(function* () {
             context[key] = undefined;
             if (
@@ -11597,12 +11597,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   message.subtype === "status" &&
                   message.status === "requesting"))
             ) {
+              yield* cancelTurnTimeout(context, "requestTimeout");
               yield* armTurnTimeout(context, liveQuery, "requestTimeout");
             }
             // Only root work answers this request; older background agents can still send frames.
             if (
               context.requestTimeout !== undefined &&
-              (((message.type === "assistant" || message.type === "stream_event") &&
+              (((message.type === "stream_event" ||
+                (message.type === "assistant" && message.message.model !== "<synthetic>")) &&
                 message.parent_tool_use_id === null) ||
                 (message.type === "system" &&
                   message.subtype === "task_started" &&
