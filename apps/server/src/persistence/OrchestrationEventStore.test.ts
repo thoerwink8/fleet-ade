@@ -699,7 +699,77 @@ layer("OrchestrationEventStore", (it) => {
         })
         .pipe(Stream.runCollect);
       assert.deepEqual([...replayedWindow], expectedAgents.slice(500));
+      // 300 rows remain after the cursor, so a limit above them cannot truncate
+      // while a limit below them slices exactly.
+      const truncated = yield* store
+        .readAgentEvents({
+          threadId,
+          afterSequence: throughMiddle,
+          limit: 200,
+          skipUnknownEventTypes: true,
+        })
+        .pipe(Stream.runCollect);
+      assert.deepEqual([...truncated], expectedAgents.slice(500, 700));
     }),
+  );
+  it.effect.each(["agent", "application"] as const)(
+    "%s replay queries the next page before its consumer finishes this one",
+    (reader) =>
+      Effect.gen(function* () {
+        const store = yield* OrchestrationEventStore.OrchestrationEventStore;
+        const sql = yield* SqlClient.SqlClient;
+        const threadId = ThreadId.make(`thread:readahead:${reader}`);
+        const baseline = yield* store.latestApplicationSequence;
+        const now = "2026-03-01T00:00:00.000Z";
+        // 501 rows span exactly two pages of 500; the second page holds one row.
+        yield* Effect.forEach(
+          Array.from({ length: 501 }, (_, index) => index + 1),
+          (version) =>
+            sql`
+              INSERT INTO orchestration_events (
+                event_id, aggregate_kind, stream_id, stream_version, event_type,
+                occurred_at, actor_kind, payload_json, metadata_json, application_event_version
+              ) VALUES (
+                ${`event:readahead:${reader}:${version}`}, 'thread', ${threadId}, ${version},
+                'provider-session.detached', ${now}, 'server',
+                ${JSON.stringify({ providerSessionId: `session:readahead:${version}`, detachedAt: now })},
+                '{}', 2
+              )
+            `,
+          { discard: true },
+        );
+        const throughSequence = yield* store.latestApplicationSequence;
+        const secondPageQueryStarted = yield* Deferred.make<void>();
+        let pageQueries = 0;
+        const countPages: Statement.Transformer = (statement) => {
+          const [query] = statement.compile();
+          if (query.includes("FROM orchestration_events") && !query.includes("MAX(sequence)")) {
+            pageQueries += 1;
+            if (pageQueries === 2) {
+              return Deferred.succeed(secondPageQueryStarted, undefined).pipe(Effect.as(statement));
+            }
+          }
+          return Effect.succeed(statement);
+        };
+        const replay =
+          reader === "agent"
+            ? store.readAgentEvents({ threadId, afterSequence: baseline })
+            : store.readApplicationEvents({ afterSequence: baseline, throughSequence });
+        // rechunk(1) makes every pull consume exactly one row, so 499 pulls leave
+        // the last row of the first page inside the read-ahead buffer.
+        const pull = yield* Stream.toPull(
+          replay.pipe(
+            Stream.provideService(Statement.CurrentTransformer, countPages),
+            Stream.rechunk(1),
+          ),
+        );
+        for (let rows = 0; rows < 499; rows += 1) {
+          yield* pull;
+        }
+        // Without read-ahead the second page query only runs once the consumer
+        // finishes the first page, so this Deferred never completes.
+        yield* Deferred.await(secondPageQueryStarted);
+      }),
   );
 });
 
