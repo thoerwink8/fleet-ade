@@ -1807,3 +1807,36 @@ it("grades thread links as chat renders them: exact labeled targets, plain menti
     assert.match(c.check, /^threadLinks/);
   }
 });
+
+it("grades file names on rendered visible text: comments count for nothing", () => {
+  const expect = {
+    visibleTextMust: ["src/parser\\.ts"],
+    threadLinks: {
+      linked: [
+        { label: "Fix parser crash", href: "t3-thread://v2/env-1/thread-aaa" },
+        { label: "Stabilize flaky cart test", href: "t3-thread://v2/env-1/thread-bbb" },
+      ],
+      plainText: ["Settings sync audit", "#123"],
+    },
+  };
+  const failures = (text: string) =>
+    gradeSample(expect, { calls: [], text, finalText: text, stopReason: "end_turn" })
+      .filter((c) => !c.pass)
+      .map((c) => c.check);
+  const links = [
+    "[Fix parser crash](t3-thread://v2/env-1/thread-aaa) and",
+    "[Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb).",
+    "Settings sync audit, PR #123.",
+  ].join(" ");
+  // Both links, the audit and the PR are untouched; only the file name moved into an HTML
+  // comment, where the reader never sees it.
+  assert.includeMembers(failures(`${links} <!-- src/parser.ts -->`), [
+    "visibleTextMust /src/parser\\.ts/",
+  ]);
+  // Visible prose passes.
+  assert.deepEqual(failures(`${links} The fix landed in src/parser.ts.`), []);
+  // Inline code around the file name is visible text, so it passes.
+  assert.deepEqual(failures(`${links} The fix landed in \`src/parser.ts\`.`), []);
+  // The file name as a working file link's label is visible too.
+  assert.deepEqual(failures(`${links} The fix landed in [src/parser.ts](src/parser.ts).`), []);
+});
