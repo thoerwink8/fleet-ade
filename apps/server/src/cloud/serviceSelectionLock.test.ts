@@ -1,10 +1,37 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Lease tests spawn real child processes and shape real lease mtimes.
+import * as NodeChildProcess from "node:child_process";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Lease tests inject shaped filesystem failures.
+import * as NodeFS from "node:fs";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Lease tests shape real lease mtimes.
+import * as NodeFSP from "node:fs/promises";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 
 import { acquireServiceSelectionLock } from "./serviceSelectionLock.ts";
+
+/** The boot epoch leases carry, read out of a real acquisition instead of recomputed. */
+const probeBootEpoch = async (selectionPath: string, lock: string): Promise<string> => {
+  const release = await acquireServiceSelectionLock(selectionPath);
+  const ownerFile = NodeFS.readdirSync(lock)[0] ?? "";
+  release();
+  return ownerFile.split(".")[1] ?? "0";
+};
+
+const errnoException = (code: string, syscall: string): NodeJS.ErrnoException =>
+  Object.assign(new Error(`${code}: injected ${syscall} failure`), { code, syscall });
+
+/** Fake time that expires the 30s acquisition deadline on the 30th iteration. */
+const expiringNow = () => {
+  let calls = 0;
+  return () => (++calls === 1 ? 1_000_000 : 1_000_000 + (calls - 1) * 1_001);
+};
+
+// A lease stamped years in the past belongs to a process gone long before any child spawned now.
+const longAgo = DateTime.toDateUtc(DateTime.makeUnsafe("2020-01-01T00:00:00.000Z"));
 
 it.layer(NodeServices.layer)("service selection lock", (it) => {
   it.effect("reclaims a lease from an earlier boot even when its PID is live again", () =>
@@ -23,6 +50,212 @@ it.layer(NodeServices.layer)("service selection lock", (it) => {
       assert.equal(owners.length, 1);
       assert.notEqual(owners[0], stale);
       assert.isTrue(owners[0]!.startsWith(`${process.pid}.`));
+      release();
+      assert.isFalse(yield* fs.exists(lock));
+    }),
+  );
+
+  it.effect("reclaims a same-boot lease whose owner PID was reused by a newer process", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+      const lock = `${selectionPath}.selection-lock`;
+      const child = NodeChildProcess.spawn(
+        process.execPath,
+        ["-e", "setInterval(() => {}, 1000)"],
+        { stdio: "ignore", windowsHide: true },
+      );
+      try {
+        const pid = child.pid;
+        assert.isNumber(pid);
+        const lease = `${pid}.${yield* Effect.promise(() => probeBootEpoch(selectionPath, lock))}.00000000-0000-4000-8000-000000000000`;
+        yield* fs.makeDirectory(lock, { recursive: true });
+        yield* fs.writeFileString(path.join(lock, lease), "");
+        // A fixed stamp years in the past: the lease predates the process now holding its PID.
+        yield* Effect.promise(() => NodeFSP.utimes(path.join(lock, lease), longAgo, longAgo));
+
+        const release = yield* Effect.promise(() =>
+          acquireServiceSelectionLock(selectionPath, {
+            now: expiringNow(),
+            waitForRetry: () => Promise.resolve(),
+          }),
+        );
+        assert.isFalse(yield* fs.exists(path.join(lock, lease)));
+        release();
+        assert.isFalse(yield* fs.exists(lock));
+      } finally {
+        child.kill();
+      }
+    }),
+  );
+
+  it.effect("keeps waiting on a lease written after its owner process started", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+      const lock = `${selectionPath}.selection-lock`;
+      const child = NodeChildProcess.spawn(
+        process.execPath,
+        ["-e", "setInterval(() => {}, 1000)"],
+        { stdio: "ignore", windowsHide: true },
+      );
+      try {
+        const pid = child.pid;
+        assert.isNumber(pid);
+        const lease = `${pid}.${yield* Effect.promise(() => probeBootEpoch(selectionPath, lock))}.00000000-0000-4000-8000-000000000000`;
+        yield* fs.makeDirectory(lock, { recursive: true });
+        // Written now, after the child started: a live lease that must never be reclaimed.
+        yield* fs.writeFileString(path.join(lock, lease), "");
+
+        const outcome = yield* Effect.promise(() =>
+          acquireServiceSelectionLock(selectionPath, {
+            now: expiringNow(),
+            waitForRetry: () => Promise.resolve(),
+          }).then(
+            () => "acquired" as const,
+            (error: unknown) => error,
+          ),
+        );
+        assert.instanceOf(outcome, Error);
+        assert.match((outcome as Error).message, /Service selection is locked/);
+        assert.isTrue(yield* fs.exists(path.join(lock, lease)));
+      } finally {
+        child.kill();
+      }
+    }),
+  );
+
+  it.effect("waits on a contended live lease until the first holder releases it", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+      const lock = `${selectionPath}.selection-lock`;
+
+      const releaseFirst = yield* Effect.promise(() => acquireServiceSelectionLock(selectionPath));
+      const retryStarted = Promise.withResolvers<void>();
+      const retryGate = Promise.withResolvers<void>();
+      let secondAcquired = false;
+      const second = acquireServiceSelectionLock(selectionPath, {
+        waitForRetry: () => {
+          retryStarted.resolve();
+          return retryGate.promise;
+        },
+      }).then((release) => {
+        secondAcquired = true;
+        return release;
+      });
+      yield* Effect.promise(() => retryStarted.promise);
+      assert.isFalse(secondAcquired);
+      releaseFirst();
+      retryGate.resolve();
+      const releaseSecond = yield* Effect.promise(() => second);
+      assert.isTrue(secondAcquired);
+      releaseSecond();
+      assert.isFalse(yield* fs.exists(lock));
+    }),
+  );
+
+  it.effect("retries a Windows rename refused with EPERM until it succeeds", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+      const lock = `${selectionPath}.selection-lock`;
+
+      let renameAttempts = 0;
+      const release = yield* Effect.promise(() =>
+        acquireServiceSelectionLock(selectionPath, {
+          platform: "win32",
+          waitForRetry: () => Promise.resolve(),
+          renameSync: (from, to) => {
+            if (String(from).includes(".selection-lock.") && ++renameAttempts <= 2) {
+              throw errnoException("EPERM", "rename");
+            }
+            return NodeFS.renameSync(from, to);
+          },
+        }),
+      );
+      assert.isAtLeast(renameAttempts, 3);
+      assert.equal((yield* fs.readDirectory(lock)).length, 1);
+      release();
+      assert.isFalse(yield* fs.exists(lock));
+    }),
+  );
+
+  it.effect("does not retry Windows file operations failing with other error codes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+
+      let renameAttempts = 0;
+      const outcome = yield* Effect.promise(() =>
+        acquireServiceSelectionLock(selectionPath, {
+          platform: "win32",
+          waitForRetry: () => Promise.resolve(),
+          renameSync: (from, to) => {
+            if (String(from).includes(".selection-lock.")) {
+              renameAttempts += 1;
+              throw errnoException("EIO", "rename");
+            }
+            return NodeFS.renameSync(from, to);
+          },
+        }).then(
+          () => "acquired" as const,
+          (error: unknown) => error,
+        ),
+      );
+      assert.equal((outcome as NodeJS.ErrnoException)?.code, "EIO");
+      assert.equal(renameAttempts, 1);
+    }),
+  );
+
+  it.effect("retries removing a Windows lock directory busy with open handles", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-selection-lock-" });
+      const selectionPath = path.join(root, "service-state.json");
+      const lock = `${selectionPath}.selection-lock`;
+      const stale = `${process.pid}.1.00000000-0000-4000-8000-000000000000`;
+      yield* fs.makeDirectory(lock, { recursive: true });
+      yield* fs.writeFileString(path.join(lock, stale), "");
+
+      let renameAttempts = 0;
+      let rmdirAttempts = 0;
+      let busy = true;
+      const release = yield* Effect.promise(() =>
+        acquireServiceSelectionLock(selectionPath, {
+          platform: "win32",
+          waitForRetry: () => Promise.resolve(),
+          renameSync: (from, to) => {
+            if (String(from).includes(".selection-lock.") && ++renameAttempts <= 2) {
+              throw errnoException("EEXIST", "rename");
+            }
+            return NodeFS.renameSync(from, to);
+          },
+          rmdirSync: (target) => {
+            if (String(target) === lock) {
+              rmdirAttempts += 1;
+              if (busy) {
+                busy = false;
+                throw errnoException("EBUSY", "rmdir");
+              }
+            }
+            return NodeFS.rmdirSync(target);
+          },
+        }),
+      );
+      assert.isAtLeast(rmdirAttempts, 2);
+      assert.isFalse(yield* fs.exists(path.join(lock, stale)));
       release();
       assert.isFalse(yield* fs.exists(lock));
     }),
