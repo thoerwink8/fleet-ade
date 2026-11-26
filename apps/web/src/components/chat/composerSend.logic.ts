@@ -86,7 +86,12 @@ export function resetSentComposerPrompt(input: {
   readonly clearPrompt: () => void;
   readonly resetCursor: () => void;
 }) {
-  if (input.currentRouteThreadKey !== input.sentRouteThreadKey) return;
+  if (
+    input.currentRouteThreadKey !== null &&
+    input.currentRouteThreadKey !== input.sentRouteThreadKey
+  ) {
+    return;
+  }
   input.clearPrompt();
   input.resetCursor();
 }

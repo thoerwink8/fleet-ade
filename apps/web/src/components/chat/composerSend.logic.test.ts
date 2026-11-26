@@ -154,4 +154,19 @@ describe("resetSentComposerPrompt", () => {
     expect(clearPrompt).toHaveBeenCalledOnce();
     expect(resetCursor).toHaveBeenCalledOnce();
   });
+
+  it("resets an unmounted route without touching a newly visible thread", () => {
+    const clearPrompt = vi.fn();
+    const resetCursor = vi.fn();
+
+    resetSentComposerPrompt({
+      currentRouteThreadKey: null,
+      sentRouteThreadKey: "environment:test:thread:sent",
+      clearPrompt,
+      resetCursor,
+    });
+
+    expect(clearPrompt).toHaveBeenCalledOnce();
+    expect(resetCursor).toHaveBeenCalledOnce();
+  });
 });
