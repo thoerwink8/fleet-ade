@@ -10,7 +10,7 @@ import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as TestClock from "effect/testing/TestClock";
 
-import { writeFileStringAtomically } from "./atomicWrite.ts";
+import { writeFileStringAtomically, writeFileStringInPlace } from "./atomicWrite.ts";
 import * as HostProcess from "./HostProcess.ts";
 import { synchronousFileSystem } from "./testing/syncFileSystem.ts";
 
@@ -58,6 +58,38 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
 
       assert.strictEqual(yield* fs.readFileString(filePath), chunks.join(""));
       assert.deepStrictEqual(yield* fs.readDirectory(root), ["cache.json"]);
+    }),
+  );
+
+  it.effect("writes Uint8Array contents byte for byte", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+      const filePath = path.join(root, "task.xml");
+      const bytes = new Uint8Array([0xff, 0xfe, 0x3c, 0x00, 0x3f, 0x00, 0x00, 0xff]);
+
+      yield* writeFileStringAtomically({ filePath, contents: bytes });
+
+      assert.deepStrictEqual(Array.from(yield* fs.readFile(filePath)), Array.from(bytes));
+    }),
+  );
+
+  it.effect("replaces the symlink itself when the writer owns the link path", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-atomic-write-" });
+      const destination = path.join(root, "separate.service");
+      const link = path.join(root, "managed.service");
+      yield* fs.writeFileString(destination, "separate definition");
+      yield* fs.symlink(destination, link);
+
+      yield* writeFileStringAtomically({ filePath: link, contents: "updated", symlink: "replace" });
+
+      assert.strictEqual(yield* fs.readFileString(destination), "separate definition");
+      assert.strictEqual(yield* fs.readFileString(link), "updated");
+      assert.strictEqual(Exit.isFailure(yield* Effect.exit(fs.readLink(link))), true);
     }),
   );
 
@@ -353,6 +385,119 @@ it.layer(NodeServices.layer)("writeFileStringAtomically", (it) => {
       assert.isTrue(Exit.isFailure(yield* Fiber.join(stale)));
       assert.strictEqual(yield* fs.readFileString(filePath), "newer");
       assert.deepStrictEqual(yield* fs.readDirectory(root), ["settings.json"]);
+    }),
+  );
+});
+
+it.layer(NodeServices.layer)("writeFileStringInPlace", (it) => {
+  it.effect("rewrites the same directory entry, preserving hard links", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+      const filePath = path.join(root, "service.env");
+      const linkPath = path.join(root, "service.env.alias");
+      yield* fs.writeFileString(filePath, "before");
+      yield* fs.link(filePath, linkPath);
+
+      yield* writeFileStringInPlace({ filePath, contents: "after" });
+
+      assert.strictEqual(yield* fs.readFileString(filePath), "after");
+      assert.strictEqual(yield* fs.readFileString(linkPath), "after");
+    }),
+  );
+
+  it.effect("truncates a longer previous document", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+      const filePath = path.join(root, "service.env");
+      yield* fs.writeFileString(filePath, "a much longer previous document");
+
+      yield* writeFileStringInPlace({ filePath, contents: "short" });
+
+      assert.strictEqual(yield* fs.readFileString(filePath), "short");
+    }),
+  );
+
+  it.effect("writes Uint8Array contents byte for byte", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+      const filePath = path.join(root, "bytes.bin");
+      const bytes = new Uint8Array([0xff, 0xfe, 0x00, 0x3c]);
+
+      yield* writeFileStringInPlace({ filePath, contents: bytes });
+
+      assert.deepStrictEqual(Array.from(yield* fs.readFile(filePath)), Array.from(bytes));
+    }),
+  );
+
+  it.effect("syncs the written contents before the close", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+      const filePath = path.join(root, "service.env");
+      yield* fs.writeFileString(filePath, "before");
+      const events: Array<string> = [];
+      const recording = FileSystem.make({
+        ...fs,
+        open: (openedPath, options) =>
+          fs.open(openedPath, options).pipe(
+            Effect.map((file): FileSystem.File =>
+              openedPath === filePath
+                ? Object.create(file, {
+                    writeAll: {
+                      value: (buffer: Uint8Array) =>
+                        file.writeAll(buffer).pipe(
+                          Effect.tap(() =>
+                            Effect.sync(() => {
+                              events.push("write file");
+                            }),
+                          ),
+                        ),
+                    },
+                    sync: {
+                      value: file.sync.pipe(
+                        Effect.tap(() =>
+                          Effect.sync(() => {
+                            events.push("sync file");
+                          }),
+                        ),
+                      ),
+                    },
+                  })
+                : file,
+            ),
+          ),
+      });
+
+      yield* writeFileStringInPlace({ filePath, contents: "after" }).pipe(
+        Effect.provideService(FileSystem.FileSystem, recording),
+      );
+
+      assert.strictEqual(yield* fs.readFileString(filePath), "after");
+      assert.deepStrictEqual(events, ["write file", "sync file"]);
+    }),
+  );
+
+  it.effect("writes through a symlink instead of replacing it", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+      const destination = path.join(root, "real.env");
+      const link = path.join(root, "linked.env");
+      yield* fs.writeFileString(destination, "before");
+      yield* fs.symlink(destination, link);
+
+      yield* writeFileStringInPlace({ filePath: link, contents: "after" });
+
+      assert.strictEqual(yield* fs.readLink(link), destination);
+      assert.strictEqual(yield* fs.readFileString(destination), "after");
     }),
   );
 });

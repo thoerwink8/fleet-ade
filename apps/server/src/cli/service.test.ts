@@ -7,12 +7,13 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as TestConsole from "effect/testing/TestConsole";
+import * as Exit from "effect/Exit";
 import { Command } from "effect/cli";
 import { afterEach, vi } from "vite-plus/test";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
-import { serviceCommand } from "./service.ts";
+import { serviceCommand, writeServiceEnv } from "./service.ts";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -150,6 +151,63 @@ it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("service commands
       );
       expect(yield* fs.readFileString(`${baseDir}/service.env`)).toBe(input.expected);
     }),
+  );
+
+  it.effect("writeServiceEnv updates the same directory entry, preserving hard links", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
+      const filePath = `${baseDir}/service.env`;
+      const linkPath = `${baseDir}/service.env.alias`;
+      yield* fs.writeFileString(filePath, "T3CODE_LAN=true\n");
+      yield* fs.link(filePath, linkPath);
+
+      yield* writeServiceEnv(baseDir, { T3CODE_LAN: "false" });
+
+      expect(yield* fs.readFileString(filePath)).toBe("T3CODE_LAN=false\n");
+      expect(yield* fs.readFileString(linkPath)).toBe("T3CODE_LAN=false\n");
+    }),
+  );
+
+  // Root ignores the missing write bit, so only a regular user sees the refusal.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32" || process.getuid?.() === 0)(
+    "writeServiceEnv refuses a read-only file, leaving bytes and permissions unchanged",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
+        const filePath = `${baseDir}/service.env`;
+        yield* fs.writeFileString(filePath, "T3CODE_LAN=true\n");
+        yield* fs.chmod(filePath, 0o444);
+
+        const exit = yield* Effect.exit(writeServiceEnv(baseDir, { T3CODE_LAN: "false" }));
+
+        expect(Exit.isFailure(exit)).toBe(true);
+        expect((yield* fs.stat(filePath)).mode & 0o777).toBe(0o444);
+        yield* fs.chmod(filePath, 0o600);
+        expect(yield* fs.readFileString(filePath)).toBe("T3CODE_LAN=true\n");
+      }),
+  );
+
+  // The owner, group and mode ride on the inode, so rewriting it in place keeps all three.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "writeServiceEnv rewrites the existing inode instead of replacing it",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
+        const filePath = `${baseDir}/service.env`;
+        yield* fs.writeFileString(filePath, "T3CODE_LAN=true\n");
+        yield* fs.chmod(filePath, 0o640);
+        const before = yield* fs.stat(filePath);
+
+        yield* writeServiceEnv(baseDir, { T3CODE_LAN: "false" });
+
+        const after = yield* fs.stat(filePath);
+        expect(after.ino).toEqual(before.ino);
+        expect(after.mode & 0o777).toBe(0o640);
+        expect(yield* fs.readFileString(filePath)).toBe("T3CODE_LAN=false\n");
+      }),
   );
 
   it.effect("protect refuses root before creating any T3 directories", () =>

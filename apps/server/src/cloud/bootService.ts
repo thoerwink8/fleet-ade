@@ -1000,8 +1000,12 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       ? installedBaseDir
       : undefined;
   };
-  const writeDurably = (filePath: string, contents: string) =>
-    writeFileStringAtomically({ filePath, contents }).pipe(
+  const writeDurably = (filePath: string, contents: string, symlink?: "follow" | "replace") =>
+    writeFileStringAtomically({
+      filePath,
+      contents,
+      ...(symlink === undefined ? {} : { symlink }),
+    }).pipe(
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.provideService(Path.Path, path),
       Effect.mapError((cause) => new BootServiceInstallError({ cause })),
@@ -1371,7 +1375,9 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             }
           }
           const unit = manager.render(plan);
-          yield* writeDurably(unitPath, unit);
+          // The service owns the unit path entry itself: a user linking it to a shared
+          // definition must not see that definition overwritten by an upgrade.
+          yield* writeDurably(unitPath, unit, "replace");
           if (!start && manager.kind === "schtasks") yield* refreshWindowsTask(unit);
           return plan;
         }),

@@ -1,4 +1,4 @@
-import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
+import { writeFileStringInPlace } from "@t3tools/shared/atomicWrite";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -222,7 +222,7 @@ const writeDropIns = Effect.fn("ServiceProtection.writeDropIns")(function* (
   const fs = yield* FileSystem.FileSystem;
   const pathService = yield* Path.Path;
   for (const { path, contents } of dropIns) {
-    yield* writeFileStringAtomically({ filePath: path, contents }).pipe(
+    yield* writeFileStringInPlace({ filePath: path, contents }).pipe(
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.provideService(Path.Path, pathService),
     );
