@@ -1,12 +1,16 @@
 import {
+  ApplicationProjectEvent,
   CommandId,
   EventId,
   NodeId,
+  OrchestrationV2DomainEventJson,
+  OrchestrationV2StoredEvent,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
   ThreadId,
   TurnItemId,
+  type ApplicationStoredEvent,
   type OrchestrationV2DomainEvent,
 } from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
@@ -553,6 +557,145 @@ layer("OrchestrationEventStore", (it) => {
           isPersistenceDecodeError(yield* read(beforeBroken, broken, true).pipe(Effect.flip)),
         );
       }),
+  );
+  it.effect("replays rows spanning pages as the exact stored events their spec decodes to", () =>
+    Effect.gen(function* () {
+      const store = yield* OrchestrationEventStore.OrchestrationEventStore;
+      const sql = yield* SqlClient.SqlClient;
+      const threadId = ThreadId.make("thread:replay-spec");
+      const projectId = ProjectId.make("project:replay-spec");
+      const baseline = yield* store.latestApplicationSequence;
+      const decodeStoredEventSpec = Schema.decodeUnknownSync(OrchestrationV2StoredEvent);
+      const decodeEventSpec = Schema.decodeUnknownSync(OrchestrationV2DomainEventJson);
+      const decodeProjectSpec = Schema.decodeUnknownSync(ApplicationProjectEvent);
+      // The spec mirrors what the rows commit to: the domain event as stored, then the stored
+      // event around it. Any decode drift in the implementation drifts from this, independent of
+      // how many times the implementation decodes each row.
+      const agentSpec = (row: {
+        readonly sequence: number;
+        readonly event_id: string;
+        readonly command_id: string | null;
+        readonly occurred_at: string;
+        readonly payload_json: string;
+        readonly metadata_json: string;
+      }) => {
+        const metadata = JSON.parse(row.metadata_json) as Record<string, unknown>;
+        const event = decodeEventSpec({
+          id: row.event_id,
+          threadId,
+          type: "provider-session.detached",
+          occurredAt: row.occurred_at,
+          payload: JSON.parse(row.payload_json),
+          ...(metadata.runId === undefined ? {} : { runId: metadata.runId }),
+          ...(metadata.nodeId === undefined ? {} : { nodeId: metadata.nodeId }),
+          ...(metadata.driver === undefined ? {} : { driver: metadata.driver }),
+          ...(metadata.providerInstanceId === undefined
+            ? {}
+            : { providerInstanceId: metadata.providerInstanceId }),
+          ...(metadata.rawEventId === undefined ? {} : { rawEventId: metadata.rawEventId }),
+        });
+        return decodeStoredEventSpec({ sequence: row.sequence, commandId: row.command_id, event });
+      };
+      const now = "2026-02-01T00:00:00.000Z";
+      const insertAgent = Effect.fnUntraced(function* (index: number) {
+        const metadata: Record<string, string> = {};
+        if (index % 5 === 1) metadata.runId = `run:spec-${index}`;
+        if (index % 7 === 2) metadata.nodeId = `node:spec-${index}`;
+        if (index % 11 === 3) metadata.driver = "codex";
+        if (index % 13 === 4) metadata.providerInstanceId = "codex";
+        if (index % 17 === 5) metadata.rawEventId = `raw-${index}`;
+        const commandId = index % 3 === 0 ? null : `command:spec-${index}`;
+        const payload = JSON.stringify({
+          providerSessionId: `session:spec-${index}-🦊-"quoted"`,
+          detachedAt: now,
+          reason: index % 2 === 0 ? undefined : `原因 ${index}`,
+        });
+        const rows = yield* sql<{ readonly sequence: number }>`
+          INSERT INTO orchestration_events (
+            event_id, aggregate_kind, stream_id, stream_version, event_type,
+            occurred_at, command_id, actor_kind, payload_json, metadata_json,
+            application_event_version
+          ) VALUES (
+            ${`event:spec-${index}`}, 'thread', ${threadId}, ${index},
+            'provider-session.detached', ${now}, ${commandId}, 'server',
+            ${payload}, ${JSON.stringify(metadata)}, 2
+          ) RETURNING sequence
+        `;
+        const row = rows[0]!;
+        return agentSpec({
+          sequence: row.sequence,
+          event_id: `event:spec-${index}`,
+          command_id: commandId,
+          occurred_at: now,
+          payload_json: payload,
+          metadata_json: JSON.stringify(metadata),
+        });
+      });
+      const insertProject = Effect.fnUntraced(function* (index: number) {
+        const payload = {
+          projectId,
+          title: `Replay spec ${index}`,
+          updatedAt: now,
+        };
+        const rows = yield* sql<{
+          readonly sequence: number;
+        }>`
+          INSERT INTO orchestration_events (
+            event_id, aggregate_kind, stream_id, stream_version, event_type,
+            occurred_at, command_id, causation_event_id, correlation_id, actor_kind,
+            payload_json, metadata_json, application_event_version
+          ) VALUES (
+            ${`event:spec-project-${index}`}, 'project', ${projectId}, ${index},
+            'project.meta-updated', ${now}, NULL, NULL, NULL, 'server',
+            ${JSON.stringify(payload)}, '{}', 2
+          ) RETURNING sequence
+        `;
+        return decodeProjectSpec({
+          sequence: rows[0]!.sequence,
+          eventId: `event:spec-project-${index}`,
+          type: "project.meta-updated",
+          aggregateKind: "project",
+          aggregateId: projectId,
+          occurredAt: now,
+          commandId: null,
+          causationEventId: null,
+          correlationId: null,
+          payload,
+          metadata: {},
+        });
+      });
+      // 800 rows span two pages of 500, exercising the read-ahead across a page boundary.
+      const expectedAgents: Array<OrchestrationV2StoredEvent> = [];
+      const expectedApplication: Array<ApplicationStoredEvent> = [];
+      for (let index = 1; index <= 800; index += 1) {
+        const agent = yield* insertAgent(index);
+        expectedAgents.push(agent);
+        expectedApplication.push(agent);
+        if (index % 200 === 0) {
+          expectedApplication.push(yield* insertProject(index));
+        }
+      }
+      expectedApplication.sort((a, b) => a.sequence - b.sequence);
+      const replayedAgents = yield* store.readAgentEvents({ threadId }).pipe(Stream.runCollect);
+      assert.deepEqual([...replayedAgents], expectedAgents);
+      const replayedApplication = yield* store
+        .readApplicationEvents({
+          afterSequence: baseline,
+          throughSequence: yield* store.latestApplicationSequence,
+        })
+        .pipe(Stream.runCollect);
+      assert.deepEqual([...replayedApplication], expectedApplication);
+      const throughMiddle = expectedAgents[499]!.sequence;
+      const replayedWindow = yield* store
+        .readAgentEvents({
+          threadId,
+          afterSequence: throughMiddle,
+          limit: 700,
+          skipUnknownEventTypes: true,
+        })
+        .pipe(Stream.runCollect);
+      assert.deepEqual([...replayedWindow], expectedAgents.slice(500));
+    }),
   );
 });
 
