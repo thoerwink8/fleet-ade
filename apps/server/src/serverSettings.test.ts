@@ -538,7 +538,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         settingsPath: config.settingsPath,
       });
       assert.notInclude(decoded.message, config.settingsPath);
-      assert.include(fields.detail, targetSettingsPath);
+      // The write fails creating its temp file inside the read-only directory, so the
+      // detail names that directory; the symlink target file itself is never reached.
+      assert.include(fields.detail, targetDirectory);
     }).pipe(Effect.provide(layerServerSettings())),
   );
 

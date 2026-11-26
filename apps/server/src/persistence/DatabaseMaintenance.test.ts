@@ -41,6 +41,8 @@ it.layer(DatabaseMaintenance.layer.pipe(Layer.provideMerge(NodeServices.layer)))
         const legacy = path.join(userdata, "state.sqlite");
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient;
+          yield* sql`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, deleted_at TEXT)`;
+          yield* sql`CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, deleted_at TEXT)`;
           yield* sql`CREATE TABLE retained_data (value TEXT)`;
           yield* sql`INSERT INTO retained_data VALUES ('keep')`;
         }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: dbPath })));
@@ -50,6 +52,8 @@ it.layer(DatabaseMaintenance.layer.pipe(Layer.provideMerge(NodeServices.layer)))
         yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient;
           yield* sql`PRAGMA journal_mode = WAL`;
+          yield* sql`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, deleted_at TEXT)`;
+          yield* sql`CREATE TABLE projection_threads (thread_id TEXT PRIMARY KEY, deleted_at TEXT)`;
           yield* sql`CREATE TABLE v1_data (value TEXT)`;
           yield* sql`INSERT INTO v1_data VALUES ('rollback')`;
         }).pipe(Effect.provide(openLegacy));
@@ -99,6 +103,46 @@ it.layer(DatabaseMaintenance.layer.pipe(Layer.provideMerge(NodeServices.layer)))
         }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: dbPath, readonly: true })));
         assert.isNull((yield* maintenance.inspect(dbPath)).legacyDatabaseBytes);
       }),
+    );
+
+    it.effect(
+      "refuses to delete the database from before 0.1.0 while its projects or threads are missing",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const maintenance = yield* DatabaseMaintenance.DatabaseMaintenance;
+          const userdata = yield* fs.makeTempDirectoryScoped({ prefix: "t3-legacy-verify-" });
+          const dbPath = path.join(userdata, "statev2.sqlite");
+          const legacy = path.join(userdata, "state.sqlite");
+          yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            yield* sql`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, deleted_at TEXT)`;
+            yield* sql`CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, deleted_at TEXT)`;
+            yield* sql`INSERT INTO projection_projects VALUES ('migrated-project', NULL)`;
+            yield* sql`INSERT INTO orchestration_v2_projection_threads VALUES ('migrated-thread', NULL)`;
+          }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: dbPath })));
+          yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            yield* sql`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, deleted_at TEXT)`;
+            yield* sql`CREATE TABLE projection_threads (thread_id TEXT PRIMARY KEY, deleted_at TEXT)`;
+            yield* sql`INSERT INTO projection_projects VALUES ('migrated-project', NULL), ('lost-project', NULL), ('deleted-project', '2026-10-01')`;
+            yield* sql`INSERT INTO projection_threads VALUES ('migrated-thread', NULL), ('lost-thread', NULL), ('deleted-thread', '2026-10-01')`;
+          }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: legacy })));
+
+          const missing = yield* Effect.flip(maintenance.removeLegacyDatabase(dbPath));
+          assert.equal(missing._tag, "LegacyDatabaseHasUnmigratedRecordsError");
+          assert.isTrue(yield* fs.exists(legacy));
+
+          yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            yield* sql`INSERT INTO projection_projects VALUES ('lost-project', NULL)`;
+            yield* sql`INSERT INTO orchestration_v2_projection_threads VALUES ('lost-thread', NULL)`;
+          }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: dbPath })));
+
+          yield* maintenance.removeLegacyDatabase(dbPath);
+          assert.isFalse(yield* fs.exists(legacy));
+        }),
     );
 
     it.effect("runs a repair requested from Settings once and keeps its failure for Settings", () =>

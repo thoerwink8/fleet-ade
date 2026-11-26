@@ -21,13 +21,13 @@ import {
   settlePromise,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import * as Cause from "effect/Cause";
 
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import {
   applyWslEnableSelection,
   isWslSettingsRowVisible,
   missingTailscaleEndpointDescription,
+  mutationFailureMessage,
   peerLinkHostSections,
   resolveTailscaleServeBaseUrl,
 } from "./ConnectionsSettings.logic";
@@ -473,8 +473,7 @@ function ConnectionsSettingsContent({
       setPendingTailscaleServeEndpoint(null);
     });
     if (settled._tag === "Failure") {
-      const error = Cause.squash(settled.cause);
-      const message = error instanceof Error ? error.message : "无法配置 Tailscale HTTPS。";
+      const message = mutationFailureMessage(settled.cause, "无法配置 Tailscale HTTPS。");
       setDesktopServerExposureMutationError(message);
       toastManager.add(
         stackedThreadToast({
@@ -512,8 +511,7 @@ function ConnectionsSettingsContent({
       setDisableTailscaleServeDialogOpen(false);
     });
     if (settled._tag === "Failure") {
-      const error = Cause.squash(settled.cause);
-      const message = error instanceof Error ? error.message : "无法停用 Tailscale HTTPS。";
+      const message = mutationFailureMessage(settled.cause, "无法停用 Tailscale HTTPS。");
       setDesktopServerExposureMutationError(message);
       toastManager.add(
         stackedThreadToast({
@@ -729,8 +727,7 @@ function ConnectionsSettingsContent({
       refreshDesktopWslState();
     });
     if (settled._tag === "Failure") {
-      const error = Cause.squash(settled.cause);
-      const message = error instanceof Error ? error.message : "无法更新 WSL 后台服务。";
+      const message = mutationFailureMessage(settled.cause, "无法更新 WSL 后台服务。");
       setDesktopWslMutationError(message);
       toastManager.add(
         stackedThreadToast({
