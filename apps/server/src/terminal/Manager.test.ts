@@ -1220,10 +1220,24 @@ it.layer(
         const recovered = yield* createManager(5_000, { historyByteLimit: maxBytes }).pipe(
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
-            writeFileString: (file, data, options) =>
-              failure === "write" && !failed && data === expected
-                ? fs.writeFileString(file, "partial", options).pipe(Effect.andThen(fail))
-                : fs.writeFileString(file, data, options),
+            // The bounded file lands atomically: its temp file is the only write
+            // target. The write failure fills the disk after some bytes already
+            // landed, so the failure carries a half-written temp file.
+            open: (file, options) =>
+              failure === "write" && !failed && file.includes("t3-write-")
+                ? fs.open(file, options).pipe(
+                    Effect.map((opened): FileSystem.File =>
+                      Object.create(opened, {
+                        writeAll: {
+                          value: (buffer: Uint8Array) =>
+                            opened
+                              .writeAll(buffer.subarray(0, Math.max(1, buffer.length / 2)))
+                              .pipe(Effect.andThen(fail())),
+                        },
+                      }),
+                    ),
+                  )
+                : fs.open(file, options),
             rename: (from, to) => (failure === "rename" && !failed ? fail() : fs.rename(from, to)),
           }),
         );
@@ -1774,19 +1788,32 @@ it.layer(
       let failNextWrite = true;
       const limited = FileSystem.FileSystem.of({
         ...fs,
-        writeFileString: (filePath, data, options) => {
-          if (!failNextWrite) return fs.writeFileString(filePath, data, options);
+        // The bounded file lands atomically: its temp file is the only write
+        // target, so filling the disk there is the write failure.
+        open: (filePath, options) => {
+          if (!failNextWrite || !filePath.includes("t3-write-")) return fs.open(filePath, options);
           failNextWrite = false;
-          return fs.writeFileString(filePath, "partial").pipe(
-            Effect.andThen(
-              Effect.fail(
-                PlatformError.systemError({
-                  _tag: "Unknown",
-                  module: "FileSystem",
-                  method: "writeFileString",
-                  cause: { code: "ENOSPC" },
-                }),
-              ),
+          // The disk fills after the first bytes of the temp file already landed.
+          return fs.open(filePath, options).pipe(
+            Effect.map((opened): FileSystem.File =>
+              Object.create(opened, {
+                writeAll: {
+                  value: (buffer: Uint8Array) =>
+                    opened.writeAll(buffer.subarray(0, Math.max(1, buffer.length / 2))).pipe(
+                      Effect.andThen(
+                        Effect.fail(
+                          PlatformError.systemError({
+                            _tag: "Unknown",
+                            module: "FileSystem",
+                            method: "write",
+                            pathOrDescriptor: filePath,
+                            cause: { code: "ENOSPC" },
+                          }),
+                        ),
+                      ),
+                    ),
+                },
+              }),
             ),
           );
         },

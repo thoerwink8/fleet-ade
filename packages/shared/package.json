@@ -331,6 +331,10 @@
       "types": "./src/testing/symlinks.ts",
       "import": "./src/testing/symlinks.ts"
     },
+    "./testing/syncFileSystem": {
+      "types": "./src/testing/syncFileSystem.ts",
+      "import": "./src/testing/syncFileSystem.ts"
+    },
     "./databaseMigrationLog": {
       "types": "./src/databaseMigrationLog.ts",
       "import": "./src/databaseMigrationLog.ts"

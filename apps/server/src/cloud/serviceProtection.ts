@@ -1,3 +1,4 @@
+import { writeFileStringInPlace } from "@t3tools/shared/atomicWrite";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -219,9 +220,12 @@ const writeDropIns = Effect.fn("ServiceProtection.writeDropIns")(function* (
   dropIns: ReadonlyArray<DropIn>,
 ) {
   const fs = yield* FileSystem.FileSystem;
+  const pathService = yield* Path.Path;
   for (const { path, contents } of dropIns) {
-    yield* fs.makeDirectory(directoryOf(path), { recursive: true });
-    yield* fs.writeFileString(path, contents);
+    yield* writeFileStringInPlace({ filePath: path, contents }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, pathService),
+    );
   }
 }, Effect.mapError(userSettingsError));
 

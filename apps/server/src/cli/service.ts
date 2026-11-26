@@ -1,5 +1,6 @@
 import * as NodeUtil from "node:util";
 
+import { writeFileStringInPlace } from "@t3tools/shared/atomicWrite";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
@@ -100,12 +101,12 @@ export const writeServiceEnv = Effect.fn("cli.service.write_env")(function* (
   baseDir: string,
   entries: Readonly<Record<string, string | undefined>>,
 ) {
-  const fs = yield* FileSystem.FileSystem;
   const current = yield* readServiceEnv(baseDir);
   const next = upsertServiceEnv(current.contents, entries);
   if (next === current.contents) return;
-  yield* fs.makeDirectory(baseDir, { recursive: true });
-  yield* fs.writeFileString(current.path, next);
+  // The file's owner, group and mode are part of the service contract: rewriting in
+  // place keeps them, and a read-only file still refuses the write.
+  yield* writeFileStringInPlace({ filePath: current.path, contents: next });
 });
 
 export const reconcileService = Effect.fn("cli.service.reconcile")(function* (options?: {

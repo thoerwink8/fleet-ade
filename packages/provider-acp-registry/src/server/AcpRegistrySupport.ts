@@ -14,6 +14,7 @@ import {
 import type { AcpRegistryDistributionPreference } from "../settings.ts";
 import { ompNeedsInstallerExecutable } from "../builtinOmp.ts";
 import type { AcpRegistrySettings } from "../settings.ts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { cliArchiveTarCommand } from "@t3tools/shared/cliRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import {
@@ -1063,12 +1064,14 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
         receipt.distribution,
         receipt.managerPath,
       );
-      const temporaryPath = `${receiptPath}.${process.pid}.tmp`;
       yield* fileSystem.makeDirectory(packageReceiptsDirectory, { recursive: true });
-      yield* fileSystem.remove(temporaryPath, { force: true });
-      yield* fileSystem.writeFileString(temporaryPath, `${encodePackageInstallReceipt(receipt)}\n`);
-      yield* fileSystem.remove(receiptPath, { force: true });
-      yield* fileSystem.rename(temporaryPath, receiptPath);
+      yield* writeFileStringAtomically({
+        filePath: receiptPath,
+        contents: `${encodePackageInstallReceipt(receipt)}\n`,
+      }).pipe(
+        Effect.provideService(FileSystem.FileSystem, fileSystem),
+        Effect.provideService(Path.Path, path),
+      );
     },
     Effect.mapError((cause) =>
       isAcpRegistryError(cause)

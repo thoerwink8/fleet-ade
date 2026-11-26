@@ -1,4 +1,5 @@
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -999,25 +1000,16 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       ? installedBaseDir
       : undefined;
   };
-  const writeDurably = (filePath: string, contents: string) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const directory = path.dirname(filePath);
-        yield* fs.makeDirectory(directory, { recursive: true });
-        const tempPath = yield* fs.makeTempFileScoped({ directory, prefix: ".service-write-" });
-        yield* fs.writeFileString(tempPath, contents, { mode: 0o600 });
-        // Opened read-write: Windows refuses to flush a handle without write access.
-        yield* (yield* fs.open(tempPath, { flag: "r+" })).sync;
-        yield* fs.rename(tempPath, filePath);
-        // Windows has no directory fsync (EPERM); NTFS journals the rename.
-        yield* (yield* fs.open(directory, { flag: "r" })).sync.pipe(
-          Effect.catchIf(
-            (error) => (error.reason.cause as NodeJS.ErrnoException | undefined)?.code === "EPERM",
-            () => Effect.void,
-          ),
-        );
-      }),
-    ).pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+  const writeDurably = (filePath: string, contents: string, symlink?: "follow" | "replace") =>
+    writeFileStringAtomically({
+      filePath,
+      contents,
+      ...(symlink === undefined ? {} : { symlink }),
+    }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, path),
+      Effect.mapError((cause) => new BootServiceInstallError({ cause })),
+    );
   const planForUnit = (unit: string): BootServicePlan => {
     const effectiveInstallBinDir =
       installBinDir || serviceUnitEnvironmentValueOf(unit, "T3CODE_INSTALL_BIN_DIR");
@@ -1362,7 +1354,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             .makeDirectory(path.dirname(unitPath), { recursive: true })
             .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
           // Files can match the new version even when activation fails; keep that install retryable.
-          yield* fs.writeFileString(restartPendingPath, `${input.cliVersion}\n`, { mode: 0o600 });
+          yield* writeDurably(restartPendingPath, `${input.cliVersion}\n`);
           const plan = planForUnit(currentlyInstalled ? yield* fs.readFileString(unitPath) : "");
           yield* writeDurably(
             statePath,
@@ -1383,7 +1375,9 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             }
           }
           const unit = manager.render(plan);
-          yield* writeDurably(unitPath, unit);
+          // The service owns the unit path entry itself: a user linking it to a shared
+          // definition must not see that definition overwritten by an upgrade.
+          yield* writeDurably(unitPath, unit, "replace");
           if (!start && manager.kind === "schtasks") yield* refreshWindowsTask(unit);
           return plan;
         }),

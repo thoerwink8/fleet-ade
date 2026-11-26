@@ -126,18 +126,22 @@ describe("question answer paths", () => {
           expect(yield* Queue.size(started)).toBe(0);
           expect(NodeFS.existsSync(second + ".txt")).toBe(false);
           expect(
-            NodeFS.readdirSync(config.attachmentsDir).filter((file) => file.endsWith(".part")),
+            NodeFS.readdirSync(config.attachmentsDir).filter((file) =>
+              file.startsWith("t3-write-"),
+            ),
           ).toEqual([]);
         }).pipe(
           Effect.provide(Layer.fresh(DocumentText.layer)),
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
             stat: (file) =>
-              Effect.gen(function* () {
-                yield* Queue.offer(started, file);
-                yield* Deferred.await(releases.get(file)!);
-                return yield* fs.stat(file);
-              }),
+              releases.has(file)
+                ? Effect.gen(function* () {
+                    yield* Queue.offer(started, file);
+                    yield* Deferred.await(releases.get(file)!);
+                    return yield* fs.stat(file);
+                  })
+                : fs.stat(file),
           }),
         );
       }).pipe(Effect.provide(layer)),
@@ -168,20 +172,33 @@ describe("question answer paths", () => {
         expect(yield* Fiber.join(retry)).toBe(path + ".txt");
         expect(NodeFS.readFileSync(path + ".txt", "utf8")).toBe("Retried");
         expect(
-          NodeFS.readdirSync(config.attachmentsDir).filter((file) => file.endsWith(".part")),
+          NodeFS.readdirSync(config.attachmentsDir).filter((file) => file.startsWith("t3-write-")),
         ).toEqual([]);
       }).pipe(
         Effect.provide(Layer.fresh(DocumentText.layer)),
         Effect.provideService(FileSystem.FileSystem, {
           ...fs,
-          writeFileString: (file, data) =>
-            Effect.gen(function* () {
-              if (++writes === 1) {
-                yield* Deferred.succeed(writing, undefined);
-                yield* Deferred.await(writeReleased);
-              }
-              return yield* fs.writeFileString(file, data);
-            }),
+          // The atomic writer streams into a temp file handle: writeAll is the
+          // moment the cancelled extraction is still publishing.
+          open: (file, options) =>
+            fs.open(file, options).pipe(
+              Effect.map((opened): FileSystem.File =>
+                file.includes("t3-write-")
+                  ? Object.create(opened, {
+                      writeAll: {
+                        value: (buffer: Uint8Array) =>
+                          Effect.gen(function* () {
+                            if (++writes === 1) {
+                              yield* Deferred.succeed(writing, undefined);
+                              yield* Deferred.await(writeReleased);
+                            }
+                            return yield* opened.writeAll(buffer);
+                          }),
+                      },
+                    })
+                  : opened,
+              ),
+            ),
           rename: (from, to) =>
             Effect.gen(function* () {
               if (++renames === 1) {

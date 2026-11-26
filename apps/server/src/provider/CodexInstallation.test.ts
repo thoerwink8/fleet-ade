@@ -698,6 +698,62 @@ int main(int argc, char **argv) {
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
+  it.effect("does not publish an update the manifest withdraws while it downloads", () =>
+    Effect.gen(function* () {
+      const digest = yield* Digest.Digest;
+      const checksum = Hex.encode(
+        yield* digest.digest(Digest.sha256, upstreamArchive).pipe(Effect.orDie),
+      );
+      const fs = yield* FileSystem.FileSystem;
+      let manifest = ModelManifest.BUNDLED_MODEL_MANIFEST;
+      let withdrawn = false;
+      const withdrawnManifest = {
+        ...ModelManifest.BUNDLED_MODEL_MANIFEST,
+        compatibility: [
+          {
+            driver: "codex",
+            t3CodeRange: ">=0.0.42",
+            ranges: [
+              { range: ">=0.160.0", status: "unsupported" as const },
+              { range: ">=0.156.0 <0.160.0", status: "supported" as const },
+            ],
+          },
+        ],
+      };
+      // The temp file's chmod is the last atomic-write step before the rename
+      // syncs and publishes, so flipping there replays a withdrawal that lands
+      // mid-download.
+      const flippingFs: FileSystem.FileSystem = {
+        ...fs,
+        chmod: (file, mode) =>
+          fs.chmod(file, mode).pipe(
+            Effect.tap(() =>
+              withdrawn && file.includes("t3-write-")
+                ? Effect.sync(() => {
+                    manifest = withdrawnManifest;
+                  })
+                : Effect.void,
+            ),
+          ),
+      };
+      const h = yield* makeHarness({
+        responses: upstreamResponses(checksum),
+        manifestCurrent: Effect.sync(() => manifest),
+      }).pipe(Effect.provideService(FileSystem.FileSystem, flippingFs));
+      yield* h.installation.start;
+      yield* terminalState(h.installation);
+      yield* h.installation.checkForUpdate;
+      expect((yield* h.installation.state).version).toBe(upstreamVersion);
+
+      withdrawn = true;
+      yield* h.installation.start;
+      const state = yield* terminalState(h.installation);
+      expect(state.phase).toBe("failed");
+      expect(state.message).toContain("撤回");
+      expect((yield* h.installation.resolve()).version).toBe("0.156.1");
+    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
+
   it.effect.each(["update", "reinstall"] as const)(
     "rejects withdrawal during $0 validation",
     (operation) =>

@@ -1,4 +1,5 @@
 import { DatabaseReclaimError, type DatabaseStorageStatus } from "@t3tools/contracts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
@@ -151,7 +152,10 @@ const make = Effect.gen(function* () {
     });
     const result = yield* maintenance.pruneEventStore(betweenPages);
     const completedAt = yield* Clock.currentTimeMillis;
-    yield* fs.writeFileString(compactedAtPath, String(completedAt)).pipe(Effect.ignore);
+    yield* writeFileStringAtomically({
+      filePath: compactedAtPath,
+      contents: String(completedAt),
+    }).pipe(Effect.ignore);
     if (result.deletedEventCount > 0 || result.deletedReceiptCount > 0) {
       yield* Effect.logInfo("Compacted orchestration history", result);
     }
@@ -222,7 +226,12 @@ const make = Effect.gen(function* () {
     const requestedAt = yield* Clock.currentTimeMillis;
     // One step: a request interrupted between them would repair on some unrelated later exit.
     yield* Effect.uninterruptible(
-      fs.writeFileString(reclaimFiles.request, String(requestedAt)).pipe(
+      writeFileStringAtomically({
+        filePath: reclaimFiles.request,
+        contents: String(requestedAt),
+      }).pipe(
+        Effect.provideService(FileSystem.FileSystem, fs),
+        Effect.provideService(Path.Path, path),
         // Reply before stopping: the restart closes this connection.
         Effect.andThen(restart.pipe(Effect.delay("500 millis"), Effect.forkDetach)),
       ),
