@@ -484,6 +484,36 @@ it.effect("checkpoint capture ignores an inherited object directory", () =>
   }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
 );
 
+it.effect(
+  "checkpoint capture succeeds when the server inherits a foreign GIT_QUARANTINE_PATH",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const driver = yield* GitVcsDriver.makeVcsDriverShape();
+      const sandbox = yield* fs.makeTempDirectoryScoped({ prefix: "t3-inherited-quarantine-" });
+      const cwd = path.join(sandbox, "repo");
+      yield* fs.makeDirectory(cwd);
+      const { git, checkpointRef } = yield* makeCheckpointFixture(driver, cwd);
+      const foreign = path.join(sandbox, "foreign-quarantine");
+      yield* fs.makeDirectory(foreign);
+      // A nested repository without a commit exercises the recovery probe as well.
+      yield* git(["init", "empty-nested"]);
+      const inherited = process.env.GIT_QUARANTINE_PATH;
+      process.env.GIT_QUARANTINE_PATH = foreign;
+      try {
+        yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
+      } finally {
+        if (inherited === undefined) delete process.env.GIT_QUARANTINE_PATH;
+        else process.env.GIT_QUARANTINE_PATH = inherited;
+      }
+      assert.strictEqual((yield* git(["show", `${checkpointRef}:file.txt`])).stdout, "unstaged\n");
+      // Nothing may have been written into the foreign quarantine store.
+      assert.deepEqual(yield* fs.readDirectory(foreign), []);
+      yield* git(["fsck", "--full"]);
+    }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
 it.effect.each(["sha1", "sha256"] as const)(
   "checkpoint object isolation supports linked worktrees with $0 objects",
   (format) =>

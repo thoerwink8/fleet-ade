@@ -159,6 +159,8 @@ const REPOSITORY_SELECTORS = new Set([
   "GIT_INDEX_FILE",
   "GIT_OBJECT_DIRECTORY",
   "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  // An inherited quarantine makes update-ref fail with "ref updates forbidden".
+  "GIT_QUARANTINE_PATH",
 ]);
 
 /**

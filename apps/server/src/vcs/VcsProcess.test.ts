@@ -506,6 +506,52 @@ describe("VcsProcess.run", () => {
     }).pipe(Effect.scoped, provideLive, Effect.provide(NodeServices.layer)),
   );
 
+  it.effect("strips an inherited GIT_QUARANTINE_PATH but passes an explicit one through", () =>
+    Effect.gen(function* () {
+      const inherited = process.env.GIT_QUARANTINE_PATH;
+      process.env.GIT_QUARANTINE_PATH = "/tmp/foreign-quarantine";
+      const seen = yield* Ref.make<ProcessRunner.ProcessRunInput | undefined>(undefined);
+      const service = yield* VcsProcess.make.pipe(
+        Effect.provideService(
+          ProcessRunner.ProcessRunner,
+          ProcessRunner.ProcessRunner.of({
+            run: (input) =>
+              Ref.set(seen, input).pipe(
+                Effect.as({
+                  stdout: "",
+                  stderr: "",
+                  code: ChildProcessSpawner.ExitCode(0),
+                  timedOut: false,
+                  stdoutTruncated: false,
+                  stderrTruncated: false,
+                  stdoutInvalidUtf8: false,
+                  stderrInvalidUtf8: false,
+                }),
+              ),
+          }),
+        ),
+      );
+      try {
+        yield* service.run(baseInput);
+        const spawned = yield* Ref.get(seen);
+        assert.isDefined(spawned);
+        expect(Object.hasOwn(spawned!.env ?? {}, "GIT_QUARANTINE_PATH")).toBe(true);
+        expect(spawned!.env?.GIT_QUARANTINE_PATH).toBeUndefined();
+
+        // An explicit quarantine for this capture is the caller's own and passes through.
+        yield* service.run({
+          ...baseInput,
+          env: { GIT_QUARANTINE_PATH: "/tmp/capture-quarantine" },
+        });
+        const explicit = yield* Ref.get(seen);
+        expect(explicit!.env?.GIT_QUARANTINE_PATH).toBe("/tmp/capture-quarantine");
+      } finally {
+        if (inherited === undefined) delete process.env.GIT_QUARANTINE_PATH;
+        else process.env.GIT_QUARANTINE_PATH = inherited;
+      }
+    }).pipe(Effect.scoped, provideLive, Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("keeps git from opening a folder laid out as a bare repository", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
