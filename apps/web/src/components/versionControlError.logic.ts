@@ -318,6 +318,11 @@ export function describeVersionControlError(
       };
     case "VcsProcessOutputLimitError":
       return { ...base, nextStep: "输出内容过大，请在终端里运行此命令。" };
+    case "VcsCheckpointStorageError":
+      return {
+        ...base,
+        nextStep: "无法写入检查点对象，请检查仓库的 .git 目录可用且可写，然后重试。",
+      };
     case "VcsRepositoryDetectionError":
       return { ...base, nextStep: "请确认目录存在，并且版本控制工具可以读取。" };
     case "VcsUnsupportedOperationError":
