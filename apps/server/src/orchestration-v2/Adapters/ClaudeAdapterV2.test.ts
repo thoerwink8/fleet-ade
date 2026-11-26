@@ -10910,6 +10910,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     "retry after request",
     "concurrent Stop",
     "forked skill",
+    "late depth-one background frame",
   ] as const)("bounds unanswered Claude requests after %s", (phase) =>
     Effect.gen(function* () {
       const interruptStarted = yield* Deferred.make<void>();
@@ -10996,6 +10997,22 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             uuid: "00000000-0000-4000-8000-000000000217",
             text: "Internal notice",
             model: "<synthetic>",
+          }),
+        );
+      }
+      if (phase === "late depth-one background frame") {
+        // A resumed background task re-emits depth-1 starts; its tool use belongs
+        // to an earlier turn, so it must not answer this request.
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "system",
+            subtype: "task_started",
+            task_id: "background-task",
+            tool_use_id: "toolu_previous_turn_launch",
+            description: "Running a skill",
+            spawn_depth: 1,
+            uuid: "00000000-0000-4000-8000-000000000218",
+            session_id: WAKE_NATIVE_SESSION,
           }),
         );
       }
