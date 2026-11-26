@@ -485,6 +485,61 @@ it.layer(NodeServices.layer)("writeFileStringInPlace", (it) => {
     }),
   );
 
+  // The entry can vanish between the writer's creation check and its open, which is
+  // exactly what the user drop-in's undo entry does. A recreated entry is new, so the
+  // directory must be synced even though the file existed when the write began.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "syncs the directory when the entry is recreated mid-write",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+        const filePath = path.join(root, "90-t3code-protect.conf");
+        yield* fs.writeFileString(filePath, "before");
+        const events: Array<string> = [];
+        let unlinked = false;
+        const recording = FileSystem.make({
+          ...fs,
+          open: (openedPath, options) => {
+            const recreate =
+              openedPath === filePath && !unlinked
+                ? fs.remove(filePath).pipe(
+                    Effect.tap(() =>
+                      Effect.sync(() => {
+                        unlinked = true;
+                      }),
+                    ),
+                  )
+                : Effect.void;
+            return recreate.pipe(
+              Effect.andThen(fs.open(openedPath, options)),
+              Effect.map((file): FileSystem.File =>
+                Object.create(file, {
+                  sync: {
+                    value: file.sync.pipe(
+                      Effect.tap(() =>
+                        Effect.sync(() => {
+                          events.push(openedPath === filePath ? "sync file" : "sync directory");
+                        }),
+                      ),
+                    ),
+                  },
+                }),
+              ),
+            );
+          },
+        });
+
+        yield* writeFileStringInPlace({ filePath, contents: "after" }).pipe(
+          Effect.provideService(FileSystem.FileSystem, recording),
+        );
+
+        assert.strictEqual(yield* fs.readFileString(filePath), "after");
+        assert.deepStrictEqual(events, ["sync file", "sync directory"]);
+      }),
+  );
+
   it.effect("writes through a symlink instead of replacing it", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

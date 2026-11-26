@@ -88,13 +88,12 @@ export const writeFileStringInPlace = (input: {
       yield* fs.makeDirectory(targetDirectory, { recursive: true });
       // Write-only access, since a service drop-in may be write-only for its owner:
       // "w" truncates and creates, unlike "r+" which demands read access it never uses.
-      const created = !(yield* fs.exists(input.filePath));
       const file = yield* fs.open(input.filePath, { flag: "w" });
       yield* writeContents(file, input.contents);
-      // The scope closes the handle after the sync; the directory entry is durable once
-      // it already existed, so only a creation needs the directory sync.
+      // The scope closes the handle after the sync. The directory sync is unconditional:
+      // checking existence first would miss the entry being recreated after the check.
       yield* file.sync;
-      if (platform !== "win32" && created) {
+      if (platform !== "win32") {
         yield* syncDirectory(fs, targetDirectory);
       }
     }),
