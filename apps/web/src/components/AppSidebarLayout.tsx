@@ -25,6 +25,7 @@ import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalSt
 import {
   isRichTextBoldShortcut,
   isSidebarToggleShortcut,
+  resolveShortcutCommand,
   shortcutLabelForCommand,
 } from "../keybindings";
 import { useVisibleShortcutLabel } from "../hooks/useKeyboardShortcutHints";
