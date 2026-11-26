@@ -39,8 +39,10 @@ import {
   isExactServiceVersion,
   decodeServiceUnit,
   disabledServiceTask,
+  encodeServiceTask,
   SERVICE_ENV_FILE,
   SERVICE_LAUNCHER_PROTOCOL,
+  serviceTaskIsDisabled,
   SERVICE_RESTART_PENDING_FILE,
   SERVICE_STOP_MARKER_FILE,
 } from "./cloud/serviceProtocol.ts";
@@ -175,27 +177,34 @@ const runLauncher = async (root: string) => {
   }
 };
 
+/** Task Scheduler units are UTF-16LE after a repoint; systemd and launchd units stay UTF-8. */
+const readUnitFile = async (unitPath: string): Promise<string> =>
+  decodeServiceUnit(await NodeFSP.readFile(unitPath));
+
 const fakeServiceUnit = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   root: string,
   version: string,
   render = renderBootServiceUnit,
+  unitName = "t3code.service",
 ) =>
   Effect.gen(function* () {
     const plan = unitPlan(root, version);
-    yield* fs.makeDirectory(path.dirname(plan.unitPath), { recursive: true });
+    const unitPath = `${root}/unit/${unitName}`;
+    yield* fs.makeDirectory(path.dirname(unitPath), { recursive: true });
+    // The file starts as the installer's write: UTF-8 without a BOM on every platform.
     const contents = render(plan);
-    yield* fs.writeFileString(plan.unitPath, contents);
+    yield* fs.writeFileString(unitPath, contents);
     const unit = {
-      path: plan.unitPath,
+      path: unitPath,
       reloads: 0,
       loadedContents: contents,
       failReload: false,
       reload: async () => {
         unit.reloads += 1;
         if (unit.failReload) throw new Error("daemon-reload failed");
-        unit.loadedContents = await NodeFSP.readFile(unit.path, "utf8");
+        unit.loadedContents = await readUnitFile(unit.path);
       },
     };
     return unit;
@@ -274,6 +283,104 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
       task = unit.replace("1.1.0", "1.0.0");
       yield* Effect.promise(() => registerServiceTask(unitPath, "t3code-PC-theo", schtasks));
       assert.equal(task, unit);
+    }),
+  );
+
+  const chineseTaskPlan = (root: string) =>
+    renderBootServiceTask(
+      {
+        program: [`${root}/runtime/versions/1.1.0/t3.exe`, "__service-launcher"],
+        baseDir: root,
+        logPath: `${root}/logs/boot-service.log`,
+        unitPath: `${root}/unit/t3code-task.xml`,
+      },
+      { userId: "PC\\theo", homeDir: "C:\\Users\\theo", conhostPath: "conhost.exe" },
+    );
+
+  it.effect("registers a legacy UTF-8 task file as UTF-16LE, keeping its Chinese path", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-测试服务-" });
+      const unitPath = path.join(root, "t3code-task.xml");
+      const unit = chineseTaskPlan(root);
+      // The installer's original write: undeclared UTF-8, no BOM.
+      yield* fs.writeFileString(unitPath, unit);
+
+      let created: { readonly xmlPath: string; readonly bytes: Uint8Array } | undefined;
+      const schtasks = async (...args: ReadonlyArray<string>) => {
+        if (args[0] === "/Create") {
+          created = { xmlPath: args[2] ?? "", bytes: await NodeFSP.readFile(args[2] ?? "") };
+        }
+        return { stdout: unit };
+      };
+
+      yield* Effect.promise(() => registerServiceTask(unitPath, "t3code-PC-theo", schtasks));
+      assert.isDefined(created);
+      assert.deepEqual([...created!.bytes.subarray(0, 2)], [0xff, 0xfe]);
+      const registered = decodeServiceUnit(created!.bytes);
+      assert.equal(registered, unit);
+      assert.include(registered, root);
+      assert.isFalse(serviceTaskIsDisabled(registered));
+      // The legacy file itself is untouched; the transcoded copy is removed after registration.
+      assert.equal(yield* fs.readFileString(unitPath), unit);
+      assert.deepEqual(yield* fs.readDirectory(root), ["t3code-task.xml"]);
+    }),
+  );
+
+  it.effect("keeps a disabled task disabled when its legacy file is transcoded", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-测试服务-" });
+      const unitPath = path.join(root, "t3code-task.xml");
+      const unit = chineseTaskPlan(root);
+      yield* fs.writeFileString(unitPath, unit);
+
+      let created: { readonly xmlPath: string; readonly bytes: Uint8Array } | undefined;
+      const schtasks = async (...args: ReadonlyArray<string>) => {
+        if (args[0] === "/Create") {
+          created = { xmlPath: args[2] ?? "", bytes: await NodeFSP.readFile(args[2] ?? "") };
+        }
+        return { stdout: disabledServiceTask(unit) };
+      };
+
+      yield* Effect.promise(() => registerServiceTask(unitPath, "t3code-PC-theo", schtasks));
+      assert.isDefined(created);
+      assert.notEqual(created!.xmlPath, unitPath);
+      assert.deepEqual([...created!.bytes.subarray(0, 2)], [0xff, 0xfe]);
+      const registered = decodeServiceUnit(created!.bytes);
+      assert.equal(registered, disabledServiceTask(unit));
+      assert.isTrue(serviceTaskIsDisabled(registered));
+      assert.include(registered, root);
+      assert.deepEqual(yield* fs.readDirectory(root), ["t3code-task.xml"]);
+    }),
+  );
+
+  it.effect("registers an already UTF-16LE task file in place without copying", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-测试服务-" });
+      const unitPath = path.join(root, "t3code-task.xml");
+      const unit = chineseTaskPlan(root);
+      yield* Effect.promise(() => NodeFSP.writeFile(unitPath, encodeServiceTask(unit)));
+
+      let created: { readonly xmlPath: string; readonly bytes: Uint8Array } | undefined;
+      const schtasks = async (...args: ReadonlyArray<string>) => {
+        if (args[0] === "/Create") {
+          created = { xmlPath: args[2] ?? "", bytes: await NodeFSP.readFile(args[2] ?? "") };
+        }
+        return { stdout: unit };
+      };
+
+      yield* Effect.promise(() => registerServiceTask(unitPath, "t3code-PC-theo", schtasks));
+      assert.isDefined(created);
+      assert.equal(created!.xmlPath, unitPath);
+      assert.deepEqual([...created!.bytes.subarray(0, 2)], [0xff, 0xfe]);
+      assert.equal(decodeServiceUnit(created!.bytes), unit);
+      assert.isFalse(serviceTaskIsDisabled(decodeServiceUnit(created!.bytes)));
+      assert.deepEqual(yield* fs.readDirectory(root), ["t3code-task.xml"]);
     }),
   );
 
@@ -947,6 +1054,7 @@ process.exit(0);
     render = renderBootServiceUnit,
     missingUnit = false,
     legacyInstall = false,
+    unitName = "t3code.service",
   ) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -957,7 +1065,7 @@ process.exit(0);
       const activatedPath = path.join(root, "activated");
       yield* fs.makeDirectory(path.dirname(databasePath), { recursive: true });
       yield* fs.writeFileString(databasePath, "before trial");
-      const unit = yield* fakeServiceUnit(fs, path, root, "1.0.0", render);
+      const unit = yield* fakeServiceUnit(fs, path, root, "1.0.0", render, unitName);
       if (missingUnit) yield* fs.remove(unit.path);
       const childSource = `
 import assert from "node:assert/strict";
@@ -1046,10 +1154,12 @@ if (context.update?.status === "pending") {
       name: "systemd after a protocol-3 local upgrade",
       render: renderBootServiceUnit,
       legacyInstall: true,
+      unitName: "t3code.service",
     },
     {
       name: "launchd",
       legacyInstall: false,
+      unitName: "t3code.service",
       render: (plan: Parameters<typeof renderBootServicePlist>[0]) =>
         renderBootServicePlist(plan, {
           homeDir: "/Users/test & <user>",
@@ -1059,6 +1169,7 @@ if (context.update?.status === "pending") {
     {
       name: "Task Scheduler",
       legacyInstall: false,
+      unitName: "t3code-task.xml",
       render: (plan: Parameters<typeof renderBootServiceTask>[0]) =>
         renderBootServiceTask(
           { ...plan, program: [`${plan.program[0]}.exe`, "__service-launcher"] },
@@ -1067,13 +1178,85 @@ if (context.update?.status === "pending") {
     },
   ])(
     "commits and repoints $name only after the trial reports prepared",
-    ({ render, legacyInstall }) =>
+    ({ render, legacyInstall, unitName }) =>
       Effect.gen(function* () {
-        const { fs, root, unit } = yield* commitUpdate(render, false, legacyInstall);
+        const { root, unit } = yield* commitUpdate(render, false, legacyInstall, unitName);
         const expected = render(unitPlan(root, "1.1.0"));
-        assert.equal(yield* fs.readFileString(unit.path), expected);
+        const rewritten = yield* Effect.promise(() => NodeFSP.readFile(unit.path));
+        assert.equal(decodeServiceUnit(rewritten), expected);
+        if (unit.path.endsWith(".xml")) {
+          // Everything schtasks is offered starts with the UTF-16LE BOM.
+          assert.deepEqual([...rewritten.subarray(0, 2)], [0xff, 0xfe]);
+        }
         assert.equal(unit.loadedContents, expected);
         assert.equal(unit.reloads, 1);
+      }),
+  );
+
+  it.effect(
+    "registers an unrepointed legacy task file as UTF-16LE when a committed update restarts",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-测试服务-" });
+        const statePath = path.join(root, "runtime", "service-state.json");
+        const unitPath = `${root}/unit/t3code-task.xml`;
+        yield* fs.makeDirectory(path.dirname(unitPath), { recursive: true });
+        // The installer wrote the unit for 1.1.0 with the update, so the startup repoint
+        // finds nothing to change; the file is still the installer's undeclared UTF-8.
+        const unitXml = renderBootServiceTask(
+          {
+            ...unitPlan(root, "1.1.0"),
+            program: [`${unitPlan(root, "1.1.0").program[0]}.exe`, "__service-launcher"],
+          },
+          { userId: "PC\\theo", homeDir: "C:\\Users\\theo", conhostPath: "conhost.exe" },
+        );
+        yield* fs.writeFileString(unitPath, unitXml);
+        yield* Effect.promise(() =>
+          writeServiceState(statePath, {
+            protocol: SERVICE_LAUNCHER_PROTOCOL,
+            activeVersion: "1.1.0",
+            update: {
+              id: "update-1",
+              fromVersion: "1.0.0",
+              targetVersion: "1.1.0",
+              status: "committed",
+            },
+          }),
+        );
+
+        let created: { readonly xmlPath: string; readonly bytes: Uint8Array } | undefined;
+        const schtasks = async (...args: ReadonlyArray<string>) => {
+          if (args[0] === "/Create") {
+            created = { xmlPath: args[2] ?? "", bytes: await NodeFSP.readFile(args[2] ?? "") };
+          }
+          return { stdout: unitXml };
+        };
+        const unit = {
+          path: unitPath,
+          reload: () => registerServiceTask(unitPath, "t3code-PC-theo", schtasks),
+        };
+        // The runtime directory stays absent on purpose: the child fails to start, but the
+        // repoint and registration still run through the same finally path as production.
+        const launcher = new Launcher(
+          root,
+          yield* Effect.promise(() => readServiceState(statePath)),
+          { serviceUnit: unit },
+        );
+        yield* Effect.promise(() =>
+          expect(launcher.run()).rejects.toThrow("runtime is missing or incomplete"),
+        );
+
+        assert.isDefined(created);
+        assert.deepEqual([...created!.bytes.subarray(0, 2)], [0xff, 0xfe]);
+        const registered = decodeServiceUnit(created!.bytes);
+        assert.equal(registered, unitXml);
+        assert.include(registered, root);
+        assert.isFalse(serviceTaskIsDisabled(registered));
+        // Nothing repointed, so nothing rewrote the legacy file either.
+        assert.equal(yield* fs.readFileString(unitPath), unitXml);
+        assert.deepEqual(yield* fs.readDirectory(path.dirname(unitPath)), ["t3code-task.xml"]);
       }),
   );
 

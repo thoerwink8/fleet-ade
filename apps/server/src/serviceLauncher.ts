@@ -103,7 +103,9 @@ const runSchtasks = (...args: ReadonlyArray<string>) =>
 
 /**
  * Registering replaces the task, so one the CLI disabled to keep the service stopped is
- * registered disabled. The caller holds the unit lease, as the CLI does to disable it.
+ * registered disabled. Every file handed to `/Create /XML` is UTF-16LE with a BOM; files
+ * already encoded that way register in place, everything else through a transcoded copy.
+ * The caller holds the unit lease, as the CLI does to disable it.
  */
 export async function registerServiceTask(
   unitPath: string,
@@ -112,13 +114,26 @@ export async function registerServiceTask(
 ): Promise<void> {
   const register = (xmlPath: string) => schtasks("/Create", "/XML", xmlPath, "/TN", taskName, "/F");
   const registered = await schtasks("/Query", "/TN", taskName, "/XML");
+  const original = await NodeFSP.readFile(unitPath);
   if (!serviceTaskIsDisabled(registered.stdout)) {
-    await register(unitPath);
+    if (original[0] === 0xff && original[1] === 0xfe) {
+      await register(unitPath);
+      return;
+    }
+    // schtasks decodes undeclared XML in the ANSI code page: a legacy UTF-8 file would
+    // garble non-ASCII paths, so it is transcoded instead of handed over unchanged.
+    const transcodedPath = `${unitPath}.${process.pid}.utf16`;
+    try {
+      await NodeFSP.writeFile(transcodedPath, encodeServiceTask(decodeServiceUnit(original)));
+      await register(transcodedPath);
+    } finally {
+      await NodeFSP.rm(transcodedPath, { force: true });
+    }
     return;
   }
   const disabledPath = `${unitPath}.${process.pid}.disabled`;
   try {
-    const unit = decodeServiceUnit(await NodeFSP.readFile(unitPath));
+    const unit = decodeServiceUnit(original);
     await NodeFSP.writeFile(disabledPath, encodeServiceTask(disabledServiceTask(unit)));
     await register(disabledPath);
   } finally {
