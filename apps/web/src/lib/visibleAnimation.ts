@@ -7,6 +7,7 @@ const animations = new Map<Element, ObservedAnimation>();
 let observer: IntersectionObserver | null = null;
 let reducedMotion: MediaQueryList | null = null;
 
+// will-change is set only while the element is visible and animating: a spinner that stays promoted when off-screen holds a GPU layer for nothing.
 function updateAnimation(animation: ObservedAnimation) {
   const running =
     animation.intersecting && document.visibilityState === "visible" && !reducedMotion?.matches;

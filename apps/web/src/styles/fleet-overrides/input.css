@@ -1,6 +1,6 @@
-/* Size variants for single inputs on sm+ viewports (default stays --fa-ctrl = 32px). */
+/* A standalone input is 32px (--fa-ctrl); sm is that same height. compact (28px, --fa-ctrl-sm) is for inputs inside a bar, row, table cell, or list popup that is itself at least 32px. */
 .fa-input[data-size="sm"]:not(textarea) {
-  height: var(--fa-ctrl-sm);
+  height: var(--fa-ctrl);
 }
 
 .fa-input[data-size="compact"]:not(textarea) {
@@ -17,7 +17,10 @@
   min-height: var(--fa-ctrl);
 }
 
-.fa-input--group:has([data-size="sm"]),
+.fa-input--group:has([data-size="sm"]) {
+  min-height: var(--fa-ctrl);
+}
+
 .fa-input--group:has([data-size="compact"]) {
   min-height: var(--fa-ctrl-sm);
 }
@@ -31,13 +34,13 @@
   align-self: stretch;
 }
 
-/* Narrow viewports (< 640px / sm) keep taller touch-friendly heights on the 4px grid. */
-@media (max-width: 639.98px) {
+/* Narrow viewports (< 768px) keep taller touch-friendly heights on the 4px grid, with 16px type so iOS Safari does not zoom on focus. */
+@media (max-width: 767.98px) {
   .fa-input:not(textarea):not(.fa-input--group) {
     height: 36px;
   }
   .fa-input[data-size="sm"]:not(textarea) {
-    height: var(--fa-ctrl);
+    height: 36px;
   }
   .fa-input[data-size="compact"]:not(textarea) {
     height: var(--fa-ctrl-sm);
@@ -49,7 +52,7 @@
     min-height: 36px;
   }
   .fa-input--group:has([data-size="sm"]) {
-    min-height: var(--fa-ctrl);
+    min-height: 36px;
   }
   .fa-input--group:has([data-size="compact"]) {
     min-height: var(--fa-ctrl-sm);
@@ -58,7 +61,7 @@
     min-height: var(--fa-ctrl-lg);
   }
 
-  /* @fleet/design switches the field to 16px below 480px; this app's narrow layout starts at 640px. */
+  /* @fleet/design switches the field to 16px below 480px; standalone inputs here use 16px up to 767.98px. */
   .fa-input,
   .fa-input__control {
     font-size: 16px;
@@ -130,7 +133,7 @@ textarea.fa-input[data-size="lg"] {
 
 /* InputGroup variants (popover and ghost) sit on top of .fa-input--group. */
 .fa-input--group[data-variant="popover"] {
-  border-radius: var(--radius-2xl, 1rem);
+  border-radius: var(--fa-radius-lg);
   padding-inline: var(--fa-space-3);
 }
 

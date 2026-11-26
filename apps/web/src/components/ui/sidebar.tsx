@@ -35,7 +35,7 @@ import {
 import * as Schema from "effect/Schema";
 import { announceSidebarVisibility } from "~/lib/accessibilityAnnouncements";
 
-const SIDEBAR_WIDTH = "264px";
+const SIDEBAR_WIDTH = "240px";
 const SIDEBAR_WIDTH_MOBILE = "min(28rem, calc(100vw - var(--fa-space-12, 3rem)))";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_RESIZE_DEFAULT_MIN_WIDTH = 16 * 16;
@@ -395,7 +395,7 @@ function Sidebar({
       <SidebarInstanceContext value={instanceContextValue}>
         <div
           className={cn(
-            "flex h-full w-(--sidebar-width) flex-col bg-sidebar surface-grain text-sidebar-foreground",
+            "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
             className,
           )}
           data-slot="sidebar"
@@ -432,7 +432,7 @@ function Sidebar({
             keepMounted
             transitionDurationMs={0}
             finalFocus={() => resolveMobileReturnFocusTarget(mobilePopupRef.current) ?? true}
-            className={cn("bg-sidebar surface-grain p-0 text-sidebar-foreground", className)}
+            className={cn("bg-sidebar p-0 text-sidebar-foreground", className)}
             data-mobile="true"
             data-sidebar="sidebar"
             data-slot="sidebar"
@@ -573,7 +573,7 @@ function Sidebar({
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >
@@ -817,7 +817,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
       className={cn(
-        "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
+        "relative flex min-w-0 w-full flex-1 flex-col bg-background",
         "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm/5",
         className,
       )}
@@ -965,7 +965,7 @@ const sidebarMenuButtonVariants = cva(
         "icon-sm":
           "ade-touch-target relative size-7 justify-center overflow-visible rounded-[var(--control-radius)] p-0 max-md:size-8 pointer-coarse:size-8",
         scope:
-          "ade-touch-target ade-touch-target--y h-8 max-w-40 min-w-0 shrink overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-row",
+          "ade-touch-target ade-touch-target--y h-8 max-w-40 min-w-0 shrink overflow-hidden rounded-[var(--control-radius)] px-2 py-1.5 text-row",
         lg: "h-12 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-row group-data-[collapsible=icon]:p-0!",
         sm: "h-7 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-meta",
       },

@@ -17,6 +17,7 @@ import {
   type CommandPaletteUiState,
   buildRootGroups,
   commandPaletteDisabledReason,
+  commandPaletteItemLineCount,
 } from "./CommandPalette.logic";
 
 describe("linked pull request thread navigation", () => {
@@ -240,6 +241,9 @@ describe("buildThreadActionItems", () => {
     const remoteItem = items.find((item) => item.description === "Remote project · 当前会话");
     await remoteItem?.run();
     expect(runThread).toHaveBeenCalledWith(remote);
+    expect(remoteItem?.timestamp).toBeTruthy();
+    expect(remoteItem?.meta).toBe(remoteItem?.timestamp);
+    expect(commandPaletteItemLineCount(remoteItem!)).toBe(3);
   });
 
   it("hides never-messaged empty threads except the active thread while keeping messaged siblings", () => {

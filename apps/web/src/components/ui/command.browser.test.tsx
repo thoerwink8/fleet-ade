@@ -97,6 +97,8 @@ describe("command palette shell", () => {
     expect(getComputedStyle(footer).fontSize).toBe("12px");
 
     const fieldStyle = getComputedStyle(field);
+    // The whole 48px row (less its 1px border) is the click target, not just the text line.
+    expect(field.getBoundingClientRect().height).toBe(inputRow.getBoundingClientRect().height - 1);
     expect(fieldStyle.borderTopWidth).toBe("0px");
     expect(fieldStyle.borderBottomWidth).toBe("0px");
     expect(fieldStyle.outlineStyle).toBe("none");
