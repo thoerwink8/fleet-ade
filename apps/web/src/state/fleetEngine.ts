@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { EnvironmentRegistry } from "@t3tools/client-runtime/connection";
+import { describeRequestFailure } from "@t3tools/client-runtime/errors";
 import { executeConnectedEnvironmentHttpRequest } from "@t3tools/client-runtime/state/environmentHttpAuth";
 import type { EnvironmentId, FleetEngineStatus } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -408,7 +409,7 @@ export function useFleetEngineStatus(environmentId: EnvironmentId): {
   const manualRetry = useAtomValue(manualRetryStateAtom(environmentId));
   const isRetrying = result.waiting || manualRetry.inFlight;
   if (result._tag === "Failure") {
-    const cause = Cause.squash(result.cause);
+    const cause = describeRequestFailure(result.cause);
     const message = cause instanceof Error ? cause.message : "读不到接口";
     return {
       status: AsyncResult.getOrElse(result, () => null),
