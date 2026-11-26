@@ -6,6 +6,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as TestClock from "effect/testing/TestClock";
@@ -499,6 +500,28 @@ it.layer(NodeServices.layer)("writeFileStringInPlace", (it) => {
       assert.strictEqual(yield* fs.readLink(link), destination);
       assert.strictEqual(yield* fs.readFileString(destination), "after");
     }),
+  );
+  // Root ignores the missing read bit, so only a regular user exercises the write-only open.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32" || process.getuid?.() === 0)(
+    "updates a write-only file without read access, keeping its mode",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-in-place-write-" });
+        const filePath = path.join(root, "90-t3code-protect.conf");
+        yield* fs.writeFileString(filePath, "MemoryLow=1G\n");
+        yield* fs.chmod(filePath, 0o200);
+        const before = yield* fs.stat(filePath);
+
+        yield* writeFileStringInPlace({ filePath, contents: "MemoryLow=2G\n" });
+
+        const after = yield* fs.stat(filePath);
+        assert.strictEqual(Option.getOrNull(after.ino), Option.getOrNull(before.ino));
+        assert.strictEqual(after.mode & 0o777, 0o200);
+        yield* fs.chmod(filePath, 0o600);
+        assert.strictEqual(yield* fs.readFileString(filePath), "MemoryLow=2G\n");
+      }),
   );
 });
 

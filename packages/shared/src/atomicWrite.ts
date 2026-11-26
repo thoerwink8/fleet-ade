@@ -86,16 +86,10 @@ export const writeFileStringInPlace = (input: {
       const platform = yield* HostProcess.Platform;
       const targetDirectory = path.dirname(input.filePath);
       yield* fs.makeDirectory(targetDirectory, { recursive: true });
-      const opened = yield* fs.open(input.filePath, { flag: "r+" }).pipe(
-        Effect.map((file) => [file, false] as const),
-        Effect.catchIf(
-          (error) => error.reason._tag === "NotFound",
-          () =>
-            Effect.map(fs.open(input.filePath, { flag: "w+" }), (file) => [file, true] as const),
-        ),
-      );
-      const [file, created] = opened;
-      yield* file.truncate(0);
+      // Write-only access, since a service drop-in may be write-only for its owner:
+      // "w" truncates and creates, unlike "r+" which demands read access it never uses.
+      const created = !(yield* fs.exists(input.filePath));
+      const file = yield* fs.open(input.filePath, { flag: "w" });
       yield* writeContents(file, input.contents);
       // The scope closes the handle after the sync; the directory entry is durable once
       // it already existed, so only a creation needs the directory sync.

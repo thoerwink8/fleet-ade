@@ -429,23 +429,27 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       }),
   );
 
-  it.effect("updating a linked unit replaces the link and leaves its target intact", () =>
-    Effect.gen(function* () {
-      const { service, makeService, fs, home } = yield* makeHarness();
-      const path = yield* Path.Path;
-      const { unitPath } = yield* service.install();
-      const separate = path.join(home, "separate-managed-unit.service");
-      const previous = yield* fs.readFileString(unitPath);
-      yield* fs.rename(unitPath, separate);
-      yield* fs.symlink(separate, unitPath);
+  // The systemd harness needs POSIX-shaped temp paths; on Windows the real temp directory
+  // carries backslashes, which unit rendering refuses before the link assertions run.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "updating a linked unit replaces the link and leaves its target intact",
+    () =>
+      Effect.gen(function* () {
+        const { service, makeService, fs, home } = yield* makeHarness();
+        const path = yield* Path.Path;
+        const { unitPath } = yield* service.install();
+        const separate = path.join(home, "separate-managed-unit.service");
+        const previous = yield* fs.readFileString(unitPath);
+        yield* fs.rename(unitPath, separate);
+        yield* fs.symlink(separate, unitPath);
 
-      const newer = yield* makeService(undefined, "1.2.4");
-      yield* newer.install({ start: false });
+        const newer = yield* makeService(undefined, "1.2.4");
+        yield* newer.install({ start: false });
 
-      expect(yield* fs.readFileString(separate)).toBe(previous);
-      const installed = yield* fs.readFileString(unitPath);
-      expect(installed).toContain("1.2.4");
-    }),
+        expect(yield* fs.readFileString(separate)).toBe(previous);
+        const installed = yield* fs.readFileString(unitPath);
+        expect(installed).toContain("1.2.4");
+      }),
   );
 
   it.effect(
