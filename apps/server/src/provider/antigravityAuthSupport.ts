@@ -3,6 +3,7 @@ import * as NodeFSP from "node:fs/promises";
 
 import type { AntigravityAuthMethod, ProviderInstanceId } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { resolveNodeExecutable, nodeRuntimeUnavailableMessage } from "@t3tools/shared/nodeRuntime";
 import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
@@ -428,9 +429,14 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
         .pipe(Effect.mapError(() => authSupportError("无法设置 Antigravity 配置目录的权限。")));
     }
   }
-  yield* fs
-    .writeFileString(path.join(acpDirectory, "settings.json"), antigravityProfileSettings(auth))
-    .pipe(Effect.mapError(() => authSupportError("无法写入 Antigravity 配置。")));
+  yield* writeFileStringAtomically({
+    filePath: path.join(acpDirectory, "settings.json"),
+    contents: antigravityProfileSettings(auth),
+  }).pipe(
+    Effect.provideService(FileSystem.FileSystem, fs),
+    Effect.provideService(Path.Path, path),
+    Effect.mapError(() => authSupportError("无法写入 Antigravity 配置。")),
+  );
   yield* linkAntigravityUserSkills({ profileDirectory: geminiHome, userHome, platform });
   return profile;
 });
