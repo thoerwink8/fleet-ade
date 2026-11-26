@@ -1039,12 +1039,14 @@ process.exit(0);
       assert.isTrue(yield* Effect.promise(() => stateDirOwned(root)));
       yield* fs.writeFileString(recordPath, JSON.stringify({ ...record, ownerId: "lock-aware" }));
       assert.isFalse(yield* Effect.promise(() => stateDirOwned(root)));
-      // This process started after 1970, so its PID was reused since that record.
+      // Pre-lock records carry no identity proof: while their PID lives, the real legacy server
+      // and a reused PID are indistinguishable, so the home stays owned either way — only a dead
+      // PID clears it. The wall-clock rejection of old records no longer exists.
       yield* fs.writeFileString(
         recordPath,
         JSON.stringify({ ...record, startedAt: "1970-01-01T00:00:00Z" }),
       );
-      assert.isFalse(yield* Effect.promise(() => stateDirOwned(root)));
+      assert.isTrue(yield* Effect.promise(() => stateDirOwned(root)));
       yield* fs.writeFileString(recordPath, JSON.stringify({ ...record, pid: 2 ** 22 + 1 }));
       assert.isFalse(yield* Effect.promise(() => stateDirOwned(root)));
     }),

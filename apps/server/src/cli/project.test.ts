@@ -44,6 +44,7 @@ import * as T3ProjectFileLoader from "../project/T3ProjectFileLoader.ts";
 import {
   makePersistedServerRuntimeState,
   persistServerRuntimeState,
+  registerInProcessOwner,
 } from "../serverRuntimeState.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
@@ -138,12 +139,19 @@ it.effect.each(["snapshot", "mutation"] as const)(
       const baseDir = NodePath.join(root, "state");
       const workspaceRoot = NodePath.join(root, "workspace");
       yield* fs.makeDirectory(workspaceRoot);
+      // Stands in for this same process owning the home, the binding a real server gets from
+      // acquireServerOwnership: a defined ownerId with a registered owner.
+      const liveStatePath = NodePath.join(baseDir, "userdata", "server-runtime.json");
+      yield* registerInProcessOwner(liveStatePath, "4ec9f94a-0000-4000-8000-000000000000");
       yield* persistServerRuntimeState({
-        path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-        state: yield* makePersistedServerRuntimeState({
-          config: { host: "127.0.0.1", devUrl: undefined },
-          port: 3_773,
-        }),
+        path: liveStatePath,
+        state: {
+          ...(yield* makePersistedServerRuntimeState({
+            config: { host: "127.0.0.1", devUrl: undefined },
+            port: 3_773,
+          })),
+          ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+        },
       });
       const now = "2026-01-01T00:00:00.000Z";
       const requestReceived = Promise.withResolvers<void>();

@@ -18,6 +18,7 @@ import { cli } from "../binCli.ts";
 import {
   makePersistedServerRuntimeState,
   persistServerRuntimeState,
+  registerInProcessOwner,
 } from "../serverRuntimeState.ts";
 
 const hooks = vi.hoisted(() => ({
@@ -105,12 +106,19 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("CLI deferred imp
       const baseDir = NodePath.join(root, "state");
       const workspaceRoot = NodePath.join(root, "workspace");
       yield* fs.makeDirectory(workspaceRoot);
+      // Stands in for this same process owning the home, the binding a real server gets from
+      // acquireServerOwnership: a defined ownerId with a registered owner.
+      const liveStatePath = NodePath.join(baseDir, "userdata", "server-runtime.json");
+      yield* registerInProcessOwner(liveStatePath, "4ec9f94a-0000-4000-8000-000000000000");
       yield* persistServerRuntimeState({
-        path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
-        state: yield* makePersistedServerRuntimeState({
-          config: { host: "127.0.0.1", devUrl: undefined },
-          port: 3_773,
-        }),
+        path: liveStatePath,
+        state: {
+          ...(yield* makePersistedServerRuntimeState({
+            config: { host: "127.0.0.1", devUrl: undefined },
+            port: 3_773,
+          })),
+          ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+        },
       });
 
       hooks.importsAttempted.length = 0;

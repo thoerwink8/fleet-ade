@@ -614,13 +614,15 @@ describe("readLiveServerRuntimeState", () => {
         assert.notEqual(holder.pid, impostor.pid);
 
         // The impostor owns the record's PID, but the stored identity was written by the dead
-        // original owner: exact identity comparison proves the reuse without any clock.
+        // original owner: exact identity comparison proves the reuse without any clock. A
+        // synthetic identity stands in for the original owner's — POSIX `ps` resolves to whole
+        // seconds, so probing two freshly spawned processes can collide within the same second.
         yield* fs.writeFileString(
           statePath,
           JSON.stringify(
             recordFor(impostor.pid, {
               ownerId: "4ec9f94a-0000-4000-8000-000000000000",
-              processIdentity: yield* Effect.promise(() => probeIdentityOf(holder.pid!)),
+              processIdentity: "the original owner's start time, from a process long dead",
             }),
           ),
         );

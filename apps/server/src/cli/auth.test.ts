@@ -12,6 +12,7 @@ import type * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import {
   makePersistedServerRuntimeState,
   persistServerRuntimeState,
+  registerInProcessOwner,
 } from "../serverRuntimeState.ts";
 import { revokeSessionLiveOrOffline } from "./auth.ts";
 
@@ -32,7 +33,13 @@ it.effect(
         },
         port: 3773,
       });
-      yield* persistServerRuntimeState({ path: statePath, state });
+      // The fixture stands in for this same process owning the home, the binding a real server
+      // gets from acquireServerOwnership: a defined ownerId with a registered owner.
+      yield* registerInProcessOwner(statePath, "4ec9f94a-0000-4000-8000-000000000000");
+      yield* persistServerRuntimeState({
+        path: statePath,
+        state: { ...state, ownerId: "4ec9f94a-0000-4000-8000-000000000000" },
+      });
 
       const revokedOffline: Array<AuthSessionId> = [];
       const liveRequests: Array<{
