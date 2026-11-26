@@ -156,7 +156,7 @@ const isServerOwnershipHeld = (statePath: string): boolean => {
 export const verifyRecordedServerProcess = Effect.fn("verifyRecordedServerProcess")(function* (
   state: Pick<PersistedServerRuntimeState, "pid" | "ownerId" | "startedAt">,
   statePath: string,
-) {
+): Effect.fn.Return<boolean, never, never> {
   if (!isProcessAlive(state.pid)) return false;
   if (state.ownerId !== undefined) return isServerOwnershipHeld(statePath);
   const recordedAt = Date.parse(state.startedAt);
@@ -250,7 +250,9 @@ export const readPersistedServerRuntimeState = Effect.fn(
  */
 export const readLiveServerRuntimeState = Effect.fn(
   "serverRuntimeState.readLiveServerRuntimeState",
-)(function* (path: string) {
+)(function* (
+  path: string,
+): Effect.fn.Return<Option.Option<PersistedServerRuntimeState>, never, FileSystem.FileSystem> {
   const state = yield* readPersistedServerRuntimeState(path);
   if (Option.isNone(state)) return state;
   if (state.value.pid === process.pid) return state;

@@ -1,4 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
+import * as DateTime from "effect/DateTime";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeEvents from "node:events";
 import * as NodeFS from "node:fs";
@@ -196,8 +197,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
             pid: child.pid,
             port: 3773,
             origin: "http://127.0.0.1:3773",
-            // oxlint-disable-next-line t3code/no-wall-clock-in-tests -- process creation time is wall-clock; TestClock freezes it at the epoch
-            startedAt: new Date().toISOString(),
+            startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
           }),
         );
         const cwd = path.join(baseDir, "project");

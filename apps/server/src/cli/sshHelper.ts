@@ -98,43 +98,39 @@ const runtimePort = Command.make("runtime-port", {
 }).pipe(
   Command.withHandler(({ runtimeFile }) =>
     Effect.gen(function* () {
-      try {
-        // @effect-diagnostics-next-line globalJsonInEffect:off - mirrors the shell snippet's loose parse.
-        const runtime = JSON.parse(NodeFS.readFileSync(runtimeFile, "utf8")) as {
-          pid?: unknown;
-          ownerId?: unknown;
-          startedAt?: unknown;
-          port?: unknown;
-          origin?: unknown;
-        };
-        const pid = Number(runtime.pid);
-        const port = Number(runtime.port);
-        if (!Number.isInteger(pid) || pid <= 0 || !Number.isInteger(port)) {
-          process.exitCode = 1;
-          return;
-        }
-        const origin = new URL(String(runtime.origin ?? ""));
-        if (origin.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(origin.hostname)) {
-          process.exitCode = 1;
-          return;
-        }
-        const verified = yield* verifyRecordedServerProcess(
-          {
-            pid,
-            ownerId: typeof runtime.ownerId === "string" ? runtime.ownerId : undefined,
-            startedAt: typeof runtime.startedAt === "string" ? runtime.startedAt : "",
-          },
-          runtimeFile,
-        );
-        if (!verified) {
-          process.exitCode = 1;
-          return;
-        }
-        process.stdout.write(`${pid} ${port}`);
-      } catch {
+      // @effect-diagnostics-next-line globalJsonInEffect:off - mirrors the shell snippet's loose parse.
+      const runtime = JSON.parse(NodeFS.readFileSync(runtimeFile, "utf8")) as {
+        pid?: unknown;
+        ownerId?: unknown;
+        startedAt?: unknown;
+        port?: unknown;
+        origin?: unknown;
+      };
+      const pid = Number(runtime.pid);
+      const port = Number(runtime.port);
+      if (!Number.isInteger(pid) || pid <= 0 || !Number.isInteger(port)) {
         process.exitCode = 1;
+        return;
       }
-    }),
+      const origin = new URL(String(runtime.origin ?? ""));
+      if (origin.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(origin.hostname)) {
+        process.exitCode = 1;
+        return;
+      }
+      const verified = yield* verifyRecordedServerProcess(
+        {
+          pid,
+          ownerId: typeof runtime.ownerId === "string" ? runtime.ownerId : undefined,
+          startedAt: typeof runtime.startedAt === "string" ? runtime.startedAt : "",
+        },
+        runtimeFile,
+      );
+      if (!verified) {
+        process.exitCode = 1;
+        return;
+      }
+      process.stdout.write(`${pid} ${port}`);
+    }).pipe(Effect.catchDefect(() => Effect.sync(() => void (process.exitCode = 1)))),
   ),
 );
 

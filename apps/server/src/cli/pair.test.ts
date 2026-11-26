@@ -1,4 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off - CLI integration exercises Node HTTP and filesystem boundaries.
+import * as DateTime from "effect/DateTime";
 import * as NodeHttp from "node:http";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
@@ -52,8 +53,7 @@ const makeLiveServerRuntimeState = (
 ): Effect.Effect<PersistedServerRuntimeState> =>
   Effect.map(makePersistedServerRuntimeState(input), (state) => ({
     ...state,
-    // oxlint-disable-next-line t3code/no-wall-clock-in-tests -- process creation time is wall-clock; TestClock freezes it at the epoch
-    startedAt: new Date().toISOString(),
+    startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
   }));
 
 const layerCliRuntime = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer);
