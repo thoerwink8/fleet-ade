@@ -1389,9 +1389,9 @@ export const layerWithOptions = (
       // Subscribers drain after the release commit, so their settlement cannot join
       // writeReleaseRecords. A failed settlement still retries with the same
       // attribution: the captured work keys and conditional writes are unchanged.
-      const retryLostWorkSettlement = (
+      const retryLostWorkSettlement = <E>(
         providerSessionId: ProviderSessionId,
-        settlement: Effect.Effect<void, unknown>,
+        settlement: Effect.Effect<void, E>,
       ) => {
         const attempt = Effect.gen(function* () {
           const exit = yield* Effect.exit(settlement);
@@ -1417,7 +1417,8 @@ export const layerWithOptions = (
       };
 
       const settleAfterDrain =
-        (providerSessionId: ProviderSessionId) => (settlement: Effect.Effect<void, unknown>) =>
+        (providerSessionId: ProviderSessionId) =>
+        <E>(settlement: Effect.Effect<void, E>) =>
           settlement.pipe(
             Effect.catchCause((cause) =>
               Effect.logWarning("orchestration-v2.provider-session-release-failed", {
