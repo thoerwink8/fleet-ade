@@ -11600,10 +11600,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               yield* cancelTurnTimeout(context, "requestTimeout");
               yield* armTurnTimeout(context, liveQuery, "requestTimeout");
             }
-            // Only root work answers this request; older background agents can still send frames.
-            // A resumed task re-emits a depth-1 start, so the depth alone cannot prove this
-            // request's work: the launching tool use must belong to this turn. Frames without a
-            // tool use (forked skills) keep the depth-1 pass.
+            // A resumed task re-emits a depth-1 start without its launching tool use, so the
+            // depth alone cannot prove this request's work. Frames without a tool use pass only
+            // when they are foreground: a forked skill blocks its turn, while the SDK registers
+            // resumed subagents in the background.
             if (
               context.requestTimeout !== undefined &&
               (((message.type === "stream_event" ||
@@ -11612,6 +11612,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 (message.type === "system" &&
                   message.subtype === "task_started" &&
                   (message.spawn_depth ?? 1) <= 1 &&
+                  message.is_backgrounded !== true &&
                   (message.tool_use_id === undefined ||
                     context.toolCalls.has(message.tool_use_id) ||
                     heldToolUseIds(context).has(message.tool_use_id))))

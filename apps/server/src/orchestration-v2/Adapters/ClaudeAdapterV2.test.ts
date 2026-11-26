@@ -10911,6 +10911,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     "concurrent Stop",
     "forked skill",
     "late depth-one background frame",
+    "backgrounded frame without tool use",
   ] as const)("bounds unanswered Claude requests after %s", (phase) =>
     Effect.gen(function* () {
       const interruptStarted = yield* Deferred.make<void>();
@@ -11012,6 +11013,23 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             description: "Running a skill",
             spawn_depth: 1,
             uuid: "00000000-0000-4000-8000-000000000218",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+      }
+      if (phase === "backgrounded frame without tool use") {
+        // The SDK registers resumed subagents in the background and allows task_started
+        // without a tool use; a backgrounded frame never answers the foreground request.
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "system",
+            subtype: "task_started",
+            task_id: "background-task-no-tool-use",
+            description: "Resumed background agent",
+            spawn_depth: 1,
+            is_backgrounded: true,
+            task_type: "local_agent",
+            uuid: "00000000-0000-4000-8000-000000000219",
             session_id: WAKE_NATIVE_SESSION,
           }),
         );
