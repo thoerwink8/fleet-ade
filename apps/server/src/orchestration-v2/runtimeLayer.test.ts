@@ -6810,7 +6810,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const eventSink = yield* EventSink.EventSinkV2;
       const executor = yield* ThreadCommandExecutor.ThreadCommandExecutor;
-      const startWithQueuedRun = Effect.fn("test.startWithQueuedRun")(function* (
+      const startWithQueuedRuns = Effect.fn("test.startWithQueuedRuns")(function* (
         threadId: ThreadId,
       ) {
         yield* orchestrator.dispatch({
@@ -6827,11 +6827,13 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           branch: null,
           worktreePath: process.cwd(),
         });
-        for (const type of ["start_immediately", "queue_after_active"] as const) {
+        for (const [index, type] of (
+          ["start_immediately", "queue_after_active", "queue_after_active"] as const
+        ).entries()) {
           yield* orchestrator.dispatch({
             type: "message.dispatch",
-            commandId: CommandId.make(`${threadId}:${type}`),
-            messageId: MessageId.make(`${threadId}:${type}`),
+            commandId: CommandId.make(`${threadId}:${index}`),
+            messageId: MessageId.make(`${threadId}:${index}`),
             threadId,
             createdBy: "user",
             creationSource: "web",
@@ -6842,16 +6844,19 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         }
         const { runs } = yield* orchestrator.getThreadProjection(threadId);
         const active = runs.find((run) => run.status === "starting");
-        const queued = runs.find((run) => run.status === "queued");
+        const [queued, nextQueued] = runs
+          .filter((run) => run.status === "queued")
+          .toSorted((left, right) => left.ordinal - right.ordinal);
         assert.isDefined(active);
         assert.isDefined(queued);
-        return { active, queued };
+        assert.isDefined(nextQueued);
+        return { active, queued, nextQueued };
       });
 
       const busyThreadId = ThreadId.make("run-update-isolation-busy");
       const otherThreadId = ThreadId.make("run-update-isolation-other");
-      const busy = yield* startWithQueuedRun(busyThreadId);
-      const other = yield* startWithQueuedRun(otherThreadId);
+      const busy = yield* startWithQueuedRuns(busyThreadId);
+      const other = yield* startWithQueuedRuns(otherThreadId);
       const held = yield* Deferred.make<void>();
       const release = yield* Deferred.make<void>();
       yield* executor
@@ -6862,38 +6867,59 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         .pipe(Effect.forkScoped);
       yield* Deferred.await(held);
 
-      const now = yield* DateTime.now;
-      const afterSequence = yield* eventSink.latestSequence();
-      yield* eventSink.write({
-        events: [busy.active, other.active].map((run) => ({
-          id: EventId.make(`${run.threadId}:completed`),
-          type: "run.updated",
-          threadId: run.threadId,
-          runId: run.id,
-          occurredAt: now,
-          payload: { ...run, status: "completed", completedAt: now },
-        })),
-      });
-      yield* TestClock.adjust(0);
-      for (const [threadId, runId, expected] of [
-        [busyThreadId, busy.queued.id, "queued"],
-        [otherThreadId, other.queued.id, "starting"],
-      ] as const) {
-        const { runs } = yield* orchestrator.getThreadProjection(threadId);
-        assert.equal(runs.find((run) => run.id === runId)?.status, expected, threadId);
-      }
+      const busyReactionsFinished = yield* Deferred.make<void>();
+      let busyLockRequests = 0;
+      let busyLocksFinished = 0;
+      const withLock = executor.withLock;
+      const observeLock: typeof withLock = (threadId, effect) => {
+        const locked = withLock(threadId, effect);
+        if (threadId !== busyThreadId) return locked;
+        return Effect.suspend(() => {
+          busyLockRequests += 1;
+          // Each terminal update takes the command lock for delivery, then for queue promotion.
+          return locked.pipe(
+            Effect.tap(() =>
+              ++busyLocksFinished === 4
+                ? Deferred.succeed(busyReactionsFinished, undefined)
+                : Effect.void,
+            ),
+          );
+        });
+      };
+      const lockSpy = vi.spyOn(executor, "withLock").mockImplementation(observeLock);
 
-      yield* Deferred.succeed(release, undefined);
-      yield* eventSink.stream({ threadId: busyThreadId, afterSequence }).pipe(
-        Stream.filter(
-          ({ event }) =>
-            event.type === "run.updated" &&
-            event.runId === busy.queued.id &&
-            event.payload.status === "starting",
-        ),
-        Stream.take(1),
-        Stream.runDrain,
-      );
+      yield* Effect.gen(function* () {
+        const now = yield* DateTime.now;
+        yield* eventSink.write({
+          events: [busy.active, busy.active, other.active].map((run, index) => ({
+            id: EventId.make(`${run.threadId}:completed:${index}`),
+            type: "run.updated",
+            threadId: run.threadId,
+            runId: run.id,
+            occurredAt: now,
+            payload: { ...run, status: "completed", completedAt: now },
+          })),
+        });
+        yield* TestClock.adjust(0);
+        for (const [threadId, runId, expected] of [
+          [busyThreadId, busy.queued.id, "queued"],
+          [otherThreadId, other.queued.id, "starting"],
+        ] as const) {
+          const { runs } = yield* orchestrator.getThreadProjection(threadId);
+          assert.equal(runs.find((run) => run.id === runId)?.status, expected, threadId);
+        }
+        assert.equal(
+          busyLockRequests,
+          1,
+          "the second reaction must wait outside the dispatch lock",
+        );
+
+        yield* Deferred.succeed(release, undefined);
+        yield* Deferred.await(busyReactionsFinished);
+        const { runs } = yield* orchestrator.getThreadProjection(busyThreadId);
+        assert.equal(runs.find((run) => run.id === busy.queued.id)?.status, "starting");
+        assert.equal(runs.find((run) => run.id === busy.nextQueued.id)?.status, "queued");
+      }).pipe(Effect.ensuring(Effect.sync(() => lockSpy.mockRestore())));
     }),
   );
 
@@ -7791,9 +7817,9 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const eventSink = yield* EventSink.EventSinkV2;
+      const executor = yield* ThreadCommandExecutor.ThreadCommandExecutor;
       const dispatcherId = ThreadId.make("runtime-layer-held-queue-worktree");
       const dispatcher = yield* queueTestThread(dispatcherId);
-      const witness = yield* queueTestThread(ThreadId.make("runtime-layer-held-queue-witness"));
       yield* dispatcher.send("setup", "agent", true);
       yield* dispatcher.send("issue", "agent", false);
       yield* dispatcher.end("setup", "failed", "", {
@@ -7803,8 +7829,6 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       assert.isTrue((yield* dispatcher.runFor("issue")).queueHeld);
       yield* dispatcher.send("tick", "agent", true);
       assert.equal((yield* dispatcher.runFor("tick")).status, "starting");
-      yield* witness.send("active", "agent", true);
-      yield* witness.send("queued", "agent", false);
       // The failed setup never produced the thread's worktree.
       const { thread } = yield* orchestrator.getThreadProjection(dispatcherId);
       yield* eventSink.write({
@@ -7818,12 +7842,24 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           },
         ],
       });
-      yield* dispatcher.end("tick", "completed");
-      // One listener handles every thread's completions in order, so the witness starting
-      // means the tick's completion was handled too.
-      yield* witness.end("active", "completed");
-      assert.equal(yield* Queue.take(witness.startedRunIds), (yield* witness.runFor("queued")).id);
-      assert.isTrue((yield* dispatcher.runFor("issue")).queueHeld);
+      const tickReactionFinished = yield* Deferred.make<void>();
+      const withLock = executor.withLock;
+      let tickLocks = 0;
+      const observeLock: typeof withLock = (threadId, effect) => {
+        const locked = withLock(threadId, effect);
+        if (threadId !== dispatcherId) return locked;
+        return Effect.suspend(() =>
+          ++tickLocks === 2
+            ? locked.pipe(Effect.tap(() => Deferred.succeed(tickReactionFinished, undefined)))
+            : locked,
+        );
+      };
+      const lockSpy = vi.spyOn(executor, "withLock").mockImplementation(observeLock);
+      yield* Effect.gen(function* () {
+        yield* dispatcher.end("tick", "completed");
+        yield* Deferred.await(tickReactionFinished);
+        assert.isTrue((yield* dispatcher.runFor("issue")).queueHeld);
+      }).pipe(Effect.ensuring(Effect.sync(() => lockSpy.mockRestore())));
     }),
   );
 
