@@ -374,6 +374,7 @@ const CLAUDE_SCRIPT_EXTENSIONS = [".js", ".mjs", ".tsx", ".ts", ".jsx"];
 // The SDK has no control-request deadline; the CLI waits up to 30 s per MCP server.
 const CLAUDE_MCP_REGISTRATION_TIMEOUT = "90 seconds";
 const CLAUDE_BOOT_TIMEOUT = "5 minutes";
+const CLAUDE_REQUEST_TIMEOUT_MS = 10 * 60 * 1_000;
 // Claude can consume a subagent result before the launching turn ends, leaving
 // its notification with no native wake turn to answer the continuation.
 const CLAUDE_WAKE_TURN_START_DEADLINE = "2 minutes";
@@ -763,6 +764,15 @@ class ClaudeMcpRegistrationTimeoutError extends Schema.TaggedError<ClaudeMcpRegi
     return this.phase === "initialize"
       ? "Claude timed out while starting up. Retry the turn; if it keeps failing, check Claude and the server logs."
       : "Claude timed out while registering its MCP tools. Retry the turn; if it keeps failing, check Claude and the server logs.";
+  }
+}
+
+class ClaudeRequestTimeoutError extends Schema.TaggedError<
+  ClaudeRequestTimeoutError,
+  { readonly brand: unique symbol }
+>()("ClaudeRequestTimeoutError", { timeoutMs: Schema.Number }) {
+  override get message(): string {
+    return `Claude did not respond within ${this.timeoutMs / 60_000} minutes.`;
   }
 }
 
@@ -4756,6 +4766,9 @@ function formatClaudeUsageLimitWait(waitMs: number): string {
 }
 
 interface ActiveClaudeTurnContext {
+  requestTimeout?: Fiber.Fiber<void> | undefined;
+  retryTimeout?: Fiber.Fiber<void> | undefined;
+  stallFailure?: OrchestrationV2ProviderFailure;
   readonly queryPolicy: ClaudeRuntimeQueryPolicy;
   readonly input: ProviderAdapter.ProviderAdapterV2TurnInput;
   readonly autoCompactWindow: string;
@@ -6097,6 +6110,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           });
         });
 
+        const cancelTurnTimeout = Effect.fn("ClaudeAdapterV2.cancelTurnTimeout")(function* (
+          context: ActiveClaudeTurnContext,
+          key: "requestTimeout" | "retryTimeout",
+        ) {
+          const timer = context[key];
+          context[key] = undefined;
+          if (timer !== undefined) yield* Fiber.interrupt(timer);
+        });
+
         // Claude has no recovered frame; the next assistant message proves recovery.
         // Runs on every model output frame and is almost always a no-op; only a pending retry gets a span.
         const completeProviderRetry = Effect.fnUntraced(function* (
@@ -6115,6 +6137,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           if (providerRetry === undefined) {
             return;
           }
+          yield* cancelTurnTimeout(context, "retryTimeout");
           yield* emitProviderEvent({
             type: "turn_item.updated",
             driver: CLAUDE_PROVIDER,
@@ -8748,7 +8771,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           }
         });
 
-        const finalizeActiveTurn = Effect.fnUntraced(function* (input: {
+        const finalizeActiveTurn = Effect.fnUntraced(function* (requested: {
           readonly context: ActiveClaudeTurnContext;
           readonly status: Extract<
             OrchestrationV2ProviderTurn["status"],
@@ -8759,7 +8782,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           readonly threadDisposition?: "reusable" | "broken";
           readonly result?: SDKResultMessage;
         }) {
-          input.context.steersClosed = true;
+          const { context } = requested;
+          if (context.steersClosed) return;
+          context.steersClosed = true;
+          yield* cancelTurnTimeout(context, "requestTimeout");
+          yield* cancelTurnTimeout(context, "retryTimeout");
+          const input =
+            requested.status === "interrupted" && context.stallFailure !== undefined
+              ? { ...requested, status: "failed" as const, failure: context.stallFailure }
+              : requested;
           yield* reasoningDeltas.flushTurn(input.context.nativeTurnId);
           if (input.status === "completed") {
             yield* assistantDeltas.flushTurn(input.context.nativeTurnId);
@@ -9268,6 +9299,61 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               cause,
             });
           }
+        });
+
+        const armTurnTimeout = Effect.fn("ClaudeAdapterV2.armTurnTimeout")(function* (
+          context: ActiveClaudeTurnContext,
+          liveQuery: ClaudeLiveQueryContext,
+          key: "requestTimeout" | "retryTimeout",
+        ) {
+          if (context[key] !== undefined || context.steersClosed) return;
+          context[key] = yield* Effect.gen(function* () {
+            context[key] = undefined;
+            if (
+              (yield* Ref.get(activeTurn)) !== context ||
+              (yield* Ref.get(queryContext)) !== liveQuery ||
+              context.steersClosed ||
+              (yield* Ref.get(interruptedTurns)).has(context.providerTurnId)
+            ) {
+              return;
+            }
+            if (key === "retryTimeout") {
+              const retry = (yield* Ref.get(providerRetries)).get(context.providerTurnId);
+              if (retry === undefined) return;
+              context.stallFailure = { ...retry.failure, retryable: false };
+            } else {
+              const cause = new ClaudeRequestTimeoutError({ timeoutMs: CLAUDE_REQUEST_TIMEOUT_MS });
+              context.stallFailure = makeProviderFailure({
+                cause,
+                class: "transport_error",
+                code: "claude_request_unanswered",
+                message: cause.message,
+                retryable: false,
+              });
+            }
+            yield* interruptTurn({
+              providerThread: context.input.providerThread,
+              providerTurnId: context.providerTurnId,
+            }).pipe(
+              Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS),
+              Effect.catch((cause) =>
+                Effect.logWarning("orchestration-v2.claude-stalled-turn-stop-failed", { cause }),
+              ),
+            );
+            if ((yield* Ref.get(activeTurn)) !== context || context.steersClosed) return;
+            const ownsLiveQuery = yield* Ref.modify(queryContext, (current) =>
+              current === liveQuery ? [true, null] : [false, current],
+            );
+            if (!ownsLiveQuery) return;
+            liveQuery.stopping = true;
+            yield* liveQuery.query.close.pipe(
+              Effect.timeoutOption(CLAUDE_STOP_CONFIRM_TIMEOUT_MS),
+              Effect.ignore,
+            );
+            yield* finalizeActiveTurnAfterQueryExit(liveQuery);
+            yield* endSubagentCallsOfClosedQuery(liveQuery.nativeThreadId, "interrupted");
+            yield* Deferred.succeed(liveQuery.closed, undefined);
+          }).pipe(Effect.delay(CLAUDE_REQUEST_TIMEOUT_MS), Effect.forkIn(sessionScope));
         });
 
         const applyWorkflowProgressWithoutTurn = Effect.fnUntraced(function* (message: SDKMessage) {
@@ -10629,6 +10715,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               updated.set(context.providerTurnId, state);
               return updated;
             });
+            yield* cancelTurnTimeout(context, "requestTimeout");
+            yield* armTurnTimeout(context, liveQuery, "retryTimeout");
             yield* emitProviderEvent({
               type: "turn_item.updated",
               driver: CLAUDE_PROVIDER,
@@ -10652,7 +10740,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
 
           if (message.type === "assistant" && input.replayed !== true) {
             const now = yield* DateTime.now;
-            yield* completeProviderRetry(context, now);
+            if (message.parent_tool_use_id === null && message.message.model !== "<synthetic>") {
+              yield* completeProviderRetry(context, now);
+            }
             // CLI-generated <synthetic> frames report zero usage, not context usage.
             if (
               message.parent_tool_use_id === null &&
@@ -11498,15 +11588,35 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           const message = input.message;
           const context = yield* Ref.get(activeTurn);
           const liveQuery = yield* Ref.get(queryContext);
-          // The API answering again is recovery; a long text or tool input block emits nothing
-          // else. Judged here, in arrival order: held and buffered frames are handled later.
-          if (
-            context !== null &&
-            liveQuery?.query === input.query &&
-            message.type === "stream_event" &&
-            message.event.type === "message_start"
-          ) {
-            yield* completeProviderRetry(context, yield* DateTime.now);
+          if (context !== null && liveQuery?.query === input.query) {
+            const lifecycle = claudePromptLifecycle(message);
+            if (
+              context.retryTimeout === undefined &&
+              ((lifecycle?.state === "started" && lifecycle.uuid === context.promptUuid) ||
+                (message.type === "system" &&
+                  message.subtype === "status" &&
+                  message.status === "requesting"))
+            ) {
+              yield* armTurnTimeout(context, liveQuery, "requestTimeout");
+            }
+            // Only root work answers this request; older background agents can still send frames.
+            if (
+              ((message.type === "assistant" || message.type === "stream_event") &&
+                message.parent_tool_use_id === null) ||
+              (message.type === "system" &&
+                message.subtype === "task_started" &&
+                (message.spawn_depth ?? 1) <= 1)
+            ) {
+              yield* cancelTurnTimeout(context, "requestTimeout");
+            }
+            // A message_start proves recovery even when a long streamed block follows.
+            if (
+              message.type === "stream_event" &&
+              message.parent_tool_use_id === null &&
+              message.event.type === "message_start"
+            ) {
+              yield* completeProviderRetry(context, yield* DateTime.now);
+            }
           }
           if (
             context !== null &&

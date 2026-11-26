@@ -10865,6 +10865,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         }),
       );
       yield* harness.until(() => retryItems().length === 2);
+      yield* TestClock.adjust("10 minutes");
       assert.lengthOf(harness.terminalEvents(), 0);
       const recoveredRetry = retryItems()[1];
       assert.equal(recoveredRetry?.id, runningRetry?.id);
@@ -10896,6 +10897,104 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         ),
       ),
     ),
+  );
+
+  it.effect.each(["started", "requesting", "retrying", "forked skill"] as const)(
+    "bounds unanswered Claude requests after %s",
+    (phase) =>
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarnessWithOptions({
+          close: Queue.shutdown,
+          ...(phase === "requesting" ? { interrupt: Effect.never } : {}),
+        });
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("attempt-claude-request-timeout"),
+            text: "Continue.",
+            attachments: [],
+          }),
+        );
+        const offerRetry = (attempt: number) =>
+          harness.offerAndWait(
+            claudeSdkFrame({
+              type: "system",
+              subtype: "api_retry",
+              attempt,
+              max_retries: 10,
+              retry_delay_ms: 1_500,
+              error_status: 503,
+              error: "unknown",
+              uuid: `00000000-0000-4000-8000-00000000021${attempt}`,
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          );
+        if (phase === "retrying") {
+          yield* offerRetry(1);
+        } else if (phase === "requesting") {
+          yield* harness.offerAndWait(
+            claudeSdkFrame({
+              type: "system",
+              subtype: "status",
+              status: "requesting",
+              uuid: "00000000-0000-4000-8000-000000000213",
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          );
+        } else {
+          yield* harness.offerAndWait(
+            claudeSdkFrame({
+              type: "command_lifecycle",
+              command_uuid: harness.promptUuid(0),
+              state: "started",
+              uuid: "00000000-0000-4000-8000-000000000214",
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          );
+          yield* harness.offerAndWait(
+            claudeSdkFrame({
+              type: "system",
+              subtype: "task_started",
+              task_id: "background-task",
+              description: "Running a skill",
+              spawn_depth: phase === "forked skill" ? 1 : 2,
+              uuid: "00000000-0000-4000-8000-000000000215",
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          );
+        }
+        yield* TestClock.adjust("9 minutes");
+        assert.isEmpty(harness.terminalEvents());
+        if (phase === "retrying") yield* offerRetry(2);
+        yield* TestClock.adjust("1 minute");
+        if (phase === "requesting") yield* TestClock.adjust("10 seconds");
+
+        if (phase === "forked skill") {
+          assert.isEmpty(harness.terminalEvents());
+          return;
+        }
+        assert.lengthOf(harness.terminalEvents(), 1);
+        const [terminal] = harness.terminalEvents();
+        assert.equal(terminal?.status, "failed");
+        if (terminal?.status !== "failed") return;
+        assert.equal(
+          terminal.failure.code,
+          phase === "retrying" ? "api_error_503" : "claude_request_unanswered",
+        );
+        assert.isFalse(terminal.failure.retryable);
+        if (phase === "retrying") assert.equal(terminal.retry?.attempt, 2);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            IdAllocator.layer,
+            McpProviderSessions.layer,
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+      ),
   );
 
   it.effect("fails immediately without retrying when api_retry reports an auth error", () =>
