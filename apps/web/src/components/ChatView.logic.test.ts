@@ -13,6 +13,7 @@ import {
   isThreadEnvironmentLocked,
   recallCheckoutIsRepo,
   rememberCheckoutIsRepo,
+  threadErrorIsServerRuntime,
 } from "./ChatView.logic";
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
 import { deriveProviderInstanceEntries, NO_PROVIDER_MODEL_SELECTION } from "../providerInstances";
@@ -1779,5 +1780,41 @@ describe("waitForRollbackOutcome", () => {
     // Nothing is listening any more: a late completion or failure changes nothing.
     setThread(handle, { rollbackCompletedRequestId: requestId });
     setThread(handle, { rollbackFailure: { requestId, message: "late" } });
+  });
+});
+
+describe("threadErrorIsServerRuntime", () => {
+  it("shares a dismissal between a server runtime error and its local copy", () => {
+    expect(
+      threadErrorIsServerRuntime({
+        isServerThread: true,
+        localServerError: null,
+        runtimeError: "E",
+      }),
+    ).toBe(true);
+    expect(
+      threadErrorIsServerRuntime({
+        isServerThread: true,
+        localServerError: "E",
+        runtimeError: "E",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps different local errors and draft errors independent", () => {
+    expect(
+      threadErrorIsServerRuntime({
+        isServerThread: true,
+        localServerError: "E2",
+        runtimeError: "E",
+      }),
+    ).toBe(false);
+    expect(
+      threadErrorIsServerRuntime({
+        isServerThread: false,
+        localServerError: null,
+        runtimeError: "E",
+      }),
+    ).toBe(false);
   });
 });

@@ -118,6 +118,11 @@ export function DiffCommentAnnotation({
           event.currentTarget.setSelectionRange(end, end);
         }}
         onKeyDown={(event) => {
+          // An unclaimed IME Escape would close the containing sheet or leave the PR page.
+          if (event.nativeEvent.isComposing || event.keyCode === 229) {
+            event.stopPropagation();
+            return;
+          }
           if (event.key === "Escape") {
             event.preventDefault();
             onCancel();

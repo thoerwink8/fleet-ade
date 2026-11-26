@@ -62,6 +62,7 @@ export function commandPaletteFixedRowSize(metric: CommandPaletteRowMetric): num
   };
   if (metric === "item-1") return px("--fa-row-1");
   if (metric === "item-2") return px("--fa-row-2");
+  if (metric === "item-3") return px("--fa-row-3");
   const padTop = px("--fa-space-2");
   const padBottom = px("--fa-space-1");
   if (padTop === undefined || padBottom === undefined) return undefined;
@@ -171,7 +172,7 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
         getItemType={(row) => commandPaletteRowMetric(row)}
         getFixedItemSize={(row, _index, type) =>
           commandPaletteFixedRowSize(
-            type === "label" || type === "item-1" || type === "item-2"
+            type === "label" || type === "item-1" || type === "item-2" || type === "item-3"
               ? type
               : commandPaletteRowMetric(row),
           )
@@ -229,7 +230,8 @@ function CommandPaletteResultLines(props: {
   hideShortcuts?: boolean;
   keybindings?: ResolvedKeybindingsConfig;
 }) {
-  const twoLine = commandPaletteItemLineCount(props.item) === 2;
+  const lineCount = commandPaletteItemLineCount(props.item);
+  const twoLine = lineCount >= 2;
   return (
     <>
       <span className="lead">{props.item.icon}</span>
@@ -254,7 +256,9 @@ function CommandPaletteResultLines(props: {
               }
             />
           ) : null}
-          {props.item.timestamp ? <span className="tm">{props.item.timestamp}</span> : null}
+          {props.item.timestamp && !props.item.meta ? (
+            <span className="tm">{props.item.timestamp}</span>
+          ) : null}
           {props.shortcutLabel ? (
             <CommandShortcut variant="hint">{props.shortcutLabel}</CommandShortcut>
           ) : null}
@@ -273,6 +277,11 @@ function CommandPaletteResultLines(props: {
             </span>
           </span>
         ) : null}
+        {props.item.meta ? (
+          <span className="l l3">
+            <span className="x">{props.item.meta}</span>
+          </span>
+        ) : null}
       </span>
     </>
   );
@@ -284,7 +293,7 @@ function DisabledCommandPaletteResultRow(props: {
   const reason =
     commandPaletteDisabledReason(props.item) ??
     (typeof props.item.description === "string" ? props.item.description : null);
-  const twoLine = commandPaletteItemLineCount(props.item) === 2;
+  const lineCount = commandPaletteItemLineCount(props.item);
   return (
     <button
       type="button"
@@ -294,7 +303,7 @@ function DisabledCommandPaletteResultRow(props: {
           toastManager.add({ type: "info", title: "命令不可用", description: reason });
         }
       }}
-      className={cn("fa-cmd__row has-lead", twoLine ? "fa-cmd__row--2" : "fa-cmd__row--1")}
+      className={cn("fa-cmd__row has-lead", `fa-cmd__row--${lineCount}`)}
     >
       <CommandPaletteResultLines item={props.item} reason={reason} />
     </button>
@@ -314,11 +323,11 @@ function CommandPaletteResultRow(props: {
       ? shortcutLabelForCommand(props.keybindings, props.item.shortcutCommand)
       : null;
 
-  const twoLine = commandPaletteItemLineCount(props.item) === 2;
+  const lineCount = commandPaletteItemLineCount(props.item);
   return (
     <CommandItem
       {...(props.index === undefined ? {} : { index: props.index })}
-      lines={twoLine ? 2 : 1}
+      lines={lineCount}
       hasLead
       value={props.item.value}
       active={props.isActive}

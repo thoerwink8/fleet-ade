@@ -98,7 +98,7 @@ function FileSearchField({
         ref={ref}
         type="search"
         name={props.name}
-        size="sm"
+        size="compact"
         value={props.value}
         aria-label={props.ariaLabel}
         placeholder="搜索文件"

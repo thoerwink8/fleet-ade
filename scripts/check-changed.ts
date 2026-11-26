@@ -19,7 +19,10 @@
 // TIMEOUT. A rerun on exactly the files of the last passing run prints that
 // run's summary.
 import * as NodeCrypto from "node:crypto";
+import * as NodeFS from "node:fs";
+import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -31,7 +34,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import type * as PlatformError from "effect/PlatformError";
+import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
@@ -149,6 +152,215 @@ export const git = Effect.fn("checkChanged.git")(function* (
 });
 export const gitLines = (cwd: string, args: ReadonlyArray<string>) =>
   git(cwd, args).pipe(Effect.map((stdout) => stdout.toString().split("\n").filter(Boolean)));
+
+// Ignored files that checks read: generated sources, declarations, and env files.
+const checkInput = /(^|\/)\.(generated|astro)\/|\.d\.ts$|(^|\/)\.env[^/]*$/;
+const inNodeModules = /(^|\/)node_modules\//;
+
+// Input contract: nothing under any node_modules is a cache input, nested
+// repositories included, unlike the old pathspec listing — checks never read
+// dependency content. Outside node_modules every input matches the old
+// listing.
+
+type DirectoryEntries = ReadonlyArray<NodeFS.Dirent>;
+export type ReadDirectory = (absolute: string) => Promise<DirectoryEntries>;
+
+const systemError = (method: string) => (cause: unknown) => {
+  const code =
+    typeof cause === "object" && cause !== null && "code" in cause ? String(cause.code) : undefined;
+  return PlatformError.systemError({
+    _tag:
+      code === "ENOENT" || code === "ENOTDIR"
+        ? "NotFound"
+        : code === "EACCES" || code === "EPERM"
+          ? "PermissionDenied"
+          : "Unknown",
+    module: "checkChanged",
+    method,
+    cause,
+  });
+};
+
+// A directory removed mid-scan or replaced by a file is not an input; anything
+// else (EACCES, EMFILE) must fail the listing, not skip inputs.
+const recoverNotFound = <A, R, F>(
+  effect: Effect.Effect<A, PlatformError.PlatformError, R>,
+  fallback: F,
+): Effect.Effect<A | F, PlatformError.PlatformError, R> =>
+  Effect.catchIf(
+    effect,
+    (error) => error.reason._tag === "NotFound",
+    () => Effect.succeed(fallback),
+  );
+
+// Git's is_git_directory: HEAD must parse as a reference and the object
+// store and refs must exist, possibly shared through commondir. A `.git`
+// file names the real directory, resolved against the directory holding it.
+// HEAD is a symbolic reference or a detached commit id (SHA-1 or SHA-256).
+const headContent = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\r?\n?$/;
+
+const isGitDirectory = Effect.fnUntraced(function* (directory: string) {
+  const lstat = (path: string) =>
+    recoverNotFound(
+      Effect.tryPromise({
+        try: () => NodeFSP.lstat(path),
+        catch: systemError("lstat"),
+      }),
+      undefined,
+    );
+  const readTextFile = (path: string) =>
+    recoverNotFound(
+      Effect.tryPromise({
+        try: () => NodeFSP.readFile(path, "utf8"),
+        catch: systemError("readFile"),
+      }),
+      undefined,
+    );
+  const headPath = NodePath.join(directory, "HEAD");
+  const headInfo = yield* lstat(headPath);
+  let headValid = false;
+  if (headInfo !== undefined) {
+    if (headInfo.isSymbolicLink()) {
+      const target = yield* Effect.tryPromise({
+        try: () => NodeFSP.readlink(headPath),
+        catch: systemError("readlink"),
+      });
+      headValid = target.startsWith("refs/");
+    } else if (headInfo.isFile()) {
+      const content = yield* readTextFile(headPath);
+      headValid =
+        content !== undefined && (content.startsWith("ref: refs/") || headContent.test(content));
+    }
+  }
+  if (!headValid) return false;
+  // A linked worktree's gitdir shares the object store and refs of the main
+  // repository through its commondir file.
+  const commondir = yield* readTextFile(NodePath.join(directory, "commondir"));
+  const store = commondir === undefined ? directory : NodePath.resolve(directory, commondir.trim());
+  const objects = yield* lstat(NodePath.join(store, "objects"));
+  if (objects === undefined || !objects.isDirectory()) return false;
+  const refs = yield* lstat(NodePath.join(store, "refs"));
+  return refs !== undefined && refs.isDirectory();
+});
+
+const isNestedRepository = Effect.fnUntraced(function* (absolute: string) {
+  const dotGit = NodePath.join(absolute, ".git");
+  const info = yield* recoverNotFound(
+    Effect.tryPromise({
+      try: () => NodeFSP.stat(dotGit),
+      catch: systemError("stat"),
+    }),
+    undefined,
+  );
+  if (info === undefined) return false;
+  if (info.isDirectory()) return yield* isGitDirectory(dotGit);
+  if (!info.isFile()) return false;
+  const content = yield* recoverNotFound(
+    Effect.tryPromise({
+      try: () => NodeFSP.readFile(dotGit, "utf8"),
+      catch: systemError("readFile"),
+    }),
+    undefined,
+  );
+  if (content === undefined || !content.startsWith("gitdir: ")) return false;
+  // git's read_gitfile_raw: the prefix is exactly `gitdir: `, the rest of the
+  // line is the path, and only the trailing newline is not part of it.
+  const target = content.slice(8).replace(/\r?\n$/, "");
+  if (target.length === 0) return false;
+  return yield* isGitDirectory(NodePath.resolve(absolute, target));
+});
+
+// Expanding a collapsed directory with `git ls-files` descends into its nested
+// node_modules (only --directory skips ignored directories, and expansion cannot
+// use it). A readdir walk loses nothing: collapsed directories hold only ignored
+// entries, and checks never read node_modules.
+const walkIgnoredDirectory = Effect.fnUntraced(function* (
+  root: string,
+  directory: string,
+  into: Set<string>,
+  readDirectory: ReadDirectory,
+) {
+  interface Pending {
+    readonly relative: string;
+    readonly absolute: string;
+  }
+  const pending: Array<Pending> = [
+    { relative: directory, absolute: NodePath.join(root, directory) },
+  ];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    const entries = yield* recoverNotFound(
+      Effect.tryPromise({
+        try: () => readDirectory(current.absolute),
+        catch: systemError("readdir"),
+      }),
+      [],
+    );
+    // Whether a directory is a repository is git's own rule: .git must be a
+    // directory, or a file with exactly the `gitdir: ` prefix whose target
+    // validates as a git directory. Anything else is ordinary content git
+    // descends into, and so does the walker.
+    const repository = entries.some((entry) => entry.name === ".git")
+      ? yield* isNestedRepository(current.absolute)
+      : false;
+    if (repository) {
+      // A nested repository stands for its content in the hash, as the old
+      // pathspecs listed it; git never descends into one either.
+      into.add(current.relative);
+      continue;
+    }
+    for (const entry of entries) {
+      const relative = current.relative + entry.name;
+      if (entry.isDirectory()) {
+        // git never descends into a `.git` directory, valid or not.
+        if (entry.name !== "node_modules" && entry.name !== ".git") {
+          pending.push({
+            relative: relative + "/",
+            absolute: NodePath.join(current.absolute, entry.name),
+          });
+        }
+      } else if (checkInput.test(relative)) {
+        into.add(relative);
+      }
+    }
+  }
+});
+
+export const ignoredCheckInputs = Effect.fn("checkChanged.ignoredCheckInputs")(function* (
+  root: string,
+  options?: { readonly readDirectory?: ReadDirectory },
+) {
+  const readDirectory =
+    options?.readDirectory ??
+    ((absolute: string) => NodeFSP.readdir(absolute, { withFileTypes: true }));
+  const list = (args: ReadonlyArray<string>) =>
+    git(root, ["ls-files", "-z", ...args]).pipe(
+      Effect.map((stdout) => stdout.toString().split("\0").filter(Boolean)),
+    );
+  const ignored = ["--others", "--ignored", "--exclude-standard"];
+  // `--directory` hides a directory where the index has a file; `-k` lists those.
+  // The `-o -i` filter keeps unignored blockers (an untracked file sitting where
+  // a directory is expected) out of the ignored inputs.
+  const [listed, replaced] = yield* Effect.all(
+    [list([...ignored, "--directory"]), list(["-k", ...ignored, "--directory"])],
+    { concurrency: 2 },
+  );
+  const files = new Set(
+    [...listed, ...replaced].filter(
+      (entry) => !entry.endsWith("/") && !inNodeModules.test(entry) && checkInput.test(entry),
+    ),
+  );
+  const directories = [...new Set([...listed, ...replaced])]
+    .filter((entry) => entry.endsWith("/"))
+    .sort();
+  for (const directory of directories) {
+    // The input contract excludes everything under any node_modules, so no
+    // dependency directory is ever opened or its content hashed.
+    if (inNodeModules.test(directory)) continue;
+    yield* walkIgnoredDirectory(root, directory, files, readDirectory);
+  }
+  return [...files].sort();
+});
 
 export const comparisonBase = Effect.fn("checkChanged.comparisonBase")(function* (
   root: string,
@@ -308,18 +520,7 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
         "--",
       ]),
     );
-    const ignored = yield* lines(
-      "ls-files",
-      "--others",
-      "--ignored",
-      "--exclude-standard",
-      "--",
-      ":(glob)**/.generated/**",
-      ":(glob)**/.astro/**",
-      ":(glob)**/*.d.ts",
-      ":(glob)**/.env*",
-      ":(exclude,glob)**/node_modules/**",
-    );
+    const ignored = yield* ignoredCheckInputs(root);
     for (const file of [
       // Raw bytes of changed files too: .gitattributes normalizes line endings in
       // the diff, but the formatter reads the file as it is on disk.
