@@ -635,6 +635,8 @@ it.layer(layerTest, { excludeTestServices: true })("WorkspaceFileSystemLive", (i
           ...new TextEncoder().encode(bomContents.replace("42", "43")),
         ]);
 
+        // Overwriting an existing file without a BOM must not add one either.
+        yield* writeTextFile(cwd, "plain.ts", "old\n");
         yield* workspaceFileSystem.writeFile({
           cwd,
           relativePath: "plain.ts",
