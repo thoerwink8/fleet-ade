@@ -964,13 +964,7 @@ function TerminalSessionViewport({
       }
 
       function handleData(data: string): void {
-        if (!hasTerminalWriteAccess()) return;
-        void (async () => {
-          const result = await writeTerminal(data);
-          if (result._tag === "Success" || isAtomCommandInterrupted(result)) return;
-          const error = squashAtomCommandFailure(result);
-          writeSystemMessage(terminal, error instanceof Error ? error.message : "终端写入失败");
-        })();
+        void sendTerminalInput(data, "终端写入失败");
       }
 
       const themeObserver = new MutationObserver(() => {
