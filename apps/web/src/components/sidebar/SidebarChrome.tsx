@@ -81,8 +81,9 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           aria-label="切换主侧边栏"
         />
       </div>
-      <div className="relative z-10 flex h-8 min-w-0 flex-1 flex-wrap content-start items-center gap-x-2 overflow-hidden py-0.5">
-        <div className="flex shrink-0 items-center gap-1">
+      {/* The brand barely shrinks, so the project filter's label gives way first; if the row is still too narrow the brand ends in an ellipsis and never runs under the filter. */}
+      <div className="relative z-10 flex h-8 min-w-0 grow-0 shrink-[0.001] items-center gap-x-2 overflow-hidden py-0.5">
+        <div className="flex min-w-0 items-center gap-1">
           <SidebarBrand onBackdrop={backdropVariant !== null} />
           {isElectron ? (
             <div className="hidden items-center md:flex">
@@ -99,7 +100,9 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           </div>
         ) : null}
       </div>
-      {actions ? <div className="relative z-10 flex shrink-0 items-center">{actions}</div> : null}
+      {actions ? (
+        <div className="relative z-10 flex min-w-0 flex-1 items-center justify-end">{actions}</div>
+      ) : null}
     </div>
   );
 });
@@ -182,7 +185,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     <Link
       aria-label="Fleet ADE 首页"
       className={cn(
-        "relative z-10 ml-[calc(var(--workspace-controls-left)+var(--workspace-titlebar-control-size)+var(--fa-space-1))] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex pointer-coarse:min-h-8 pointer-coarse:min-w-8",
+        "relative z-10 ml-[calc(var(--workspace-controls-left)+var(--workspace-titlebar-control-size)+var(--fa-space-1))] hidden h-7 w-fit min-w-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex pointer-coarse:min-h-8 pointer-coarse:min-w-8",
         onBackdrop ? "text-white" : "text-foreground",
       )}
       to="/"
@@ -196,7 +199,7 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-baseline truncate text-sm font-medium tracking-tight [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1",
+        "block min-w-0 truncate text-sm font-medium tracking-tight [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1",
         onBackdrop ? "text-white" : "text-foreground",
       )}
     >
