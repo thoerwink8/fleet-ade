@@ -2888,6 +2888,41 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         }),
     );
 
+    it.effect("reads GBK-encoded files as readable text in the review diff and expansion", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        yield* initRepoWithCommit(cwd);
+        const before = "// 初始中文注释\nint a = 1;\n";
+        const after = "// 修改后的中文注释\nint a = 2;\n";
+        // GBK bytes of `before` and `after`; git stores and reports them as-is.
+        yield* Effect.sync(() =>
+          NodeFS.writeFileSync(
+            NodePath.join(cwd, "main.c"),
+            Buffer.from("2f2f20b3f5cabcd6d0cec4d7a2cacd0a696e742061203d20313b0a", "hex"),
+          ),
+        );
+        yield* git(cwd, ["add", "main.c"]);
+        yield* git(cwd, ["commit", "-m", "add GBK file"]);
+        yield* Effect.sync(() =>
+          NodeFS.writeFileSync(
+            NodePath.join(cwd, "main.c"),
+            Buffer.from("2f2f20d0deb8c4baf3b5c4d6d0cec4d7a2cacd0a696e742061203d20323b0a", "hex"),
+          ),
+        );
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+
+        const preview = yield* driver.getReviewDiffPreview({ cwd });
+        const diff = preview.sources.map((source) => source.diff).join("\n");
+        assert.include(diff, "-// 初始中文注释");
+        assert.include(diff, "+// 修改后的中文注释");
+
+        const contents = yield* driver.getReviewDiffFileContents(
+          makeReviewDiffFileContentsInput(cwd, { oldPath: "main.c", newPath: "main.c" }),
+        );
+        assert.deepStrictEqual(contents, { oldContents: before, newContents: after });
+      }),
+    );
+
     it.effect("propagates patch failures instead of reporting an empty complete diff", () =>
       Effect.gen(function* () {
         const cwd = yield* makeTmpDir();
