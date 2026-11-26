@@ -7,9 +7,22 @@ import * as Schema from "effect/Schema";
 const decodeProxyConfig = Schema.decodeUnknownSync(
   Schema.Struct({ url: Schema.String, headers: Schema.Record(Schema.String, Schema.String) }),
 );
-/** Reads the `vibeproxy` CLIProxyAPI provider from `~/.codex/config.toml`. */
-export const proxyConfig = () =>
-  decodeProxyConfig(
+/**
+ * Reads the `vibeproxy` CLIProxyAPI provider from `~/.codex/config.toml`. On machines without
+ * python3 or that provider, `T3_EVAL_PROXY_URL` and `T3_EVAL_PROXY_TOKEN` (the bearer token's
+ * environment variable's value) name an OpenAI Responses proxy directly.
+ */
+export const proxyConfig = () => {
+  if (
+    process.env.T3_EVAL_PROXY_URL !== undefined &&
+    process.env.T3_EVAL_PROXY_TOKEN !== undefined
+  ) {
+    return decodeProxyConfig({
+      url: process.env.T3_EVAL_PROXY_URL.replace(/\/+$/, ""),
+      headers: { Authorization: `Bearer ${process.env.T3_EVAL_PROXY_TOKEN}` },
+    });
+  }
+  return decodeProxyConfig(
     JSON.parse(
       NodeChildProcess.execFileSync(
         "python3",
@@ -31,3 +44,4 @@ print(json.dumps({'url': p['base_url'].rstrip('/'), 'headers': h}))
       ),
     ),
   );
+};

@@ -7,6 +7,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it, vi } from "@effect/vitest";
 import {
+  EnvironmentId,
   CheckpointId,
   CommandId,
   EventId,
@@ -24,6 +25,7 @@ import {
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
+import { parseThreadLinkHref } from "@t3tools/shared/threadLinks";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
@@ -35,6 +37,7 @@ import * as TestClock from "effect/testing/TestClock";
 
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as ServerEnvironmentTestkit from "../environment/ServerEnvironment.testkit.ts";
 import * as McpSessionRegistryTestkit from "../mcp/McpSessionRegistry.testkit.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectEnrichmentService from "../project/ProjectEnrichmentService.ts";
@@ -158,6 +161,7 @@ const layerTest = Layer.mergeAll(
   Layer.provide(layerCheckpointStoreTest),
   Layer.provide(layerServerConfig),
   Layer.provide(ServerSettings.layerTest()),
+  Layer.provide(ServerEnvironmentTestkit.layerTestIdentity("environment-delegated-completion")),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerPlatformTest),
 );
@@ -182,6 +186,7 @@ const seedParentWithTerminalTask = (input: {
     readonly id: NodeId;
     readonly deliveryState: "delivered" | "claimed";
   }>;
+  readonly childThreadIds?: Readonly<Record<string, ThreadId>>;
   readonly now: DateTime.Utc;
 }) =>
   Effect.gen(function* () {
@@ -306,7 +311,7 @@ const seedParentWithTerminalTask = (input: {
             driver,
             providerInstanceId: modelSelection.instanceId,
             providerThreadId: null,
-            childThreadId: null,
+            childThreadId: input.childThreadIds?.[String(task.id)] ?? null,
             nativeTaskRef: null,
             prompt: "Inspect the delivered ownership edge.",
             title: null,
@@ -668,6 +673,7 @@ it.layer(layerTest)("delegated completion delivery repairs", (it) => {
       const rootNodeId = NodeId.make("node:delegated-delivery-live-cohort-root");
       const firstTaskId = NodeId.make("node:delegated-delivery-live-cohort-first");
       const secondTaskId = NodeId.make("node:delegated-delivery-live-cohort-second");
+      const firstChildThreadId = ThreadId.make("thread:delegated-delivery-live-cohort-child-first");
       const messageId = MessageId.make(`message:delegated-delivery:${threadId}`);
 
       yield* seedParentWithTerminalTask({
@@ -679,6 +685,9 @@ it.layer(layerTest)("delegated completion delivery repairs", (it) => {
         deliveryState: "claimed",
         completionWake: "always",
         deliveryTaskIds: [firstTaskId, secondTaskId],
+        childThreadIds: {
+          [String(firstTaskId)]: firstChildThreadId,
+        },
         now,
       });
 
@@ -706,6 +715,208 @@ it.layer(layerTest)("delegated completion delivery repairs", (it) => {
       assert.include(message?.text ?? "", String(secondTaskId));
       assert.include(message?.text ?? "", "task_status");
       assert.include(message?.text ?? "", "child finished");
+      // The completed task's thread is linked, and the link parses back to its thread.
+      const hrefPattern = /t3-thread:\/\/v2\/[^\s>)]+/g;
+      const hrefs = message?.text.match(hrefPattern) ?? [];
+      assert.equal(hrefs.length, 1);
+      assert.deepEqual(parseThreadLinkHref(hrefs[0]!), {
+        environmentId: EnvironmentId.make("environment-delegated-completion"),
+        threadId: firstChildThreadId,
+      });
+    }),
+  );
+
+  it.effect("links failed and cancelled tasks with escaped titles and one link per thread", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const sink = yield* EventSink.EventSinkV2;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make("thread:delegated-delivery-links");
+      const projectId = ProjectId.make("project:delegated-delivery-links");
+      const runId = RunId.make("run:delegated-delivery-links");
+      const rootNodeId = NodeId.make("node:delegated-delivery-links-root");
+      const escapeTaskId = NodeId.make("node:delegated-delivery-links-escape");
+      const sharedTaskId = NodeId.make("node:delegated-delivery-links-shared");
+      const untitledTaskId = NodeId.make("node:delegated-delivery-links-untitled");
+      const threadlessTaskId = NodeId.make("node:delegated-delivery-links-threadless");
+      const childThreadId = ThreadId.make("thread:delegated-delivery-links-child");
+      const untitledChildThreadId = ThreadId.make("thread:delegated-delivery-links-untitled-child");
+      const messageId = MessageId.make(`message:delegated-delivery:${threadId}`);
+
+      yield* seedParentWithTerminalTask({
+        threadId,
+        projectId,
+        runId,
+        rootNodeId,
+        taskId: escapeTaskId,
+        deliveryState: "claimed",
+        completionWake: "always",
+        deliveryTaskIds: [escapeTaskId, sharedTaskId, untitledTaskId, threadlessTaskId],
+        siblingTasks: [
+          { id: sharedTaskId, deliveryState: "claimed" },
+          { id: untitledTaskId, deliveryState: "claimed" },
+          { id: threadlessTaskId, deliveryState: "claimed" },
+        ],
+        childThreadIds: {
+          [String(escapeTaskId)]: childThreadId,
+          [String(sharedTaskId)]: childThreadId,
+          [String(untitledTaskId)]: untitledChildThreadId,
+        },
+        now,
+      });
+
+      const projection = yield* orchestrator.getThreadProjection(threadId);
+      const seeded = new Map(projection.subagents.map((task) => [task.id, task]));
+      yield* sink.write({
+        events: [
+          {
+            taskId: escapeTaskId,
+            status: "completed" as const,
+            title: "Fix [the] (parser) `crash`",
+            result: "escaped",
+          },
+          { taskId: sharedTaskId, status: "failed" as const, title: "Shared thread", result: null },
+          { taskId: untitledTaskId, status: "cancelled" as const, title: null, result: null },
+          {
+            taskId: threadlessTaskId,
+            status: "failed" as const,
+            title: "No thread row",
+            result: null,
+          },
+        ].map(({ taskId, status, title, result }) => ({
+          id: EventId.make(`event:links:${taskId}`),
+          type: "subagent.updated" as const,
+          threadId,
+          runId,
+          nodeId: taskId,
+          driver,
+          providerInstanceId: modelSelection.instanceId,
+          occurredAt: now,
+          payload: { ...seeded.get(taskId)!, status, title, result },
+        })),
+      });
+
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("command:delegated-delivery-links"),
+        threadId,
+        messageId,
+        text: "Delegated tasks finished.",
+        attachments: [],
+        dispatchMode: { type: "queue_after_active" },
+        createdBy: "agent",
+        creationSource: "server",
+        delegatedCompletion: {
+          parentRunId: runId,
+          generation: 1,
+          taskIds: [escapeTaskId, sharedTaskId, untitledTaskId, threadlessTaskId],
+        },
+      });
+
+      const message = (yield* orchestrator.getThreadProjection(threadId)).messages.find(
+        (candidate) => candidate.id === messageId,
+      );
+      const text = message?.text ?? "";
+      const href = `t3-thread://v2/environment-delegated-completion/${untitledChildThreadId}`;
+      const sharedHref = `t3-thread://v2/environment-delegated-completion/${childThreadId}`;
+      // Brackets and backslashes leave the label so the link still parses; backticks may stay.
+      assert.include(text, `([Fix the (parser) \`crash\`](${sharedHref})) [completed]`);
+      // The shared child thread is linked once, on its first task, not again on the second.
+      assert.equal(text.split(sharedHref).length - 1, 1);
+      assert.include(text, `Delegated task ${sharedTaskId} (Shared thread) [failed]`);
+      // A failed or cancelled task still carries its thread's link; a titleless one is an autolink.
+      assert.include(text, `(<${href}>) [cancelled]`);
+      // No thread means plain text, never an invented link.
+      assert.include(text, `Delegated task ${threadlessTaskId} (No thread row) [failed]`);
+      assert.equal((text.match(/t3-thread:\/\//g) ?? []).length, 2);
+      for (const written of text.match(/t3-thread:\/\/v2\/[^\s>)]+/g) ?? []) {
+        assert.isNotNull(parseThreadLinkHref(written));
+      }
+    }),
+  );
+
+  it.effect("links a remote child to its own environment, never this one", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const sink = yield* EventSink.EventSinkV2;
+      const now = yield* DateTime.now;
+      const threadId = ThreadId.make("thread:delegated-delivery-remote");
+      const projectId = ProjectId.make("project:delegated-delivery-remote");
+      const runId = RunId.make("run:delegated-delivery-remote");
+      const rootNodeId = NodeId.make("node:delegated-delivery-remote-root");
+      const remoteTaskId = NodeId.make("node:delegated-delivery-remote-task");
+      const remoteEnvironmentId = EnvironmentId.make("environment-linked-remote");
+      const remoteThreadId = ThreadId.make("thread:remote-child");
+      const messageId = MessageId.make(`message:delegated-delivery:${threadId}`);
+
+      yield* seedParentWithTerminalTask({
+        threadId,
+        projectId,
+        runId,
+        rootNodeId,
+        taskId: remoteTaskId,
+        deliveryState: "claimed",
+        completionWake: "always",
+        deliveryTaskIds: [remoteTaskId],
+        now,
+      });
+
+      const projection = yield* orchestrator.getThreadProjection(threadId);
+      const seeded = projection.subagents[0]!;
+      yield* sink.write({
+        events: [
+          {
+            id: EventId.make(`event:remote:${remoteTaskId}`),
+            type: "subagent.updated" as const,
+            threadId,
+            runId,
+            nodeId: remoteTaskId,
+            driver,
+            providerInstanceId: modelSelection.instanceId,
+            occurredAt: now,
+            payload: {
+              ...seeded,
+              status: "completed" as const,
+              result: "done remotely",
+              remoteChild: {
+                environmentId: remoteEnvironmentId,
+                threadId: remoteThreadId,
+                label: "Linked VPS",
+                title: "Remote task",
+              },
+            },
+          },
+        ],
+      });
+
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("command:delegated-delivery-remote"),
+        threadId,
+        messageId,
+        text: "Delegated task finished.",
+        attachments: [],
+        dispatchMode: { type: "queue_after_active" },
+        createdBy: "agent",
+        creationSource: "server",
+        delegatedCompletion: {
+          parentRunId: runId,
+          generation: 1,
+          taskIds: [remoteTaskId],
+        },
+      });
+
+      const message = (yield* orchestrator.getThreadProjection(threadId)).messages.find(
+        (candidate) => candidate.id === messageId,
+      );
+      const text = message?.text ?? "";
+      // The client opens v2 links in the environment they name, so a remote child is
+      // linked to its own machine; a link naming this environment would land on a wrong or missing thread here.
+      const remoteHref = `t3-thread://v2/${remoteEnvironmentId}/${remoteThreadId}`;
+      assert.include(text, `([Remote task](${remoteHref})) [completed]`);
+      assert.notInclude(text, `t3-thread://v2/environment-delegated-completion/${remoteThreadId}`);
+      const link = parseThreadLinkHref(remoteHref);
+      assert.deepEqual(link, { environmentId: remoteEnvironmentId, threadId: remoteThreadId });
     }),
   );
 
