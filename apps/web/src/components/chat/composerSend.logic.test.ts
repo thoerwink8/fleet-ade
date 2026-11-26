@@ -1,6 +1,6 @@
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { formatInlineContextReference } from "../../lib/composerContextReferences";
 import { threadContextReference } from "../../lib/composerContextRecords";
 import { threadContextRecord } from "@t3tools/shared/composerContextReferences";
@@ -9,6 +9,7 @@ import {
   loadBalancingSendWarning,
   multipleModelSendBlock,
   referencedThreadContexts,
+  resetSentComposerPrompt,
 } from "./composerSend.logic";
 
 const local = EnvironmentId.make("local");
@@ -120,5 +121,37 @@ describe("approvalRedirectNotice", () => {
   it("stays quiet when the decline failed or the user left the thread", () => {
     expect(approvalRedirectNotice({ ...settled, declined: false })).toBeNull();
     expect(approvalRedirectNotice(settled)).toBeNull();
+  });
+});
+
+describe("resetSentComposerPrompt", () => {
+  it("preserves the visible prompt after navigating during a send", () => {
+    const clearPrompt = vi.fn();
+    const resetCursor = vi.fn();
+
+    resetSentComposerPrompt({
+      currentDraftTargetKey: "thread:other",
+      sentDraftTargetKey: "thread:sent",
+      clearPrompt,
+      resetCursor,
+    });
+
+    expect(clearPrompt).not.toHaveBeenCalled();
+    expect(resetCursor).not.toHaveBeenCalled();
+  });
+
+  it("resets the prompt when the sent draft is still visible", () => {
+    const clearPrompt = vi.fn();
+    const resetCursor = vi.fn();
+
+    resetSentComposerPrompt({
+      currentDraftTargetKey: "thread:sent",
+      sentDraftTargetKey: "thread:sent",
+      clearPrompt,
+      resetCursor,
+    });
+
+    expect(clearPrompt).toHaveBeenCalledOnce();
+    expect(resetCursor).toHaveBeenCalledOnce();
   });
 });

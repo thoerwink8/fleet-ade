@@ -71,6 +71,7 @@ import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEve
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as EffectWorker from "../EffectWorker.ts";
 import * as Orchestrator from "../Orchestrator.ts";
+import * as ProviderSessionManager from "../ProviderSessionManager.ts";
 import * as ProviderReplayHarness from "../testkit/ProviderReplayHarness.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import type * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
@@ -5836,118 +5837,145 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
   });
 
-  it.effect("Stop ends a background command no Codex process tracks any more", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-bg-stale-workspace-" });
-      const staleTranscript = makeCodexReplayTranscript({
-        scenario: "codex-bg-stop-untracked",
-        entries: [
-          ...backgroundExecTranscript.entries.slice(0, -1),
-          { type: "runtime_exit", status: "success" },
-        ],
-      });
-      const localTranscript = yield* decodeReplayTranscriptJson(
-        (yield* encodeReplayTranscriptJson(staleTranscript)).replaceAll(
-          yield* encodeStringJson("/workspace"),
-          yield* encodeStringJson(cwd),
-        ),
-      );
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      for (const args of [
-        ["init", "--quiet"],
-        [
-          "-c",
-          "user.name=Test",
-          "-c",
-          "user.email=test@example.com",
-          "commit",
-          "--allow-empty",
-          "--quiet",
-          "-m",
-          "Initial commit",
-        ],
-      ]) {
-        assert.equal(Number(yield* spawner.exitCode(ChildProcess.make("git", args, { cwd }))), 0);
-      }
-      yield* Effect.gen(function* () {
-        const orchestrator = yield* Orchestrator.OrchestratorV2;
-        const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
-        const threadId = ThreadId.make("thread:background-stop-untracked");
-        yield* orchestrator.dispatch({
-          type: "thread.create",
-          commandId: CommandId.make("create-background-stop-untracked"),
-          threadId,
-          projectId: ProjectId.make("project:background-stop-untracked"),
-          title: "Background stop untracked",
-          modelSelection: CODEX_TEST_MODEL_SELECTION,
-          runtimeMode: "full-access",
-          interactionMode: "default",
-          branch: null,
-          worktreePath: cwd,
-          createdBy: "user",
-          creationSource: "web",
+  it.effect.each(["T3 closes the session", "the process exits"] as const)(
+    "settles a background command after %s",
+    (ending) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-bg-stale-workspace-" });
+        const staleTranscript = makeCodexReplayTranscript({
+          scenario: "codex-bg-stop-untracked",
+          entries: [
+            ...backgroundExecTranscript.entries.slice(0, -1),
+            ...(ending === "the process exits"
+              ? [{ type: "runtime_exit" as const, status: "success" as const }]
+              : []),
+          ],
         });
-        const settled = yield* orchestrator.streamDomainEvents.pipe(
-          Stream.filter(
-            (event) =>
-              event.type === "run.updated" &&
-              (event.payload.status === "waiting" || event.payload.status === "completed"),
+        const localTranscript = yield* decodeReplayTranscriptJson(
+          (yield* encodeReplayTranscriptJson(staleTranscript)).replaceAll(
+            yield* encodeStringJson("/workspace"),
+            yield* encodeStringJson(cwd),
           ),
-          Stream.runHead,
-          Effect.forkChild({ startImmediately: true }),
         );
-        yield* orchestrator.dispatch({
-          type: "message.dispatch",
-          commandId: CommandId.make("start-background-stop-untracked"),
-          threadId,
-          messageId: MessageId.make("message:background-stop-untracked"),
-          text: BG_PROMPT,
-          attachments: [],
-          createdBy: "user",
-          creationSource: "web",
-          dispatchMode: { type: "start_immediately" },
-        });
-        yield* worker.drain();
-        yield* Fiber.join(settled);
-        yield* worker.drain();
-        const before = yield* orchestrator.getThreadShell(threadId);
-        assert.deepEqual(
-          before?.pendingBackgroundTasks?.map((task) => task.kind),
-          ["command"],
-          "the thread still shows the command the gone process never finished",
-        );
-        const run = (yield* orchestrator.getThreadProjection(threadId)).runs.at(-1)!;
-        yield* orchestrator.dispatch({
-          type: "run.interrupt",
-          commandId: CommandId.make("stop-background-untracked"),
-          threadId,
-          runId: run.id,
-          holdQueue: true,
-        });
-        yield* worker.drain();
-        const projection = yield* orchestrator.getThreadProjection(threadId);
-        assert.deepEqual(
-          projection.turnItems.flatMap((item) =>
-            item.type === "command_execution" ? [item.status] : [],
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        for (const args of [
+          ["init", "--quiet"],
+          [
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "--quiet",
+            "-m",
+            "Initial commit",
+          ],
+        ]) {
+          assert.equal(Number(yield* spawner.exitCode(ChildProcess.make("git", args, { cwd }))), 0);
+        }
+        yield* Effect.gen(function* () {
+          const orchestrator = yield* Orchestrator.OrchestratorV2;
+          const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+          const threadId = ThreadId.make("thread:background-stop-untracked");
+          yield* orchestrator.dispatch({
+            type: "thread.create",
+            commandId: CommandId.make("create-background-stop-untracked"),
+            threadId,
+            projectId: ProjectId.make("project:background-stop-untracked"),
+            title: "Background stop untracked",
+            modelSelection: CODEX_TEST_MODEL_SELECTION,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: cwd,
+            createdBy: "user",
+            creationSource: "web",
+          });
+          const settled = yield* orchestrator.streamDomainEvents.pipe(
+            Stream.filter(
+              (event) =>
+                event.type === "run.updated" &&
+                (event.payload.status === "waiting" || event.payload.status === "completed"),
+            ),
+            Stream.runHead,
+            Effect.forkChild({ startImmediately: true }),
+          );
+          const interrupted = yield* orchestrator.streamDomainEvents.pipe(
+            Stream.filter(
+              (event) =>
+                event.type === "turn-item.updated" &&
+                event.payload.type === "command_execution" &&
+                event.payload.status === "interrupted",
+            ),
+            Stream.runHead,
+            Effect.forkChild({ startImmediately: true }),
+          );
+          yield* orchestrator.dispatch({
+            type: "message.dispatch",
+            commandId: CommandId.make("start-background-stop-untracked"),
+            threadId,
+            messageId: MessageId.make("message:background-stop-untracked"),
+            text: BG_PROMPT,
+            attachments: [],
+            createdBy: "user",
+            creationSource: "web",
+            dispatchMode: { type: "start_immediately" },
+          });
+          yield* worker.drain();
+          yield* Fiber.join(settled);
+          yield* worker.drain();
+          const active = yield* orchestrator.getThreadProjection(threadId);
+          const run = active.runs.at(-1)!;
+          if (ending === "the process exits") {
+            yield* Fiber.join(interrupted);
+          } else {
+            const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+            const providerSessionId = active.providerThreads.find(
+              (candidate) => candidate.id === run.providerThreadId,
+            )?.providerSessionId;
+            assert.isString(providerSessionId);
+            yield* manager.close(providerSessionId!);
+          }
+          const before = yield* orchestrator.getThreadShell(threadId);
+          assert.deepEqual(
+            before?.pendingBackgroundTasks?.map((task) => task.kind),
+            ending === "the process exits" ? [] : ["command"],
+          );
+          if (ending === "T3 closes the session") {
+            yield* orchestrator.dispatch({
+              type: "run.interrupt",
+              commandId: CommandId.make("stop-background-untracked"),
+              threadId,
+              runId: run.id,
+              holdQueue: true,
+            });
+            yield* worker.drain();
+            yield* Fiber.join(interrupted);
+          }
+          const projection = yield* orchestrator.getThreadProjection(threadId);
+          assert.deepEqual(
+            projection.turnItems.flatMap((item) =>
+              item.type === "command_execution" ? [item.status] : [],
+            ),
+            ["interrupted"],
+          );
+          assert.equal(projection.runs.at(-1)?.status, "completed");
+          assert.deepEqual(
+            (yield* orchestrator.getThreadShell(threadId))?.pendingBackgroundTasks,
+            [],
+          );
+        }).pipe(
+          Effect.provide(
+            ProviderReplayHarness.layerWithRegistry(
+              { name: "codex-background-stop-untracked", runtimePolicyOverride: { cwd } },
+              CodexAdapterV2Testkit.layer({ transcript: withConfigReads(localTranscript) }),
+              { runEffectWorker: false },
+            ),
           ),
-          ["interrupted"],
         );
-        assert.equal(projection.runs.at(-1)?.status, "completed");
-        assert.deepEqual(
-          (yield* orchestrator.getThreadShell(threadId))?.pendingBackgroundTasks,
-          [],
-        );
-      }).pipe(
-        Effect.provide(
-          ProviderReplayHarness.layerWithRegistry(
-            { name: "codex-background-stop-untracked", runtimePolicyOverride: { cwd } },
-            CodexAdapterV2Testkit.layer({ transcript: withConfigReads(localTranscript) }),
-            { runEffectWorker: false },
-          ),
-        ),
-      );
-    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+      }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
   const INTERRUPT_SCENARIO = "codex-interrupt-mid-command";

@@ -1,11 +1,13 @@
 import {
   CommandId,
   type OrchestrationV2BatchThreadResult,
+  type OrchestrationV2ExecutionNode,
   EventId,
   type OrchestrationV2Run,
   OrchestrationV2DomainEvent,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2TurnItem,
+  type OrchestrationV2Subagent,
   OrchestrationV2StoredEvent,
   ProviderThreadId,
   RunAttemptId,
@@ -181,6 +183,16 @@ export interface EventSinkV2Shape {
   /** Commits only if the stored turn item still equals expected. */
   readonly writeIfTurnItemUnchanged: (input: {
     readonly expected: OrchestrationV2TurnItem;
+    readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
+  }) => Effect.Effect<
+    {
+      readonly committed: boolean;
+      readonly storedEvents: ReadonlyArray<OrchestrationV2StoredEvent>;
+    },
+    EventSinkV2Error
+  >;
+  readonly writeIfNativeWorkUnchanged: (input: {
+    readonly expected: OrchestrationV2ExecutionNode | OrchestrationV2Subagent;
     readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
   }) => Effect.Effect<
     {
@@ -736,6 +748,32 @@ const layerBase: Layer.Layer<
       );
     });
 
+    const writeIfNativeWorkUnchangedEffect = Effect.fn(
+      "orchestrationV2.EventSink.writeIfNativeWorkUnchanged",
+    )(function* ({
+      expected,
+      events,
+    }: Parameters<EventSinkV2Shape["writeIfNativeWorkUnchanged"]>[0]) {
+      if ("origin" in expected) {
+        return yield* writeIfStoredPayloadMatches(
+          sql<{ readonly payload_json: string }>`
+            SELECT payload_json FROM orchestration_v2_projection_subagents
+            WHERE subagent_id = ${expected.id}
+          `,
+          yield* ProjectionStore.encodeSubagentPayload(expected),
+          events,
+        );
+      }
+      return yield* writeIfStoredPayloadMatches(
+        sql<{ readonly payload_json: string }>`
+          SELECT payload_json FROM orchestration_v2_projection_nodes
+          WHERE node_id = ${expected.id}
+        `,
+        yield* ProjectionStore.encodeNodePayload(expected),
+        events,
+      );
+    });
+
     const existingCommandResult =
       /* This helper runs for individual orchestration events; the enclosing operation owns the span. */
       Effect.fnUntraced(function* (commandId: CommandId) {
@@ -1178,6 +1216,12 @@ const layerBase: Layer.Layer<
         ),
       writeIfTurnItemUnchanged: (input) =>
         writeIfTurnItemUnchangedEffect(input).pipe(
+          Effect.mapError(
+            (cause) => new EventSinkWriteError({ eventCount: input.events.length, cause }),
+          ),
+        ),
+      writeIfNativeWorkUnchanged: (input) =>
+        writeIfNativeWorkUnchangedEffect(input).pipe(
           Effect.mapError(
             (cause) => new EventSinkWriteError({ eventCount: input.events.length, cause }),
           ),

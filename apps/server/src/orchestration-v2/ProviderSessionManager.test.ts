@@ -1,4 +1,5 @@
 import * as NetAddress from "effect/net/NetAddress";
+import * as NodeUtil from "node:util";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
@@ -10,6 +11,7 @@ import {
   NodeId,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
+  type OrchestrationV2ExecutionNode,
   type OrchestrationV2PromptSuggestion,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2ProviderSession,
@@ -32,6 +34,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
@@ -185,6 +188,29 @@ const layerBeforeUnchangedWriteEventSink = (
     }),
   ).pipe(Layer.provide(layerTestEventSink));
 
+// Fails runtime recovery projection reads with the armed error, then delegates.
+const layerFlakyRecoveryReadProjection = (
+  flaky: Ref.Ref<Option.Option<ProjectionStore.ProjectionStoreReadError>>,
+) =>
+  Layer.effect(
+    ProjectionStore.ProjectionStoreV2,
+    Effect.gen(function* () {
+      const delegate = yield* ProjectionStore.ProjectionStoreV2;
+      return ProjectionStore.ProjectionStoreV2.of({
+        ...delegate,
+        getRuntimeRecoveryProjection: (threadId) =>
+          Ref.getAndSet(flaky, Option.none()).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => delegate.getRuntimeRecoveryProjection(threadId),
+                onSome: (error) => Effect.fail(error),
+              }),
+            ),
+          ),
+      });
+    }),
+  ).pipe(Layer.provide(layerTestStores));
+
 const CodexCapabilities: OrchestrationV2ProviderCapabilities = CodexProviderCapabilitiesV2;
 const ExclusiveCapabilities: OrchestrationV2ProviderCapabilities = {
   ...CodexCapabilities,
@@ -202,7 +228,10 @@ interface TestProviderRuntimeState {
   readonly unloadedNativeThreadIds: ReadonlyArray<string>;
   readonly eventQueues: ReadonlyMap<
     string,
-    Queue.Queue<ProviderAdapter.ProviderAdapterV2Event, Cause.Done>
+    Queue.Queue<
+      ProviderAdapter.ProviderAdapterV2Event,
+      Cause.Done | ProviderAdapter.ProviderAdapterEventStreamError
+    >
   >;
 }
 
@@ -430,7 +459,7 @@ const makeNativeChildFixture = Effect.fnUntraced(function* () {
     modelSelection,
     runtimePolicy,
   });
-  return { manager, parent, resumeChild };
+  return { manager, parent, resumeChild, childProviderThread };
 });
 
 function unimplemented(detail: string) {
@@ -510,7 +539,10 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
           yield* Ref.update(options.mcpConfigs, (configs) => [...configs, mcpConfig]);
         }
         const now = yield* DateTime.now;
-        const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event, Cause.Done>();
+        const events = yield* Queue.unbounded<
+          ProviderAdapter.ProviderAdapterV2Event,
+          Cause.Done | ProviderAdapter.ProviderAdapterEventStreamError
+        >();
         let session: OrchestrationV2ProviderSession = {
           ...makeProviderSession({
             providerSessionId: input.providerSessionId,
@@ -634,6 +666,7 @@ function layerTest(input: {
   readonly pauseAttachWrite?: Parameters<typeof layerPausingAttachEventSink>[0];
   readonly beforeUnchangedWrite?: Ref.Ref<Effect.Effect<void>>;
   readonly beforeTurnItemsWrite?: Ref.Ref<ReadonlyArray<Effect.Effect<void>>>;
+  readonly flakyRecoveryRead?: Ref.Ref<Option.Option<ProjectionStore.ProjectionStoreReadError>>;
   readonly pauseResolve?: {
     readonly armed: Ref.Ref<boolean>;
     readonly paused: Deferred.Deferred<void>;
@@ -704,6 +737,13 @@ function layerTest(input: {
     input.pauseResolve === undefined
       ? layerTestMcpRegistry
       : layerPausingMcpRegistry(input.pauseResolve);
+  const layerStores =
+    input.flakyRecoveryRead === undefined
+      ? layerTestStores
+      : Layer.merge(
+          EventStore.layer.pipe(Layer.provide(layerTestDatabase)),
+          layerFlakyRecoveryReadProjection(input.flakyRecoveryRead),
+        );
   const layerProviderEventIngestorTest = ProviderEventIngestor.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -712,7 +752,7 @@ function layerTest(input: {
         }),
         layerConfiguredEventSink,
         IdAllocator.layer,
-        layerTestStores,
+        layerStores,
         ThreadCommandExecutor.layer,
         Layer.mock(GitVcsDriver.GitVcsDriver)({
           resolveBranchName: () => Effect.succeed(null),
@@ -721,7 +761,7 @@ function layerTest(input: {
     ),
   );
   return Layer.mergeAll(
-    layerTestStores,
+    layerStores,
     layerConfiguredEventSink,
     IdAllocator.layer,
     layerConfiguredMcpRegistry,
@@ -734,13 +774,13 @@ function layerTest(input: {
         Layer.mergeAll(
           layerRegistry.pipe(Layer.provideMerge(McpProviderSessions.layer)),
           CommandOutputHub.layer.pipe(
-            Layer.provide(Layer.merge(layerConfiguredEventSink, layerTestStores)),
+            Layer.provide(Layer.merge(layerConfiguredEventSink, layerStores)),
           ),
           layerConfiguredEventSink,
           IdAllocator.layer,
           layerProviderEventIngestorTest,
           layerConfiguredMcpRegistry,
-          layerTestStores,
+          layerStores,
           input.installationGateLayer ?? ProviderInstallationGate.layer,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
         ),
@@ -3006,7 +3046,7 @@ it.effect(
     }),
 );
 
-const openSessionWithBackgroundCommand = (fixtureName: string) =>
+const openSessionWithBackgroundCommand = (fixtureName: string, seedReplacement = true) =>
   Effect.gen(function* () {
     const eventSink = yield* EventSink.EventSinkV2;
     const idAllocator = yield* IdAllocator.IdAllocatorV2;
@@ -3114,7 +3154,12 @@ const openSessionWithBackgroundCommand = (fixtureName: string) =>
           ],
         });
       });
-    yield* Effect.forEach(Object.values(seededToolCalls), writeToolCall);
+    yield* Effect.forEach(
+      seedReplacement
+        ? Object.values(seededToolCalls)
+        : [seededToolCalls.cutOff, seededToolCalls.finished, seededToolCalls.otherSession],
+      writeToolCall,
+    );
     yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
     const toolCallStatus = (id: OrchestrationV2TurnItem["id"]) =>
       Effect.gen(function* () {
@@ -3269,6 +3314,599 @@ it.effect.each(["a runtime whose tasks can outlive it", "server shutdown"] as co
         ),
       );
     }),
+);
+
+it.effect("ProviderSessionManagerV2 ends open tool calls when the provider process dies", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const beforeUnchangedWrite = yield* Ref.make(Effect.void);
+    const beforeTurnItemsWrite = yield* Ref.make<ReadonlyArray<Effect.Effect<void>>>([]);
+    yield* Effect.gen(function* () {
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const { threadId, providerSessionId, seededToolCalls, toolCalls, writeToolCall } =
+        yield* openSessionWithBackgroundCommand("provider-session-manager-process-exit", false);
+      const eventSink = yield* EventSink.EventSinkV2;
+      const afterSequence = yield* eventSink.latestSequence({ threadId });
+      const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+      const first = yield* runtime.subscribeEvents!;
+      const second = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const now = yield* DateTime.now;
+      const lateCompletion = { ...seededToolCalls.cutOff, id: TurnItemId.make("late-completion") };
+      const queuedCall = { ...seededToolCalls.cutOff, id: TurnItemId.make("queued-before-exit") };
+      const consuming = yield* Deferred.make<void>();
+      const resume = yield* Deferred.make<void>();
+      const firstConsumer = yield* first.events.pipe(
+        Stream.tap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.id === seededToolCalls.cutOff.id
+            ? writeToolCall(event.turnItem)
+            : Effect.void,
+        ),
+        Stream.runDrain,
+        Effect.ensuring(first.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      const secondConsumer = yield* second.events.pipe(
+        Stream.tap((event) =>
+          event.type !== "turn_item.updated"
+            ? Effect.void
+            : Deferred.succeed(consuming, undefined).pipe(
+                Effect.andThen(Deferred.await(resume)),
+                Effect.andThen(writeToolCall(event.turnItem)),
+              ),
+        ),
+        Stream.runDrain,
+        Effect.ensuring(second.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      yield* writeToolCall(lateCompletion);
+      yield* Ref.set(beforeTurnItemsWrite, [
+        manager
+          .open({ threadId, providerSessionId, modelSelection, runtimePolicy })
+          .pipe(
+            Effect.andThen(
+              writeToolCall({ ...seededToolCalls.replacement, startedAt: now, updatedAt: now }),
+            ),
+            Effect.andThen(
+              writeToolCall({ ...lateCompletion, status: "completed", completedAt: now }),
+            ),
+            Effect.orDie,
+          ),
+      ]);
+      const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+        driver: CODEX_DRIVER,
+        providerSessionId,
+        cause: "Provider process exited.",
+      });
+
+      yield* Queue.offerAll(
+        queue,
+        [seededToolCalls.cutOff, queuedCall].map((turnItem) => ({
+          type: "turn_item.updated" as const,
+          driver: CODEX_DRIVER,
+          turnItem,
+        })),
+      );
+      yield* Deferred.await(consuming);
+      yield* Queue.fail(queue, error);
+      assert.deepEqual(yield* Fiber.join(firstConsumer), error);
+      yield* Deferred.succeed(resume, undefined);
+      assert.deepEqual(yield* Fiber.join(secondConsumer), error);
+      const update = yield* eventSink.stream({ threadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) =>
+            event.type === "turn-item.updated" &&
+            event.payload.id === seededToolCalls.cutOff.id &&
+            event.payload.status === "interrupted",
+        ),
+        Stream.runHead,
+      );
+      const { event } = Option.getOrThrow(update);
+      assert.equal(event.type === "turn-item.updated" && event.payload.status, "interrupted");
+      assert.deepStrictEqual(yield* toolCalls, {
+        cutOff: "interrupted",
+        finished: "completed",
+        otherSession: "running",
+        replacement: "running",
+      });
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const { turnItems } = yield* store.getThreadRecords(threadId, ["turnItems"]);
+      assert.equal(turnItems.find((item) => item.id === lateCompletion.id)?.status, "completed");
+      const eventStore = yield* EventStore.EventStoreV2;
+      const interrupted = yield* eventStore.read({ threadId, afterSequence }).pipe(
+        Stream.runCollect,
+        Effect.map((events) =>
+          events.flatMap(({ event }) =>
+            event.type === "turn-item.updated" && event.payload.status === "interrupted"
+              ? [event.payload.id]
+              : [],
+          ),
+        ),
+      );
+      assert.lengthOf(interrupted, 2);
+      assert.sameMembers(interrupted, [seededToolCalls.cutOff.id, queuedCall.id]);
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          state,
+          idleTimeoutMs: 60_000,
+          backgroundTasksEndWithProcess: false,
+          beforeUnchangedWrite,
+          beforeTurnItemsWrite,
+        }),
+      ),
+    );
+  }),
+);
+
+// regression: a lost settlement write left tools running forever once subscribers
+// had drained, because the failure was only logged.
+it.effect("ProviderSessionManagerV2 retries a failed settlement write after process exit", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const beforeUnchangedWrite = yield* Ref.make(Effect.void);
+    const beforeTurnItemsWrite = yield* Ref.make<ReadonlyArray<Effect.Effect<void>>>([]);
+    yield* Effect.gen(function* () {
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const { threadId, providerSessionId, seededToolCalls, toolCalls, writeToolCall } =
+        yield* openSessionWithBackgroundCommand("provider-session-manager-settlement-retry", false);
+      const eventSink = yield* EventSink.EventSinkV2;
+      const afterSequence = yield* eventSink.latestSequence({ threadId });
+      const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+      const first = yield* runtime.subscribeEvents!;
+      const second = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const now = yield* DateTime.now;
+      const lateCompletion = { ...seededToolCalls.cutOff, id: TurnItemId.make("late-completion") };
+      const queuedCall = { ...seededToolCalls.cutOff, id: TurnItemId.make("queued-before-exit") };
+      const consuming = yield* Deferred.make<void>();
+      const resume = yield* Deferred.make<void>();
+      const firstConsumer = yield* first.events.pipe(
+        Stream.tap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.id === seededToolCalls.cutOff.id
+            ? writeToolCall(event.turnItem)
+            : Effect.void,
+        ),
+        Stream.runDrain,
+        Effect.ensuring(first.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      const secondConsumer = yield* second.events.pipe(
+        Stream.tap((event) =>
+          event.type !== "turn_item.updated"
+            ? Effect.void
+            : Deferred.succeed(consuming, undefined).pipe(
+                Effect.andThen(Deferred.await(resume)),
+                Effect.andThen(writeToolCall(event.turnItem)),
+              ),
+        ),
+        Stream.runDrain,
+        Effect.ensuring(second.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      yield* writeToolCall(lateCompletion);
+      // One commit failure hits the first conditional settlement write, after the
+      // replacement session has written its own rows.
+      yield* Ref.set(beforeTurnItemsWrite, [
+        manager
+          .open({ threadId, providerSessionId, modelSelection, runtimePolicy })
+          .pipe(
+            Effect.andThen(
+              writeToolCall({ ...seededToolCalls.replacement, startedAt: now, updatedAt: now }),
+            ),
+            Effect.andThen(
+              writeToolCall({ ...lateCompletion, status: "completed", completedAt: now }),
+            ),
+            Effect.andThen(Effect.die(new Error("simulated commit failure"))),
+            Effect.orDie,
+          ),
+      ]);
+      const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+        driver: CODEX_DRIVER,
+        providerSessionId,
+        cause: "Provider process exited.",
+      });
+
+      yield* Queue.offerAll(
+        queue,
+        [seededToolCalls.cutOff, queuedCall].map((turnItem) => ({
+          type: "turn_item.updated" as const,
+          driver: CODEX_DRIVER,
+          turnItem,
+        })),
+      );
+      yield* Deferred.await(consuming);
+      yield* Queue.fail(queue, error);
+      assert.deepEqual(yield* Fiber.join(firstConsumer), error);
+      yield* Deferred.succeed(resume, undefined);
+      assert.deepEqual(yield* Fiber.join(secondConsumer), error);
+      // The first settlement attempt failed before the clock advances.
+      assert.equal((yield* toolCalls).cutOff, "running");
+      const interrupted = yield* eventSink.stream({ threadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) =>
+            event.type === "turn-item.updated" && event.payload.status === "interrupted",
+        ),
+        Stream.take(2),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* TestClock.adjust("30 seconds");
+      const settled = yield* Fiber.join(interrupted);
+      assert.lengthOf(settled, 2);
+      assert.sameMembers(
+        settled.map(({ event }) => (event.type === "turn-item.updated" ? event.payload.id : "")),
+        [seededToolCalls.cutOff.id, queuedCall.id],
+      );
+      assert.deepStrictEqual(yield* toolCalls, {
+        cutOff: "interrupted",
+        finished: "completed",
+        otherSession: "running",
+        replacement: "running",
+      });
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const { turnItems } = yield* store.getThreadRecords(threadId, ["turnItems"]);
+      assert.equal(turnItems.find((item) => item.id === lateCompletion.id)?.status, "completed");
+      const eventStore = yield* EventStore.EventStoreV2;
+      const interruptedIds = yield* eventStore.read({ threadId, afterSequence }).pipe(
+        Stream.runCollect,
+        Effect.map((events) =>
+          events.flatMap(({ event }) =>
+            event.type === "turn-item.updated" && event.payload.status === "interrupted"
+              ? [event.payload.id]
+              : [],
+          ),
+        ),
+      );
+      assert.lengthOf(interruptedIds, 2);
+      assert.sameMembers(interruptedIds, [seededToolCalls.cutOff.id, queuedCall.id]);
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          state,
+          idleTimeoutMs: 60_000,
+          backgroundTasksEndWithProcess: false,
+          beforeUnchangedWrite,
+          beforeTurnItemsWrite,
+        }),
+      ),
+    );
+  }),
+);
+
+// regression: the after-drain retry must not extend the manual-close scan, which
+// re-reads by time window; a retrying scan interrupts a replacement session's tools.
+it.effect(
+  "ProviderSessionManagerV2 keeps replacement tool calls running when a manual-close settlement write fails",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const beforeUnchangedWrite = yield* Ref.make(Effect.void);
+      const beforeTurnItemsWrite = yield* Ref.make<ReadonlyArray<Effect.Effect<void>>>([]);
+      yield* Effect.gen(function* () {
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const { threadId, providerSessionId, seededToolCalls, toolCalls, writeToolCall } =
+          yield* openSessionWithBackgroundCommand("provider-session-manager-manual-close", false);
+        const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+        const subscription = yield* runtime.subscribeEvents!;
+        const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+        const now = yield* DateTime.now;
+        const consuming = yield* Deferred.make<void>();
+        const resume = yield* Deferred.make<void>();
+        // The blocked consumer holds the dead session's stale write of the old tool; once
+        // released it re-opens the item the release scan already interrupted.
+        const consumer = yield* subscription.events.pipe(
+          Stream.tap((event) =>
+            event.type === "turn_item.updated" && event.turnItem.id === seededToolCalls.cutOff.id
+              ? Deferred.succeed(consuming, undefined).pipe(
+                  Effect.andThen(Deferred.await(resume)),
+                  Effect.andThen(writeToolCall(event.turnItem)),
+                )
+              : Effect.void,
+          ),
+          Stream.runDrain,
+          Effect.ensuring(subscription.close),
+          Effect.flip,
+          Effect.forkScoped,
+        );
+
+        yield* Queue.offer(queue, {
+          type: "turn_item.updated",
+          driver: CODEX_DRIVER,
+          turnItem: seededToolCalls.cutOff,
+        });
+        yield* Deferred.await(consuming);
+        yield* manager.close(providerSessionId);
+        // The release scan interrupted the seeded tool; only now does the after-drain
+        // settlement write fail.
+        yield* Ref.set(beforeTurnItemsWrite, [Effect.die(new Error("simulated commit failure"))]);
+        // The replacement session opens the same provider session and thread before the
+        // blocked subscriber finishes draining, so the after-drain scan meets both items.
+        yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+        yield* writeToolCall({ ...seededToolCalls.replacement, startedAt: now, updatedAt: now });
+        yield* Deferred.succeed(resume, undefined);
+        yield* Fiber.join(consumer);
+        yield* TestClock.adjust("30 seconds");
+        // A retried scan would find the replacement's running tool by its time window.
+        assert.equal((yield* toolCalls).replacement, "running");
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            beforeUnchangedWrite,
+            beforeTurnItemsWrite,
+          }),
+        ),
+      );
+    }),
+);
+
+// regression: release-work read failures log session id and error type chain only;
+// projection causes can carry SQL detail and provider output in their messages.
+it.effect("ProviderSessionManagerV2 keeps projection read exception text out of release logs", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const flakyRecoveryRead = yield* Ref.make<
+      Option.Option<ProjectionStore.ProjectionStoreReadError>
+    >(Option.none());
+    const warnings: Array<{ readonly entry: string; readonly annotations: unknown }> = [];
+    const captureWarnings = Logger.make<unknown, void>(({ logLevel, message }) => {
+      if (logLevel === "Warn") {
+        const parts = message as ReadonlyArray<unknown>;
+        warnings.push({ entry: String(parts[0]), annotations: parts[1] });
+      }
+    });
+    yield* Effect.gen(function* () {
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const { threadId, providerSessionId, toolCalls } = yield* openSessionWithBackgroundCommand(
+        "provider-session-manager-read-failure",
+        false,
+      );
+      const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+      const subscription = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const consumer = yield* subscription.events.pipe(
+        Stream.runDrain,
+        Effect.ensuring(subscription.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+        driver: CODEX_DRIVER,
+        providerSessionId,
+        cause: "Provider process exited.",
+      });
+      yield* Ref.set(
+        flakyRecoveryRead,
+        Option.some(
+          new ProjectionStore.ProjectionStoreReadError({
+            threadId,
+            cause: new Error("R4-PROJECTION-READ-MARKER projection decode failed"),
+          }),
+        ),
+      );
+
+      yield* Queue.fail(queue, error);
+      // Failing the subscribers runs after the release read and its warning log.
+      assert.deepEqual(yield* Fiber.join(consumer), error);
+
+      const captured = warnings.filter(
+        (warning) => warning.entry === "orchestration-v2.provider-session-release-work-read-failed",
+      );
+      assert.lengthOf(captured, 1);
+      const warning = captured[0]!;
+      assert.isObject(warning.annotations);
+      const annotations = warning.annotations as Record<string, unknown>;
+      assert.equal(annotations.providerSessionId, providerSessionId);
+      assert.isArray(annotations.errorTypes);
+      assert.include(
+        (annotations.errorTypes as Array<string>).join(";"),
+        "ProjectionStoreReadError",
+      );
+      assert.notProperty(annotations, "cause");
+      assert.notInclude(NodeUtil.inspect(warning), "R4-PROJECTION-READ-MARKER");
+      // The forfeit: settlement writes nothing when the recovery read fails.
+      assert.equal((yield* toolCalls).cutOff, "running");
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            backgroundTasksEndWithProcess: false,
+            flakyRecoveryRead,
+          }),
+          Logger.layer([captureWarnings], { mergeWithExisting: false }),
+        ),
+      ),
+    );
+  }),
+);
+
+it.effect("ProviderSessionManagerV2 ends native background subagents after process exit", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    yield* Effect.gen(function* () {
+      const { manager, parent, childProviderThread } = yield* makeNativeChildFixture();
+      const threadId = childProviderThread.appThreadId!;
+      const now = yield* DateTime.now;
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const { subagents } = yield* store.getThreadRecords(parent.threadId, ["subagents"]);
+      const task = { ...subagents[0]!, status: "running", completedAt: null } as const;
+      const parentRunId = task.runId!;
+      const taskItem = {
+        ...task,
+        id: TurnItemId.make("native-subagent-item"),
+        subagentId: task.id,
+        nodeId: task.id,
+        providerTurnId: null,
+        nativeItemRef: task.nativeTaskRef,
+        parentItemId: null,
+        ordinal: 1,
+        type: "subagent",
+      } satisfies OrchestrationV2TurnItem;
+      const childRootId = NodeId.make("native-child-root");
+      const node = {
+        id: task.id,
+        threadId: parent.threadId,
+        runId: parentRunId,
+        parentNodeId: task.parentNodeId,
+        rootNodeId: task.parentNodeId!,
+        kind: "subagent",
+        status: "running",
+        countsForRun: false,
+        providerThreadId: childProviderThread.id,
+        providerTurnId: null,
+        nativeItemRef: task.nativeTaskRef,
+        runtimeRequestId: null,
+        checkpointScopeId: null,
+        startedAt: now,
+        completedAt: null,
+      } satisfies OrchestrationV2ExecutionNode;
+      const childRoot = {
+        ...node,
+        id: childRootId,
+        threadId,
+        runId: null,
+        parentNodeId: null,
+        rootNodeId: childRootId,
+        kind: "root_turn",
+      } satisfies OrchestrationV2ExecutionNode;
+      const childCall = {
+        id: TurnItemId.make("native-child-tool-call"),
+        threadId,
+        runId: null,
+        nodeId: null,
+        providerThreadId: childProviderThread.id,
+        providerTurnId: null,
+        nativeItemRef: null,
+        parentItemId: null,
+        ordinal: 1,
+        type: "dynamic_tool",
+        toolName: "native-child-tool",
+        input: {},
+        title: null,
+        status: "running",
+        startedAt: now,
+        completedAt: null,
+        updatedAt: now,
+      } satisfies OrchestrationV2TurnItem;
+      yield* eventSink.write({
+        events: [
+          {
+            id: yield* idAllocator.allocate.event({ threadId: parent.threadId }),
+            type: "run.updated",
+            threadId: parent.threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: {
+              id: parentRunId,
+              threadId: parent.threadId,
+              ordinal: 1,
+              providerInstanceId: modelSelection.instanceId,
+              modelSelection,
+              providerThreadId: null,
+              userMessageId: MessageId.make("finished-native-parent"),
+              rootNodeId: task.parentNodeId,
+              activeAttemptId: null,
+              status: "completed",
+              requestedAt: now,
+              startedAt: now,
+              completedAt: now,
+              checkpointId: null,
+              contextHandoffId: null,
+            },
+          },
+          {
+            id: yield* idAllocator.allocate.event({ threadId: parent.threadId }),
+            type: "subagent.updated",
+            threadId: parent.threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: task,
+          },
+          {
+            id: yield* idAllocator.allocate.event({ threadId: parent.threadId }),
+            type: "turn-item.updated",
+            threadId: parent.threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: taskItem,
+          },
+          ...(yield* Effect.forEach([node, childRoot], (payload) =>
+            idAllocator.allocate.event({ threadId: payload.threadId }).pipe(
+              Effect.map((id) => ({
+                id,
+                type: "node.updated" as const,
+                threadId: payload.threadId,
+                driver: CODEX_DRIVER,
+                occurredAt: now,
+                payload,
+              })),
+            ),
+          )),
+          {
+            id: yield* idAllocator.allocate.event({ threadId }),
+            type: "turn-item.updated",
+            threadId,
+            driver: CODEX_DRIVER,
+            occurredAt: now,
+            payload: childCall,
+          },
+        ],
+      });
+      assert.isNotEmpty((yield* store.getThreadShell(parent.threadId))!.pendingBackgroundTasks);
+      const afterSequence = yield* eventSink.latestSequence({ threadId });
+      const runtime = Option.getOrThrow(yield* manager.get(parent.providerSessionId));
+      const subscription = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(parent.providerSessionId))!;
+      yield* Queue.fail(
+        queue,
+        new ProviderAdapter.ProviderAdapterEventStreamError({
+          driver: CODEX_DRIVER,
+          providerSessionId: parent.providerSessionId,
+          cause: "Provider process exited.",
+        }),
+      );
+      yield* Stream.runDrain(subscription.events).pipe(
+        Effect.ensuring(subscription.close),
+        Effect.flip,
+      );
+      yield* eventSink.stream({ threadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) => event.type === "turn-item.updated" && event.payload.id === childCall.id,
+        ),
+        Stream.runHead,
+      );
+
+      const { turnItems, nodes } = yield* store.getThreadRecords(threadId, ["turnItems", "nodes"]);
+      const root = yield* store.getThreadRecords(parent.threadId, [
+        "runs",
+        "subagents",
+        "turnItems",
+        "nodes",
+      ]);
+      assert.equal(turnItems.find((item) => item.id === childCall.id)?.status, "interrupted");
+      assert.equal(root.subagents.find((item) => item.id === task.id)?.status, "interrupted");
+      assert.equal(root.turnItems.find((item) => item.id === taskItem.id)?.status, "interrupted");
+      assert.equal(root.nodes.find((item) => item.id === node.id)?.status, "interrupted");
+      assert.equal(nodes.find((item) => item.id === childRoot.id)?.status, "interrupted");
+      assert.equal(root.runs.find((run) => run.id === parentRunId)?.status, "completed");
+      assert.isEmpty((yield* store.getThreadShell(parent.threadId))!.pendingBackgroundTasks);
+      assert.isEmpty((yield* store.getThreadShell(threadId))!.pendingBackgroundTasks);
+    }).pipe(
+      Effect.provide(
+        layerTest({ state, idleTimeoutMs: 60_000, backgroundTasksEndWithProcess: false }),
+      ),
+    );
+  }),
 );
 
 // regression: #19355 settled and idle-released threads stayed Waiting
