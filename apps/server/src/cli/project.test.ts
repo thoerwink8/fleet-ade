@@ -46,6 +46,7 @@ import {
   persistServerRuntimeState,
   registerInProcessOwner,
 } from "../serverRuntimeState.ts";
+import { processIdentity } from "../legacyServerOwner.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 
@@ -140,9 +141,11 @@ it.effect.each(["snapshot", "mutation"] as const)(
       const workspaceRoot = NodePath.join(root, "workspace");
       yield* fs.makeDirectory(workspaceRoot);
       // Stands in for this same process owning the home, the binding a real server gets from
-      // acquireServerOwnership: a defined ownerId with a registered owner.
+      // acquireServerOwnership: a registered ownerId plus this process's exact probe identity.
       const liveStatePath = NodePath.join(baseDir, "userdata", "server-runtime.json");
       yield* registerInProcessOwner(liveStatePath, "4ec9f94a-0000-4000-8000-000000000000");
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+      const identity = yield* Effect.promise(() => processIdentity(process.pid, process.platform));
       yield* persistServerRuntimeState({
         path: liveStatePath,
         state: {
@@ -151,6 +154,7 @@ it.effect.each(["snapshot", "mutation"] as const)(
             port: 3_773,
           })),
           ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+          ...(identity === undefined ? {} : { processIdentity: identity }),
         },
       });
       const now = "2026-01-01T00:00:00.000Z";

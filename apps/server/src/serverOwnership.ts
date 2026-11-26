@@ -277,8 +277,10 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
       // cannot answer, the record is still published without one: nothing on this host could
       // verify an identity anyway, and verification falls back to unknown.
       const probeIdentity = yield* ProcessIdentityProbe;
-      const platform = yield* HostProcess.Platform;
-      const identity = yield* Effect.promise(() => probeIdentity(process.pid, platform));
+      // The probe interrogates the real host kernel; use the real platform, not the injectable
+      // HostProcess.Platform, so writer and verifier always agree (they both probe the host).
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+      const identity = yield* Effect.promise(() => probeIdentity(process.pid, process.platform));
       yield* persistServerRuntimeState({
         path: statePath,
         state: {

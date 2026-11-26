@@ -1,5 +1,4 @@
 import * as NodeSqlite from "node:sqlite";
-import * as HostProcess from "@t3tools/shared/HostProcess";
 
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -76,7 +75,10 @@ const copyIsAbandoned = (
 const removeAbandonedCopies = Effect.fn("removeAbandonedCopies")(function* (directory: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const platform = yield* HostProcess.Platform;
+  // The probe interrogates the real host kernel, so it uses the real platform, not the
+  // injectable HostProcess.Platform.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+  const platform = process.platform;
   const probeIdentity = yield* ProcessIdentityProbe;
   const entries = yield* fs.readDirectory(directory).pipe(
     Effect.catchIf(
@@ -122,8 +124,8 @@ export const initializeV2Database = Effect.fn("initializeV2Database")(function* 
     // recorded PID, and only an exact identity match keeps the copy alive. When the probe
     // cannot answer, the copy is still written — on such a host nothing could verify one.
     const probeIdentity = yield* ProcessIdentityProbe;
-    const platform = yield* HostProcess.Platform;
-    const identity = yield* Effect.promise(() => probeIdentity(process.pid, platform));
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+    const identity = yield* Effect.promise(() => probeIdentity(process.pid, process.platform));
     if (identity !== undefined) {
       yield* fs.writeFileString(
         path.join(temporaryDirectory, COPY_OWNER_FILE),

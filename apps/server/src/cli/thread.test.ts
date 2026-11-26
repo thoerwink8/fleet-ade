@@ -23,6 +23,7 @@ import {
   persistServerRuntimeState,
   registerInProcessOwner,
 } from "../serverRuntimeState.ts";
+import { processIdentity } from "../legacyServerOwner.ts";
 import {
   readLatestMessages,
   resolveProject,
@@ -75,9 +76,11 @@ it.effect(
         { id: ProjectId.make("~/literal-id"), title: "Exact id", workspaceRoot: cwd },
       ];
       // Stands in for this same process owning the home, the binding a real server gets from
-      // acquireServerOwnership: a defined ownerId with a registered owner.
+      // acquireServerOwnership: a registered ownerId plus this process's exact probe identity.
       const liveStatePath = path.join(baseDir, "userdata", "server-runtime.json");
       yield* registerInProcessOwner(liveStatePath, "4ec9f94a-0000-4000-8000-000000000000");
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+      const identity = yield* Effect.promise(() => processIdentity(process.pid, process.platform));
       yield* persistServerRuntimeState({
         path: liveStatePath,
         state: {
@@ -86,6 +89,7 @@ it.effect(
             port: 3_773,
           })),
           ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+          ...(identity === undefined ? {} : { processIdentity: identity }),
         },
       });
       using _session = vi.spyOn(McpBridge, "mcpToolSession").mockReturnValue(

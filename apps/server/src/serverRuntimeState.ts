@@ -14,7 +14,6 @@ import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { formatHostForUrl, isWildcardHost } from "@t3tools/shared/hostClassification";
 import packageJson from "../package.json" with { type: "json" };
 import type * as ServerConfig from "./config.ts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
 import { processIdentity } from "./legacyServerOwner.ts";
 
 export const PersistedServerRuntimeState = Schema.Struct({
@@ -198,9 +197,9 @@ export const ProcessIdentityProbe = Context.Reference<
 export type RecordedServerLiveness = "live" | "stale" | "unknown";
 
 /**
- * Whether the record describes a server that still runs and still owns its home. The stored
- * process identity must equal a fresh probe of the recorded PID exactly — no wall clock, no
- * tolerance. Unverifiable identity is "unknown", never "live".
+ * Whether the record describes a server that still runs and still owns its home. Live needs an
+ * ownerId, the stored identity exactly equal to a fresh probe, and the lock held; unverifiable
+ * is "unknown", a proven contradiction "stale".
  */
 export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServerProcessLiveness")(
   function* (
@@ -209,31 +208,42 @@ export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServ
   ): Effect.fn.Return<RecordedServerLiveness, never, never> {
     if (!isProcessAlive(state.pid)) return "stale";
 
-    // The in-process registry is authoritative for this process's own ownership: POSIX SQLite
-    // locks are invisible to their own process, and a registered owner never needs to re-prove
-    // itself. Only a defined ownerId with a matching registration binds the record; a missing
-    // ownerId or an empty registry never matches, not even on undefined === undefined.
-    if (
-      state.pid === process.pid &&
-      state.ownerId !== undefined &&
-      inProcessOwners.get(statePath) === state.ownerId
-    ) {
-      return "live";
-    }
+    // A lock-aware server always publishes its ownerId. A record without one cannot be bound
+    // to any owner: unverifiable, so unknown while the PID lives — never live.
+    if (state.ownerId === undefined) return "unknown";
 
-    // Records written before identity tracking carry no proof. While their PID lives, a reused
-    // PID and the real legacy server are indistinguishable, so they are never live.
+    // The in-process registry is the oracle for homes this process owns. POSIX SQLite locks
+    // are invisible to their holder, so the lock probe cannot contradict a foreign ownerId
+    // here; only the registry can. A mismatch proves the record is not this home's owner.
+    const registeredOwnerId = inProcessOwners.get(statePath);
+    if (registeredOwnerId !== undefined && state.ownerId !== registeredOwnerId) return "stale";
+
+    // Without a stored identity the process generation cannot be bound at all — not even for
+    // this process's own registered ownerId.
     if (state.processIdentity === undefined) return "unknown";
 
     const probeIdentity = yield* ProcessIdentityProbe;
-    const platform = yield* HostProcess.Platform;
-    const liveIdentity = yield* Effect.promise(() => probeIdentity(state.pid, platform));
+    // The probe interrogates the real host kernel, so it must use the real platform, not the
+    // injectable HostProcess.Platform — tests override that one to emulate another OS's behavior.
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+    const liveIdentity = yield* Effect.promise(() => probeIdentity(state.pid, process.platform));
     if (liveIdentity === undefined) return "unknown";
     if (liveIdentity !== state.processIdentity) return "stale";
 
-    // The identity match proves this process is the recorded owner instance. In-system it holds
-    // the lock until it dies; a free lock means it lost the home, and the probe cannot identify
-    // another holder, so held plus identity is the binding proof.
+    // The identity match proves this process is the recorded owner instance. A registered
+    // ownerId match with our own PID is the in-process lock proof: the registry entry exists
+    // only while the acquisition scope holds the lock.
+    if (state.pid === process.pid) {
+      // Without a registration for this home the record's claim is false outright: nothing in
+      // this process ever owned it, so the record can never read live regardless of who else
+      // holds the lock.
+      return registeredOwnerId === undefined ? "stale" : "live";
+    }
+
+    // Cross-process: the lock probe cannot say who holds it, only that someone does — a record
+    // already resolved live cannot detect the lock changing hands afterwards. The window is
+    // accepted: a connecting client learns the truth from the protocol answer on the port, or
+    // from the connection failing.
     switch (probeServerOwnershipLock(statePath)) {
       case "held":
         return "live";

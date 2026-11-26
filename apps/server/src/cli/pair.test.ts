@@ -36,6 +36,7 @@ import {
   registerInProcessOwner,
   type PersistedServerRuntimeState,
 } from "../serverRuntimeState.ts";
+import { processIdentity } from "../legacyServerOwner.ts";
 import { hostShellWord, resolveHostCliCommand } from "./invocation.ts";
 import {
   DevServerNotProxiableError,
@@ -53,11 +54,19 @@ const OWNER_ID = "4ec9f94a-0000-4000-8000-000000000000";
 const makeLiveServerRuntimeState = (
   input: Parameters<typeof makePersistedServerRuntimeState>[0],
 ): Effect.Effect<PersistedServerRuntimeState> =>
-  Effect.map(makePersistedServerRuntimeState(input), (state) => ({
-    ...state,
-    ownerId: OWNER_ID,
-    startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
-  }));
+  // A live record must carry this process's exact probe identity, the same proof a real
+  // server's publish writes. The probe is the real host one: verification replays it.
+  Effect.zipWith(
+    makePersistedServerRuntimeState(input),
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+    Effect.promise(() => processIdentity(process.pid, process.platform)),
+    (state, identity) => ({
+      ...state,
+      ownerId: OWNER_ID,
+      ...(identity === undefined ? {} : { processIdentity: identity }),
+      startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
+    }),
+  );
 
 /** Persists the record and registers this process as its owner for the test's scope. */
 const persistLiveServerRuntimeState = Effect.fn("test.persistLiveServerRuntimeState")(

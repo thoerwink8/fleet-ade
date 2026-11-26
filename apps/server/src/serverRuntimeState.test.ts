@@ -584,17 +584,29 @@ describe("readLiveServerRuntimeState", () => {
 
       assert.isTrue(Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)));
 
-      // The in-process owner binding is authoritative for this process: even a record whose
-      // stored identity was corrupted still reads live while the registered ownerId matches.
+      // A registered ownerId only proves this process holds the lock; the record must still
+      // carry this process's exact probe identity. A corrupted identity rejects the record.
       const published = JSON.parse(yield* fs.readFileString(statePath));
       yield* fs.writeFileString(
         statePath,
         JSON.stringify({ ...published, processIdentity: "corrupted-on-disk" }),
       );
       assert.isTrue(
-        Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
-        "the registered in-process owner must not re-prove its own identity",
+        Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+        "a stored identity that differs from this process must reject the record",
       );
+      assert.equal(
+        yield* ServerRuntimeState.verifyRecordedServerProcessLiveness(
+          { ...published, processIdentity: "corrupted-on-disk" },
+          statePath,
+        ),
+        "stale",
+      );
+
+      // Restoring the exact identity reads live again: the registry binds ownerId, the probe
+      // binds the process generation.
+      yield* fs.writeFileString(statePath, JSON.stringify(published));
+      assert.isTrue(Option.isSome(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)));
     }).pipe(Effect.provide(layerIdentity)),
   );
 
@@ -815,5 +827,213 @@ describe("readLiveServerRuntimeState", () => {
         );
       }
     }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect(
+    "rejects a record whose ownerId is missing or does not match this process's binding",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-ownerid-" });
+        const statePath = path.join(root, "server-runtime.json");
+        const state = yield* ServerRuntimeState.makePersistedServerRuntimeState({
+          config: { host: undefined, devUrl: undefined },
+          port: 3773,
+        });
+        const owner = yield* ServerOwnership.acquireServerOwnership(statePath);
+        yield* owner.publish({ ...state, pid: process.pid });
+        const published = JSON.parse(yield* fs.readFileString(statePath));
+
+        for (const [name, tampered] of [
+          ["missing", { ...published, ownerId: undefined }],
+          ["foreign", { ...published, ownerId: "11111111-2222-3333-4444-555555555555" }],
+        ] as const) {
+          yield* fs.writeFileString(statePath, JSON.stringify(tampered));
+          assert.isTrue(
+            Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+            `a record with a ${name} ownerId must never read live`,
+          );
+          assert.equal(
+            yield* ServerRuntimeState.verifyRecordedServerProcessLiveness(tampered, statePath),
+            name === "missing" ? "unknown" : "stale",
+          );
+        }
+      }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("rejects a same-PID record this process never registered, whoever holds the lock", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-unregistered-" });
+      const statePath = path.join(root, "server-runtime.json");
+      // A foreign process holds the lock and the record names this process's own PID with a
+      // correct identity — but nothing here ever acquired this home, so the in-process proof
+      // cannot apply and the record must never read live.
+      const holder = yield* lockHoldingProcess(path.join(root, "server-owner.sqlite"));
+      assert(holder.pid !== undefined);
+      yield* fs.writeFileString(
+        statePath,
+        JSON.stringify(
+          recordFor(process.pid, {
+            ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+            processIdentity: yield* Effect.promise(() => probeIdentityOf(process.pid)),
+          }),
+        ),
+      );
+      assert.isTrue(
+        Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+        "without a registration this process never owned the home the record claims",
+      );
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect(
+    "cross-process records without an ownerId are unknown even with identity and lock",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-noowner-" });
+        const statePath = path.join(root, "server-runtime.json");
+        const holder = yield* lockHoldingProcess(path.join(root, "server-owner.sqlite"));
+        assert(holder.pid !== undefined);
+        const holderIdentity = yield* Effect.promise(() => probeIdentityOf(holder.pid!));
+
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(recordFor(holder.pid, { processIdentity: holderIdentity })),
+        );
+        assert.equal(
+          yield* ServerRuntimeState.verifyRecordedServerProcessLiveness(
+            JSON.parse(yield* fs.readFileString(statePath)),
+            statePath,
+          ),
+          "unknown",
+        );
+        assert.isTrue(
+          Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+        );
+
+        // The same record with an ownerId is live: owner presence is what a lock-aware record proves.
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(
+            recordFor(holder.pid, {
+              ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+              processIdentity: holderIdentity,
+            }),
+          ),
+        );
+        assert.equal(
+          yield* ServerRuntimeState.verifyRecordedServerProcessLiveness(
+            JSON.parse(yield* fs.readFileString(statePath)),
+            statePath,
+          ),
+          "live",
+        );
+      }).pipe(Effect.provide(layerIdentity)),
+  );
+
+  it.effect("a record published while the probe has no answer verifies unknown in-process", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-pubfail-" });
+      const statePath = path.join(root, "server-runtime.json");
+      const state = yield* ServerRuntimeState.makePersistedServerRuntimeState({
+        config: { host: undefined, devUrl: undefined },
+        port: 3773,
+      });
+      const owner = yield* ServerOwnership.acquireServerOwnership(statePath);
+      // The probe is down at publish time, so the record carries no identity at all.
+      yield* owner
+        .publish({ ...state, pid: process.pid })
+        .pipe(
+          Effect.provideService(ServerRuntimeState.ProcessIdentityProbe, () =>
+            Promise.resolve(undefined),
+          ),
+        );
+      const published = JSON.parse(yield* fs.readFileString(statePath));
+      assert.isUndefined(published.processIdentity);
+
+      // A healthy probe must not rescue it: without a stored identity nothing can bind the
+      // process generation, not even for this process's own registered ownerId.
+      assert.equal(
+        yield* ServerRuntimeState.verifyRecordedServerProcessLiveness(published, statePath),
+        "unknown",
+      );
+      assert.isTrue(Option.isNone(yield* ServerRuntimeState.readLiveServerRuntimeState(statePath)));
+    }).pipe(Effect.provide(layerIdentity)),
+  );
+});
+
+describe("processIdentity probe precision", () => {
+  it.effect("Linux identities are the kernel start tick and distinct across two processes", () =>
+    Effect.gen(function* () {
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- This case is meaningful only on a real Linux host; the injectable platform must not fake it.
+      if (process.platform !== "linux") return;
+      // The first child announces itself over stdout before the second spawns: a real
+      // process-boot interval separates the two kernel start ticks deterministically, so no
+      // wall-clock timer is needed to keep them in different ticks.
+      const spawnBootedChild = async () => {
+        const child = NodeChildProcess.spawn(
+          process.execPath,
+          ["-e", "process.stdout.write('ready\\n');process.stdin.resume()"],
+          { stdio: ["pipe", "pipe", "ignore"] },
+        );
+        await NodeEvents.EventEmitter.once(child, "spawn");
+        await Promise.race([
+          NodeEvents.EventEmitter.once(child.stdout, "data"),
+          NodeEvents.EventEmitter.once(child, "exit").then(() => {
+            throw new Error("child exited before reporting ready");
+          }),
+        ]);
+        return child;
+      };
+      const killChild = async (child: NodeChildProcess.ChildProcess) => {
+        const exited = NodeEvents.EventEmitter.once(child, "exit");
+        child.kill();
+        await exited;
+      };
+      const first = yield* Effect.promise(spawnBootedChild);
+      try {
+        const second = yield* Effect.promise(spawnBootedChild);
+        try {
+          const [firstIdentity, secondIdentity] = yield* Effect.promise(() =>
+            Promise.all([
+              processIdentity(first.pid!, "linux"),
+              processIdentity(second.pid!, "linux"),
+            ]),
+          );
+          assert.isDefined(firstIdentity);
+          assert.isDefined(secondIdentity);
+          assert.match(firstIdentity!, /^\d+$/);
+          assert.notEqual(firstIdentity, secondIdentity);
+          // The kernel's own field-22 starttime is the ground truth the identity must report.
+          const startTickOf = (pid: number) => {
+            const stat = NodeFS.readFileSync(`/proc/${pid}/stat`, "utf8");
+            return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19];
+          };
+          assert.equal(firstIdentity, startTickOf(first.pid!));
+          assert.equal(secondIdentity, startTickOf(second.pid!));
+        } finally {
+          yield* Effect.promise(() => killChild(second));
+        }
+      } finally {
+        yield* Effect.promise(() => killChild(first));
+      }
+    }),
+  );
+
+  it.effect("platforms without generation-precise identity report no answer", () =>
+    Effect.gen(function* () {
+      for (const platform of ["darwin", "freebsd", "openbsd", "sunos", "aix"] as const) {
+        // A dead PID keeps this independent of the host: no real process is needed.
+        const identity = yield* Effect.promise(() => processIdentity(2_147_483_647, platform));
+        assert.isUndefined(identity, `${platform} must not offer a low-precision identity`);
+      }
+    }),
   );
 });
