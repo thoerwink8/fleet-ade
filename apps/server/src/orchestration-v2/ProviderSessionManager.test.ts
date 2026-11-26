@@ -3408,6 +3408,143 @@ it.effect("ProviderSessionManagerV2 ends open tool calls when the provider proce
   }),
 );
 
+// regression: a lost settlement write left tools running forever once subscribers
+// had drained, because the failure was only logged.
+it.effect("ProviderSessionManagerV2 retries a failed settlement write after process exit", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const beforeUnchangedWrite = yield* Ref.make(Effect.void);
+    const beforeTurnItemsWrite = yield* Ref.make<ReadonlyArray<Effect.Effect<void>>>([]);
+    yield* Effect.gen(function* () {
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const { threadId, providerSessionId, seededToolCalls, toolCalls, writeToolCall } =
+        yield* openSessionWithBackgroundCommand("provider-session-manager-settlement-retry", false);
+      const eventSink = yield* EventSink.EventSinkV2;
+      const afterSequence = yield* eventSink.latestSequence({ threadId });
+      const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+      const first = yield* runtime.subscribeEvents!;
+      const second = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const now = yield* DateTime.now;
+      const lateCompletion = { ...seededToolCalls.cutOff, id: TurnItemId.make("late-completion") };
+      const queuedCall = { ...seededToolCalls.cutOff, id: TurnItemId.make("queued-before-exit") };
+      const consuming = yield* Deferred.make<void>();
+      const resume = yield* Deferred.make<void>();
+      const firstConsumer = yield* first.events.pipe(
+        Stream.tap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.id === seededToolCalls.cutOff.id
+            ? writeToolCall(event.turnItem)
+            : Effect.void,
+        ),
+        Stream.runDrain,
+        Effect.ensuring(first.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      const secondConsumer = yield* second.events.pipe(
+        Stream.tap((event) =>
+          event.type !== "turn_item.updated"
+            ? Effect.void
+            : Deferred.succeed(consuming, undefined).pipe(
+                Effect.andThen(Deferred.await(resume)),
+                Effect.andThen(writeToolCall(event.turnItem)),
+              ),
+        ),
+        Stream.runDrain,
+        Effect.ensuring(second.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      yield* writeToolCall(lateCompletion);
+      // One commit failure hits the first conditional settlement write, after the
+      // replacement session has written its own rows.
+      yield* Ref.set(beforeTurnItemsWrite, [
+        manager
+          .open({ threadId, providerSessionId, modelSelection, runtimePolicy })
+          .pipe(
+            Effect.andThen(
+              writeToolCall({ ...seededToolCalls.replacement, startedAt: now, updatedAt: now }),
+            ),
+            Effect.andThen(
+              writeToolCall({ ...lateCompletion, status: "completed", completedAt: now }),
+            ),
+            Effect.andThen(Effect.die(new Error("simulated commit failure"))),
+            Effect.orDie,
+          ),
+      ]);
+      const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+        driver: CODEX_DRIVER,
+        providerSessionId,
+        cause: "Provider process exited.",
+      });
+
+      yield* Queue.offerAll(
+        queue,
+        [seededToolCalls.cutOff, queuedCall].map((turnItem) => ({
+          type: "turn_item.updated" as const,
+          driver: CODEX_DRIVER,
+          turnItem,
+        })),
+      );
+      yield* Deferred.await(consuming);
+      yield* Queue.fail(queue, error);
+      assert.deepEqual(yield* Fiber.join(firstConsumer), error);
+      yield* Deferred.succeed(resume, undefined);
+      assert.deepEqual(yield* Fiber.join(secondConsumer), error);
+      // The first settlement attempt failed before the clock advances.
+      assert.equal((yield* toolCalls).cutOff, "running");
+      const interrupted = yield* eventSink.stream({ threadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) =>
+            event.type === "turn-item.updated" && event.payload.status === "interrupted",
+        ),
+        Stream.take(2),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* TestClock.adjust("30 seconds");
+      const settled = yield* Fiber.join(interrupted);
+      assert.lengthOf(settled, 2);
+      assert.sameMembers(
+        settled.map(({ event }) => (event.type === "turn-item.updated" ? event.payload.id : "")),
+        [seededToolCalls.cutOff.id, queuedCall.id],
+      );
+      assert.deepStrictEqual(yield* toolCalls, {
+        cutOff: "interrupted",
+        finished: "completed",
+        otherSession: "running",
+        replacement: "running",
+      });
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const { turnItems } = yield* store.getThreadRecords(threadId, ["turnItems"]);
+      assert.equal(turnItems.find((item) => item.id === lateCompletion.id)?.status, "completed");
+      const eventStore = yield* EventStore.EventStoreV2;
+      const interruptedIds = yield* eventStore.read({ threadId, afterSequence }).pipe(
+        Stream.runCollect,
+        Effect.map((events) =>
+          events.flatMap(({ event }) =>
+            event.type === "turn-item.updated" && event.payload.status === "interrupted"
+              ? [event.payload.id]
+              : [],
+          ),
+        ),
+      );
+      assert.lengthOf(interruptedIds, 2);
+      assert.sameMembers(interruptedIds, [seededToolCalls.cutOff.id, queuedCall.id]);
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          state,
+          idleTimeoutMs: 60_000,
+          backgroundTasksEndWithProcess: false,
+          beforeUnchangedWrite,
+          beforeTurnItemsWrite,
+        }),
+      ),
+    );
+  }),
+);
+
 it.effect("ProviderSessionManagerV2 ends native background subagents after process exit", () =>
   Effect.gen(function* () {
     const state = yield* Ref.make(emptyState);

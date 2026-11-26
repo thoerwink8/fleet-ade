@@ -1386,6 +1386,47 @@ export const layerWithOptions = (
             ),
           );
 
+      // Subscribers drain after the release commit, so their settlement cannot join
+      // writeReleaseRecords. A failed settlement still retries with the same
+      // attribution: the captured work keys and conditional writes are unchanged.
+      const retryLostWorkSettlement = (
+        providerSessionId: ProviderSessionId,
+        settlement: Effect.Effect<void, unknown>,
+      ) => {
+        const attempt = Effect.gen(function* () {
+          const exit = yield* Effect.exit(settlement);
+          if (Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)) return yield* exit;
+          yield* Effect.logWarning("orchestration-v2.provider-session-release-settlement-failed", {
+            providerSessionId,
+            cause: exit.cause,
+          });
+          return yield* Effect.fail(exit.cause);
+        });
+        return attempt.pipe(
+          Effect.retry({
+            schedule: Schedule.exponential("1 second").pipe(
+              Schedule.modifyDelay(({ duration }) =>
+                Effect.succeed(Duration.min(duration, Duration.seconds(30))),
+              ),
+            ),
+          }),
+          Effect.delay("1 second"),
+          FiberSet.run(releaseRecordRetries),
+          Effect.asVoid,
+        );
+      };
+
+      const settleAfterDrain =
+        (providerSessionId: ProviderSessionId) => (settlement: Effect.Effect<void, unknown>) =>
+          settlement.pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning("orchestration-v2.provider-session-release-failed", {
+                providerSessionId,
+                cause,
+              }).pipe(Effect.andThen(retryLostWorkSettlement(providerSessionId, settlement))),
+            ),
+          );
+
       // A request the event pump is persisting for this runtime lands before
       // the cutoff, and once the entry is gone the pump persists no more for
       // it.
@@ -1591,7 +1632,7 @@ export const layerWithOptions = (
                       (thread) => writeReleasedToolCallEvents(thread, releasedAt),
                       { discard: true },
                     )
-                  ).pipe(logReleaseFailure(input.providerSessionId));
+                  ).pipe(settleAfterDrain(input.providerSessionId));
                   let subscriberCount = 0;
                   if (input.gracefulSubscribers === true) {
                     subscriberCount = yield* endSubscribers(entry, afterDrain);
