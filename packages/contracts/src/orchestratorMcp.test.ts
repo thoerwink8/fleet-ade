@@ -66,4 +66,15 @@ describe("orchestrator MCP contracts", () => {
       }),
     ).toThrow();
   });
+
+  it("keeps the hand-back baseline on a delegated task request", () => {
+    const request = decodeDelegateTaskInput({
+      task: "Fix the parser and prove it with its tests.",
+      avoid: "Do not touch the locking layer.",
+      testCommands: ["vp test run parser"],
+    });
+    expect(request.avoid).toBe("Do not touch the locking layer.");
+    expect(request.testCommands).toEqual(["vp test run parser"]);
+    expect(decodeDelegateTaskInput({ task: "Fix the parser." }).testCommands).toBeUndefined();
+  });
 });

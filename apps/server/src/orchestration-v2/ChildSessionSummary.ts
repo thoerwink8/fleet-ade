@@ -302,6 +302,8 @@ export class ChildSessionSummary extends Context.Service<
     readonly rememberDispatch: (input: {
       readonly threadId: ThreadId;
       readonly goal: string;
+      readonly avoid?: string | undefined;
+      readonly testCommands?: readonly string[] | undefined;
     }) => Effect.Effect<void>;
     readonly markDriftFalsePositive: (options: {
       readonly threadId: ThreadId;
@@ -1061,13 +1063,15 @@ export class ChildSessionSummary extends Context.Service<
       const rememberDispatch = Effect.fn("ChildSessionSummary.rememberDispatch")(function* (input: {
         readonly threadId: ThreadId;
         readonly goal: string;
+        readonly avoid?: string | undefined;
+        readonly testCommands?: readonly string[] | undefined;
       }) {
         if (Option.isNone(assist)) return;
         yield* assist.value.rememberDispatch({
           threadId: input.threadId,
           goal: input.goal,
-          avoid: null,
-          testCommands: null,
+          avoid: input.avoid ?? null,
+          testCommands: input.testCommands ?? null,
         });
       });
 
