@@ -354,6 +354,7 @@ export interface ChatComposerHandle {
     expandedCursor: number;
     contextIds: string[];
   };
+  getDraftTargetKey: () => string;
   resetCursorState: (options?: {
     cursor?: number;
     prompt?: string;
@@ -3514,6 +3515,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       readSnapshot: () => {
         return readComposerSnapshotStable();
       },
+      getDraftTargetKey: () => composerDraftTargetKey,
       resetCursorState: (options?: {
         cursor?: number;
         prompt?: string;

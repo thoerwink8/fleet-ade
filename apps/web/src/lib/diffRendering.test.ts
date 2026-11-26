@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { resolveDiffReviewPosition } from "../reviewCommentContext";
 import {
   buildFileDiffContentVersion,
+  buildFileDiffEntries,
   buildFileDiffIdentityKey,
   buildFileDiffRenderKey,
   getDiffLineStat,
@@ -266,6 +267,34 @@ describe("getRenderablePatch", () => {
 });
 
 describe("diff file reconciliation", () => {
+  it("gives repeated blocks unique keys while retaining their content", () => {
+    const parsed = getRenderablePatch(
+      ["first", "second"]
+        .map((content) =>
+          [
+            "diff --git a/same.ts b/same.ts",
+            "--- a/same.ts",
+            "+++ b/same.ts",
+            "@@ -1 +1 @@",
+            "-before",
+            `+${content}`,
+            "",
+          ].join("\n"),
+        )
+        .join(""),
+    );
+    expect(parsed?.kind).toBe("files");
+    if (parsed?.kind !== "files") return;
+    const files = [...parsed.files, parsed.files[1]!];
+
+    const entries = buildFileDiffEntries(files);
+
+    expect(entries.map((entry) => entry.fileDiff)).toEqual(files);
+    expect(new Set(entries.map((entry) => entry.fileKey)).size).toBe(3);
+    expect(entries[0]?.fileKey).toBe(buildFileDiffIdentityKey(files[0]!));
+    expect(buildFileDiffEntries(files)).toEqual(entries);
+  });
+
   it("keeps Pierre's render key stable when a partial diff hydrates", () => {
     const patch = [
       "diff --git a/example.ts b/example.ts",

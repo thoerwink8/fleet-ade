@@ -15,6 +15,7 @@ import {
   withMessageContext,
   makeThreadErrorSetter,
 } from "../ChatView.logic";
+import { resetSentComposerPrompt } from "./composerSend.logic";
 import { isUsageLimitsCommand } from "@t3tools/shared/usageLimits";
 import {
   AuthOrchestrationOperateScope,
@@ -70,6 +71,7 @@ import {
   restoreFailedDraftThread,
   checkoutPullRequestUrlToLink,
   composerDraftHasUserContent,
+  composerTargetKey,
   type ComposerFileAttachment,
   type ComposerImageAttachment,
   type DraftThreadEnvMode,
@@ -1140,9 +1142,15 @@ export function useComposerSend(input: ComposerSendInput) {
       : null;
     // Keep new-thread flows from reusing this draft while attachments and worktree setup settle.
     if (sentDraftThreadRef) markPromotedDraftThreadByRef(sentDraftThreadRef);
-    promptRef.current = "";
     clearComposerDraftContent(composerDraftTarget);
-    composerRef.current?.resetCursorState();
+    resetSentComposerPrompt({
+      currentDraftTargetKey: composerRef.current?.getDraftTargetKey() ?? null,
+      sentDraftTargetKey: composerTargetKey(composerDraftTarget),
+      clearPrompt: () => {
+        promptRef.current = "";
+      },
+      resetCursor: () => composerRef.current?.resetCursorState(),
+    });
 
     const title = deriveThreadTitleSeed({
       text: messageTextForSend,

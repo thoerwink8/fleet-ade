@@ -79,3 +79,14 @@ export function approvalRedirectNotice(input: {
   }
   return null;
 }
+
+export function resetSentComposerPrompt(input: {
+  readonly currentDraftTargetKey: string | null;
+  readonly sentDraftTargetKey: string;
+  readonly clearPrompt: () => void;
+  readonly resetCursor: () => void;
+}) {
+  if (input.currentDraftTargetKey !== input.sentDraftTargetKey) return;
+  input.clearPrompt();
+  input.resetCursor();
+}
