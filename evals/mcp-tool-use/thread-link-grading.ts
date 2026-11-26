@@ -10,7 +10,9 @@ export const ThreadLinksExpect = Schema.Struct({
    * Mentions the final answer must carry as plain text: present in what the reader sees, and not
    * the label of any Markdown link. Inline code around a mention is fine.
    */
-  plainText: Schema.optional(Schema.Array(Schema.String)),
+  plainText: Schema.optional(
+    Schema.Array(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
+  ),
 });
 
 interface MarkdownLink {
@@ -150,10 +152,14 @@ export const gradeThreadLinks = (
     pass: invented.length === 0,
   });
   for (const mention of expect.plainText ?? []) {
-    const present = new RegExp(escapeRegExp(mention)).test(visibleText);
-    const asLabel = links.some((link) => link.label.includes(mention));
+    // An array entry is satisfied by any one of its forms: a mention counts when the summary
+    // names the thread in any recognizable plain phrasing.
+    const forms = Array.isArray(mention) ? mention : [mention];
+    const name = forms[0] ?? "";
+    const present = forms.some((form) => new RegExp(escapeRegExp(form)).test(visibleText));
+    const asLabel = forms.some((form) => links.some((link) => link.label.includes(form)));
     checks.push({
-      check: `threadLinks plain ${mention}${!present ? " (missing)" : asLabel ? " (a link label)" : ""}`,
+      check: `threadLinks plain ${name}${!present ? " (missing)" : asLabel ? " (a link label)" : ""}`,
       pass: present && !asLabel,
     });
   }

@@ -1708,6 +1708,34 @@ it("grades thread links as chat renders them: exact targets, plain mentions, no 
   const wrongTarget =
     "[Fix parser crash](t3-thread://v2/env-1/thread-aaX), [Stabilize flaky cart test](t3-thread://v2/env-1/thread-bbb). Settings sync audit, PR #123.";
   assert.includeMembers(grade(wrongTarget), ["threadLinks t3-thread://v2/env-1/thread-aaa"]);
+  // An array mention is satisfied by any one of its forms.
+  const alternates = {
+    threadLinks: {
+      linked: [],
+      plainText: [["Settings sync audit", "Settings sync", "audit thread"]],
+    },
+  };
+  for (const prose of [
+    "Settings sync audit done.",
+    "The Settings sync drops keys.",
+    "See the audit thread.",
+  ]) {
+    assert.deepEqual(
+      gradeSample(alternates, { calls: [], text: prose, finalText: prose, stopReason: "end_turn" })
+        .filter((c) => !c.pass)
+        .map((c) => c.check),
+      [],
+      prose,
+    );
+  }
+  assert.isTrue(
+    gradeSample(alternates, {
+      calls: [],
+      text: "It is done.",
+      finalText: "It is done.",
+      stopReason: "end_turn",
+    }).some((c) => !c.pass && c.check.startsWith("threadLinks plain Settings sync audit")),
+  );
   // No final answer yet: every positive check fails.
   for (const c of gradeSample(expect, {
     calls: [],
