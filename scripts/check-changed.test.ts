@@ -520,7 +520,7 @@ it("ignores an unignored file sitting where an index directory is expected", asy
   assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), []);
 });
 
-it("lists ignored nested repositories inside node_modules as directory entries", async () => {
+it("excludes nested repositories inside node_modules from the inputs", async () => {
   using project = ignoredFixture((write) => {
     write(".gitignore", "node_modules/\n");
   });
@@ -529,13 +529,11 @@ it("lists ignored nested repositories inside node_modules as directory entries",
   NodeFS.mkdirSync(NodePath.join(project.root, "app/node_modules"), { recursive: true });
   git("-C", "node_modules", "init");
   git("-C", "app/node_modules", "init");
-  // Nested repositories appear in the old listing as their root path with a
-  // trailing slash, and `ls-files -o` lists them again as untracked input.
+  // The contract change: nothing under any node_modules is a cache input. The
+  // old pathspecs listed nested repositories as directory entries even here,
+  // but their content is never read by any check, so the inputs are empty.
   assert.deepStrictEqual(oldIgnoredListing(project.root), ["app/node_modules/", "node_modules/"]);
-  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
-    "app/node_modules/",
-    "node_modules/",
-  ]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), []);
 });
 
 it("does not walk a nested node_modules inside an ignored directory", async () => {
@@ -553,6 +551,52 @@ it("does not walk a nested node_modules inside an ignored directory", async () =
     "build/normal.d.ts",
   ]);
   assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/normal.d.ts"]);
+});
+
+it("descends into a plain .git file inside an ignored directory as the old pathspecs did", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/leaf/.git", "ordinary file\n");
+    write("build/leaf/types.d.ts");
+  });
+  // `.git` must be a directory or a valid `gitdir:` file to stop git; ordinary
+  // content makes the directory plain, so the declarations inside count.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/leaf/types.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/leaf/types.d.ts",
+  ]);
+});
+
+it("lists ignored nested repositories outside node_modules as directory entries", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("build/repo/types.d.ts");
+  });
+  const { git } = project;
+  git("-C", "build/repo", "init");
+  // A nested repository boundary stands for its content in both listings.
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/repo/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), ["build/repo/"]);
+});
+
+it("lists an ignored nested worktree whose .git is a valid gitdir file as a directory entry", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "build/\n");
+    write("separate/types.d.ts");
+  });
+  const { git, write, root } = project;
+  git("init", "--separate-git-dir", NodePath.join(root, "separate.git"), "separate");
+  write("build/wt/.git", "gitdir: ../../separate.git\n");
+  write("build/wt/types.d.ts");
+  // A gitdir file pointing at a real git directory is a repository boundary;
+  // a garbage or missing target is not and gets descended.
+  write("build/notwt/.git", "gitdir: ../missing.git\n");
+  write("build/notwt/types.d.ts");
+  assert.deepStrictEqual(oldIgnoredListing(project.root), ["build/notwt/types.d.ts", "build/wt/"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), [
+    "build/notwt/types.d.ts",
+    "build/wt/",
+  ]);
 });
 
 function launcherFixture() {
