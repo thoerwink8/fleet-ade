@@ -988,10 +988,12 @@ export const layerWithOptions = (
           readonly entry: LiveSessionEntry;
           readonly reason: ProviderSessionReleaseReason;
           readonly detachedThreadId?: ThreadId;
+          readonly runtimeFailed?: boolean;
         }) {
           if (
             input.reason === "server_shutdown" ||
-            input.entry.runtime.backgroundTasksEndWithProcess !== true
+            (input.entry.runtime.backgroundTasksEndWithProcess !== true &&
+              input.runtimeFailed !== true)
           ) {
             return [];
           }
@@ -1329,6 +1331,7 @@ export const layerWithOptions = (
         readonly keepIf?: Effect.Effect<boolean>;
         readonly gracefulSubscribers?: boolean;
         readonly eventStreamCause?: Cause.Cause<ProviderAdapter.ProviderAdapterV2Error>;
+        readonly runtimeFailed?: boolean;
       }) =>
         Effect.acquireUseRelease(
           removeLiveEntry(input),
@@ -1344,6 +1347,7 @@ export const layerWithOptions = (
                   const releasedProviderThreads = yield* readReleasedProviderThreads({
                     entry,
                     reason: input.reason,
+                    runtimeFailed: input.runtimeFailed === true,
                     ...detachedThread,
                   });
                   if (input.cancelIdleFiber !== false) {
@@ -2535,9 +2539,16 @@ export const layerWithOptions = (
 
       const startEventPump = (entry: LiveSessionEntry) => {
         let stoppedByProvider = false;
+        let runtimeFailed = false;
         let lastSessionStatus = entry.runtime.providerSession.status;
         const retryStalls = makeRetryStallWatch(entry);
         return entry.runtime.events.pipe(
+          // Observe adapter failures before the pump can add its own persistence failures.
+          Stream.tapErrorTag("ProviderAdapterEventStreamError", () =>
+            Effect.sync(() => {
+              runtimeFailed = true;
+            }),
+          ),
           Stream.runForEach((nativeEvent) => {
             if (shutdownSignal.received) return Effect.void;
             // Live output bypasses persistence and subscribers so floods cannot delay domain events.
@@ -2700,6 +2711,7 @@ export const layerWithOptions = (
                 reason: "runtime_error",
                 detail: makeProviderFailure({ cause }).message,
                 eventStreamCause: cause,
+                runtimeFailed,
               }).pipe(logReleaseFailure(entry.runtime.providerSessionId));
             }),
           ),

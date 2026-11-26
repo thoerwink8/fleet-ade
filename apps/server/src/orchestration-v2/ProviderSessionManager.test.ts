@@ -202,7 +202,10 @@ interface TestProviderRuntimeState {
   readonly unloadedNativeThreadIds: ReadonlyArray<string>;
   readonly eventQueues: ReadonlyMap<
     string,
-    Queue.Queue<ProviderAdapter.ProviderAdapterV2Event, Cause.Done>
+    Queue.Queue<
+      ProviderAdapter.ProviderAdapterV2Event,
+      Cause.Done | ProviderAdapter.ProviderAdapterEventStreamError
+    >
   >;
 }
 
@@ -510,7 +513,10 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
           yield* Ref.update(options.mcpConfigs, (configs) => [...configs, mcpConfig]);
         }
         const now = yield* DateTime.now;
-        const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event, Cause.Done>();
+        const events = yield* Queue.unbounded<
+          ProviderAdapter.ProviderAdapterV2Event,
+          Cause.Done | ProviderAdapter.ProviderAdapterEventStreamError
+        >();
         let session: OrchestrationV2ProviderSession = {
           ...makeProviderSession({
             providerSessionId: input.providerSessionId,
@@ -3269,6 +3275,51 @@ it.effect.each(["a runtime whose tasks can outlive it", "server shutdown"] as co
         ),
       );
     }),
+);
+
+it.effect("ProviderSessionManagerV2 ends open tool calls when the provider process dies", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    yield* Effect.gen(function* () {
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const { threadId, providerSessionId, seededToolCalls, toolCalls } =
+        yield* openSessionWithBackgroundCommand("provider-session-manager-process-exit");
+      const eventSink = yield* EventSink.EventSinkV2;
+      const afterSequence = yield* eventSink.latestSequence({ threadId });
+      const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+      const subscription = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+        driver: CODEX_DRIVER,
+        providerSessionId,
+        cause: "Provider process exited.",
+      });
+
+      yield* Queue.fail(queue, error);
+      assert.deepEqual(yield* Stream.runDrain(subscription.events).pipe(Effect.flip), error);
+      yield* TestClock.adjust(1);
+
+      assert.deepStrictEqual(yield* toolCalls, {
+        cutOff: "interrupted",
+        finished: "completed",
+        otherSession: "running",
+        replacement: "running",
+      });
+      const update = yield* eventSink.stream({ threadId, afterSequence }).pipe(
+        Stream.filter(
+          ({ event }) =>
+            event.type === "turn-item.updated" && event.payload.id === seededToolCalls.cutOff.id,
+        ),
+        Stream.runHead,
+      );
+      const { event } = Option.getOrThrow(update);
+      assert.equal(event.type === "turn-item.updated" && event.payload.status, "interrupted");
+    }).pipe(
+      Effect.provide(
+        layerTest({ state, idleTimeoutMs: 60_000, backgroundTasksEndWithProcess: false }),
+      ),
+    );
+  }),
 );
 
 // regression: #19355 settled and idle-released threads stayed Waiting
