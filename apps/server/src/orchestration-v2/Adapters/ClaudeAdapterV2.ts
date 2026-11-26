@@ -11601,11 +11601,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             }
             // Only root work answers this request; older background agents can still send frames.
             if (
-              ((message.type === "assistant" || message.type === "stream_event") &&
+              context.requestTimeout !== undefined &&
+              (((message.type === "assistant" || message.type === "stream_event") &&
                 message.parent_tool_use_id === null) ||
-              (message.type === "system" &&
-                message.subtype === "task_started" &&
-                (message.spawn_depth ?? 1) <= 1)
+                (message.type === "system" &&
+                  message.subtype === "task_started" &&
+                  (message.spawn_depth ?? 1) <= 1))
             ) {
               yield* cancelTurnTimeout(context, "requestTimeout");
             }

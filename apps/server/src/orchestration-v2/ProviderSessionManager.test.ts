@@ -433,7 +433,7 @@ const makeNativeChildFixture = Effect.fnUntraced(function* () {
     modelSelection,
     runtimePolicy,
   });
-  return { manager, parent, resumeChild };
+  return { manager, parent, resumeChild, childProviderThread };
 });
 
 function unimplemented(detail: string) {
@@ -3320,6 +3320,73 @@ it.effect("ProviderSessionManagerV2 ends open tool calls when the provider proce
       ),
     );
   }),
+);
+
+it.effect(
+  "ProviderSessionManagerV2 ends tool calls on native child threads after process exit",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      yield* Effect.gen(function* () {
+        const { manager, parent, childProviderThread } = yield* makeNativeChildFixture();
+        const threadId = childProviderThread.appThreadId!;
+        const now = yield* DateTime.now;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const eventSink = yield* EventSink.EventSinkV2;
+        const childCall = {
+          id: TurnItemId.make("native-child-tool-call"),
+          threadId,
+          runId: null,
+          nodeId: null,
+          providerThreadId: childProviderThread.id,
+          providerTurnId: null,
+          nativeItemRef: null,
+          parentItemId: null,
+          ordinal: 1,
+          type: "dynamic_tool",
+          toolName: "native-child-tool",
+          input: {},
+          title: null,
+          status: "running",
+          startedAt: now,
+          completedAt: null,
+          updatedAt: now,
+        } satisfies OrchestrationV2TurnItem;
+        yield* eventSink.write({
+          events: [
+            {
+              id: yield* idAllocator.allocate.event({ threadId }),
+              type: "turn-item.updated",
+              threadId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: childCall,
+            },
+          ],
+        });
+        const runtime = Option.getOrThrow(yield* manager.get(parent.providerSessionId));
+        const subscription = yield* runtime.subscribeEvents!;
+        const queue = (yield* Ref.get(state)).eventQueues.get(String(parent.providerSessionId))!;
+        yield* Queue.fail(
+          queue,
+          new ProviderAdapter.ProviderAdapterEventStreamError({
+            driver: CODEX_DRIVER,
+            providerSessionId: parent.providerSessionId,
+            cause: "Provider process exited.",
+          }),
+        );
+        yield* Stream.runDrain(subscription.events).pipe(Effect.flip);
+        yield* TestClock.adjust(1);
+
+        const store = yield* ProjectionStore.ProjectionStoreV2;
+        const { turnItems } = yield* store.getThreadRecords(threadId, ["turnItems"]);
+        assert.equal(turnItems.find((item) => item.id === childCall.id)?.status, "interrupted");
+      }).pipe(
+        Effect.provide(
+          layerTest({ state, idleTimeoutMs: 60_000, backgroundTasksEndWithProcess: false }),
+        ),
+      );
+    }),
 );
 
 // regression: #19355 settled and idle-released threads stayed Waiting

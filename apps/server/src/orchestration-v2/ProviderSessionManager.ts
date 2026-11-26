@@ -999,14 +999,27 @@ export const layerWithOptions = (
           }
           const providerSessionId = input.entry.runtime.providerSessionId;
           const released = [];
-          for (const threadId of releasedThreadIds(input)) {
-            const projection = yield* projectionStore.getThreadRecords(threadId, [
-              "providerThreads",
-            ]);
-            for (const providerThread of projection.providerThreads) {
+          const threadIds = releasedThreadIds(input);
+          const seen = new Set<ProviderThreadId>();
+          for (const threadId of threadIds) {
+            const { providerThreads } = yield* projectionStore
+              .getThreadRecords(threadId, ["providerThreads"])
+              .pipe(
+                Effect.catchTags({
+                  ProjectionStoreThreadNotFoundError: () => Effect.succeed({ providerThreads: [] }),
+                }),
+              );
+            for (const providerThread of providerThreads) {
               if (providerThread.providerSessionId !== providerSessionId) continue;
+              const ownerThreadId =
+                input.runtimeFailed === true ? (providerThread.appThreadId ?? threadId) : threadId;
+              if (input.runtimeFailed === true) {
+                if (seen.has(providerThread.id)) continue;
+                seen.add(providerThread.id);
+                threadIds.add(ownerThreadId);
+              }
               released.push({
-                threadId,
+                threadId: ownerThreadId,
                 providerSessionId,
                 providerThreadId: providerThread.id,
                 driver: providerThread.driver,
@@ -1344,21 +1357,33 @@ export const layerWithOptions = (
                     input.detachedThreadId === undefined
                       ? {}
                       : { detachedThreadId: input.detachedThreadId };
-                  const releasedProviderThreads = yield* readReleasedProviderThreads({
+                  const readReleasedThreads = readReleasedProviderThreads({
                     entry,
                     reason: input.reason,
                     runtimeFailed: input.runtimeFailed === true,
                     ...detachedThread,
                   });
+                  const releasedProviderThreads = yield* readReleasedThreads;
                   if (input.cancelIdleFiber !== false) {
                     yield* cancelIdleFiber(entry.idleFiber);
                   }
-                  // Queued events can persist tool calls after the release-time scan.
-                  const afterDrain = Effect.forEach(
-                    releasedProviderThreads,
-                    (thread) => writeReleasedToolCallEvents(thread, releasedAt),
-                    { discard: true },
-                  ).pipe(logReleaseFailure(input.providerSessionId));
+                  // Queued events can persist calls and create native child threads after the scan.
+                  const afterDrain = (
+                    input.runtimeFailed === true
+                      ? readReleasedThreads
+                      : Effect.succeed(releasedProviderThreads)
+                  ).pipe(
+                    Effect.flatMap((threads) =>
+                      Effect.forEach(
+                        threads,
+                        (thread) => writeReleasedToolCallEvents(thread, releasedAt),
+                        {
+                          discard: true,
+                        },
+                      ),
+                    ),
+                    logReleaseFailure(input.providerSessionId),
+                  );
                   let subscriberCount = 0;
                   if (input.gracefulSubscribers === true) {
                     subscriberCount = yield* endSubscribers(entry, afterDrain);
