@@ -321,7 +321,7 @@ export function describeVersionControlError(
     case "VcsCheckpointStorageError":
       return {
         ...base,
-        nextStep: "无法写入检查点对象，请检查仓库的 .git 目录可用且可写，然后重试。",
+        nextStep: "无法写入文件快照的对象，请检查仓库的 .git 目录可用且可写，然后重试。",
       };
     case "VcsRepositoryDetectionError":
       return { ...base, nextStep: "请确认目录存在，并且版本控制工具可以读取。" };
