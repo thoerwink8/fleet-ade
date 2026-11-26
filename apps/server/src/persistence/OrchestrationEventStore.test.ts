@@ -20,6 +20,7 @@ import * as Fiber from "effect/Fiber";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Scheduler from "effect/Scheduler";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Statement from "effect/sql/Statement";
@@ -756,19 +757,49 @@ layer("OrchestrationEventStore", (it) => {
             ? store.readAgentEvents({ threadId, afterSequence: baseline })
             : store.readApplicationEvents({ afterSequence: baseline, throughSequence });
         // rechunk(1) makes every pull consume exactly one row, so 499 pulls leave
-        // the last row of the first page inside the read-ahead buffer.
-        const pull = yield* Stream.toPull(
-          replay.pipe(
-            Stream.provideService(Statement.CurrentTransformer, countPages),
-            Stream.rechunk(1),
-          ),
+        // one row of the first page inside the read-ahead buffer. The consumer
+        // runs on a scheduler the test drains by hand, so the read-ahead
+        // question is decidable in one pass.
+        const pending = new Set<() => void>();
+        const scheduler = new Scheduler.MixedScheduler("async", (run) => {
+          pending.add(run);
+          return () => {
+            pending.delete(run);
+          };
+        });
+        const consumerPaused = yield* Deferred.make<void>();
+        const releaseConsumer = yield* Deferred.make<void>();
+        const drain = Effect.sync(() => {
+          for (const run of pending) {
+            pending.delete(run);
+            run();
+          }
+        });
+        const consumer = yield* Effect.gen(function* () {
+          const pull = yield* Stream.toPull(
+            replay.pipe(
+              Stream.provideService(Statement.CurrentTransformer, countPages),
+              Stream.rechunk(1),
+            ),
+          );
+          for (let rows = 0; rows < 499; rows += 1) {
+            yield* pull;
+          }
+          yield* Deferred.succeed(consumerPaused, undefined);
+          yield* Deferred.await(releaseConsumer);
+        }).pipe(
+          Effect.scoped,
+          Effect.provideService(Scheduler.Scheduler, scheduler),
+          Effect.forkChild({ startImmediately: true }),
         );
-        for (let rows = 0; rows < 499; rows += 1) {
-          yield* pull;
-        }
-        // Without read-ahead the second page query only runs once the consumer
-        // finishes the first page, so this Deferred never completes.
-        yield* Deferred.await(secondPageQueryStarted);
+        yield* drain;
+        const paused = yield* Deferred.isDone(consumerPaused);
+        const prefetched = yield* Deferred.isDone(secondPageQueryStarted);
+        yield* Deferred.succeed(releaseConsumer, undefined);
+        yield* drain;
+        assert.isTrue(paused, "consumer pulled 499 rows and paused");
+        assert.isTrue(prefetched, "second query started while the first page still had a row");
+        yield* Fiber.join(consumer);
       }),
   );
 });
