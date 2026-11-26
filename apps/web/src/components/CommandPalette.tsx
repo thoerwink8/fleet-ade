@@ -1308,16 +1308,6 @@ function OpenCommandPaletteDialog(props: {
   };
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
-  actionItems.push({
-    kind: "action",
-    value: "action:toggle-sidebar",
-    searchTerms: ["sidebar", "toggle sidebar", "panel"],
-    title: "切换主侧栏",
-    icon: <PanelLeftIcon className={ITEM_ICON_CLASS} />,
-    shortcutCommand: "sidebar.toggle",
-    run: () => dispatchMenuAction("sidebar.toggle"),
-  });
-
   if (projects.length > 0) {
     const activeProjectTitle =
       projectPickerEntries.find((entry) => entry.isPreferred)?.group.displayName ??
@@ -1371,6 +1361,17 @@ function OpenCommandPaletteDialog(props: {
       run: () => startScratchThread(scratchTargetEnvironmentId),
     });
   }
+  actionItems.push({
+    kind: "action",
+    value: "action:toggle-sidebar",
+    searchTerms: ["sidebar", "toggle sidebar", "panel"],
+    title: "切换主侧栏",
+    icon: <PanelLeftIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "sidebar.toggle",
+    run: async () => {
+      dispatchMenuAction("sidebar.toggle");
+    },
+  });
 
   if (activeThreadKey !== null && supportsThreadFind) {
     actionItems.push({
