@@ -269,6 +269,21 @@ describe("ServerLoggerLive", () => {
       assert.notInclude(settlementOutput, "SQLITE-MARKER");
       assert.include(settlementOutput, "Error");
       assert.include(settlementOutput, "provider-session:test");
+      // Same chain as ProviderSessionManager's release-work read failure: the tagged
+      // projection error wraps the inner exception its message must never reach logs.
+      const projectionInner = new Error("R4-PROJECTION-READ-MARKER projection decode failed");
+      const projectionFailure = {
+        _tag: "ProjectionStoreReadError",
+        threadId: "thread:test",
+        cause: projectionInner,
+      };
+      const readOutput = yield* printThroughConsole({
+        providerSessionId: "provider-session:test",
+        errorTypes: loggableErrorTypes(projectionFailure),
+      });
+      assert.notInclude(readOutput, "R4-PROJECTION-READ-MARKER");
+      assert.include(readOutput, "ProjectionStoreReadError");
+      assert.include(readOutput, "provider-session:test");
     }),
   );
 

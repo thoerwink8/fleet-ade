@@ -1588,7 +1588,7 @@ export const layerWithOptions = (
                         "orchestration-v2.provider-session-release-work-read-failed",
                         {
                           providerSessionId: input.providerSessionId,
-                          cause,
+                          errorTypes: SharedObservability.loggableErrorTypes(cause),
                         },
                       ).pipe(Effect.as([])),
                     ),

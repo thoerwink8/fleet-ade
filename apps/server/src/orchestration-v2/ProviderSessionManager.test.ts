@@ -1,4 +1,5 @@
 import * as NetAddress from "effect/net/NetAddress";
+import * as NodeUtil from "node:util";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
@@ -33,6 +34,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
@@ -185,6 +187,29 @@ const layerBeforeUnchangedWriteEventSink = (
       });
     }),
   ).pipe(Layer.provide(layerTestEventSink));
+
+// Fails runtime recovery projection reads with the armed error, then delegates.
+const layerFlakyRecoveryReadProjection = (
+  flaky: Ref.Ref<Option.Option<ProjectionStore.ProjectionStoreReadError>>,
+) =>
+  Layer.effect(
+    ProjectionStore.ProjectionStoreV2,
+    Effect.gen(function* () {
+      const delegate = yield* ProjectionStore.ProjectionStoreV2;
+      return ProjectionStore.ProjectionStoreV2.of({
+        ...delegate,
+        getRuntimeRecoveryProjection: (threadId) =>
+          Ref.getAndSet(flaky, Option.none()).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => delegate.getRuntimeRecoveryProjection(threadId),
+                onSome: (error) => Effect.fail(error),
+              }),
+            ),
+          ),
+      });
+    }),
+  ).pipe(Layer.provide(layerTestStores));
 
 const CodexCapabilities: OrchestrationV2ProviderCapabilities = CodexProviderCapabilitiesV2;
 const ExclusiveCapabilities: OrchestrationV2ProviderCapabilities = {
@@ -641,6 +666,7 @@ function layerTest(input: {
   readonly pauseAttachWrite?: Parameters<typeof layerPausingAttachEventSink>[0];
   readonly beforeUnchangedWrite?: Ref.Ref<Effect.Effect<void>>;
   readonly beforeTurnItemsWrite?: Ref.Ref<ReadonlyArray<Effect.Effect<void>>>;
+  readonly flakyRecoveryRead?: Ref.Ref<Option.Option<ProjectionStore.ProjectionStoreReadError>>;
   readonly pauseResolve?: {
     readonly armed: Ref.Ref<boolean>;
     readonly paused: Deferred.Deferred<void>;
@@ -711,6 +737,13 @@ function layerTest(input: {
     input.pauseResolve === undefined
       ? layerTestMcpRegistry
       : layerPausingMcpRegistry(input.pauseResolve);
+  const layerStores =
+    input.flakyRecoveryRead === undefined
+      ? layerTestStores
+      : Layer.merge(
+          EventStore.layer.pipe(Layer.provide(layerTestDatabase)),
+          layerFlakyRecoveryReadProjection(input.flakyRecoveryRead),
+        );
   const layerProviderEventIngestorTest = ProviderEventIngestor.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -719,7 +752,7 @@ function layerTest(input: {
         }),
         layerConfiguredEventSink,
         IdAllocator.layer,
-        layerTestStores,
+        layerStores,
         ThreadCommandExecutor.layer,
         Layer.mock(GitVcsDriver.GitVcsDriver)({
           resolveBranchName: () => Effect.succeed(null),
@@ -728,7 +761,7 @@ function layerTest(input: {
     ),
   );
   return Layer.mergeAll(
-    layerTestStores,
+    layerStores,
     layerConfiguredEventSink,
     IdAllocator.layer,
     layerConfiguredMcpRegistry,
@@ -741,13 +774,13 @@ function layerTest(input: {
         Layer.mergeAll(
           layerRegistry.pipe(Layer.provideMerge(McpProviderSessions.layer)),
           CommandOutputHub.layer.pipe(
-            Layer.provide(Layer.merge(layerConfiguredEventSink, layerTestStores)),
+            Layer.provide(Layer.merge(layerConfiguredEventSink, layerStores)),
           ),
           layerConfiguredEventSink,
           IdAllocator.layer,
           layerProviderEventIngestorTest,
           layerConfiguredMcpRegistry,
-          layerTestStores,
+          layerStores,
           input.installationGateLayer ?? ProviderInstallationGate.layer,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
         ),
@@ -3611,6 +3644,88 @@ it.effect(
         ),
       );
     }),
+);
+
+// regression: release-work read failures log session id and error type chain only;
+// projection causes can carry SQL detail and provider output in their messages.
+it.effect("ProviderSessionManagerV2 keeps projection read exception text out of release logs", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const flakyRecoveryRead = yield* Ref.make<
+      Option.Option<ProjectionStore.ProjectionStoreReadError>
+    >(Option.none());
+    const warnings: Array<{ readonly entry: string; readonly annotations: unknown }> = [];
+    const captureWarnings = Logger.make<unknown, void>(({ logLevel, message }) => {
+      if (logLevel === "Warn") {
+        const parts = message as ReadonlyArray<unknown>;
+        warnings.push({ entry: String(parts[0]), annotations: parts[1] });
+      }
+    });
+    yield* Effect.gen(function* () {
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const { threadId, providerSessionId, toolCalls } = yield* openSessionWithBackgroundCommand(
+        "provider-session-manager-read-failure",
+        false,
+      );
+      const runtime = Option.getOrThrow(yield* manager.get(providerSessionId));
+      const subscription = yield* runtime.subscribeEvents!;
+      const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId))!;
+      const consumer = yield* subscription.events.pipe(
+        Stream.runDrain,
+        Effect.ensuring(subscription.close),
+        Effect.flip,
+        Effect.forkScoped,
+      );
+      const error = new ProviderAdapter.ProviderAdapterEventStreamError({
+        driver: CODEX_DRIVER,
+        providerSessionId,
+        cause: "Provider process exited.",
+      });
+      yield* Ref.set(
+        flakyRecoveryRead,
+        Option.some(
+          new ProjectionStore.ProjectionStoreReadError({
+            threadId,
+            cause: new Error("R4-PROJECTION-READ-MARKER projection decode failed"),
+          }),
+        ),
+      );
+
+      yield* Queue.fail(queue, error);
+      // Failing the subscribers runs after the release read and its warning log.
+      assert.deepEqual(yield* Fiber.join(consumer), error);
+
+      const captured = warnings.filter(
+        (warning) => warning.entry === "orchestration-v2.provider-session-release-work-read-failed",
+      );
+      assert.lengthOf(captured, 1);
+      const warning = captured[0]!;
+      assert.isObject(warning.annotations);
+      const annotations = warning.annotations as Record<string, unknown>;
+      assert.equal(annotations.providerSessionId, providerSessionId);
+      assert.isArray(annotations.errorTypes);
+      assert.include(
+        (annotations.errorTypes as Array<string>).join(";"),
+        "ProjectionStoreReadError",
+      );
+      assert.notProperty(annotations, "cause");
+      assert.notInclude(NodeUtil.inspect(warning), "R4-PROJECTION-READ-MARKER");
+      // The forfeit: settlement writes nothing when the recovery read fails.
+      assert.equal((yield* toolCalls).cutOff, "running");
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            backgroundTasksEndWithProcess: false,
+            flakyRecoveryRead,
+          }),
+          Logger.layer([captureWarnings], { mergeWithExisting: false }),
+        ),
+      ),
+    );
+  }),
 );
 
 it.effect("ProviderSessionManagerV2 ends native background subagents after process exit", () =>
