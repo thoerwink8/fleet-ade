@@ -1660,7 +1660,7 @@ it("grades thread links as chat renders them: exact targets, plain mentions, no 
       plainText: ["Settings sync audit", "#123"],
     },
   };
-  const grade = (text) =>
+  const grade = (text: string) =>
     gradeSample(expect, { calls: [], text, finalText: text, stopReason: "end_turn" })
       .filter((c) => !c.pass)
       .map((c) => c.check);
