@@ -19,6 +19,7 @@ import {
   legacyThreadPullRequestKey,
 } from "../sourceControl/threadPullRequests.ts";
 import {
+  EnvironmentId,
   ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE,
   type ChatAttachment,
   CommandId,
@@ -81,6 +82,8 @@ import {
   TurnItemId,
   TrimmedNonEmptyString,
 } from "@t3tools/contracts";
+import { formatThreadLink } from "@t3tools/shared/threadLinks";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveDispatchAssignment, resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
@@ -996,12 +999,32 @@ const DELEGATED_RESULT_INLINE_BYTES = 16_000;
 function delegatedCompletionWakeDetail(
   taskIds: ReadonlyArray<string>,
   tasks: ReadonlyArray<OrchestrationV2Subagent>,
+  environmentId: EnvironmentId,
 ): string {
   let remainingBytes = DELEGATED_RESULT_INLINE_BYTES;
+  // The thread identity the client opens is environment and thread id together.
+  const linkedThreads = new Set<string>();
+  const threadMention = (task: OrchestrationV2Subagent): string | null => {
+    // A remote child names its own environment; a child thread here names this server's.
+    const ref =
+      task.remoteChild !== undefined
+        ? { environmentId: task.remoteChild.environmentId, threadId: task.remoteChild.threadId }
+        : task.childThreadId !== null
+          ? { environmentId, threadId: task.childThreadId }
+          : null;
+    if (ref === null) return null;
+    const identity = JSON.stringify([ref.environmentId, ref.threadId]);
+    if (linkedThreads.has(identity)) return null;
+    linkedThreads.add(identity);
+    const label = (task.remoteChild?.title ?? task.title)?.trim() || undefined;
+    return formatThreadLink(ref, label);
+  };
   return taskIds
     .map((taskId) => {
       const task = tasks.find((candidate) => candidate.id === taskId);
-      const label = `Delegated task ${taskId}${task?.title == null ? "" : ` (${task.title})`}${task === undefined ? " reached a terminal state" : ` [${task.status}]`}`;
+      const mention = task === undefined ? null : threadMention(task);
+      const parenthetical = mention ?? (task?.title?.trim() || null);
+      const label = `Delegated task ${taskId}${parenthetical === null ? "" : ` (${parenthetical})`}${task === undefined ? " reached a terminal state" : ` [${task.status}]`}`;
       if (task?.result != null) {
         const detail = `${label}:\n${task.result}`;
         const bytes = Buffer.byteLength(detail);
@@ -1607,6 +1630,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const projects = yield* ProjectStore.ProjectStoreV2;
   const projectionStore = yield* ProjectionStoreV2;
   const effectOutbox = yield* EffectOutbox.EffectOutboxV2;
+  const hereEnvironmentId = yield* ServerEnvironment.ServerEnvironmentIdentity.pipe(
+    Effect.flatMap((identity) => identity.getEnvironmentId),
+  );
   const nextTurnItemOrdinal = (
     projection: Pick<OrchestrationV2ThreadProjection, "thread"> &
       Partial<Pick<OrchestrationV2ThreadProjection, "turnItems">>,
@@ -3612,7 +3638,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           occurredAt: now,
           payload: {
             ...message,
-            text: delegatedCompletionWakeDetail(remainingTaskIds, remainingTasks),
+            text: delegatedCompletionWakeDetail(
+              remainingTaskIds,
+              remainingTasks,
+              hereEnvironmentId,
+            ),
             delegatedCompletion: {
               parentRunId: parentRun.id,
               generation: delivery.generation,
@@ -7112,7 +7142,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const dispatchText =
       delegatedCompletion === undefined
         ? command.text
-        : delegatedCompletionWakeDetail(delegatedCompletion.taskIds, projection.subagents);
+        : delegatedCompletionWakeDetail(
+            delegatedCompletion.taskIds,
+            projection.subagents,
+            hereEnvironmentId,
+          );
     const sourcePlanProjection =
       command.sourcePlanRef === undefined
         ? null
@@ -14380,6 +14414,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                     input.parentProjection.subagents.map((task) =>
                       task.id === input.updatedTask.id ? input.updatedTask : task,
                     ),
+                    hereEnvironmentId,
                   ),
                   delegatedCompletion: {
                     parentRunId: input.parentRun.id,
@@ -17076,6 +17111,7 @@ export const layer: Layer.Layer<
   | ProjectionStoreV2
   | RuntimePolicyV2
   | SecureRandom.SecureRandom
+  | ServerEnvironment.ServerEnvironmentIdentity
   | ServerSettings.ServerSettingsService
   | ThreadForkServiceV2
 > = Layer.effect(OrchestratorV2, makeOrchestrator()).pipe(

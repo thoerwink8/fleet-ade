@@ -11,6 +11,15 @@ import { filesystemEnvironment } from "../state/filesystem";
 import { useRightPanelStore } from "../rightPanelStore";
 import { remarkEnableOrderedListNumbers } from "@t3tools/shared/markdownPipeline";
 import { setMarkdownTaskChecked } from "@t3tools/shared/markdownTaskList";
+import { formatThreadLink } from "@t3tools/shared/threadLinks";
+
+const threadLinkRenders = vi.hoisted(() => [] as Array<{ label: string | null }>);
+vi.mock(import("./chat/MarkdownThreadLink"), () => ({
+  MarkdownThreadLink: (props: { label: string | null }) => {
+    threadLinkRenders.push({ label: props.label });
+    return <span data-thread-chip>{props.label ?? "会话"}</span>;
+  },
+}));
 
 const { workspaceSearch, filesystemMetadata } = vi.hoisted(() => ({
   workspaceSearch: vi.fn(),
@@ -147,6 +156,7 @@ it("keeps compact audio playback loaded across signed URL renewals", async () =>
 function setup() {
   appearance.value = "light";
   parsedSources.length = 0;
+  threadLinkRenders.length = 0;
   settingsOverrides.mathRenderingEnabled = false;
   renderDiagram.mockReset();
   workspaceSearch.mockReset().mockResolvedValue(AsyncResult.success({ entries: [] }));
@@ -193,6 +203,25 @@ it("keeps decimal markers in nested user lists while documents keep their counte
   expect(
     [...preview!.querySelectorAll("ol")].map((list) => getComputedStyle(list).listStyleType),
   ).toEqual(["decimal", "lower-alpha", "lower-roman"]);
+});
+
+it("renders a delegated-completion wake's thread links as thread chips", async () => {
+  setup();
+  const environmentId = EnvironmentId.make("environment");
+  const wake = [
+    `Delegated task node:parser (${formatThreadLink({ environmentId, threadId: ThreadId.make("thread-parser") }, "Fix parser crash")}) [completed]:`,
+    "The crash came from an empty token stream.",
+    "",
+    `Delegated task node:cart (${formatThreadLink({ environmentId, threadId: ThreadId.make("thread-cart") })}) [failed]. Use task_status with taskId node:cart to read the result.`,
+  ].join("\n");
+  await using screen = await renderText(wake, {
+    threadRef: { environmentId, threadId: ThreadId.make("thread-parent") },
+  });
+  const chips = screen.container.querySelectorAll("[data-thread-chip]");
+  expect(chips.length).toBe(2);
+  expect(threadLinkRenders).toEqual([{ label: "Fix parser crash" }, { label: null }]);
+  // The links never fall back to raw text: the href survives nowhere outside the chips.
+  expect(screen.container.textContent).not.toContain("t3-thread://");
 });
 
 it("shows unavailable audio when a workspace embed has no thread", async () => {

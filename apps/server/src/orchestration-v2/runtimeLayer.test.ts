@@ -61,6 +61,7 @@ import * as OrchestrationEventStore from "../persistence/OrchestrationEventStore
 import * as ProjectEnrichmentService from "../project/ProjectEnrichmentService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as ServerEnvironmentTestkit from "../environment/ServerEnvironment.testkit.ts";
 import * as McpSessionRegistryTestkit from "../mcp/McpSessionRegistry.testkit.ts";
 import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.ts";
 import type { ProviderInstance } from "@t3tools/provider-core/server/driver";
@@ -351,6 +352,7 @@ const layerTest = Layer.mergeAll(
   Layer.provide(layerCheckpointStoreTest),
   Layer.provide(layerServerConfig),
   Layer.provideMerge(ServerSettings.layerTest()),
+  Layer.provide(ServerEnvironmentTestkit.layerTestIdentity("environment-runtime-layer")),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerGitWorkflowTest),
   Layer.provide(layerProjectServiceTest),
@@ -364,6 +366,7 @@ const layerLegacyImportTest = Layer.merge(RuntimeLayer.layer, layerProjectionRep
   Layer.provide(layerCheckpointStoreTest),
   Layer.provide(layerServerConfig),
   Layer.provide(ServerSettings.layerTest()),
+  Layer.provide(ServerEnvironmentTestkit.layerTestIdentity("environment-runtime-layer")),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerGitWorkflowTest),
   Layer.provide(layerProjectServiceTest),
@@ -435,6 +438,7 @@ const layerProjectDeletionTest = Layer.mergeAll(
   Layer.provide(layerCheckpointStoreTest),
   Layer.provide(layerServerConfig),
   Layer.provide(ServerSettings.layerTest()),
+  Layer.provide(ServerEnvironmentTestkit.layerTestIdentity("environment-runtime-layer")),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerGitWorkflowTest),
   Layer.provide(layerPlatformTest),
@@ -935,6 +939,7 @@ const layerSharedApplicationDataPlaneTest = Layer.mergeAll(
   Layer.provide(layerCheckpointStoreTest),
   Layer.provide(layerServerConfig),
   Layer.provide(ServerSettings.layerTest()),
+  Layer.provide(ServerEnvironmentTestkit.layerTestIdentity("environment-runtime-layer")),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerGitWorkflowTest),
   Layer.provide(layerPlatformTest),
@@ -11356,6 +11361,7 @@ const layerQueueResumeDisabledInstanceTest = Layer.mergeAll(
       },
     }),
   ),
+  Layer.provide(ServerEnvironmentTestkit.layerTestIdentity("environment-runtime-layer")),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerGitWorkflowTest),
   Layer.provide(layerProjectServiceTest),

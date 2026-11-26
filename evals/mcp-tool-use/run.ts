@@ -44,6 +44,7 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
+import { scanChatMarkdown } from "@t3tools/shared/markdownPipeline";
 import { formatThreadLink } from "@t3tools/shared/threadLinks";
 import { buildCodexAdditionalContext } from "../../apps/server/src/provider/CodexDeveloperInstructions.ts";
 import { makeSideChatContext } from "../../apps/server/src/orchestration-v2/ContextHandoffService.ts";
@@ -67,6 +68,7 @@ import { proxyConfig } from "../shared/proxy.ts";
 import { changeRequestsCreatedBy } from "../../apps/server/src/orchestration-v2/PullRequestSyncReactor.ts";
 import { type BackgroundWait, makeBackgroundWait } from "./backgroundWait.ts";
 import { FileLinksExpect, gradeFileLinks } from "./file-link-grading.ts";
+import { ThreadLinksExpect, gradeThreadLinks } from "./thread-link-grading.ts";
 import {
   argvForm,
   gradeSecret,
@@ -199,6 +201,11 @@ const McpToolUseExpect = Schema.Struct({
   textMustNot: Schema.optional(Schema.Array(Schema.String)),
   /** Case-sensitive regexes on the final answer: the last response's text, once the turn ended. */
   finalTextMust: Schema.optional(Schema.Array(Schema.String)),
+  /**
+   * Case-sensitive regexes on the final answer's rendered visible text, as chat renders it:
+   * HTML comments and link targets count for nothing; inline and fenced code is visible.
+   */
+  visibleTextMust: Schema.optional(Schema.Array(Schema.String)),
   /** Each entry matches a PR URL linked at the end, as `args` values match. */
   linked: Schema.optional(Schema.Array(Schema.String)),
   /** The PR numbers linked at the end, exactly. */
@@ -210,6 +217,11 @@ const McpToolUseExpect = Schema.Struct({
   secret: Schema.optional(SecretExpect),
   /** File pills in the final answer resolve against the thread cwd to `world.files` entries. */
   fileLinks: Schema.optional(FileLinksExpect),
+  /**
+   * Thread links in the final answer, graded as chat renders them: `linked` hrefs clickable
+   * outside code, `plainText` mentions never a link's label, and no invented thread target.
+   */
+  threadLinks: Schema.optional(ThreadLinksExpect),
 });
 
 /**
@@ -1766,6 +1778,12 @@ export const gradeSample = (
   for (const p of expect.textMustNot ?? []) add(`textMustNot /${p}/`, !test(p, run.text));
   for (const p of expect.finalTextMust ?? [])
     add(`finalTextMust /${p}/`, run.stopReason === "end_turn" && test(p, run.finalText ?? ""));
+  const visibleText =
+    expect.visibleTextMust === undefined || run.stopReason !== "end_turn"
+      ? ""
+      : scanChatMarkdown(run.finalText ?? "").visibleText;
+  for (const p of expect.visibleTextMust ?? [])
+    add(`visibleTextMust /${p}/`, run.stopReason === "end_turn" && test(p, visibleText));
   const isLinked = (url: string) => (run.linked ?? []).some((at) => matches(url, at));
   for (const url of expect.linked ?? []) add(`linked ${url}`, isLinked(url));
   if (expect.linkedNumbers !== undefined) {
@@ -1779,6 +1797,12 @@ export const gradeSample = (
       run.stopReason === "end_turn" ? run.finalText : undefined,
       run.cwd,
       worldFiles,
+    ),
+  );
+  checks.push(
+    ...gradeThreadLinks(
+      expect.threadLinks,
+      run.stopReason === "end_turn" ? run.finalText : undefined,
     ),
   );
   checks.push(...gradeSecret(expect.secret, run, pasted));

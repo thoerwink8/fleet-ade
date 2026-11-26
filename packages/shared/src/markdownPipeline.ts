@@ -824,22 +824,24 @@ export function remarkAssistantInsights(this: Processor) {
   };
 }
 
-const imageSourceProcessor = unified()
+const chatMarkdownHastProcessor = unified()
   .use(remarkParse)
   .use(CHAT_MARKDOWN_REMARK_PLUGINS)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(CHAT_MARKDOWN_REHYPE_PLUGINS);
 
-interface ImageSourceNode {
+interface ChatMarkdownTreeNode {
   readonly type: string;
   readonly tagName?: string;
+  readonly value?: unknown;
   readonly properties?: {
     readonly src?: unknown;
+    readonly href?: unknown;
     readonly dataLocalSrc?: unknown;
     readonly dataDarkSrc?: unknown;
     readonly dataLightSrc?: unknown;
   };
-  readonly children?: ReadonlyArray<ImageSourceNode>;
+  readonly children?: ReadonlyArray<ChatMarkdownTreeNode>;
 }
 
 /**
@@ -848,7 +850,7 @@ interface ImageSourceNode {
  */
 export function chatMarkdownImageSources(markdown: string): Array<string> {
   const sources: Array<string> = [];
-  const visit = (node: ImageSourceNode) => {
+  const visit = (node: ChatMarkdownTreeNode) => {
     if (node.type === "element" && node.tagName === "img") {
       const { src, dataLocalSrc, dataDarkSrc, dataLightSrc } = node.properties ?? {};
       // The sanitizer drops a Windows drive path from `src`; the renderer reads it from here.
@@ -864,6 +866,52 @@ export function chatMarkdownImageSources(markdown: string): Array<string> {
     }
     node.children?.forEach(visit);
   };
-  visit(imageSourceProcessor.runSync(imageSourceProcessor.parse(markdown)) as ImageSourceNode);
+  visit(
+    chatMarkdownHastProcessor.runSync(
+      chatMarkdownHastProcessor.parse(markdown),
+    ) as ChatMarkdownTreeNode,
+  );
   return sources;
+}
+
+export interface ChatMarkdownAnchor {
+  /** The link's target as the sanitizer left it; absent when it was stripped or never set. */
+  readonly href: string | undefined;
+  /** The anchor's visible text, inline markup flattened: `[a \`b\`](x)` reads `a b`. */
+  readonly label: string;
+}
+
+export interface ScannedChatMarkdown {
+  /** The anchors the message renders clickable, in reading order. */
+  readonly anchors: ReadonlyArray<ChatMarkdownAnchor>;
+  /** Everything the reader sees, anchors flattened to their labels; comments are not rendered. */
+  readonly visibleText: string;
+}
+
+/**
+ * How chat renders a markdown message: its real anchors and visible text, parsed with the
+ * ChatMarkdown pipeline. Code spans and fences carry no anchors, comments render nothing, and
+ * reference-style links resolve, so raw-text scanning never matches what the reader gets.
+ */
+export function scanChatMarkdown(markdown: string): ScannedChatMarkdown {
+  const anchors: Array<ChatMarkdownAnchor> = [];
+  const textParts: Array<string> = [];
+  const anchorText = (node: ChatMarkdownTreeNode): string =>
+    (node.children ?? [])
+      .map((child) => (child.type === "text" ? String(child.value ?? "") : anchorText(child)))
+      .join("");
+  const visit = (node: ChatMarkdownTreeNode) => {
+    if (node.type === "text" && typeof node.value === "string") textParts.push(node.value);
+    if (node.type === "element" && node.tagName === "a") {
+      const { href } = node.properties ?? {};
+      anchors.push({ href: typeof href === "string" ? href : undefined, label: anchorText(node) });
+    }
+    node.children?.forEach(visit);
+  };
+  visit(
+    chatMarkdownHastProcessor.runSync(
+      chatMarkdownHastProcessor.parse(markdown),
+    ) as ChatMarkdownTreeNode,
+  );
+  return { anchors, visibleText: textParts.join("") };
 }

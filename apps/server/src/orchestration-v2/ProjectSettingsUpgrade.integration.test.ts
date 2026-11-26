@@ -13,6 +13,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as ServerEnvironmentTestkit from "../environment/ServerEnvironment.testkit.ts";
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 
@@ -156,6 +157,9 @@ const layerRuntime = (dbPath: string) => {
     Layer.provide(layerCheckpointStore),
     Layer.provide(layerServerConfig),
     Layer.provide(ServerSettings.layerTest()),
+    Layer.provide(
+      ServerEnvironmentTestkit.layerTestIdentity("environment-project-settings-upgrade"),
+    ),
     Layer.provide(
       Layer.succeed(ProviderInstanceRegistry.ProviderInstanceRegistry, {
         getInstance: () => Effect.undefined,

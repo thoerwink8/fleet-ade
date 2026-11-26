@@ -43,6 +43,7 @@ import * as Orchestrator from "../Orchestrator.ts";
 import * as ProjectionStore from "../ProjectionStore.ts";
 import * as ProjectStore from "../ProjectStore.ts";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
+import * as ServerEnvironmentTestkit from "../../environment/ServerEnvironment.testkit.ts";
 import * as ProviderAuthService from "../../provider/ProviderAuthService.ts";
 import * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
 import * as ProviderContinuationService from "../ProviderContinuationService.ts";
@@ -489,6 +490,7 @@ export function layerWithRegistry<Error>(
   const layerOrchestratorProvided = Orchestrator.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
+        ServerEnvironmentTestkit.layerTestIdentity("environment-provider-replay"),
         layerCheckpointServiceProvided,
         CommandPolicy.layer,
         layerContextHandoffServiceProvided,
