@@ -19,6 +19,7 @@ import {
   comparisonBase,
   defaultConcurrency,
   gitLines,
+  ignoredCheckInputs,
   judgeFilteredVitestStep,
   runSteps,
   shouldRunCssFontWeightTest,
@@ -370,16 +371,17 @@ function fixture(remotes: Record<string, "A" | "B">) {
   };
 }
 
-const compare = (root: string, ref: Option.Option<string>) =>
+const inFixture = <A, E>(effect: Effect.Effect<A, E, ChildProcessSpawner.ChildProcessSpawner>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    return yield* comparisonBase(root, ref).pipe(
+    return yield* effect.pipe(
       Effect.provideService(
         ChildProcessSpawner.ChildProcessSpawner,
         ChildProcessSpawner.make((command) => spawner.spawn(ChildProcess.setEnv(command, env))),
       ),
     );
   }).pipe(Effect.provide(NodeServices.layer), Effect.runPromise);
+const compare = (root: string, ref: Option.Option<string>) => inFixture(comparisonBase(root, ref));
 
 it.each(["upstream", "team/upstream"])(
   "compares against %s/main when the fork's origin/main lags it",
@@ -396,6 +398,111 @@ it("compares against an explicit ref instead of the closest remote main", async 
   const result = await compare(project.root, Option.some("origin/main"));
   assert.strictEqual(result.base, project.commits.A);
   assert.strictEqual(result.ref, "origin/main");
+});
+
+// The oracle is the pathspec command the input hash used before, so each scenario proves the
+// rewritten listing hashes the same ignored inputs.
+const oldIgnoredListing = (root: string) =>
+  NodeChildProcess.execFileSync(
+    "git",
+    [
+      "ls-files",
+      "-o",
+      "-i",
+      "--exclude-standard",
+      "--",
+      ":(glob)**/.generated/**",
+      ":(glob)**/.astro/**",
+      ":(glob)**/*.d.ts",
+      ":(glob)**/.env*",
+      ":(exclude,glob)**/node_modules/**",
+    ],
+    { cwd: root, encoding: "utf8", env },
+  )
+    .split("\n")
+    .filter(Boolean)
+    .sort();
+
+function ignoredFixture(setup: (write: (file: string, content?: string) => void) => void) {
+  const root = NodeFS.realpathSync(
+    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-ignored-inputs-")),
+  );
+  const write = (file: string, content = "") => {
+    const path = NodePath.join(root, file);
+    NodeFS.mkdirSync(NodePath.dirname(path), { recursive: true });
+    NodeFS.writeFileSync(path, content);
+  };
+  try {
+    setup(write);
+    NodeChildProcess.execFileSync("git", ["init"], { cwd: root, encoding: "utf8", env });
+  } catch (error) {
+    NodeFS.rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+  return {
+    root,
+    write,
+    git: (...args: Array<string>) =>
+      NodeChildProcess.execFileSync("git", args, { cwd: root, encoding: "utf8", env }),
+    [Symbol.dispose]() {
+      NodeFS.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+it("lists the same ignored inputs as the old pathspecs at the root and nested", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\ndist/\n.generated/\n.env*\n*.gen.d.ts\n");
+    write(".env.local");
+    write("src/types.gen.d.ts");
+    write("src/.generated/routes.ts");
+    write("dist/index.d.ts");
+    write("node_modules/pkg/index.d.ts");
+    write("packages/x/src/deep.gen.d.ts");
+  });
+  const old = oldIgnoredListing(project.root);
+  assert.includeMembers(old, [
+    ".env.local",
+    "dist/index.d.ts",
+    "packages/x/src/deep.gen.d.ts",
+    "src/types.gen.d.ts",
+  ]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
+});
+
+it("lists the same ignored inputs as the old pathspecs in directories replacing tracked files", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\nreplaced/\nskipped/\n");
+  });
+  const { git, write } = project;
+  write("replaced");
+  write("skipped");
+  git("init");
+  git("add", ".");
+  git("commit", "-m", "files that directories replace");
+  git("update-index", "--skip-worktree", "skipped");
+  for (const file of ["replaced", "skipped"]) {
+    NodeFS.rmSync(NodePath.join(project.root, file));
+  }
+  write("replaced/sub/a.d.ts");
+  write("skipped/a.d.ts");
+  const old = oldIgnoredListing(project.root);
+  assert.includeMembers(old, ["replaced/sub/a.d.ts", "skipped/a.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
+});
+
+it("lists the same ignored inputs as the old pathspecs in a leftover package folder", async () => {
+  using project = ignoredFixture((write) => {
+    write(".gitignore", "node_modules/\ndist/\n.generated/\n.env*\n");
+    // A package folder left behind by a branch switch: git collapses it, and its
+    // node_modules must not be walked.
+    write("old/dist/a.d.ts");
+    write("old/node_modules/pkg/index.d.ts");
+    write("old/src/index.ts");
+  });
+  const old = oldIgnoredListing(project.root);
+  assert.includeMembers(old, ["old/dist/a.d.ts"]);
+  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
 });
 
 function launcherFixture() {
