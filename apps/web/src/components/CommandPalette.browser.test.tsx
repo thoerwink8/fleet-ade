@@ -6,6 +6,7 @@ import { act, render } from "../../test/render";
 import { openCommandPalette } from "../commandPaletteBus";
 import { useCommandPaletteStore } from "../commandPaletteStore";
 import { LAST_USED_PROJECT_STORAGE_KEY } from "../hooks/useHandleNewThread";
+import { registerMenuAction } from "../shortcuts/dispatcher";
 import { removeLocalStorageItem } from "../hooks/useLocalStorage";
 import { makeThreadFixture } from "../test-fixtures";
 import type { Project, Thread } from "../types";
@@ -81,6 +82,23 @@ describe("CommandPalette open intents", () => {
     expect(onDrop).toHaveBeenCalledOnce();
     expect((onDrop.mock.calls[0]![0] as CustomEvent).detail).toEqual([{ environmentId, threadId }]);
     expect(screen.router?.state.location.pathname).toBe(pathname);
+  });
+
+  it("toggles the main sidebar from the executable command list", async () => {
+    setup();
+    await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
+    const toggleSidebar = vi.fn();
+    const unregister = registerMenuAction("sidebar.toggle", toggleSidebar);
+    try {
+      openCommandPalette({ query: "切换主侧栏" });
+      const command = page.getByRole("option", { name: /^切换主侧栏/ });
+      await expect.element(command).toBeVisible();
+      await userEvent.click(command);
+      expect(toggleSidebar).toHaveBeenCalledOnce();
+      expect(useCommandPaletteStore.getState().open).toBe(false);
+    } finally {
+      unregister();
+    }
   });
 
   it("opens New thread in... with focus in the search input, not the Back button", async () => {
