@@ -47,7 +47,7 @@ const file = Effect.gen(function* () {
   return path.join(directory, "ledger.sqlite");
 });
 
-it.effect("写锁交错的两个 handover，只有一个成功，库里只有一行", () =>
+it.effect("同一期望任期的两次 handover 只有一次成功；去掉事务时第二次会在交错写入下破坏唯一性", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const filename = yield* file;
