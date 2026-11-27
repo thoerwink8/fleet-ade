@@ -29,13 +29,10 @@ export const HandoverResult = Data.taggedEnum<HandoverResult>();
 class CoordinatorTermStorageError extends Schema.TaggedError<
   CoordinatorTermStorageError,
   { readonly brand: unique symbol }
->()(
-  "CoordinatorTermStorageError",
-  {
-    fleetId: Schema.optional(Schema.String),
-    cause: Schema.Defect(),
-  },
-) {
+>()("CoordinatorTermStorageError", {
+  fleetId: Schema.optional(Schema.String),
+  cause: Schema.Defect(),
+}) {
   override get message(): string {
     return "Coordinator term storage failed.";
   }
