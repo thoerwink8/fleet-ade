@@ -202,6 +202,16 @@ export const OrchestratorMcpDelegateTaskInput = Schema.Struct({
     }),
   ),
   interactionMode: Schema.optional(OrchestratorMcpInteractionMode),
+  avoid: Schema.optional(
+    Schema.String.annotate({
+      description: "What this child must not touch, for the drift check. Repeat it in `task`.",
+    }),
+  ),
+  testCommands: Schema.optional(
+    Schema.Array(Schema.String).annotate({
+      description: "Commands the child must run and report. Repeat them in `task` verbatim.",
+    }),
+  ),
 });
 export type OrchestratorMcpDelegateTaskInput = typeof OrchestratorMcpDelegateTaskInput.Type;
 
