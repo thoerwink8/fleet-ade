@@ -68,7 +68,7 @@ export const ChildSummaryListItem = Schema.Struct({
 });
 export type ChildSummaryListItem = typeof ChildSummaryListItem.Type;
 
-/** Hover payload. `outlook` stays null until a later phase fills it without a model call here. */
+/** Hover payload. CommandAssist fills `outlook`; null while the row is off, the call failed, or nothing ran yet. */
 export const ChildSummaryDetail = Schema.Struct({
   ...ChildSummaryListItem.fields,
   goal: Schema.String,

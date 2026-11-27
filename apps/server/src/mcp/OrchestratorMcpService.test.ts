@@ -2096,6 +2096,121 @@ describe("OrchestratorMcpService provider resolution", () => {
     }),
   );
 
+  it.effect("stores the hand-back baseline when a delegation is accepted", () =>
+    Effect.gen(function* () {
+      const task = {
+        id: taskId,
+        threadId: parentThreadId,
+        runId: parentRunId,
+        parentNodeId,
+        origin: "app_owned",
+        createdBy: "agent",
+        driver: ProviderDriverKind.make("codex"),
+        providerInstanceId: codexInstanceId,
+        providerThreadId: null,
+        childThreadId,
+        nativeTaskRef: null,
+        prompt: "Fix the parser and prove it with its tests.",
+        title: null,
+        model: "gpt-5.4",
+        status: "running",
+        result: null,
+        startedAt: null,
+        completedAt: null,
+      };
+      let delegated = false;
+      const layerDatabase = SqlitePersistence.layerMemory;
+      const settingsLayer = ServerSettings.layerTest();
+      const assistLayer = CommandAssist.layer.pipe(
+        Layer.provide(
+          Layer.succeed(CommandAssist.CommandAssistModel, { complete: () => Effect.succeed("{}") }),
+        ),
+        Layer.provide(settingsLayer),
+        Layer.provide(layerDatabase),
+      );
+      const layerDependencies = Layer.mergeAll(
+        NodeServices.layer,
+        NodeCrypto.layer,
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          hasReceipt: () => Effect.succeed(false),
+          getThreadRecords: (threadId) =>
+            Effect.succeed(
+              threadId === parentThreadId
+                ? parentProjection(delegated ? [task] : [])
+                : childProjection,
+            ),
+          isProviderInstanceEnabledForProject: () => Effect.succeed(true),
+          assertProviderInstanceEnabled: () => Effect.void,
+          dispatch: () =>
+            Effect.sync(() => {
+              delegated = true;
+            }).pipe(
+              Effect.as({
+                sequence: 1,
+                storedEvents: [
+                  {
+                    sequence: 1,
+                    commandId: null,
+                    event: { type: "subagent.updated", payload: task },
+                  },
+                ],
+              } as never),
+            ),
+        }),
+        providerRegistryLayer([
+          providerSnapshot({
+            instanceId: codexInstanceId,
+            driver: ProviderDriverKind.make("codex"),
+            model: "gpt-5.4",
+          }),
+        ]),
+        adapterRegistryLayer([codexInstanceId]),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+        settingsLayer,
+      );
+
+      yield* Effect.gen(function* () {
+        const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+        const result = yield* service.delegateTask(scope, {
+          task: "Fix the parser and prove it with its tests.",
+          avoid: "Do not touch the locking layer.",
+          testCommands: ["vp test run parser"],
+          mode: "async",
+          clientRequestId: "delegate-baseline-1",
+        });
+        assert.equal(result.status, "running");
+        const stored = yield* CommandAssist.CommandAssist.pipe(
+          Effect.flatMap((assist) => assist.read(childThreadId)),
+        );
+        assert.equal(stored.goal, "Fix the parser and prove it with its tests.");
+        assert.equal(stored.avoid, "Do not touch the locking layer.");
+        assert.deepEqual(stored.testCommands, ["vp test run parser"]);
+      }).pipe(
+        Effect.provide(
+          Layer.merge(
+            OrchestratorMcpService.layer.pipe(
+              Layer.provide(
+                Layer.merge(
+                  ChildSessionSummary.layer.pipe(
+                    Layer.provide(Layer.merge(assistLayer, layerDatabase)),
+                  ),
+                  Layer.merge(assistLayer, layerDatabase),
+                ),
+              ),
+              Layer.provide(Layer.merge(assistLayer, layerDatabase)),
+              Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
+              Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)({})),
+            ),
+            Layer.merge(assistLayer, layerDatabase),
+          ).pipe(Layer.provide(layerDependencies)),
+        ),
+      );
+    }),
+  );
+
   it.effect(
     "retrying an accepted driver-only delegation replays even after the project disables every candidate",
     () =>

@@ -622,6 +622,117 @@ it.effect("notifies the parent once when an eligible child crosses the silence l
   });
 });
 
+const assistSeeds = (child: ThreadId, parent: ThreadId, runId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* seedAssistWorkspace(child, parent);
+    yield* sql`
+      INSERT INTO orchestration_v2_projection_runs (run_id, thread_id, ordinal, provider, status, requested_at, payload_json)
+      VALUES (${runId}, ${child}, 1, ${"codex"}, ${"running"}, ${"2026-01-01T00:00:00.000Z"}, ${"{}"})
+    `;
+    yield* sql`
+      INSERT INTO orchestration_v2_projection_subagents
+        (subagent_id, thread_id, parent_node_id, provider, child_thread_id, origin, status, updated_at, payload_json)
+      VALUES (${"outlook-task"}, ${parent}, ${"node"}, ${"codex"}, ${child}, ${"app_owned"}, ${"running"}, ${"2026-01-01T00:00:00.000Z"}, ${"{}"})
+    `;
+  });
+
+// The patrol dispatch is the sync seam: it runs after observe finishes inside the
+// same forked fiber, so awaiting it means the assist state write has landed.
+const outlookStack = (complete: CommandAssist.CommandAssistModel["Service"]["complete"]) => {
+  const database = SqlitePersistence.layerMemory;
+  const settings = ServerSettingsService.layerTest({
+    commandAssist: {
+      activity: { enabled: true, modelSelection: null },
+      patrol: { enabled: true, modelSelection: null },
+    },
+  });
+  const assist = CommandAssist.layer.pipe(
+    Layer.provide(Layer.succeed(CommandAssist.CommandAssistModel, { complete })),
+    Layer.provide(settings),
+    Layer.provide(database),
+  );
+  return { database, assist };
+};
+
+it.effect("crossing the silence line writes outlook the child detail reads back", () => {
+  const { database, assist } = outlookStack(() =>
+    Effect.succeed(
+      JSON.stringify({ activity: "在改 parser.ts", outlook: "会改 parser.ts，加 3 行" }),
+    ),
+  );
+  return Effect.gen(function* () {
+    const delivered = yield* Deferred.make<Orchestrator.OrchestratorV2DispatchResult>();
+    const engine = Layer.mock(Orchestrator.OrchestratorV2)({
+      dispatch: () =>
+        Deferred.succeed(delivered, { sequence: 1, storedEvents: [] }).pipe(
+          Effect.as({ sequence: 1, storedEvents: [] }),
+        ),
+    });
+    const services = Layer.mergeAll(assist, database, engine);
+    yield* Effect.gen(function* () {
+      const internal = yield* ChildSessionSummaryInternal;
+      const summary = yield* ChildSessionSummary;
+      const parent = ThreadId.make("thread:outlook-e2e-parent");
+      const child = ThreadId.make("thread:outlook-e2e-child");
+      yield* assistSeeds(child, parent, "outlook-run");
+      yield* internal.note(factsFor(child, parent, 0));
+      yield* TestClock.adjust("4 minutes");
+      yield* internal.markIdle();
+      yield* Deferred.await(delivered);
+      const detail = yield* summary.detail({ threadId: child });
+      assert.ok(detail !== null);
+      assert.strictEqual(detail.outlook, "会改 parser.ts，加 3 行");
+    }).pipe(
+      Effect.provide(
+        Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(services)), services),
+      ),
+    );
+  });
+});
+
+it.effect("a failed assist leaves outlook null and the child row untouched", () => {
+  const { database, assist } = outlookStack(() => Effect.fail({ reason: "调用失败" }));
+  return Effect.gen(function* () {
+    const delivered = yield* Deferred.make<Orchestrator.OrchestratorV2DispatchResult>();
+    const engine = Layer.mock(Orchestrator.OrchestratorV2)({
+      dispatch: () =>
+        Deferred.succeed(delivered, { sequence: 1, storedEvents: [] }).pipe(
+          Effect.as({ sequence: 1, storedEvents: [] }),
+        ),
+    });
+    const services = Layer.mergeAll(assist, database, engine);
+    yield* Effect.gen(function* () {
+      const internal = yield* ChildSessionSummaryInternal;
+      const summary = yield* ChildSessionSummary;
+      const parent = ThreadId.make("thread:outlook-fail-parent");
+      const sql = yield* SqlClient.SqlClient;
+      const child = ThreadId.make("thread:outlook-fail-child");
+      yield* assistSeeds(child, parent, "outlook-fail-run");
+      yield* internal.note(factsFor(child, parent, 0));
+      yield* TestClock.adjust("4 minutes");
+      yield* internal.markIdle();
+      const before = yield* sql`
+        SELECT revision, phase, reason FROM child_session_summary WHERE thread_id = ${child}
+      `.pipe(Effect.orDie);
+      yield* Deferred.await(delivered);
+      const detail = yield* summary.detail({ threadId: child });
+      assert.ok(detail !== null);
+      assert.strictEqual(detail.outlook, null);
+      assert.strictEqual(detail.phase, "卡住");
+      assert.strictEqual(detail.reason, "没动静");
+      const after = yield* sql`
+        SELECT revision, phase, reason FROM child_session_summary WHERE thread_id = ${child}
+      `.pipe(Effect.orDie);
+      assert.deepStrictEqual(after, before);
+    }).pipe(
+      Effect.provide(
+        Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(services)), services),
+      ),
+    );
+  });
+});
+
 it.effect("detail triggers one observe with the row opened when activity is on", () => {
   const gate: { enabled: boolean; queue: Queue.Queue<boolean> | undefined } = {
     enabled: false,
