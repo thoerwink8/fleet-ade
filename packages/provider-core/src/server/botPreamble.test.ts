@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import {
+  CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES,
   botMemoryUpdateText,
   buildBotPreambleSections,
   capBotMemory,
@@ -67,23 +68,47 @@ describe("bot preamble", () => {
     assert.ok(sections.length > 1);
     assert.include(sections.join(""), soul);
     for (const section of sections) {
-      assert.ok(Buffer.byteLength(section, "utf8") <= 4_000);
+      assert.ok(Buffer.byteLength(section, "utf8") <= CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES);
       assert.equal(section.includes("\uFFFD"), false);
       assert.equal(unpairedSurrogate(section), false);
     }
     assert.ok(sections.slice(0, -1).every((section) => section.endsWith("\n")));
   });
 
-  it("keeps a character whole when it would cross the 4000-byte boundary", () => {
-    const soul = `${"a".repeat(4_000)}😀tail`;
+  it("splits an unbroken run of CJK at the byte cap", () => {
+    const soul = "中".repeat(3000);
     const sections = preamble({ soul });
+    assert.ok(sections.length > 1);
+    assert.equal(sections.join("").match(/中/g)?.length, 3000);
+    for (const section of sections) {
+      assert.ok(Buffer.byteLength(section, "utf8") <= CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES);
+      assert.equal(section.includes("\uFFFD"), false);
+      assert.equal(unpairedSurrogate(section), false);
+    }
+  });
+
+  it("keeps a heading with as much of the following body as fits", () => {
+    const soul = "中".repeat(2000);
+    const sections = preamble({ soul });
+    const first = sections[0] ?? "";
+    assert.ok(first.startsWith("## SOUL.md\n\n中"));
+    const leftover = CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES - Buffer.byteLength(first, "utf8");
+    assert.ok(leftover >= 0 && leftover < 3);
+  });
+
+  it("keeps a character whole when it would cross the 4000-byte boundary", () => {
+    const heading = "## SOUL.md\n\n";
+    const room = CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES - Buffer.byteLength(heading, "utf8");
+    const soul = `${"a".repeat(room)}😀tail`;
+    const sections = preamble({ soul });
+    assert.ok(sections[0]?.startsWith(`${heading}a`));
     const emojiAt = sections.findIndex((section) => section.includes("😀"));
     assert.ok(emojiAt > 0);
     assert.equal(sections[emojiAt]?.startsWith("😀"), true);
     assert.equal(sections[emojiAt - 1]?.includes("😀"), false);
     assert.include(sections.join(""), soul);
     for (const section of sections) {
-      assert.ok(Buffer.byteLength(section, "utf8") <= 4_000);
+      assert.ok(Buffer.byteLength(section, "utf8") <= CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES);
       assert.equal(unpairedSurrogate(section), false);
     }
   });
@@ -147,6 +172,24 @@ describe("bot preamble", () => {
     assert.include(replaced, "current text follows");
     assert.include(replaced, "- new 0");
     assert.notInclude(replaced, "Added:");
+  });
+
+  it("does not report a change on line 231 of a 250-line memory", () => {
+    const lines = Array.from({ length: 250 }, (_, index) => `- line ${index + 1}`);
+    const changed = lines.slice();
+    changed[230] = "- line 231 edited";
+    assert.equal(botMemoryUpdateText(lines.join("\n"), changed.join("\n")), "");
+  });
+
+  it("still reports an edit inside the loaded lines of a 250-line memory", () => {
+    const lines = Array.from({ length: 250 }, (_, index) => `- line ${index + 1}`);
+    const changed = lines.slice();
+    changed[0] = "- line 1 edited";
+    const update = botMemoryUpdateText(lines.join("\n"), changed.join("\n"));
+    assert.include(update, "- line 1 edited");
+    assert.include(update, "- line 1\n");
+    assert.notInclude(update, "line 201");
+    assert.notInclude(update, "line 231");
   });
 
   it("returns nothing when memory is unchanged", () => {

@@ -1,7 +1,8 @@
-// Adapted from stablyai/orca (MIT): src/main/bots/bot-preamble.ts, src/shared/bot-memory-lines.ts, src/main/bots/bot-turn-memory-update.ts.
+// Portions adapted from stablyai/orca (https://github.com/stablyai/orca), Copyright (c) 2026 Lovecast Inc., MIT License.
+// src/main/bots/bot-preamble.ts, src/shared/bot-memory-lines.ts, src/main/bots/bot-turn-memory-update.ts.
 
-/** Codex drops an additionalContext value over 1,000 tokens, counted as UTF-8 bytes / 4. */
-const SECTION_MAX_BYTES = 4_000;
+/** Codex silently truncates additionalContext values over 1,000 tokens, counted as UTF-8 bytes / 4. */
+export const CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES = 4_000;
 
 const MEMORY_LINE_CAP = 200;
 
@@ -55,6 +56,24 @@ export function quoteBotMemory(text: string): string {
   return `${MEMORY_LABEL}\n${fenced(text)}`;
 }
 
+const HEADING_LINE = /^#{1,6}(?:\s|$)/;
+
+/** Start of a trailing heading block, or null when the chunk does not end on one. */
+function trailingHeadingOffset(chunk: string): number | null {
+  let end = chunk.length;
+  while (end > 0 && chunk.charCodeAt(end - 1) === 10) end -= 1;
+  if (end === 0) return null;
+  let lineStart = chunk.lastIndexOf("\n", end - 1) + 1;
+  if (!HEADING_LINE.test(chunk.slice(lineStart, end).trim())) return null;
+  while (lineStart > 0) {
+    const prevEnd = lineStart - 1;
+    const prevStart = chunk.lastIndexOf("\n", prevEnd - 1) + 1;
+    if (!HEADING_LINE.test(chunk.slice(prevStart, prevEnd).trim())) break;
+    lineStart = prevStart;
+  }
+  return lineStart;
+}
+
 function splitUtf8(text: string, maxBytes: number): ReadonlyArray<string> {
   if (text.length === 0) return [];
   if (Buffer.byteLength(text, "utf8") <= maxBytes) return [text];
@@ -67,7 +86,13 @@ function splitUtf8(text: string, maxBytes: number): ReadonlyArray<string> {
     const width = code >= 0xd800 && code <= 0xdbff && index + 1 < text.length ? 2 : 1;
     const unitBytes = Buffer.byteLength(text.slice(index, index + width), "utf8");
     if (bytes + unitBytes > maxBytes && index > start) {
-      const cut = lastBreak > start ? lastBreak : index;
+      let cut = index;
+      if (lastBreak > start) {
+        const headingAt = trailingHeadingOffset(text.slice(start, lastBreak));
+        // A heading's own newline is not a split: keep the body that still fits.
+        if (headingAt === null) cut = lastBreak;
+        else if (index === lastBreak && headingAt > 0) cut = start + headingAt;
+      }
       chunks.push(text.slice(start, cut));
       start = cut;
       index = cut;
@@ -99,7 +124,7 @@ export function buildBotPreambleSections(input: {
     `## MEMORY.md\n\n${quoteBotMemory(memory.trim() ? memory : "(empty)")}`,
     input.rules.trim(),
   ].filter((part) => part.length > 0);
-  return splitUtf8(parts.join("\n\n"), SECTION_MAX_BYTES);
+  return splitUtf8(parts.join("\n\n"), CODEX_ADDITIONAL_CONTEXT_VALUE_MAX_BYTES);
 }
 
 function loadedLines(text: string): { readonly entries: string[]; readonly structure: string[] } {
@@ -163,9 +188,16 @@ function fullMemoryText(text: string): string {
   return `${MEMORY_UPDATED_FULL}\n\n${quoteBotMemory(capped.trim() ? capped : "(empty)")}`;
 }
 
+/** Lines past the cap were never shown, so an add or remove is taken only from the loaded lines. */
+function loadedMemory(text: string): string {
+  const trimmed = text.trimEnd();
+  if (trimmed === "") return "";
+  return trimmed.split(/\r?\n/).slice(0, MEMORY_LINE_CAP).join("\n");
+}
+
 export function botMemoryUpdateText(before: string, after: string): string {
-  const earlier = loadedLines(before);
-  const later = loadedLines(after);
+  const earlier = loadedLines(loadedMemory(before));
+  const later = loadedLines(loadedMemory(after));
   if (
     earlier.structure.length !== later.structure.length ||
     earlier.structure.some((line, index) => line !== later.structure[index])
