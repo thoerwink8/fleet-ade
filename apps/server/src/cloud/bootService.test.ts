@@ -1,3 +1,5 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Windows mkdtemp must keep a leading slash; Effect's temp helper joins through the host path.
+import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Cross-process launcher contention uses real filesystem leases and IPC barriers.
 import * as NodeChildProcess from "node:child_process";
 import * as NodeSqlite from "node:sqlite";
@@ -43,14 +45,43 @@ vi.mock("node:fs", async (importOriginal) => {
       try {
         return actual.renameSync(...args);
       } catch (error) {
-        if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) {
-          leaseObserver.contended(String(args[1]));
-        }
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        // Renaming onto an existing directory is EEXIST or ENOTEMPTY on Linux and EPERM on Windows.
+        const contended =
+          code === "EEXIST" ||
+          code === "ENOTEMPTY" ||
+          // oxlint-disable-next-line t3code/no-global-process-runtime -- The mock runs outside Effect and has to classify the host rename error.
+          (process.platform === "win32" &&
+            (code === "EPERM" || code === "EACCES" || code === "EBUSY"));
+        if (contended) leaseObserver.contended(String(args[1]));
         throw error;
       }
     },
   };
 });
+// systemd refuses a backslash in the executable, and launchd PATH is colon-separated.
+// A Windows temp path fails both while the test is only pretending to be Linux or macOS.
+// A leading slash is still a real directory on the current drive, and Node keeps that spelling.
+const simulatedUnixTempRoot = "/t3-boot-service-test";
+const windowsHost = HostProcess.Platform.defaultValue() === "win32";
+const posixPath = Path.Path.pipe(Effect.provide(Path.layer));
+
+const makeSimulatedTemp = (prefix: string, posix: boolean) =>
+  posix && windowsHost
+    ? Effect.acquireRelease(
+        Effect.sync(() => {
+          NodeFS.mkdirSync(simulatedUnixTempRoot, { recursive: true });
+          return NodeFS.mkdtempSync(`${simulatedUnixTempRoot}/${prefix}`);
+        }),
+        (directory) =>
+          Effect.sync(() => {
+            NodeFS.rmSync(directory, { recursive: true, force: true });
+          }),
+      )
+    : Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        return yield* fs.makeTempDirectoryScoped({ prefix });
+      });
 
 const windowsTaskOptions = {
   userId: "PC\\theo",
@@ -189,9 +220,10 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
   installBinDir?: string,
   homeName = "t3-boot-service-test-",
 ) {
+  const simulateUnix = platform !== "win32";
   const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const home = yield* fs.makeTempDirectoryScoped({ prefix: homeName });
+  const path = simulateUnix ? yield* posixPath : yield* Path.Path;
+  const home = yield* makeSimulatedTemp(homeName, simulateUnix);
   const managerUnitDir = path.join(
     managerXdgConfigHome !== undefined && path.isAbsolute(managerXdgConfigHome)
       ? managerXdgConfigHome
@@ -345,6 +377,11 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
       yield* fs.makeDirectory(path.dirname(paths.entryPath), { recursive: true });
       yield* fs.writeFileString(paths.entryPath, "#!/bin/sh\n");
       yield* fs.writeFileString(paths.sentinelPath, `${cliVersion}\n`);
+      // The forked launcher looks for t3.exe beside the sentinel. An empty file is enough
+      // until a case needs the executable to actually start.
+      if (windowsHost && platform !== "win32") {
+        yield* fs.writeFileString(path.join(path.dirname(paths.entryPath), "t3.exe"), "");
+      }
       return yield* BootService.make({
         baseDir: serviceBaseDir,
         logsDir: path.join(serviceBaseDir, "userdata", "logs"),
@@ -397,6 +434,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
           ),
         ),
       ),
+      (effect) => (platform === "win32" ? effect : effect.pipe(Effect.provide(Path.layer))),
     );
   const service = yield* makeService();
   return {
@@ -446,27 +484,23 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       }),
   );
 
-  // The systemd harness needs POSIX-shaped temp paths; on Windows the real temp directory
-  // carries backslashes, which unit rendering refuses before the link assertions run.
-  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
-    "updating a linked unit replaces the link and leaves its target intact",
-    () =>
-      Effect.gen(function* () {
-        const { service, makeService, fs, home } = yield* makeHarness();
-        const path = yield* Path.Path;
-        const { unitPath } = yield* service.install();
-        const separate = path.join(home, "separate-managed-unit.service");
-        const previous = yield* fs.readFileString(unitPath);
-        yield* fs.rename(unitPath, separate);
-        yield* fs.symlink(separate, unitPath);
+  it.effect("updating a linked unit replaces the link and leaves its target intact", () =>
+    Effect.gen(function* () {
+      const { service, makeService, fs, home } = yield* makeHarness();
+      const path = yield* posixPath;
+      const { unitPath } = yield* service.install();
+      const separate = path.join(home, "separate-managed-unit.service");
+      const previous = yield* fs.readFileString(unitPath);
+      yield* fs.rename(unitPath, separate);
+      yield* fs.symlink(separate, unitPath);
 
-        const newer = yield* makeService(undefined, "1.2.4");
-        yield* newer.install({ start: false });
+      const newer = yield* makeService(undefined, "1.2.4");
+      yield* newer.install({ start: false });
 
-        expect(yield* fs.readFileString(separate)).toBe(previous);
-        const installed = yield* fs.readFileString(unitPath);
-        expect(installed).toContain("1.2.4");
-      }),
+      expect(yield* fs.readFileString(separate)).toBe(previous);
+      const installed = yield* fs.readFileString(unitPath);
+      expect(installed).toContain("1.2.4");
+    }),
   );
 
   it.effect(
@@ -566,9 +600,8 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
   // regression: #29881
   it.effect("installs into the unit directory of the user manager that lingering starts", () =>
     Effect.gen(function* () {
-      const path = yield* Path.Path;
-      const fs = yield* FileSystem.FileSystem;
-      const shellConfigHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-xdg-config-" });
+      const path = yield* posixPath;
+      const shellConfigHome = yield* makeSimulatedTemp("t3-xdg-config-", true);
       const { makeService, home, control } = yield* makeHarness(
         "linux",
         undefined,
@@ -737,9 +770,9 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
     "manager-unavailable",
   ] as const)("installs, discovers, restarts, and uninstalls with $XDG_CONFIG_HOME %s", (setting) =>
     Effect.gen(function* () {
-      const path = yield* Path.Path;
+      const path = yield* posixPath;
       const fs = yield* FileSystem.FileSystem;
-      const configRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-xdg-config-" });
+      const configRoot = yield* makeSimulatedTemp("t3-xdg-config-", true);
       const xdgConfigHome = {
         unset: undefined,
         empty: "",
@@ -935,7 +968,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       Effect.gen(function* () {
         const { service, fs, baseDir, statePath, commands, makeService } =
           yield* makeHarness(platform);
-        const path = yield* Path.Path;
+        const path = yield* posixPath;
         const envPath = path.join(baseDir, SERVICE_ENV_FILE);
         const envBytes = new TextEncoder().encode(
           '# user configuration\r\nT3CODE_TOKEN="literal $HOME # token"',
@@ -990,7 +1023,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
     () =>
       Effect.gen(function* () {
         const { service, fs, statePath, makeService, runtime } = yield* makeHarness();
-        const path = yield* Path.Path;
+        const path = yield* posixPath;
         const plan = yield* service.install();
         const unit = yield* fs.readFileString(plan.unitPath);
         yield* fs.writeFileString(
@@ -1027,6 +1060,23 @@ process.on("message", message => {
 `,
         );
         yield* fs.chmod(runtime.entryPath, 0o755);
+        // The forked launcher is the real Windows process: it runs `t3.exe serve` from its own
+        // cwd, so the fixture is Node itself and the script beside it. POSIX keeps the shebang.
+        if (windowsHost) {
+          const executable = path.join(runtime.versionDir, "t3.exe");
+          yield* Effect.sync(() => {
+            NodeFS.rmSync(executable, { force: true });
+            try {
+              NodeFS.linkSync(process.execPath, executable);
+            } catch {
+              NodeFS.copyFileSync(process.execPath, executable);
+            }
+          });
+          yield* fs.writeFileString(
+            path.join(runtime.versionDir, "serve"),
+            yield* fs.readFileString(runtime.entryPath),
+          );
+        }
         const newer = yield* makeService(undefined, "1.2.4");
         yield* makeService(undefined, "1.2.5");
         const snapshot = Promise.withResolvers<void>();
@@ -1038,6 +1088,7 @@ process.on("message", message => {
 import fs from "node:fs/promises";
 import cp from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
+if (process.platform === "win32") process.chdir(${JSON.stringify(runtime.versionDir)});
 const server = Promise.withResolvers();
 const originalSpawn = cp.spawn;
 cp.spawn = (...args) => { const child = originalSpawn(...args); server.resolve(child); return child; };
@@ -1138,7 +1189,7 @@ process.disconnect();
   it.effect("install with start=false keeps the marker when a later write fails", () =>
     Effect.gen(function* () {
       const { service, fs, statePath, makeService } = yield* makeHarness();
-      const path = yield* Path.Path;
+      const path = yield* posixPath;
       yield* service.install();
       const newer = yield* makeService(undefined, "1.2.4");
       const unitPath = (yield* service.status).unitPath;
@@ -1233,8 +1284,7 @@ process.disconnect();
       control.enabled = true;
       control.active = true;
 
-      const fs = yield* FileSystem.FileSystem;
-      const otherHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-doctor-other-" });
+      const otherHome = yield* makeSimulatedTemp("t3-doctor-other-", true);
       const other = yield* makeService(undefined, "1.2.3", otherHome);
       commands.length = 0;
       expect(yield* other.withStopped(Effect.sync(() => control.active))).toBe(true);
@@ -1247,8 +1297,8 @@ process.disconnect();
       const { service, fs, baseDir, commands, makeService } = yield* makeHarness();
       const plan = yield* service.install();
       const unit = yield* fs.readFileString(plan.unitPath);
-      const path = yield* Path.Path;
-      const otherHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-other-home-" });
+      const path = yield* posixPath;
+      const otherHome = yield* makeSimulatedTemp("t3-other-home-", true);
 
       const other = yield* makeService(undefined, "1.2.3", path.join(otherHome, ".t3"));
       commands.length = 0;
@@ -1261,7 +1311,7 @@ process.disconnect();
       expect(commands).toEqual([]);
       expect((yield* other.status).otherBaseDir).toBe(baseDir);
 
-      const quoted = yield* makeService(undefined, "1.2.3", path.join(otherHome, 'T3 "Data"'));
+      const quoted = yield* makeService(undefined, "1.2.3", path.join(otherHome, "Theo's T3"));
       commands.length = 0;
       const unloadable = yield* quoted.install().pipe(Effect.flip);
       expect(unloadable._tag).toBe("BootServiceBaseDirUnsupportedError");
@@ -1274,8 +1324,8 @@ process.disconnect();
   it.effect("hands the whole install to systemd without changing the running service", () =>
     Effect.gen(function* () {
       const { fs, commands, invocations, control, makeService } = yield* makeHarness();
-      const path = yield* Path.Path;
-      const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-handoff-" });
+      const path = yield* posixPath;
+      const home = yield* makeSimulatedTemp("t3-handoff-", true);
       const baseDir = path.join(home, "T3 Data 100%", "${UNSET}", "$literal");
       const outside = yield* makeService(undefined, "1.2.3", baseDir);
       const plan = yield* outside.install();
@@ -1410,7 +1460,7 @@ process.disconnect();
   it.effect("installs, reports current state, and uninstalls on macOS", () =>
     Effect.gen(function* () {
       const { service, fs, statePath, commands, timeouts, runtime } = yield* makeHarness("darwin");
-      const path = yield* Path.Path;
+      const path = yield* posixPath;
       const plan = yield* service.install();
 
       expect(
@@ -1702,7 +1752,7 @@ process.disconnect();
   it.effect("puts the runtime an update installs on the launch agent PATH", () =>
     Effect.gen(function* () {
       const { makeService, fs, baseDir, runtime } = yield* makeHarness("darwin");
-      const path = yield* Path.Path;
+      const path = yield* posixPath;
       const previous = runtime.versionDir;
       const installed = pinnedRuntimePaths(path, baseDir, "1.2.4", "darwin").versionDir;
       // The 1.2.3 CLI, or the 1.2.3 service's own PATH, installs 1.2.4.
@@ -1752,7 +1802,7 @@ process.disconnect();
   it.effect("keeps failed launch agent installs pending until activation succeeds", () =>
     Effect.gen(function* () {
       const { service, fs, statePath, commands, control } = yield* makeHarness("darwin");
-      const path = yield* Path.Path;
+      const path = yield* posixPath;
       const plan = yield* service.install();
       const markerPath = path.join(path.dirname(statePath), SERVICE_RESTART_PENDING_FILE);
       const bootstrap = `launchctl bootstrap gui/501 ${plan.unitPath}`;
