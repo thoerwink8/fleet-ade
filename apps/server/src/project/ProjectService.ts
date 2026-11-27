@@ -456,6 +456,7 @@ export const make = Effect.gen(function* () {
       "runtimeRequests",
       "subagents",
       "providerSessions",
+      "bot",
     ]);
     if (projection.thread.deletedAt !== null || projection.thread.projectId !== input.projectId) {
       return;
@@ -483,7 +484,7 @@ export const make = Effect.gen(function* () {
               commandId: command.commandId,
               threadId,
             },
-            projection: { thread: deletedEvent.payload },
+            projection: { thread: deletedEvent.payload, bot: projection.bot },
             attachmentIds,
             now,
             idAllocator,
@@ -529,7 +530,7 @@ export const make = Effect.gen(function* () {
     threadId: ThreadId,
   ) {
     if ((yield* threadProjections.getThreadTrash(threadId)) === null) return;
-    const projection = yield* threadProjections.getThreadRecords(threadId, []);
+    const projection = yield* threadProjections.getThreadRecords(threadId, ["bot"]);
     const command = {
       type: "thread.purge" as const,
       commandId: CommandId.make(`${input.commandId}:purge-thread:${threadId}`),

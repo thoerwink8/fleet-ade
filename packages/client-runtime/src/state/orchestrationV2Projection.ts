@@ -329,6 +329,9 @@ export function applyOrchestrationV2ProjectionEvent(
     // Bot changes are not activity either: the thread shell carries them.
     case "bot.created":
     case "bot.retired":
+    case "bot.paused":
+    case "bot.resumed":
+    case "bot.current-thread-changed":
       return { ...projection, bot: applyBotEventToThreadBot(projection.bot ?? null, event) };
     case "run.created":
     case "run.updated": {

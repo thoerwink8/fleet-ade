@@ -32,8 +32,17 @@ import * as Layer from "effect/Layer";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 type WsRpcMethod = RpcGroup.Rpcs<typeof WsRpcGroup>["_tag"];
 
+// CLIENT_GUARDED_RPC_SCOPES also keys orchestration command types (bot.*), which are not
+// RPC methods; they reach authorization through clientRpcRequiredScopes instead.
+const {
+  "bot.pause": _bp,
+  "bot.resume": _br,
+  "bot.switch-thread": _bs,
+  ...clientGuardedMethods
+} = CLIENT_GUARDED_RPC_SCOPES;
+
 export const RPC_REQUIRED_SCOPES = {
-  ...CLIENT_GUARDED_RPC_SCOPES,
+  ...clientGuardedMethods,
   [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: AuthOrchestrationOperateScope,
   [ORCHESTRATION_V2_WS_METHODS.getWorkflowScript]: AuthOrchestrationReadScope,
   [ORCHESTRATION_V2_WS_METHODS.getNativeChildWork]: AuthOrchestrationReadScope,

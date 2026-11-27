@@ -625,18 +625,40 @@ export const OrchestrationV2Bot = Schema.Struct({
 export type OrchestrationV2Bot = typeof OrchestrationV2Bot.Type;
 
 /**
- * The bot a `bot.created` or `bot.retired` event leaves on its thread's projection.
- * Events are thread-scoped; an unrelated bot's event leaves the projection as it is.
+ * The bot a bot event leaves on its thread's projection. Events are thread-scoped;
+ * an unrelated bot's event leaves the projection as it is. A `bot.current-thread-changed`
+ * event is emitted on both the old and the new thread's stream: on the old thread it
+ * clears the bot, on the new thread it places it, decided by `event.threadId`.
  */
 export function applyBotEventToThreadBot(
   bot: OrchestrationV2Bot | null,
-  event: Extract<OrchestrationV2DomainEvent, { readonly type: "bot.created" | "bot.retired" }>,
+  event: Extract<
+    OrchestrationV2DomainEvent,
+    {
+      readonly type:
+        | "bot.created"
+        | "bot.retired"
+        | "bot.paused"
+        | "bot.resumed"
+        | "bot.current-thread-changed";
+    }
+  >,
 ): OrchestrationV2Bot | null {
   switch (event.type) {
     case "bot.created":
       return event.payload.currentThreadId === event.threadId ? event.payload : bot;
     case "bot.retired":
       return bot?.id === event.payload.id ? null : bot;
+    case "bot.paused":
+    case "bot.resumed":
+      return bot?.id === event.payload.id ? event.payload : bot;
+    case "bot.current-thread-changed": {
+      if (bot?.id !== event.payload.id && event.payload.currentThreadId !== event.threadId) {
+        return bot;
+      }
+      const { previousThreadId: _previousThreadId, ...movedBot } = event.payload;
+      return event.payload.currentThreadId === event.threadId ? movedBot : null;
+    }
   }
 }
 
@@ -2124,9 +2146,21 @@ export const OrchestrationV2DomainEvent = Schema.Union([
   }),
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
-    type: Schema.Literals(["bot.created", "bot.retired"]),
-    /** The full bot after the change, retired status included; `threadId` is its current thread. */
+    type: Schema.Literals(["bot.created", "bot.retired", "bot.paused", "bot.resumed"]),
+    /** The full bot after the change, retired or paused status included; `threadId` is its current thread. */
     payload: OrchestrationV2Bot,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2EventBase.fields,
+    type: Schema.Literal("bot.current-thread-changed"),
+    /**
+     * The full bot after the move plus the thread it left. Emitted on both the old
+     * and the new thread's stream, so each side's projection and shell recompute.
+     */
+    payload: Schema.Struct({
+      ...OrchestrationV2Bot.fields,
+      previousThreadId: ThreadId,
+    }),
   }),
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
@@ -3122,8 +3156,16 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
   }),
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,
-    type: Schema.Literals(["bot.created", "bot.retired"]),
+    type: Schema.Literals(["bot.created", "bot.retired", "bot.paused", "bot.resumed"]),
     payload: OrchestrationV2BotJson,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2JsonEventBaseFields,
+    type: Schema.Literal("bot.current-thread-changed"),
+    payload: Schema.Struct({
+      ...OrchestrationV2BotJson.fields,
+      previousThreadId: ThreadId,
+    }),
   }),
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,
@@ -3415,6 +3457,31 @@ export const OrchestrationV2Command = Schema.Union([
     type: Schema.Literal("thread.commander.unmark"),
     commandId: CommandId,
     threadId: ThreadId,
+  }),
+  /**
+   * Pauses a bot. `threadId` is the bot's current thread as the sender knows it; the
+   * server rejects a stale one rather than acting on a bot that has since moved.
+   */
+  Schema.Struct({
+    type: Schema.Literal("bot.pause"),
+    commandId: CommandId,
+    botId: BotId,
+    threadId: ThreadId,
+  }),
+  /** Resumes a paused bot. `threadId` is the bot's current thread as the sender knows it. */
+  Schema.Struct({
+    type: Schema.Literal("bot.resume"),
+    commandId: CommandId,
+    botId: BotId,
+    threadId: ThreadId,
+  }),
+  /** Moves a bot's current thread to `targetThreadId`. `threadId` is the bot's current thread. */
+  Schema.Struct({
+    type: Schema.Literal("bot.switch-thread"),
+    commandId: CommandId,
+    botId: BotId,
+    threadId: ThreadId,
+    targetThreadId: ThreadId,
   }),
   Schema.Struct({
     type: Schema.Literal("thread.tag.set"),

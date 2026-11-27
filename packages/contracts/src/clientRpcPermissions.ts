@@ -10,7 +10,7 @@ import {
   AuthSourceControlWriteScope,
   type AuthEnvironmentScope,
 } from "./auth.ts";
-import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
+import { ORCHESTRATION_V2_WS_METHODS, OrchestrationV2Command } from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
@@ -65,11 +65,18 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksUnlink]: AuthAccessWriteScope,
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
+  // Bot state transitions and thread moves are orchestration commands inside
+  // `orchestration.dispatchCommand`; these keys match the command `type`, and
+  // `clientRpcRequiredScopes` applies them when it decodes one in the payload.
+  "bot.pause": AuthOrchestrationOperateScope,
+  "bot.resume": AuthOrchestrationOperateScope,
+  "bot.switch-thread": AuthOrchestrationOperateScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);
 const decodeStackedAction = Schema.decodeUnknownSync(GitRunStackedActionInput);
+const decodeOrchestrationCommand = Schema.decodeUnknownExit(OrchestrationV2Command);
 
 export function clientRpcRequiredScopes(
   method: string,
@@ -87,6 +94,17 @@ export function clientRpcRequiredScopes(
       (payload.action === "create_pr" || payload.action === "commit_push_pr")
     )
       return [AuthSourceControlWriteScope, AuthOrchestrationReadScope];
+  }
+  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand && input !== undefined) {
+    // Per-command-type entries in CLIENT_GUARDED_RPC_SCOPES apply to the decoded
+    // command. Anything undecodable or unlisted falls through to the method scope.
+    const decoded = decodeOrchestrationCommand(input);
+    if (
+      decoded._tag === "Success" &&
+      Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, decoded.value.type)
+    ) {
+      return [CLIENT_GUARDED_RPC_SCOPES[decoded.value.type as ClientGuardedRpcTag]];
+    }
   }
   return Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, method)
     ? [CLIENT_GUARDED_RPC_SCOPES[method as ClientGuardedRpcTag]]
