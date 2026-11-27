@@ -35,6 +35,7 @@ export interface VcsProcessInput {
   readonly spawnCwd?: string;
   readonly stdin?: string;
   readonly onStdoutChunk?: (chunk: Uint8Array) => void;
+  readonly onStderrChunk?: (chunk: Uint8Array) => void;
   readonly env?: NodeJS.ProcessEnv;
   readonly allowNonZeroExit?: boolean;
   readonly timeoutMs?: number;
@@ -159,6 +160,8 @@ const REPOSITORY_SELECTORS = new Set([
   "GIT_INDEX_FILE",
   "GIT_OBJECT_DIRECTORY",
   "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  // An inherited quarantine makes update-ref fail with "ref updates forbidden".
+  "GIT_QUARANTINE_PATH",
 ]);
 
 /**
@@ -275,6 +278,7 @@ export const make = Effect.gen(function* () {
         ...(input.spawnCwd !== undefined ? { spawnCwd: input.spawnCwd } : {}),
         ...(input.stdin !== undefined ? { stdin: input.stdin } : {}),
         ...(input.onStdoutChunk !== undefined ? { onStdoutChunk: input.onStdoutChunk } : {}),
+        ...(input.onStderrChunk !== undefined ? { onStderrChunk: input.onStderrChunk } : {}),
         env: {
           ...(input.command === "git"
             ? unsetInheritedRepositoryEnv(process.env, hostPlatform)
@@ -426,11 +430,7 @@ export const make = Effect.gen(function* () {
 
   const run = Effect.fn("VcsProcess.run")(function* (input: VcsProcessInput) {
     const bounded = vcsProcesses.withPermits(1)(runUnbounded(input));
-    if (
-      input.command === "git" &&
-      input.operation === CHECKPOINT_CAPTURE_OPERATION &&
-      input.onStdoutChunk === undefined
-    ) {
+    if (input.command === "git" && input.operation === CHECKPOINT_CAPTURE_OPERATION) {
       return yield* bounded.pipe(
         Effect.tapError((error) =>
           Effect.logDebug("checkpoint Git command failed", {
