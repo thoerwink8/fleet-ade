@@ -141,6 +141,24 @@ layer("108_Bots", (it) => {
         ],
       );
 
+      // json_remove must leave the rest of the payload intact.
+      const titles = yield* sql<{
+        readonly thread_id: string;
+        readonly title: unknown;
+      }>`
+        SELECT thread_id, json_extract(payload_json, '$.title') AS title
+        FROM orchestration_v2_projection_threads
+        WHERE thread_id IN ('thread-commander', 'thread-plain')
+        ORDER BY thread_id
+      `;
+      assert.deepStrictEqual(
+        titles.map((row) => [row.thread_id, row.title]),
+        [
+          ["thread-commander", "指挥线程"],
+          ["thread-plain", "Plain"],
+        ],
+      );
+
       // Running the migration body again must not error or duplicate rows.
       yield* Migration0108;
       const botsAgain = yield* readBots;

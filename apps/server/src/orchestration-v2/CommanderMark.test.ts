@@ -10,6 +10,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
@@ -106,6 +107,7 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
     const childBefore = yield* projections.getThreadProjection(childThreadId);
     assert.isNull(before.bot);
     assert.equal(childBefore.thread.lineage.parentThreadId, parentThreadId);
+    yield* TestClock.adjust("1 second");
 
     const marked = yield* orchestrator.dispatch({
       type: "thread.commander.mark",
@@ -154,6 +156,8 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
 
     const childStillAttached = yield* projections.getThreadProjection(childThreadId);
     assert.deepEqual(childStillAttached.thread, childBefore.thread);
+    yield* TestClock.adjust("1 second");
+
     const unmarked = yield* orchestrator.dispatch({
       type: "thread.commander.unmark",
       commandId: CommandId.make("unmark-commander-parent"),

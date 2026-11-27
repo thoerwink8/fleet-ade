@@ -2,6 +2,7 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
+  BotId,
   CommandId,
   ContextTransferId,
   EnvironmentId,
@@ -1273,10 +1274,12 @@ describe("OrchestratorMcpService provider resolution", () => {
     ({
       ...parentProjection(subagents, modelSelection),
       bot: {
-        id: "bot:commander-test",
+        id: BotId.make("bot:commander-test"),
         name: "MCP parent",
         status: "active",
         currentThreadId: parentThreadId,
+        createdAt: DateTime.makeUnsafe("2026-10-03T10:00:00Z"),
+        updatedAt: DateTime.makeUnsafe("2026-10-03T10:00:00Z"),
       },
     }) as unknown as OrchestrationV2ThreadProjection;
 
