@@ -754,7 +754,7 @@ describe("readLiveServerRuntimeState", () => {
   );
 
   it.effect(
-    "a probe with no answer falls back to the ownership lock, wherever identity came from",
+    "a probe with no answer falls back to PID liveness and ownerId, without consulting the lock",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -767,8 +767,8 @@ describe("readLiveServerRuntimeState", () => {
           Promise.resolve(undefined),
         );
 
-        // The fallback ignores whatever the record stored for identity: with no lock holder
-        // the ownership proof is missing, so even a complete record is stale.
+        // The fallback ignores whatever the record stored for identity and never consults the
+        // ownership lock: a live PID with an ownerId reads live even with no lock holder.
         yield* fs.writeFileString(
           statePath,
           JSON.stringify(
@@ -782,10 +782,9 @@ describe("readLiveServerRuntimeState", () => {
           JSON.parse(yield* fs.readFileString(statePath)),
           statePath,
         );
-        assert.equal(yield* failingProbe(verifyLiveness), "stale");
+        assert.equal(yield* failingProbe(verifyLiveness), "live");
 
-        // With a live owner holding the lock the same record reads live: on hosts without a
-        // generation-precise probe this degraded verdict is the best verification can do.
+        // A lock holder changes nothing: the verdict does not depend on the lock.
         const holder = yield* lockHoldingProcess(path.join(root, "server-owner.sqlite"));
         assert(holder.pid !== undefined);
         assert.equal(yield* failingProbe(verifyLiveness), "live");
@@ -935,7 +934,7 @@ describe("readLiveServerRuntimeState", () => {
       }).pipe(Effect.provide(layerIdentity)),
   );
   it.effect(
-    "falls back to owner and lock proof when the host cannot answer the identity probe",
+    "falls back to PID liveness and ownerId when the host cannot answer the identity probe",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -949,9 +948,9 @@ describe("readLiveServerRuntimeState", () => {
         );
 
         // Platforms without a generation-precise probe (macOS) publish records that carry no
-        // processIdentity at all. Verification on those hosts must fall back to PID liveness,
-        // ownerId presence, and the ownership lock — the pre-identity judgement — or no record
-        // could ever read live and pairing would be impossible there.
+        // processIdentity at all. Verification on those hosts must fall back to PID liveness
+        // and ownerId presence — the pre-identity judgement — or no record could ever read
+        // live and pairing would be impossible there.
         yield* fs.writeFileString(
           statePath,
           JSON.stringify(

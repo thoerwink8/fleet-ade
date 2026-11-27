@@ -199,8 +199,8 @@ export type RecordedServerLiveness = "live" | "stale" | "unknown";
 /**
  * Whether the record describes a server that still runs and still owns its home. Live needs an
  * ownerId, a lock proof, and — where the probe can answer — the stored identity exactly equal
- * to a fresh probe. A host without a probe answer (macOS) falls back to PID liveness, ownerId,
- * and the lock, or no record could ever read live there.
+ * to a fresh probe. A host without a probe answer (macOS, or a failed probe) falls back to PID
+ * liveness and ownerId, or no record could ever read live there.
  */
 export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServerProcessLiveness")(
   function* (
@@ -225,15 +225,16 @@ export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServ
     // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
     const liveIdentity = yield* Effect.promise(() => probeIdentity(state.pid, process.platform));
 
-    if (liveIdentity !== undefined) {
-      // The probe answered, so identity verifies strictly. Without a stored identity the
-      // process generation cannot be bound at all — not even for this process's own
-      // registered ownerId.
-      if (state.processIdentity === undefined) return "unknown";
-      if (liveIdentity !== state.processIdentity) return "stale";
-    }
-    // With no probe answer the identity proof is impossible on this host; the checks above
-    // already cover PID liveness and ownerId, so ownership degrades to the lock proof.
+    // With no probe answer the identity proof is impossible on this host (no probe on macOS,
+    // or the probe failed). The checks above already cover PID liveness and ownerId, which is
+    // the judgement from before identity existed; the lock is not consulted.
+    if (liveIdentity === undefined) return "live";
+
+    // The probe answered, so identity verifies strictly. Without a stored identity the
+    // process generation cannot be bound at all — not even for this process's own
+    // registered ownerId.
+    if (state.processIdentity === undefined) return "unknown";
+    if (liveIdentity !== state.processIdentity) return "stale";
 
     // A registered ownerId match with our own PID is the in-process lock proof: the registry
     // entry exists only while the acquisition scope holds the lock.
