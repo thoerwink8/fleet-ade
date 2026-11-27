@@ -430,14 +430,7 @@ export const make = Effect.gen(function* () {
 
   const run = Effect.fn("VcsProcess.run")(function* (input: VcsProcessInput) {
     const bounded = vcsProcesses.withPermits(1)(runUnbounded(input));
-    // Streamed chunks can't be replayed; a retry would append duplicates, so
-    // streaming commands skip the transient retry lane.
-    if (
-      input.command === "git" &&
-      input.operation === CHECKPOINT_CAPTURE_OPERATION &&
-      input.onStdoutChunk === undefined &&
-      input.onStderrChunk === undefined
-    ) {
+    if (input.command === "git" && input.operation === CHECKPOINT_CAPTURE_OPERATION) {
       return yield* bounded.pipe(
         Effect.tapError((error) =>
           Effect.logDebug("checkpoint Git command failed", {

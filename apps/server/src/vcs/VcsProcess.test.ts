@@ -1,5 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, expect, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -508,8 +509,8 @@ describe("VcsProcess.run", () => {
 
   it.effect("strips an inherited GIT_QUARANTINE_PATH but passes an explicit one through", () =>
     Effect.gen(function* () {
-      const inherited = process.env.GIT_QUARANTINE_PATH;
-      process.env.GIT_QUARANTINE_PATH = "/tmp/foreign-quarantine";
+      vi.stubEnv("GIT_QUARANTINE_PATH", "/tmp/foreign-quarantine");
+      yield* Effect.addFinalizer(() => Effect.sync(() => vi.unstubAllEnvs()));
       const seen = yield* Ref.make<ProcessRunner.ProcessRunInput | undefined>(undefined);
       const service = yield* VcsProcess.make.pipe(
         Effect.provideService(
@@ -531,24 +532,19 @@ describe("VcsProcess.run", () => {
           }),
         ),
       );
-      try {
-        yield* service.run(baseInput);
-        const spawned = yield* Ref.get(seen);
-        assert.isDefined(spawned);
-        expect(Object.hasOwn(spawned!.env ?? {}, "GIT_QUARANTINE_PATH")).toBe(true);
-        expect(spawned!.env?.GIT_QUARANTINE_PATH).toBeUndefined();
+      yield* service.run(baseInput);
+      const spawned = yield* Ref.get(seen);
+      assert.isDefined(spawned);
+      expect(Object.hasOwn(spawned!.env ?? {}, "GIT_QUARANTINE_PATH")).toBe(true);
+      expect(spawned!.env?.GIT_QUARANTINE_PATH).toBeUndefined();
 
-        // An explicit quarantine for this capture is the caller's own and passes through.
-        yield* service.run({
-          ...baseInput,
-          env: { GIT_QUARANTINE_PATH: "/tmp/capture-quarantine" },
-        });
-        const explicit = yield* Ref.get(seen);
-        expect(explicit!.env?.GIT_QUARANTINE_PATH).toBe("/tmp/capture-quarantine");
-      } finally {
-        if (inherited === undefined) delete process.env.GIT_QUARANTINE_PATH;
-        else process.env.GIT_QUARANTINE_PATH = inherited;
-      }
+      // An explicit quarantine for this capture is the caller's own and passes through.
+      yield* service.run({
+        ...baseInput,
+        env: { GIT_QUARANTINE_PATH: "/tmp/capture-quarantine" },
+      });
+      const explicit = yield* Ref.get(seen);
+      expect(explicit!.env?.GIT_QUARANTINE_PATH).toBe("/tmp/capture-quarantine");
     }).pipe(Effect.scoped, provideLive, Effect.provide(NodeServices.layer)),
   );
 
