@@ -1,4 +1,5 @@
 import { DesktopShellEnvironmentSnapshot, ShellEnvironmentPatch } from "@t3tools/contracts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import {
   applyShellEnvironment,
   buildEnvironmentCaptureCommand,
@@ -665,9 +666,10 @@ export const make = Effect.gen(function* () {
       );
       const persist = Effect.gen(function* () {
         const encoded = yield* encodeCache({ version: 1, key, environment: cached });
-        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
-        yield* fileSystem.writeFileString(cachePath + ".tmp", encoded, { mode: 0o600 });
-        yield* fileSystem.rename(cachePath + ".tmp", cachePath);
+        yield* writeFileStringAtomically({ filePath: cachePath, contents: encoded }).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+        );
       });
       yield* persist.pipe(
         Effect.catch(() => Effect.logWarning("Could not cache shell environment")),

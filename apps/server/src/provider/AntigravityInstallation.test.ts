@@ -13,6 +13,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
+import * as TestClock from "effect/testing/TestClock";
+import { synchronousFileSystem } from "@t3tools/shared/testing/syncFileSystem";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Sink from "effect/Sink";
@@ -731,10 +733,16 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
             (stage === "extract" && target.endsWith(executableName))
               ? fs.sink(target, options).pipe(Sink.mapInputEffect(() => Effect.fail(noSpace)))
               : fs.sink(target, options),
-          writeFileString: (target, content, options) =>
+          open: (target, options) =>
             stage === "active pointer" && target.endsWith("contents.tmp")
-              ? Effect.fail(noSpace)
-              : fs.writeFileString(target, content, options),
+              ? fs.open(target, options).pipe(
+                  Effect.map((file): FileSystem.File =>
+                    Object.assign(Object.create(file), {
+                      writeAll: () => Effect.fail(noSpace),
+                    }),
+                  ),
+                )
+              : fs.open(target, options),
         });
         const { installation, stagingReleased, path } = yield* makeHarness({
           previous: true,
@@ -806,90 +814,55 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       }),
   );
 
+  // The atomic writer moves its temp file away before the directory is removed, so a
+  // locked leftover can fail the removal. That failure must not fail the finished write.
   it.effect.each([
     { name: "the committed install", restart: false },
     { name: "a newer install", restart: true },
   ])("does not fail $name when old pointer cleanup fails", (testCase) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const cleanupStarted = yield* Deferred.make<void>();
-      const releaseCleanup = yield* Deferred.make<void>();
-      const nextValidationStarted = yield* Deferred.make<void>();
-      const releaseNextValidation = yield* Deferred.make<void>();
-      const firstWorker = yield* Deferred.make<Fiber.Fiber<unknown, unknown>>();
+      const removalAttempts: Array<string> = [];
       const cleanupError = PlatformError.systemError({
         _tag: "PermissionDenied",
         module: "FileSystem",
         method: "remove",
         description: "EPERM: pointer temp directory is in use",
       });
-      let firstPointer = true;
-      let validationCount = 0;
-      const { installation, stagingReleased } = yield* makeHarness({
+      const { installation } = yield* makeHarness({
         previous: true,
-        validate: () => {
-          validationCount += 1;
-          return validationCount === 2
-            ? Deferred.succeed(nextValidationStarted, undefined).pipe(
-                Effect.andThen(Deferred.await(releaseNextValidation)),
-              )
-            : Effect.void;
-        },
         fileSystem: FileSystem.FileSystem.of({
           ...fs,
-          makeTempDirectoryScoped: (settings) => {
-            if (settings?.prefix !== "active.json." || !firstPointer) {
-              return fs.makeTempDirectoryScoped(settings);
+          remove: (target, options) => {
+            if (typeof target === "string" && target.includes("t3-write-")) {
+              removalAttempts.push(target);
+              return Effect.fail(cleanupError);
             }
-            firstPointer = false;
-            return Effect.fiber.pipe(
-              Effect.tap((worker) => Deferred.succeed(firstWorker, worker)),
-              Effect.andThen(
-                Effect.acquireRelease(fs.makeTempDirectory(settings), () =>
-                  Deferred.succeed(cleanupStarted, undefined).pipe(
-                    Effect.andThen(Deferred.await(releaseCleanup)),
-                    Effect.andThen(Effect.die(cleanupError)),
-                  ),
-                ),
-              ),
-            );
+            return fs.remove(target, options);
           },
         }),
       });
-      yield* Effect.gen(function* () {
-        const first = yield* installation.start;
-        yield* Deferred.await(cleanupStarted);
-        expect(yield* installation.state).toMatchObject({
-          operationId: first.operationId,
-          phase: "succeeded",
-          installedVersion: "fixture-new",
-        });
-        const current = testCase.restart ? yield* installation.start : first;
-        if (testCase.restart) yield* Deferred.await(nextValidationStarted);
-
-        yield* Deferred.succeed(releaseCleanup, undefined);
-        yield* Fiber.await(yield* Deferred.await(firstWorker));
-        yield* Deferred.await(stagingReleased);
-        expect(yield* installation.state).toMatchObject({
-          operationId: current.operationId,
-          phase: testCase.restart ? "verifying" : "succeeded",
-          installedVersion: "fixture-new",
-        });
-        expect((yield* installation.resolve()).version).toBe("fixture-new");
-
-        yield* Deferred.succeed(releaseNextValidation, undefined);
-        expect(yield* terminalState(installation)).toMatchObject({
-          operationId: current.operationId,
-          phase: "succeeded",
-          installedVersion: "fixture-new",
-        });
-      }).pipe(
-        Effect.ensuring(
-          Deferred.succeed(releaseCleanup, undefined).pipe(
-            Effect.andThen(Deferred.succeed(releaseNextValidation, undefined)),
-          ),
+      yield* installation.start;
+      expect(yield* terminalState(installation)).toMatchObject({
+        phase: "succeeded",
+        installedVersion: "fixture-new",
+      });
+      expect(removalAttempts).toHaveLength(1);
+      expect((yield* installation.resolve()).version).toBe("fixture-new");
+      expect(
+        (yield* fs.readDirectory(installation.managedDirectory)).some((name) =>
+          name.startsWith("t3-write-"),
         ),
-      );
+      ).toBe(true);
+
+      if (testCase.restart) {
+        yield* installation.start;
+        expect(yield* terminalState(installation)).toMatchObject({
+          phase: "succeeded",
+          installedVersion: "fixture-new",
+        });
+      }
+      expect((yield* installation.resolve()).version).toBe("fixture-new");
     }),
   );
 
@@ -1252,57 +1225,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       }),
   );
 
-  it.effect(
-    "reuses an immutable Windows release and preserves the pointer when rename is denied",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const archive = Buffer.from(zipFixtures.windows, "base64");
-        const asset = yield* releaseAsset(archive, "win32");
-        let denyPointerRename = true;
-        const renameTargets: string[] = [];
-        const { installation, requests, validations } = yield* makeHarness({
-          previous: true,
-          platform: "win32",
-          archive,
-          fileSystem: FileSystem.FileSystem.of({
-            ...fs,
-            rename: (source, target) => {
-              renameTargets.push(target);
-              return denyPointerRename
-                ? Effect.fail(
-                    PlatformError.systemError({
-                      _tag: "PermissionDenied",
-                      module: "FileSystem",
-                      method: "rename",
-                      pathOrDescriptor: target,
-                      description: "EPERM: file is in use",
-                    }),
-                  )
-                : fs.rename(source, target);
-            },
-          }),
-        });
-        yield* writeRelease(installation.managedDirectory, asset, false);
-        yield* installation.start;
-        expect((yield* terminalState(installation)).phase).toBe("failed");
-        yield* expectPreviousRelease(installation);
-        expect(renameTargets).toEqual([path.join(installation.managedDirectory, "active.json")]);
-
-        denyPointerRename = false;
-        yield* installation.start;
-        expect((yield* terminalState(installation)).phase).toBe("succeeded");
-        expect((yield* installation.resolve()).version).toBe("fixture-new");
-        expect(requests).toEqual([]);
-        expect(validations).toHaveLength(2);
-        expect(renameTargets).toEqual([
-          path.join(installation.managedDirectory, "active.json"),
-          path.join(installation.managedDirectory, "active.json"),
-        ]);
-      }),
-  );
-
   it.effect("reports unsupported hosts without downloading or changing state", () =>
     Effect.gen(function* () {
       const { installation, requests } = yield* makeHarness({ asset: null, platform: "darwin" });
@@ -1313,5 +1235,78 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       expect(yield* installation.state).toMatchObject({ phase: "idle", operationId: null });
       expect(requests).toEqual([]);
     }),
+  );
+
+  it.effect(
+    "reuses an immutable Windows release and preserves the pointer when rename is denied",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const archive = Buffer.from(zipFixtures.windows, "base64");
+        const asset = yield* releaseAsset(archive, "win32");
+        let denyPointerRename = true;
+        const renameTargets: string[] = [];
+        const firstAttempt = yield* Deferred.make<void>();
+        const syncFs = synchronousFileSystem(fs);
+        const { installation, requests, validations } = yield* makeHarness({
+          previous: true,
+          platform: "win32",
+          archive,
+          fileSystem: FileSystem.FileSystem.of({
+            ...syncFs,
+            rename: (source, target) =>
+              // Suspended so each run of atomicWrite's reused publish effect is a fresh
+              // attempt, like the real rename.
+              Effect.suspend(() => {
+                renameTargets.push(target);
+                return denyPointerRename
+                  ? (renameTargets.length === 1
+                      ? Deferred.succeed(firstAttempt, undefined)
+                      : Effect.void
+                    ).pipe(
+                      Effect.andThen(
+                        Effect.fail(
+                          PlatformError.systemError({
+                            _tag: "Unknown",
+                            module: "FileSystem",
+                            method: "rename",
+                            pathOrDescriptor: target,
+                            cause: Object.assign(new Error("EPERM: file is in use"), {
+                              code: "EPERM",
+                            }),
+                          }),
+                        ),
+                      ),
+                    )
+                  : syncFs.rename(source, target);
+              }),
+          }),
+        });
+        yield* writeRelease(installation.managedDirectory, asset, false);
+        // atomicWrite reads the platform from the context start runs in, not from
+        // the harness's construction-time override, so pin win32 at the call site.
+        yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
+        yield* Deferred.await(firstAttempt);
+        // One first try plus twenty retries at a hundred milliseconds each, all on the
+        // synchronous stat and rename the wrap provides, so one adjustment drains them.
+        yield* TestClock.adjust("2100 millis");
+        // The install work runs in its own fiber, so the state stream is the
+        // completion signal: wait for the failure, then confirm the retries stopped.
+        expect(yield* terminalState(installation)).toMatchObject({ phase: "failed" });
+        yield* expectPreviousRelease(installation);
+        expect(new Set(renameTargets)).toEqual(
+          new Set([path.join(installation.managedDirectory, "active.json")]),
+        );
+        expect(renameTargets.length).toBe(21);
+
+        denyPointerRename = false;
+        yield* installation.start.pipe(Effect.provideService(HostProcess.Platform, "win32"));
+        expect((yield* terminalState(installation)).phase).toBe("succeeded");
+        expect((yield* installation.resolve()).version).toBe("fixture-new");
+        expect(requests).toEqual([]);
+        expect(validations).toHaveLength(2);
+        expect(renameTargets.at(-1)).toBe(path.join(installation.managedDirectory, "active.json"));
+      }),
   );
 });

@@ -6,6 +6,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Option from "effect/Option";
+import * as PlatformError from "effect/PlatformError";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Stream from "effect/Stream";
 import * as Tracer from "effect/Tracer";
 import * as TestClock from "effect/testing/TestClock";
@@ -122,10 +124,18 @@ it.effect("remembers completion only after the paced pass finishes", () =>
       Effect.provide(compactionLayer(compact)),
       Effect.provideService(FileSystem.FileSystem, {
         ...fs,
-        writeFileString: (file, content, options) =>
+        // The timestamp lands atomically: its rename, not the temp-file write,
+        // is the moment readers can observe it.
+        rename: (source, target) =>
           fs
-            .writeFileString(file, content, options)
-            .pipe(Effect.ensuring(Deferred.succeed(timestampWritten, undefined))),
+            .rename(source, target)
+            .pipe(
+              Effect.tap(() =>
+                target === timestampPath
+                  ? Deferred.succeed(timestampWritten, undefined)
+                  : Effect.void,
+              ),
+            ),
       }),
     );
   }).pipe(Effect.provide(testConfig.pipe(Layer.provideMerge(NodeServices.layer)))),
@@ -194,6 +204,55 @@ it.effect(
       }).pipe(Effect.provide(reclaimLayer(restart)));
       assert.isTrue(yield* fs.exists(files.request));
       assert.isFalse(yield* fs.exists(files.failure));
+      assert.isFalse(yield* Deferred.isDone(restarted), "the reply must go out before the restart");
+      yield* TestClock.adjust(500);
+      yield* Deferred.await(restarted);
+    }).pipe(Effect.provide(testConfig.pipe(Layer.provideMerge(NodeServices.layer)))),
+);
+
+it.effect(
+  "a published reclaim request still restarts when directory sync fails after the rename",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const config = yield* ServerConfig.ServerConfig;
+      const files = DatabaseMaintenance.reclaimFiles(path, config.dbPath);
+      const restartDirectory = path.dirname(files.request);
+      const restarted = yield* Deferred.make<void>();
+      const restart = Deferred.succeed(restarted, undefined).pipe(Effect.asVoid);
+      const syncFailure = PlatformError.systemError({
+        _tag: "Unknown",
+        module: "FileSystem",
+        method: "sync",
+        pathOrDescriptor: restartDirectory,
+        cause: Object.assign(new Error("EIO, fsync"), { code: "EIO" }),
+      });
+      const failingDirectorySync: FileSystem.FileSystem = {
+        ...fs,
+        open: (openedPath, options) =>
+          fs
+            .open(openedPath, options)
+            .pipe(
+              Effect.map((file): FileSystem.File =>
+                openedPath === restartDirectory
+                  ? Object.create(file, { sync: { value: Effect.fail(syncFailure) } })
+                  : file,
+              ),
+            ),
+      };
+
+      // The rename already published the request, so the answer and the restart
+      // must match what a reader of the marker sees: the repair is coming.
+      yield* Effect.gen(function* () {
+        const storage = yield* DatabaseStorage.DatabaseStorage;
+        // Pins the atomic writer onto its directory-sync path; Windows hosts skip it natively.
+        yield* storage.requestReclaim.pipe(Effect.provideService(HostProcess.Platform, "linux"));
+      }).pipe(
+        Effect.provide(reclaimLayer(restart)),
+        Effect.provideService(FileSystem.FileSystem, failingDirectorySync),
+      );
+      assert.isTrue(yield* fs.exists(files.request));
       assert.isFalse(yield* Deferred.isDone(restarted), "the reply must go out before the restart");
       yield* TestClock.adjust(500);
       yield* Deferred.await(restarted);

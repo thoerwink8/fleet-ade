@@ -6,6 +6,8 @@ import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -45,6 +47,7 @@ export class DocumentText extends Context.Service<
 
 const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
+  const pathService = yield* Path.Path;
   const executable = yield* HostProcess.ExecutablePath;
   const isExecutable = yield* HostProcess.IsExecutable;
   const environment = yield* HostProcess.Environment;
@@ -52,8 +55,6 @@ const make = Effect.gen(function* () {
   // A large DOCX worker peaks near 270 MiB RSS, so two slots bound parser memory near 540 MiB.
   const lock = yield* Semaphore.make(2);
   const failed = new Map<string, number>();
-  // A cancelled extraction can still be publishing while its retry runs in the other slot.
-  let attempt = 0;
   // In a bundle import.meta.url is bin.mjs; development and tests use this source module.
   const entry = NodeURL.fileURLToPath(
     new URL(import.meta.url.endsWith(".ts") ? "../bin.ts" : "./bin.mjs", import.meta.url),
@@ -99,14 +100,13 @@ const make = Effect.gen(function* () {
         return Effect.logWarning("Document text extraction failed.", { extension });
       }),
     );
-    const pending = `${sidecar}.${attempt++}.part`;
-    yield* fs
-      .writeFileString(pending, content)
-      .pipe(
-        Effect.andThen(fs.rename(pending, sidecar)),
-        Effect.ensuring(fs.remove(pending, { force: true }).pipe(Effect.ignore)),
-        Effect.uninterruptible,
-      );
+    // The atomic writer carries its own random temp names, so a cancelled
+    // extraction republishing in the other slot cannot collide with the retry.
+    yield* writeFileStringAtomically({ filePath: sidecar, contents: content }).pipe(
+      Effect.provideService(FileSystem.FileSystem, fs),
+      Effect.provideService(Path.Path, pathService),
+      Effect.uninterruptible,
+    );
     return sidecar;
   }, lock.withPermits(1));
   const extracting = yield* Cache.make({ capacity: Infinity, timeToLive: 0, lookup: extract });

@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopClientSettings from "./DesktopClientSettings.ts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 
 const clientSettings: ClientSettings = {
   ...DEFAULT_CLIENT_SETTINGS,
@@ -130,12 +131,16 @@ describe("DesktopClientSettings", () => {
           recursive: true,
         });
 
-        const error = yield* settings.set(clientSettings).pipe(Effect.flip);
+        // POSIX semantics fail the rename without retrying; the Windows retry
+        // behavior is covered one layer down in atomicWrite.test.ts.
+        const error = yield* settings
+          .set(clientSettings)
+          .pipe(Effect.flip, Effect.provideService(HostProcess.Platform, "linux"));
 
         assert.equal(error.operation, "replace-settings-file");
         assert.deepEqual(
-          (yield* fileSystem.readDirectory(environment.stateDir)).filter((name) =>
-            name.endsWith(".tmp"),
+          (yield* fileSystem.readDirectory(environment.stateDir)).filter(
+            (name) => name.endsWith(".tmp") || name.startsWith("t3-write-"),
           ),
           [],
         );

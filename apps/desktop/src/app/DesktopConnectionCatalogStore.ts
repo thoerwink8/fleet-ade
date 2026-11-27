@@ -10,9 +10,9 @@ import {
   type ConnectionCatalogDocument as RuntimeConnectionCatalogDocumentType,
 } from "@t3tools/client-runtime/platform";
 import type { PersistedSavedEnvironmentRecord } from "@t3tools/contracts";
+import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import * as Context from "effect/Context";
-import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Base64 from "effect/encoding/Base64";
 import * as FileSystem from "effect/FileSystem";
@@ -46,10 +46,8 @@ const encodeRuntimeConnectionCatalogDocumentJson = Schema.encodeEffect(
 );
 
 const DesktopConnectionCatalogStoreWriteOperation = Schema.Literals([
-  "create-temporary-file-name",
   "encode-document",
   "create-directory",
-  "write-temporary-file",
   "replace-catalog-file",
 ]);
 
@@ -220,10 +218,8 @@ const writeDocument = Effect.fn("desktop.connectionCatalogStore.writeDocument")(
   readonly path: Path.Path;
   readonly catalogPath: string;
   readonly document: EncryptedConnectionCatalogDocument;
-  readonly suffix: string;
 }): Effect.fn.Return<void, DesktopConnectionCatalogStoreWriteError> {
   const directory = input.path.dirname(input.catalogPath);
-  const tempPath = `${input.catalogPath}.${process.pid}.${input.suffix}.tmp`;
   const encoded = yield* encodeEncryptedConnectionCatalogDocumentJson(input.document).pipe(
     Effect.mapError(
       (cause) =>
@@ -244,37 +240,16 @@ const writeDocument = Effect.fn("desktop.connectionCatalogStore.writeDocument")(
         }),
     ),
   );
-  yield* Effect.gen(function* () {
-    yield* input.fileSystem.writeFileString(tempPath, `${encoded}\n`).pipe(
-      Effect.mapError(
-        (cause) =>
-          new DesktopConnectionCatalogStoreWriteError({
-            operation: "write-temporary-file",
-            path: tempPath,
-            cause,
-          }),
-      ),
-    );
-    yield* input.fileSystem.rename(tempPath, input.catalogPath).pipe(
-      Effect.mapError(
-        (cause) =>
-          new DesktopConnectionCatalogStoreWriteError({
-            operation: "replace-catalog-file",
-            path: input.catalogPath,
-            cause,
-          }),
-      ),
-    );
-  }).pipe(
-    Effect.ensuring(
-      input.fileSystem.remove(tempPath, { force: true }).pipe(
-        Effect.catch((error) =>
-          Effect.logWarning("Could not remove a temporary connection catalog file.", {
-            tempPath,
-            error,
-          }),
-        ),
-      ),
+  yield* writeFileStringAtomically({ filePath: input.catalogPath, contents: `${encoded}\n` }).pipe(
+    Effect.provideService(FileSystem.FileSystem, input.fileSystem),
+    Effect.provideService(Path.Path, input.path),
+    Effect.mapError(
+      (cause) =>
+        new DesktopConnectionCatalogStoreWriteError({
+          operation: "replace-catalog-file",
+          path: input.catalogPath,
+          cause,
+        }),
     ),
   );
 });
@@ -373,7 +348,6 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const safeStorage = yield* ElectronSafeStorage.ElectronSafeStorage;
-  const random = yield* SecureRandom.SecureRandom;
   const savedEnvironments = yield* DesktopSavedEnvironments.DesktopSavedEnvironments;
   const catalogPath = path.join(environment.stateDir, "connection-catalog.json");
   const encryptionAvailable = safeStorage.isEncryptionAvailable.pipe(
@@ -402,13 +376,11 @@ export const make = Effect.gen(function* () {
         ),
       ),
     );
-    const suffix = (yield* random.uuidV4()).replace(/-/g, "");
     yield* writeDocument({
       fileSystem,
       path,
       catalogPath,
       document: { version: 1, encryptedCatalog },
-      suffix,
     });
   });
 
