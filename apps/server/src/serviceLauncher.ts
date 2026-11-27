@@ -39,11 +39,6 @@ import {
   SERVICE_UNIT_ENV,
   systemdUnitDirectoryOf,
 } from "./cloud/serviceProtocol.ts";
-import {
-  legacyOwnerStartedBeforeRecord,
-  legacyOwnerStartTimeCommand,
-} from "./legacyServerOwner.ts";
-
 const HANDOFF_DELAY_MS = 2_000;
 /**
  * Migrations count toward it and can scale with the database: tens of GB on a cold page cache
@@ -818,22 +813,9 @@ export async function stateDirOwned(baseDir: string): Promise<boolean> {
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "EPERM")) return false;
   }
-  const recordedAt = Date.parse(
-    "startedAt" in record && typeof record.startedAt === "string" ? record.startedAt : "",
-  );
-  if (!Number.isFinite(recordedAt)) return true;
-  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
-  const platform = process.platform;
-  const { command, args, env } = legacyOwnerStartTimeCommand(pid, platform);
-  const output = await new Promise<string | undefined>((resolve) =>
-    NodeChildProcess.execFile(
-      command,
-      args,
-      { env: { ...process.env, ...env }, timeout: 2_000, maxBuffer: 16_384 },
-      (error, stdout) => resolve(error === null ? stdout : undefined),
-    ),
-  );
-  return legacyOwnerStartedBeforeRecord(output, recordedAt, platform);
+  // Pre-lock records carry no process identity: while their PID lives, the real legacy server
+  // and a reused PID are indistinguishable, so the directory stays owned either way.
+  return true;
 }
 
 const stopMarkerPath = (baseDir: string) =>

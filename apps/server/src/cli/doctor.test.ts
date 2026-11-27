@@ -246,3 +246,81 @@ it.effect(
       assert.notInclude(text, "Delete the database from before 0.1.0");
     }).pipe(Effect.provide(layerHost)),
 );
+
+it.effect(
+  "keeps the occupancy hint while the holder cannot be queried, without naming an unverified process",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const compactCalls: string[] = [];
+      for (const recordContents of [
+        undefined,
+        "not json at all",
+        // A plausible record whose process identity cannot be verified: this PID is dead.
+        JSON.stringify({
+          version: 1,
+          pid: 2_147_483_647,
+          ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+          port: 3773,
+          origin: "http://127.0.0.1:3773",
+          startedAt: "2026-10-01T00:00:00.000Z",
+        }),
+      ]) {
+        const stateDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-doctor-unowned-" });
+        const serverRuntimeStatePath = path.join(stateDir, "server-runtime.json");
+        if (recordContents !== undefined) {
+          yield* fs.writeFileString(serverRuntimeStatePath, recordContents);
+        }
+        const failed = yield* Effect.scoped(
+          acquireServerOwnership(serverRuntimeStatePath).pipe(
+            Effect.andThen(
+              runDoctor(
+                {
+                  dbPath: path.join(stateDir, "statev2.sqlite"),
+                  serverRuntimeStatePath,
+                },
+                { fix: true, dryRun: false, interactive: false },
+              ),
+            ),
+          ),
+        ).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              Layer.mock(BootService.BootService)({
+                withStopped: (operation) => operation,
+              }),
+              Layer.succeed(DatabaseMaintenance, {
+                inspect: () =>
+                  Effect.succeed({
+                    databaseBytes: 2000,
+                    reclaimableBytes: 1000,
+                    incrementalVacuumEnabled: false,
+                    legacyDatabaseBytes: null,
+                    legacyOnlyRecords: null,
+                  }),
+                compact: () =>
+                  Effect.sync(() => {
+                    compactCalls.push("compact");
+                    return {
+                      beforeBytes: 2000,
+                      afterBytes: 1000,
+                      deletedEventCount: 0,
+                      deletedReceiptCount: 0,
+                    };
+                  }),
+                removeLegacyDatabase: () => Effect.void,
+              }),
+            ),
+          ),
+          Effect.flip,
+        );
+        assert.equal(
+          failed.message,
+          "Stop the Fleet ADE server and desktop app, including any version before 0.1.0, before repairing the database.",
+          `the occupancy hint must survive a holder it cannot name (record: ${recordContents === undefined ? "missing" : "present"})`,
+        );
+      }
+      assert.deepEqual(compactCalls, [], "nothing may be repaired while the home is held");
+    }).pipe(Effect.provide(layerHost)),
+);

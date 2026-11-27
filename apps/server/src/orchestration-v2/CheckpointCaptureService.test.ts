@@ -278,7 +278,7 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
                         Layer.mock(CheckpointStore.CheckpointStore)({
                           listAuthoredPaths: () => Effect.succeed(null),
                           isGitRepository: () => Effect.succeed(true),
-                          captureCheckpoint: () => Effect.void,
+                          captureCheckpoint: () => Effect.succeed({ skippedPaths: [] }),
                           hasCheckpointRef: () =>
                             Effect.fail(
                               new VcsProcessTimeoutError({
@@ -642,7 +642,7 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
                     Layer.mock(CheckpointStore.CheckpointStore)({
                       isGitRepository: () => Effect.succeed(true),
                       hasCheckpointRef: () => Effect.succeed(true),
-                      captureCheckpoint: () => Effect.void,
+                      captureCheckpoint: () => Effect.succeed({ skippedPaths: [] }),
                       diffCheckpoints: () => Effect.succeed(""),
                       listAuthoredPaths: () => Effect.succeed(null),
                     }),
