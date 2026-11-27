@@ -28,6 +28,7 @@ import {
 import { threadPullRequestsOf } from "../sourceControl/threadPullRequests.ts";
 import type {
   OrchestrationV2AppThread,
+  OrchestrationV2Bot,
   OrchestrationV2Checkpoint,
   OrchestrationV2CheckpointScope,
   OrchestrationV2ExecutionNode,
@@ -78,6 +79,7 @@ import {
   OrchestrationV2SubagentJson as OrchestrationV2SubagentJsonSchema,
   OrchestrationV2TurnItemJson as OrchestrationV2TurnItemJsonSchema,
   orchestrationV2RunWorkStartedAt,
+  BotId,
   RunId,
   MessageId,
   RuntimeRequestId,
@@ -568,6 +570,10 @@ export interface ProjectionStoreV2Shape {
     fields: ReadonlyArray<K>,
     filter?: ProjectionRecordFilter,
   ) => Effect.Effect<ProjectionRecords<K>, ProjectionStoreV2Error>;
+  /** The bot row by id, retired ones included; null when no such bot exists. */
+  readonly getBot: (
+    botId: BotId,
+  ) => Effect.Effect<OrchestrationV2Bot | null, ProjectionStoreV2Error>;
   readonly getThreadTrash: (
     threadId: ThreadId,
   ) => Effect.Effect<ProjectionThreadTrash | null, ProjectionStoreV2Error>;
@@ -997,6 +1003,9 @@ export function applyToProjection(
       };
     case "bot.created":
     case "bot.retired":
+    case "bot.paused":
+    case "bot.resumed":
+    case "bot.current-thread-changed":
       return {
         ...projection,
         bot: applyBotEventToThreadBot(projection.bot ?? null, event),
@@ -2441,8 +2450,14 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               break;
             }
             case "bot.created":
-            case "bot.retired": {
-              const payloadJson = yield* encodeBotPayload(event.payload);
+            case "bot.retired":
+            case "bot.paused":
+            case "bot.resumed":
+            case "bot.current-thread-changed": {
+              // The move event's previousThreadId is event metadata, not bot state.
+              const { previousThreadId: _previousThreadId, ...botPayload } =
+                event.payload as typeof event.payload & { readonly previousThreadId?: string };
+              const payloadJson = yield* encodeBotPayload(botPayload);
               const payload = parseEncodedPayload(payloadJson);
               yield* sql`
               INSERT INTO orchestration_v2_projection_bots (
@@ -3419,6 +3434,9 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             event.type !== "thread.commander-unmarked" &&
             event.type !== "bot.created" &&
             event.type !== "bot.retired" &&
+            event.type !== "bot.paused" &&
+            event.type !== "bot.resumed" &&
+            event.type !== "bot.current-thread-changed" &&
             event.type !== "thread.visited" &&
             event.type !== "thread.marked-unread" &&
             event.type !== "thread.metadata-updated" &&
@@ -9230,6 +9248,18 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       return row === undefined ? null : threadTrashFromRow(row);
     }, Effect.mapError(shellSnapshotReadError));
 
+    const getBot: ProjectionStoreV2Shape["getBot"] = Effect.fn("ProjectionStore.getBot")(function* (
+      botId,
+    ) {
+      const rows = yield* sql<PayloadRow>`
+          SELECT payload_json
+          FROM orchestration_v2_projection_bots
+          WHERE bot_id = ${botId}
+        `;
+      const row = rows[0];
+      return row === undefined ? null : yield* decodeBotPayload(row.payload_json);
+    }, Effect.mapError(shellSnapshotReadError));
+
     const getThreadTrashCascade: ProjectionStoreV2Shape["getThreadTrashCascade"] = Effect.fn(
       "ProjectionStore.getThreadTrashCascade",
     )(function* (cascadeRootId) {
@@ -9567,6 +9597,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       listActiveSubagentThreadIds: readOnReader(listActiveSubagentThreadIds),
       countThreads: readOnReader(countThreads),
       listActiveShellIndex: readOnReader(listActiveShellIndex),
+      getBot: readOnReader(getBot),
       getThreadTrash: readOnReader(getThreadTrash),
       getThreadTrashCascade: readOnReader(getThreadTrashCascade),
       isThreadInTrash: readOnReader(isThreadInTrash),

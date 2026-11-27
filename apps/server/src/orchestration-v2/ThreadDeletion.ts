@@ -237,18 +237,34 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
 
 export const planThreadPurge = Effect.fn("ThreadDeletion.planThreadPurge")(function* (input: {
   readonly command: Extract<OrchestrationV2Command, { readonly type: "thread.purge" }>;
-  readonly projection: Pick<OrchestrationV2ThreadProjection, "thread">;
+  readonly projection: Pick<OrchestrationV2ThreadProjection, "thread" | "bot">;
   readonly attachmentIds: ReadonlyArray<string>;
   readonly now: DateTime.Utc;
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
   readonly effectScope?: string;
 }): Effect.fn.Return<ThreadPurgePlan, IdAllocator.IdAllocatorV2Error> {
   const { command, projection, now, idAllocator } = input;
+  const events: Array<OrchestrationV2DomainEvent> = [];
+  // A purged thread can no longer be a bot's home: its bot retires in the same
+  // transaction, freeing the thread slot of the unique index.
+  if (projection.bot != null && projection.bot.currentThreadId === command.threadId) {
+    const botEventId = yield* idAllocator.allocate.event({
+      threadId: command.threadId,
+      commandId: command.commandId,
+    });
+    events.push({
+      id: botEventId,
+      type: "bot.retired",
+      threadId: command.threadId,
+      occurredAt: now,
+      payload: { ...projection.bot, status: "retired", updatedAt: now },
+    });
+  }
   const eventId = yield* idAllocator.allocate.event({
     threadId: command.threadId,
     commandId: command.commandId,
   });
-  const event: OrchestrationV2DomainEvent = {
+  events.push({
     id: eventId,
     type: "thread.purged",
     threadId: command.threadId,
@@ -258,7 +274,7 @@ export const planThreadPurge = Effect.fn("ThreadDeletion.planThreadPurge")(funct
       ...projection.thread,
       updatedAt: now,
     },
-  };
+  });
   const effectScope = input.effectScope ?? command.commandId;
   const effects: Array<PendingOrchestrationEffectV2> = [
     {
@@ -283,5 +299,5 @@ export const planThreadPurge = Effect.fn("ThreadDeletion.planThreadPurge")(funct
       request: { type: "attachment.cleanup", attachmentIds },
     });
   }
-  return { events: [event], effects };
+  return { events, effects };
 });

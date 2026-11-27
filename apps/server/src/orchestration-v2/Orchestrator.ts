@@ -758,6 +758,9 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.unpin":
     case "thread.commander.mark":
     case "thread.commander.unmark":
+    case "bot.pause":
+    case "bot.resume":
+    case "bot.switch-thread":
     case "thread.pin.reorder":
     case "thread.active.reorder":
     case "thread.tag.set":
@@ -4115,6 +4118,118 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       occurredAt: now,
       payload: { ...bot, status: "retired" as const, updatedAt: now },
     });
+  });
+
+  const dispatchBotCommand = Effect.fn("orchestrationV2.dispatch.botCommand")(function* (
+    command: Extract<
+      OrchestrationV2ServerCommand,
+      { readonly type: "bot.pause" | "bot.resume" | "bot.switch-thread" }
+    >,
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+  ) {
+    const refuse = (cause: string) =>
+      new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause,
+      });
+    const bot = yield* projectionStore
+      .getBot(command.botId)
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    if (bot === null) {
+      return yield* refuse(`Bot ${command.botId} does not exist.`);
+    }
+    if (bot.status === "retired") {
+      return yield* refuse(`Bot ${command.botId} is retired.`);
+    }
+    // The sender's current thread is optimistic concurrency: a bot that moved since
+    // refuses rather than acting from stale state.
+    if (bot.currentThreadId !== command.threadId) {
+      return yield* refuse(
+        `Bot ${command.botId} is on thread ${bot.currentThreadId}, not ${command.threadId}.`,
+      );
+    }
+    const now = yield* DateTime.now;
+    if (command.type === "bot.pause") {
+      if (bot.status === "paused") return;
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "bot.paused",
+        threadId: bot.currentThreadId,
+        occurredAt: now,
+        payload: { ...bot, status: "paused" as const, updatedAt: now },
+      });
+      return;
+    }
+    if (command.type === "bot.resume") {
+      if (bot.status === "active") return;
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "bot.resumed",
+        threadId: bot.currentThreadId,
+        occurredAt: now,
+        payload: { ...bot, status: "active" as const, updatedAt: now },
+      });
+      return;
+    }
+    if (command.targetThreadId === bot.currentThreadId) return;
+    const targetThread = yield* projectionStore.getThread(command.targetThreadId).pipe(
+      Effect.catchTags({
+        ProjectionStoreThreadNotFoundError: () => Effect.succeed(null),
+      }),
+      Effect.mapError(
+        (cause) => new OrchestratorProjectionError({ threadId: command.targetThreadId, cause }),
+      ),
+    );
+    if (targetThread === null) {
+      return yield* refuse(`Thread ${command.targetThreadId} does not exist.`);
+    }
+    if (targetThread.deletedAt !== null) {
+      return yield* refuse(`Thread ${command.targetThreadId} is deleted.`);
+    }
+    // Deletes lock a parent before its side chats; holding a side chat's lock here while
+    // waiting on the current thread's could invert that order and deadlock.
+    if (targetThread.lineage.sideChat === true) {
+      return yield* refuse(`Thread ${command.targetThreadId} is a side chat.`);
+    }
+    // The partial unique index makes this race-free as a backstop; the read gives the
+    // user a refusal instead of a constraint failure.
+    const occupant = (yield* projectionStore
+      .getThreadRecords(command.targetThreadId, ["bot"])
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.targetThreadId, cause }),
+        ),
+      )).bot;
+    if (occupant != null && occupant.id !== bot.id) {
+      return yield* refuse(`Thread ${command.targetThreadId} already has bot ${occupant.id}.`);
+    }
+    const movedBot = {
+      ...bot,
+      currentThreadId: command.targetThreadId,
+      updatedAt: now,
+    };
+    // One copy on each stream: the old thread's projections and shell lose the bot,
+    // the new thread's gain it, each from its own event.
+    for (const streamThreadId of [bot.currentThreadId, command.targetThreadId]) {
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "bot.current-thread-changed" as const,
+        threadId: streamThreadId,
+        occurredAt: now,
+        payload: { ...movedBot, previousThreadId: bot.currentThreadId },
+      });
+    }
   });
 
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
@@ -15266,7 +15381,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const now = yield* DateTime.now;
       for (const member of cascade) {
         const projection = yield* projectionStore
-          .getThreadRecords(member.threadId, [])
+          .getThreadRecords(member.threadId, ["bot"])
           .pipe(
             Effect.mapError(
               (cause) => new OrchestratorProjectionError({ threadId: member.threadId, cause }),
@@ -15604,13 +15719,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               "runtimeRequests",
               "subagents",
               "providerSessions",
+              "bot",
             ])
             .pipe(
               Effect.mapError(
                 (cause) => new OrchestratorProjectionError({ threadId: deletion.threadId, cause }),
               ),
             );
-          return yield* mapDispatchError(command)(
+          const plan = yield* mapDispatchError(command)(
             planThreadDeletion({
               command: deletion,
               cascadeRootId: command.threadId,
@@ -15619,6 +15735,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               idAllocator,
             }),
           );
+          return { ...plan, bot: projection.bot ?? null };
         });
         // Checked under the thread lock: a message sent since the client looked keeps the thread.
         if (command.onlyIfUnused === true) {
@@ -15661,7 +15778,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                   commandId: command.commandId,
                   threadId: deleted.threadId,
                 },
-                projection: { thread: deleted.payload },
+                projection: { thread: deleted.payload, bot: plan.bot },
                 attachmentIds: yield* projectionStore
                   .getThreadAttachmentIds(deleted.threadId)
                   .pipe(mapDispatchError(command)),
@@ -15710,6 +15827,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.commander.mark":
       case "thread.commander.unmark":
         yield* dispatchCommanderMark(command, events);
+        break;
+      case "bot.pause":
+      case "bot.resume":
+      case "bot.switch-thread":
+        yield* dispatchBotCommand(command, events);
         break;
       case "thread.pull-request-watch.checks-reopen":
         yield* dispatchThreadMutation(command, events, effects);
@@ -16078,6 +16200,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           // Marking or unmarking again leaves the thread as it is.
           command.type === "thread.commander.mark" ||
           command.type === "thread.commander.unmark" ||
+          // Pausing, resuming, or switching to the thread the bot is already on is a no-op.
+          command.type === "bot.pause" ||
+          command.type === "bot.resume" ||
+          command.type === "bot.switch-thread" ||
           command.type === "delegated_task.timeout" ||
           (command.type === "thread.delete" && command.onlyIfUnused === true) ||
           command.type === "thread.batch",
@@ -16094,6 +16220,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           if (
             cause._tag === "OrchestratorThreadAboveModeLimitError" ||
             cause._tag === "OrchestratorDispatchConcurrencyLimitError" ||
+            // Bot refusals depend on state the user can change (a retired or moved bot,
+            // an occupied target); a recorded rejection would block the retry.
+            command.type === "bot.pause" ||
+            command.type === "bot.resume" ||
+            command.type === "bot.switch-thread" ||
             (cause._tag === "OrchestratorDispatchError" &&
               cause.code !== undefined &&
               isThreadTrashFailureCode(cause.code))
@@ -16302,6 +16433,21 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* source === null || source.lineage.sideChat === true || target !== null
         ? dispatch
         : threadDispatch.withLock(command.sourceThreadId, dispatch);
+    }
+    if (command.type === "bot.switch-thread") {
+      // The move writes to both threads' streams, so it holds both locks in sorted
+      // order; pause and resume need only the current thread's, already taken above.
+      // A side chat target would invert the parent-before-side-chat lock order deletes
+      // take; dispatch refuses those, so they skip the second lock like fork does.
+      const target = yield* findThread(command.targetThreadId);
+      if (target === null || target.lineage.sideChat === true) return yield* dispatch;
+      const lockIds = [...new Set([command.threadId, command.targetThreadId])]
+        .toSorted()
+        .toReversed();
+      return yield* lockIds.reduce(
+        (locked, threadId) => threadDispatch.withLock(threadId, locked),
+        dispatchWithReceiptEffect(command),
+      );
     }
     if (command.type === "thread.restore" || command.type === "thread.purge") {
       const trash = yield* projectionStore

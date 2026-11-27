@@ -68,6 +68,17 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
+/**
+ * Orchestration commands inside `orchestration.dispatchCommand` that need more than the
+ * method's scope, keyed by their `type` string. The key alone decides execution, so no
+ * schema decode is needed here: the server re-decodes and rejects malformed commands.
+ */
+const CLIENT_GUARDED_COMMAND_SCOPES = {
+  "bot.pause": AuthOrchestrationOperateScope,
+  "bot.resume": AuthOrchestrationOperateScope,
+  "bot.switch-thread": AuthOrchestrationOperateScope,
+} as const;
+
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);
 const decodeStackedAction = Schema.decodeUnknownSync(GitRunStackedActionInput);
 
@@ -87,6 +98,21 @@ export function clientRpcRequiredScopes(
       (payload.action === "create_pr" || payload.action === "commit_push_pr")
     )
       return [AuthSourceControlWriteScope, AuthOrchestrationReadScope];
+  }
+  if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand && input !== undefined) {
+    // Guarded command types key CLIENT_GUARDED_COMMAND_SCOPES by their `type` string,
+    // which decides execution. Anything unlisted or malformed falls through to the
+    // method scope; the server rejects malformed commands after decoding.
+    const commandType =
+      typeof input === "object" && input !== null && "type" in input ? input.type : undefined;
+    if (
+      typeof commandType === "string" &&
+      Object.hasOwn(CLIENT_GUARDED_COMMAND_SCOPES, commandType)
+    ) {
+      return [
+        CLIENT_GUARDED_COMMAND_SCOPES[commandType as keyof typeof CLIENT_GUARDED_COMMAND_SCOPES],
+      ];
+    }
   }
   return Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, method)
     ? [CLIENT_GUARDED_RPC_SCOPES[method as ClientGuardedRpcTag]]
