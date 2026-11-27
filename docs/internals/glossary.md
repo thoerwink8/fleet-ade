@@ -29,6 +29,8 @@ Terms whose meaning matters across T3 Code. Architecture and lifecycle constrain
 | Outbox effect           | Side-effect intent committed with the events, such as starting a provider turn or capturing a checkpoint. |
 | Effect worker           | The worker that runs outbox effects after commit and feeds their results back as commands.                |
 
+| Bot | A durable agent identity with a current thread, stored in the bots projection. The commander mark is a bot; a thread does not store one. |
+
 ## Providers and checkpoints
 
 | Term                | Meaning                                                                                                      |

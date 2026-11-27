@@ -19,6 +19,7 @@ import {
   legacyThreadPullRequestKey,
 } from "../sourceControl/threadPullRequests.ts";
 import {
+  BotId,
   EnvironmentId,
   ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE,
   type ChatAttachment,
@@ -1836,6 +1837,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           "providerThreads",
           "providerTurns",
           "runtimeRequests",
+          "bot",
           "messages",
           "turnItems",
           "checkpointScopes",
@@ -4049,6 +4051,71 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       );
     },
   );
+  const dispatchCommanderMark = Effect.fn("orchestrationV2.dispatch.commanderMark")(function* (
+    command: Extract<
+      OrchestrationV2ServerCommand,
+      { readonly type: "thread.commander.mark" | "thread.commander.unmark" }
+    >,
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+  ) {
+    const thread = yield* projectionStore.getThread(command.threadId).pipe(
+      Effect.mapError(
+        (cause) =>
+          new OrchestratorProjectionError({
+            threadId: command.threadId,
+            cause,
+          }),
+      ),
+    );
+    if (thread.deletedAt !== null) {
+      return yield* new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause: `Thread ${command.threadId} is deleted.`,
+      });
+    }
+    // The mark is a bot on the thread since migration 108; the thread payload stays untouched.
+    const bot = (yield* projectionStore.getThreadRecords(command.threadId, ["bot"]).pipe(
+      Effect.mapError(
+        (cause) =>
+          new OrchestratorProjectionError({
+            threadId: command.threadId,
+            cause,
+          }),
+      ),
+    )).bot;
+    const now = yield* DateTime.now;
+    if (command.type === "thread.commander.mark") {
+      if (bot != null) return;
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "bot.created",
+        threadId: command.threadId,
+        occurredAt: now,
+        payload: {
+          id: BotId.make(`bot:${command.commandId}`),
+          name: thread.title,
+          status: "active",
+          currentThreadId: command.threadId,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+      return;
+    }
+    if (bot == null) return;
+    yield* emit(
+      events,
+      command,
+    )({
+      type: "bot.retired",
+      threadId: command.threadId,
+      occurredAt: now,
+      payload: { ...bot, status: "retired" as const, updatedAt: now },
+    });
+  });
 
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
     command: Extract<
@@ -4064,8 +4131,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           | "thread.auto-settle.set"
           | "thread.pin"
           | "thread.unpin"
-          | "thread.commander.mark"
-          | "thread.commander.unmark"
           | "thread.pin.reorder"
           | "thread.tag.set"
           | "thread.active.reorder"
@@ -4103,12 +4168,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         commandType: command.type,
         cause: `Thread ${command.threadId} is deleted.`,
       });
-    }
-    if (
-      (command.type === "thread.commander.mark" && thread.commander === true) ||
-      (command.type === "thread.commander.unmark" && thread.commander !== true)
-    ) {
-      return;
     }
     if (
       command.type === "thread.pull-request.watch" &&
@@ -4683,10 +4742,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             updatedAt: alreadyUnpinned ? thread.updatedAt : now,
           };
         }
-        case "thread.commander.mark":
-          return { ...thread, commander: true };
-        case "thread.commander.unmark":
-          return { ...thread, commander: false };
         case "thread.pin.reorder": {
           const keyUnchanged = thread.pinOrderKey === command.orderKey;
           return {
@@ -5126,10 +5181,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return "thread.pinned" as const;
         case "thread.unpin":
           return "thread.unpinned" as const;
-        case "thread.commander.mark":
-          return "thread.commander-marked" as const;
-        case "thread.commander.unmark":
-          return "thread.commander-unmarked" as const;
         case "thread.pin.reorder":
           return "thread.pin-reordered" as const;
         case "thread.active.reorder":
@@ -6908,7 +6959,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       projection = applyToProjection(projection, event);
     }
     let modelSelection = command.modelSelection ?? projection.thread.modelSelection;
-    if (command.modelSelection === undefined && projection.thread.commander === true) {
+    if (command.modelSelection === undefined && projection.bot != null) {
       const commanderModel = resolveDispatchAssignment(
         yield* serverSettings.getSettings.pipe(Effect.orDie),
         projection.thread.projectId,
@@ -9187,11 +9238,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         readonly commandId: CommandId;
         readonly parentThreadId: ThreadId;
       },
-      thread: Pick<OrchestrationV2ThreadProjection["thread"], "commander" | "projectId">,
+      parent: {
+        readonly bot?: OrchestrationV2ThreadProjection["bot"] | undefined;
+        readonly thread: Pick<OrchestrationV2ThreadProjection["thread"], "projectId">;
+      },
     ) {
-      if (thread.commander !== true) return;
+      if (parent.bot == null) return;
       const settings = yield* serverSettings.getSettings.pipe(Effect.orDie);
-      const limit = resolveProjectSettings(settings, thread.projectId).settings
+      const limit = resolveProjectSettings(settings, parent.thread.projectId).settings
         .dispatchConcurrencyLimit;
       if (limit === null) return;
       const open = yield* projectionStore
@@ -9336,7 +9390,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       const parentProjection = yield* projectionStore
         .getThreadRecords(
           command.parentThreadId,
-          ["runs", "nodes", "providerThreads", "providerTurns", "attempts"],
+          ["runs", "nodes", "providerThreads", "providerTurns", "attempts", "bot"],
           // The parent node must belong to the active run, whose nodes this keeps.
           { omitSettledLeafNodes: true },
         )
@@ -9380,7 +9434,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           cause: `Parent node ${command.parentNodeId} is not part of active run ${parentRun.id}.`,
         });
       }
-      yield* refuseCommanderConcurrency(command, parentProjection.thread);
+      yield* refuseCommanderConcurrency(command, parentProjection);
 
       const targetAdapter = yield* providerAdapters.get(command.modelSelection.instanceId).pipe(
         Effect.mapError(
@@ -9446,7 +9500,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         model: command.modelSelection.model,
         modelSelection: command.modelSelection,
         ...(command.completionWake === undefined ? {} : { completionWake: command.completionWake }),
-        ...(parentProjection.thread.commander !== true
+        ...(parentProjection.bot == null
           ? {}
           : yield* acceptedCommanderDispatch(parentProjection.thread.projectId)),
         status: "running",
@@ -9790,7 +9844,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
   ) {
     const parentProjection = yield* projectionStore
-      .getThreadRecords(command.parentThreadId, ["runs", "providerTurns", "attempts", "subagents"])
+      .getThreadRecords(command.parentThreadId, [
+        "runs",
+        "providerTurns",
+        "attempts",
+        "subagents",
+        "bot",
+      ])
       .pipe(
         Effect.mapError(
           (cause) => new OrchestratorProjectionError({ threadId: command.parentThreadId, cause }),
@@ -9826,7 +9886,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: `Parent run ${command.parentRunId} is stopping.`,
       });
     }
-    yield* refuseCommanderConcurrency(command, parentProjection.thread);
+    yield* refuseCommanderConcurrency(command, parentProjection);
     const now = yield* DateTime.now;
     const taskNodeId = idAllocator.derive.delegatedTaskNode({ commandId: command.commandId });
     const taskTurnItemId = idAllocator.derive.delegatedTaskTurnItem({
@@ -15630,8 +15690,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.auto-settle.set":
       case "thread.pin":
       case "thread.unpin":
-      case "thread.commander.mark":
-      case "thread.commander.unmark":
       case "thread.pin.reorder":
       case "thread.active.reorder":
       case "thread.tag.set":
@@ -15648,6 +15706,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.model-selection.set":
       case "provider.switch":
         yield* dispatchThreadMutation(command, events, effects);
+        break;
+      case "thread.commander.mark":
+      case "thread.commander.unmark":
+        yield* dispatchCommanderMark(command, events);
         break;
       case "thread.pull-request-watch.checks-reopen":
         yield* dispatchThreadMutation(command, events, effects);

@@ -719,9 +719,9 @@ describe("orchestrator MCP toolkit", () => {
         );
         expect(capabilities.isError).not.toBe(true);
         expect(messageReads).toHaveLength(messageReadsBeforeCapabilities);
-        // The caller check reads only the thread row, never its history.
+        // The caller check reads the thread row and its bot, never its history.
         expect(new Set(projectionTableReads.slice(tableReadsBeforeCapabilities))).toEqual(
-          new Set(["threads"]),
+          new Set(["threads", "bots"]),
         );
         const runReadsBeforeStatus = runReads.length;
         const transferReadsBeforeStatus = transferReads.length;
