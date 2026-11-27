@@ -1,3 +1,4 @@
+import { applyBotEventToThreadBot } from "@t3tools/contracts";
 import { applyThreadPullRequestLinkUpdate } from "../threadPullRequests.ts";
 import type {
   OrchestrationV2DomainEvent,
@@ -325,6 +326,10 @@ export function applyOrchestrationV2ProjectionEvent(
     case "thread.commander-marked":
     case "thread.commander-unmarked":
       return { ...projection, thread: event.payload };
+    // Bot changes are not activity either: the thread shell carries them.
+    case "bot.created":
+    case "bot.retired":
+      return { ...projection, bot: applyBotEventToThreadBot(projection.bot ?? null, event) };
     case "run.created":
     case "run.updated": {
       const next = { ...base, runs: upsertEntity(base.runs, event.payload) };

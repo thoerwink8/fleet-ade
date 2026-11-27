@@ -8,6 +8,7 @@ import * as SchemaGetter from "effect/SchemaGetter";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import {
+  BotId,
   CheckpointId,
   CheckpointRef,
   CheckpointScopeId,
@@ -554,7 +555,7 @@ export const OrchestrationV2AppThread = Schema.Struct({
   /** Guest links are removed; kept so threads persisted while they existed still decode. */
   guestShare: Schema.optional(Schema.NullOr(ThreadGuestShare)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
-  /** Absent on threads written before commander marks; not a commander. */
+  /** Legacy commander mark. Threads no longer write it since migration 108; read the thread projection's `bot`. Kept so persisted threads decode. */
   commander: Schema.optional(Schema.Boolean),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -605,6 +606,39 @@ export const OrchestrationV2AppThread = Schema.Struct({
   deletedAt: Schema.NullOr(Schema.DateTimeUtc),
 });
 export type OrchestrationV2AppThread = typeof OrchestrationV2AppThread.Type;
+
+export const OrchestrationV2BotStatus = Schema.Literals(["active", "paused", "retired"]);
+export type OrchestrationV2BotStatus = typeof OrchestrationV2BotStatus.Type;
+
+/**
+ * A durable agent identity. The commander mark is a bot: the thread no longer stores one.
+ * `currentThreadId` is unique among non-retired bots at the projection layer.
+ */
+export const OrchestrationV2Bot = Schema.Struct({
+  id: BotId,
+  name: TrimmedNonEmptyString,
+  status: OrchestrationV2BotStatus,
+  currentThreadId: ThreadId,
+  createdAt: Schema.DateTimeUtc,
+  updatedAt: Schema.DateTimeUtc,
+});
+export type OrchestrationV2Bot = typeof OrchestrationV2Bot.Type;
+
+/**
+ * The bot a `bot.created` or `bot.retired` event leaves on its thread's projection.
+ * Events are thread-scoped; an unrelated bot's event leaves the projection as it is.
+ */
+export function applyBotEventToThreadBot(
+  bot: OrchestrationV2Bot | null,
+  event: Extract<OrchestrationV2DomainEvent, { readonly type: "bot.created" | "bot.retired" }>,
+): OrchestrationV2Bot | null {
+  switch (event.type) {
+    case "bot.created":
+      return event.payload.currentThreadId === event.threadId ? event.payload : bot;
+    case "bot.retired":
+      return bot?.id === event.payload.id ? null : bot;
+  }
+}
 
 /** A thread another agent drives: a local subagent or a task delegated from a linked environment. */
 export const isDelegatedAppThread = (
@@ -2090,6 +2124,12 @@ export const OrchestrationV2DomainEvent = Schema.Union([
   }),
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
+    type: Schema.Literals(["bot.created", "bot.retired"]),
+    /** The full bot after the change, retired status included; `threadId` is its current thread. */
+    payload: OrchestrationV2Bot,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2EventBase.fields,
     type: Schema.Literals([
       "thread.archived",
       "thread.unarchived",
@@ -2102,6 +2142,7 @@ export const OrchestrationV2DomainEvent = Schema.Union([
       "thread.pinned",
       "thread.auto-settle-set",
       "thread.unpinned",
+      // Decoded only: since migration 108 the mark is a bot and no thread event is emitted.
       "thread.commander-marked",
       "thread.commander-unmarked",
       "thread.pin-reordered",
@@ -2240,6 +2281,8 @@ export type OrchestrationV2DomainEvent = typeof OrchestrationV2DomainEvent.Type;
 
 export const OrchestrationV2ThreadProjection = Schema.Struct({
   thread: OrchestrationV2AppThread,
+  /** The non-retired bot whose current thread this is. Absent on servers before bots. */
+  bot: Schema.optional(Schema.NullOr(OrchestrationV2Bot)),
   runs: Schema.Array(OrchestrationV2Run),
   attempts: Schema.Array(OrchestrationV2RunAttempt),
   nodes: Schema.Array(OrchestrationV2ExecutionNode),
@@ -2382,7 +2425,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   snoozedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
-  /** Absent on threads written before commander marks; not a commander. */
+  /** Computed from the bots projection on servers with migration 108; the wire shape is unchanged. */
   commander: Schema.optional(Schema.Boolean),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -2588,6 +2631,13 @@ export const OrchestrationV2AppThreadJson = OrchestrationV2AppThread.mapFields((
   deletedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 }));
 export type OrchestrationV2AppThreadJson = typeof OrchestrationV2AppThreadJson.Type;
+
+export const OrchestrationV2BotJson = OrchestrationV2Bot.mapFields((fields) => ({
+  ...fields,
+  createdAt: Schema.DateTimeUtcFromString,
+  updatedAt: Schema.DateTimeUtcFromString,
+}));
+export type OrchestrationV2BotJson = typeof OrchestrationV2BotJson.Type;
 
 export const OrchestrationV2RunJson = OrchestrationV2Run.mapFields((fields) => ({
   ...fields,
@@ -2960,6 +3010,7 @@ export const OrchestrationV2ThreadProjectionJson = OrchestrationV2ThreadProjecti
   (fields) => ({
     ...fields,
     thread: OrchestrationV2AppThreadJson,
+    bot: Schema.optional(Schema.NullOr(OrchestrationV2BotJson)),
     runs: Schema.Array(OrchestrationV2RunJson),
     attempts: Schema.Array(OrchestrationV2RunAttemptJson),
     nodes: Schema.Array(OrchestrationV2ExecutionNodeJson),
@@ -3068,6 +3119,11 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
     ...OrchestrationV2JsonEventBaseFields,
     type: Schema.Literal("thread.created"),
     payload: OrchestrationV2AppThreadJson,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2JsonEventBaseFields,
+    type: Schema.Literals(["bot.created", "bot.retired"]),
+    payload: OrchestrationV2BotJson,
   }),
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,
@@ -3348,11 +3404,13 @@ export const OrchestrationV2Command = Schema.Union([
     commandId: CommandId,
     threadId: ThreadId,
   }),
+  /** Creates a bot on the thread since migration 108; the thread payload no longer carries the mark. */
   Schema.Struct({
     type: Schema.Literal("thread.commander.mark"),
     commandId: CommandId,
     threadId: ThreadId,
   }),
+  /** Retires the thread's bot since migration 108; the thread payload no longer carries the mark. */
   Schema.Struct({
     type: Schema.Literal("thread.commander.unmark"),
     commandId: CommandId,

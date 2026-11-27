@@ -1419,7 +1419,7 @@ it.effect("counts accepted queued delegations against the commander limit", () =
       commandId: CommandId.make("mark-commander-limit"),
       threadId: parentThreadId,
     });
-    assert.equal((yield* projections.getThreadProjection(parentThreadId)).thread.commander, true);
+    assert.isNotNull((yield* projections.getThreadProjection(parentThreadId)).bot);
     yield* orchestrator.dispatch({
       type: "message.dispatch",
       commandId: CommandId.make("start-commander-limit"),

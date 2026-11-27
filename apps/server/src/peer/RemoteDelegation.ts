@@ -268,7 +268,7 @@ const make = Effect.gen(function* () {
   const delegate: RemoteDelegation["Service"]["delegate"] = Effect.fn("RemoteDelegation.delegate")(
     function* (scope, input) {
       const { target } = input;
-      const parent = yield* threads.getThreadRecords(scope.thread.threadId, ["runs"]).pipe(
+      const parent = yield* threads.getThreadRecords(scope.thread.threadId, ["runs", "bot"]).pipe(
         Effect.mapError(
           () =>
             new OrchestratorMcpFailure({
@@ -292,7 +292,7 @@ const make = Effect.gen(function* () {
       }
       const parentNodeId = parentRun.rootNodeId;
       let note: string | undefined;
-      if (parent.thread.commander === true) {
+      if (parent.bot != null) {
         const settings = yield* serverSettings.getSettings.pipe(
           Effect.mapError(
             () =>

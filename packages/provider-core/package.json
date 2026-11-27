@@ -23,6 +23,10 @@
       "types": "./src/server/auth.ts",
       "import": "./src/server/auth.ts"
     },
+    "./server/botPreamble": {
+      "types": "./src/server/botPreamble.ts",
+      "import": "./src/server/botPreamble.ts"
+    },
     "./server/collectStreamText": {
       "types": "./src/server/collectStreamText.ts",
       "import": "./src/server/collectStreamText.ts"

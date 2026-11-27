@@ -59,6 +59,8 @@ import {
   IDLE_COMPACTION_TEXT,
   idleCompactionOf,
   OrchestrationV2AppThreadJson as OrchestrationV2AppThreadJsonSchema,
+  applyBotEventToThreadBot,
+  OrchestrationV2BotJson as OrchestrationV2BotJsonSchema,
   OrchestrationV2CheckpointJson as OrchestrationV2CheckpointJsonSchema,
   OrchestrationV2CheckpointScopeJson as OrchestrationV2CheckpointScopeJsonSchema,
   OrchestrationV2ContextHandoffJson as OrchestrationV2ContextHandoffJsonSchema,
@@ -885,6 +887,7 @@ export function emptyProjection(
 ): OrchestrationV2ThreadProjection {
   return {
     thread: event.payload,
+    bot: null,
     runs: [],
     attempts: [],
     nodes: [],
@@ -991,6 +994,12 @@ export function applyToProjection(
       return {
         ...projection,
         thread: event.payload,
+      };
+    case "bot.created":
+    case "bot.retired":
+      return {
+        ...projection,
+        bot: applyBotEventToThreadBot(projection.bot ?? null, event),
       };
     case "run.created":
     case "run.updated":
@@ -1146,6 +1155,7 @@ export type AgentAwarenessThread = ProjectThreadAwarenessV2Input["thread"] &
 type ShellThreadRow = {
   readonly thread_id: string;
   readonly payload_json: string;
+  readonly commander: number;
   readonly forked_from_run_source_thread_id: string | null;
   readonly latest_run_id: string | null;
   readonly latest_run_status: string | null;
@@ -1229,6 +1239,7 @@ const encodeIdList = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema
 const matchesNothing = (...filters: ReadonlyArray<ReadonlyArray<unknown> | undefined>) =>
   filters.some((values) => values?.length === 0);
 
+const encodeBotPayload = Schema.encodeEffect(Schema.fromJsonString(OrchestrationV2BotJsonSchema));
 const encodeThreadPayload = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationV2AppThreadJsonSchema),
 );
@@ -1317,6 +1328,9 @@ const decodePullRequestThread = Schema.decodeUnknownEffect(
   Schema.fromJsonString(PullRequestThread),
 );
 
+const decodeBotPayload = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(OrchestrationV2BotJsonSchema),
+);
 const decodeThreadPayload = Schema.decodeUnknownEffect(
   Schema.fromJsonString(OrchestrationV2AppThreadJsonSchema),
 );
@@ -1930,7 +1944,7 @@ export function threadShellFromProjection(
     snoozedUntil: projection.thread.snoozedUntil ?? null,
     snoozedAt: projection.thread.snoozedAt ?? null,
     pinnedAt: projection.thread.pinnedAt ?? null,
-    commander: projection.thread.commander === true,
+    commander: projection.bot != null,
 
     autoSettleDisabledAt: projection.thread.autoSettleDisabledAt ?? null,
     pinOrderKey: projection.thread.pinOrderKey ?? null,
@@ -2022,6 +2036,8 @@ function isActivityRunForShell(
 
 type ShellThreadState = {
   readonly thread: OrchestrationV2ThreadProjection["thread"];
+  /** A non-retired bot has this thread as its current thread. */
+  readonly commander: boolean;
   readonly latestRunId: RunId | null;
   readonly latestRunStatus: OrchestrationV2ShellThreadStatus;
   readonly latestRunRequestedAt: DateTime.Utc | null;
@@ -2237,7 +2253,7 @@ function shellFromState(input: {
     snoozedUntil: input.state.thread.snoozedUntil ?? null,
     snoozedAt: input.state.thread.snoozedAt ?? null,
     pinnedAt: input.state.thread.pinnedAt ?? null,
-    commander: input.state.thread.commander === true,
+    commander: input.state.commander,
 
     autoSettleDisabledAt: input.state.thread.autoSettleDisabledAt ?? null,
     pinOrderKey: input.state.thread.pinOrderKey ?? null,
@@ -2422,6 +2438,34 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 type: "thread.pull-request-synced",
                 payload: applyThreadPullRequestLinkUpdate(thread, event.payload),
               });
+              break;
+            }
+            case "bot.created":
+            case "bot.retired": {
+              const payloadJson = yield* encodeBotPayload(event.payload);
+              const payload = parseEncodedPayload(payloadJson);
+              yield* sql`
+              INSERT INTO orchestration_v2_projection_bots (
+                bot_id,
+                status,
+                current_thread_id,
+                updated_at,
+                payload_json
+              )
+              VALUES (
+                ${event.payload.id},
+                ${event.payload.status},
+                ${event.payload.currentThreadId},
+                ${stringField(payload, "updatedAt")},
+                ${payloadJson}
+              )
+              ON CONFLICT(bot_id)
+              DO UPDATE SET
+                status = excluded.status,
+                current_thread_id = excluded.current_thread_id,
+                updated_at = excluded.updated_at,
+                payload_json = excluded.payload_json
+            `;
               break;
             }
             case "thread.created":
@@ -3373,6 +3417,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             event.type !== "thread.tags-updated" &&
             event.type !== "thread.commander-marked" &&
             event.type !== "thread.commander-unmarked" &&
+            event.type !== "bot.created" &&
+            event.type !== "bot.retired" &&
             event.type !== "thread.visited" &&
             event.type !== "thread.marked-unread" &&
             event.type !== "thread.metadata-updated" &&
@@ -4064,6 +4110,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
 
         const [
           thread,
+          botRows,
           runRows,
           attemptRows,
           nodeRows,
@@ -4080,6 +4127,13 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           contextTransferRows,
         ] = yield* Effect.all([
           decodeThreadPayload(threadRow.payload_json),
+          fields !== undefined && !fields.includes("bot")
+            ? Effect.succeed([])
+            : sql<PayloadRow>`
+            SELECT payload_json
+            FROM orchestration_v2_projection_bots
+            WHERE current_thread_id = ${threadId} AND status <> 'retired'
+          `,
           (fields !== undefined && !fields.includes("runs")) ||
           (window === undefined &&
             (matchesNothing(filter?.runIds) ||
@@ -4560,6 +4614,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           decodeRows(decodeContextHandoffPayload, threadId)(contextHandoffRows),
           decodeRows(decodeContextTransferPayload, threadId)(contextTransferRows),
         ]);
+        const bot =
+          botRows[0] === undefined ? null : yield* decodeBotPayload(botRows[0].payload_json);
         const messageOrdinals = new Map<string, number>();
         // The literal `type = 'user_message'` lets SQLite pick the partial user-message index.
         const userOnly = messages.every((message) => message.role === "user");
@@ -4599,6 +4655,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         }
         const orderedMessages = sortMessagesByTurnItemOrder(messages, turnItems, messageOrdinals);
         const projection = {
+          bot,
           thread,
           runs,
           attempts,
@@ -7929,6 +7986,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             SELECT
               t.thread_id,
               t.payload_json,
+              EXISTS (
+                SELECT 1 FROM orchestration_v2_projection_bots bot
+                WHERE bot.current_thread_id = t.thread_id AND bot.status <> 'retired'
+              ) AS commander,
               CASE
                 WHEN json_extract(t.payload_json, '$.forkedFrom.type') = 'run'
                   AND json_extract(t.payload_json, '$.lineage.sideChat') IS NOT 1
@@ -8765,6 +8826,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           updatedAt: thread.updatedAt,
           runsById: runsByThreadId.get(ThreadId.make(row.thread_id)) ?? new Map(),
           itemCountByRunId: itemCountsByThreadId.get(ThreadId.make(row.thread_id)) ?? new Map(),
+          commander: row.commander === 1,
         } satisfies ShellThreadState;
       });
 
@@ -9048,7 +9110,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         readonly settled_override: string | null;
         readonly settled_at: string | null;
         readonly pinned_at: string | null;
-        readonly commander: number | null;
+        readonly commander: number;
         readonly snoozed_until: string | null;
         readonly may_be_live: number;
         readonly has_remote_tasks: number;
@@ -9063,7 +9125,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
           json_extract(t.payload_json, '$.settledOverride') AS settled_override,
           json_extract(t.payload_json, '$.settledAt') AS settled_at,
           json_extract(t.payload_json, '$.pinnedAt') AS pinned_at,
-          json_extract(t.payload_json, '$.commander') AS commander,
+          EXISTS (
+            SELECT 1 FROM orchestration_v2_projection_bots bot
+            WHERE bot.current_thread_id = t.thread_id AND bot.status <> 'retired'
+          ) AS commander,
           json_extract(t.payload_json, '$.snoozedUntil') AS snoozed_until,
           -- A superset of isLiveSubagentShell: the sources of its run status, pending request,
           -- and pending background work.
