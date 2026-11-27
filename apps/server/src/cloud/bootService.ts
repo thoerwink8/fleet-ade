@@ -39,7 +39,9 @@ import {
   SERVICE_STATE_FILE,
   SERVICE_UNIT_ENV,
   compareExactServiceVersions,
+  decodeServiceUnit,
   disabledServiceTask,
+  encodeServiceTask,
   serviceTaskIsDisabled,
   serviceUnitBaseDirOf as bootServiceBaseDirOf,
   serviceUnitEnvironmentValueOf,
@@ -208,7 +210,7 @@ export function renderBootServicePlist(
 /**
  * Task Scheduler can neither set variables nor redirect output, so the launcher takes them as
  * flags. A console program started by a task opens a window unless a headless console hosts it.
- * No XML declaration: schtasks rejects `encoding="UTF-8"` but reads undeclared XML as UTF-8.
+ * No XML declaration: the file is written as UTF-16LE with a BOM (see `encodeServiceTask`).
  */
 export function renderBootServiceTask(
   plan: BootServicePlan,
@@ -912,6 +914,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       (release) => Effect.sync(release),
     ),
   );
+  const readUnit = () => fs.readFile(unitPath).pipe(Effect.map(decodeServiceUnit));
   /**
    * Task Scheduler runs its own copy of the task, so an install that starts nothing still
    * registers the new one. A task that was disabled or absent stays stopped.
@@ -941,7 +944,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
           directory: path.dirname(unitPath),
           prefix: ".service-task-",
         });
-        yield* fs.writeFileString(disabledPath, disabledServiceTask(unit));
+        yield* fs.writeFile(disabledPath, encodeServiceTask(disabledServiceTask(unit)));
         yield* register(disabledPath);
       }),
     );
@@ -949,7 +952,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   // Ending the task closes the launcher's console, which the launcher takes as its SIGTERM.
   // Task Scheduler then reports the task stopped at once, so the lock says when it really is.
   const stopWindowsLauncher = Effect.gen(function* () {
-    const unit = yield* fs.readFileString(unitPath).pipe(Effect.option);
+    const unit = yield* readUnit().pipe(Effect.option);
     yield* runner.run({ command: "schtasks", args: ["/End", ...windowsTask] }).pipe(Effect.ignore);
     yield* Effect.tryPromise({
       try: (signal) => waitForServiceLauncherExit(launcherLockPath(unit), signal),
@@ -1000,7 +1003,11 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       ? installedBaseDir
       : undefined;
   };
-  const writeDurably = (filePath: string, contents: string, symlink?: "follow" | "replace") =>
+  const writeDurably = (
+    filePath: string,
+    contents: string | Uint8Array,
+    symlink?: "follow" | "replace",
+  ) =>
     writeFileStringAtomically({
       filePath,
       contents,
@@ -1194,7 +1201,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
     // The unit is per user. Rewriting one that serves another home moves the
     // service onto this home's data, which looks like every thread vanished.
     const refuseOtherBaseDir = Effect.gen(function* () {
-      const existingUnit = yield* fs.readFileString(unitPath).pipe(Effect.option);
+      const existingUnit = yield* readUnit().pipe(Effect.option);
       const installedBaseDir = Option.isSome(existingUnit)
         ? otherBaseDirOf(existingUnit.value)
         : undefined;
@@ -1299,9 +1306,9 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
         input.baseDir.replaceAll("$", () => "$$"),
         ...(options?.allowDowngrade === true ? ["--allow-downgrade"] : []),
       ]);
-      const unit = yield* fs
-        .readFileString(unitPath)
-        .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
+      const unit = yield* readUnit().pipe(
+        Effect.mapError((cause) => new BootServiceInstallError({ cause })),
+      );
       return { ...planForUnit(unit), handedOff: true };
     }
     // Task Scheduler restarts the task itself, so the files are written as for a deferred
@@ -1355,7 +1362,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             .pipe(Effect.mapError((cause) => new BootServiceInstallError({ cause })));
           // Files can match the new version even when activation fails; keep that install retryable.
           yield* writeDurably(restartPendingPath, `${input.cliVersion}\n`);
-          const plan = planForUnit(currentlyInstalled ? yield* fs.readFileString(unitPath) : "");
+          const plan = planForUnit(currentlyInstalled ? yield* readUnit() : "");
           yield* writeDurably(
             statePath,
             // @effect-diagnostics-next-line globalJsonInEffect:off - fixed launcher-owned document.
@@ -1377,7 +1384,11 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
           const unit = manager.render(plan);
           // The service owns the unit path entry itself: a user linking it to a shared
           // definition must not see that definition overwritten by an upgrade.
-          yield* writeDurably(unitPath, unit, "replace");
+          yield* writeDurably(
+            unitPath,
+            manager.kind === "schtasks" ? encodeServiceTask(unit) : unit,
+            "replace",
+          );
           if (!start && manager.kind === "schtasks") yield* refreshWindowsTask(unit);
           return plan;
         }),
@@ -1416,14 +1427,40 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
 
   const restart: BootService["Service"]["restart"] = Effect.gen(function* () {
     const manager = yield* requireManager;
-    const unit = yield* fs.readFileString(unitPath).pipe(Effect.option);
-    if (Option.isNone(unit)) return "skipped" as const;
-    const installedBaseDir = bootServiceBaseDirOf(unit.value);
+    const rawUnit = yield* fs.readFile(unitPath).pipe(Effect.option);
+    if (Option.isNone(rawUnit)) return "skipped" as const;
+    const unit = decodeServiceUnit(rawUnit.value);
+    const installedBaseDir = bootServiceBaseDirOf(unit);
     if (
       installedBaseDir === undefined ||
       path.resolve(installedBaseDir) !== path.resolve(input.baseDir)
     ) {
       return "skipped" as const;
+    }
+    // schtasks decodes undeclared XML in the ANSI code page, so a legacy UTF-8 task file
+    // registers garbled paths. The re-read inside the lock keeps a concurrent install's
+    // newer unit from being overwritten by the stale snapshot read above.
+    if (manager.kind === "schtasks" && !(rawUnit.value[0] === 0xff && rawUnit.value[1] === 0xfe)) {
+      yield* withSelectionLock(
+        unitPath,
+        Effect.gen(function* () {
+          const currentUnit = yield* fs.readFile(unitPath).pipe(Effect.option);
+          if (Option.isNone(currentUnit)) return;
+          const currentBaseDir = bootServiceBaseDirOf(decodeServiceUnit(currentUnit.value));
+          if (
+            currentBaseDir === undefined ||
+            path.resolve(currentBaseDir) !== path.resolve(input.baseDir) ||
+            (currentUnit.value[0] === 0xff && currentUnit.value[1] === 0xfe)
+          ) {
+            return;
+          }
+          yield* writeDurably(
+            unitPath,
+            encodeServiceTask(decodeServiceUnit(currentUnit.value)),
+            "replace",
+          );
+        }),
+      );
     }
     // Writes no state, and the launcher lets an update transition in flight
     // finish before the queued stop tears it down.
@@ -1449,7 +1486,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   ): Effect.fn.Return<A, E | BootServiceError, R> {
     if (detectedManager === undefined) return yield* operation;
     const manager = detectedManager;
-    const unit = yield* fs.readFileString(unitPath).pipe(Effect.option);
+    const unit = yield* readUnit().pipe(Effect.option);
     if (Option.isNone(unit)) return yield* operation;
     const installedBaseDir = bootServiceBaseDirOf(unit.value);
     if (
@@ -1525,7 +1562,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
       return { supported: true, installed: false, current: false, unitPath, logPath };
     }
     const [unit, runtimeEntryExists, runtimeSentinel, stateText] = yield* Effect.all([
-      fs.readFileString(unitPath),
+      readUnit(),
       fs.exists(runtimePaths.entryPath),
       fs.readFileString(runtimePaths.sentinelPath).pipe(Effect.option),
       fs.readFileString(statePath).pipe(Effect.option),

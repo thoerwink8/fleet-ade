@@ -587,7 +587,12 @@ const make = Effect.gen(function* () {
             ? drift.model
             : null;
       if (selection === null) return show(yield* current(), false);
-      const facts = clipFacts(input);
+      const baseline = yield* load(input.threadId);
+      const facts = clipFacts({
+        ...input,
+        goal: baseline.goal ?? input.goal,
+        avoid: baseline.avoid ?? input.avoid,
+      });
       const key = yield* cacheKey(facts);
       const decision = yield* update(input.threadId, (state) => {
         const runChanged = state.runId !== input.runId;

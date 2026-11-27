@@ -367,6 +367,39 @@ it.effect("leaves the previous sentences when the reply is not the activity obje
   );
 });
 
+it.effect("drift reads the goal and avoid list stored at dispatch", () => {
+  const prompts: string[] = [];
+  const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+  return Effect.gen(function* () {
+    const assist = yield* CommandAssist.CommandAssist;
+    const thread = ThreadId.make("thread-baseline");
+    yield* assist.rememberDispatch({
+      threadId: thread,
+      goal: "修复解析器的回退逻辑",
+      avoid: "锁那一层不许碰",
+      testCommands: null,
+    });
+    yield* assist.observe(
+      facts({ opened: true, threadId: thread, goal: "在改 parser.ts", avoid: "" }),
+    );
+    const prompt = prompts[0] ?? "";
+    assert.ok(prompt.includes("修复解析器的回退逻辑"));
+    assert.ok(prompt.includes("锁那一层不许碰"));
+  }).pipe(
+    Effect.provide(
+      harness(
+        {
+          complete: (input) => {
+            prompts.push(input.prompt);
+            return Effect.succeed(reply);
+          },
+        },
+        settings,
+      ),
+    ),
+  );
+});
+
 it.effect("clears outlook when the model fails and leaves the child phase alone", () => {
   const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
   let fail = false;
