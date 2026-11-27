@@ -34,6 +34,8 @@
         "resolve-nightly-release.ts",
         "smoke-desktop-app.ts",
         "verify-windows-desktop-artifact.ts",
+        // Run by path: node scripts/bot-preamble-probe.ts
+        "bot-preamble-probe.ts",
         // Installed onto the headless France host by scripts/deploy/france-github-app.sh.
         "deploy/git-credential-fleet-ade-app.mjs",
       ],
