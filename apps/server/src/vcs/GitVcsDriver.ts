@@ -1510,7 +1510,10 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                           cause.reason._tag === "Unknown",
                         () =>
                           Effect.gen(function* () {
-                            if (yield* fileSystem.exists(to)) return;
+                            if (yield* fileSystem.exists(to)) {
+                              preExistingObjects.add(relativeName(name));
+                              return;
+                            }
                             // Git also falls back to rename without hardlinks; identical object names are interchangeable.
                             // Renames move the object out of the private store, so they are tracked for rollback.
                             yield* fileSystem.rename(from, to).pipe(
@@ -1521,7 +1524,10 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                                 (cause) => cause.reason._tag === "Unknown",
                                 () =>
                                   Effect.gen(function* () {
-                                    if (yield* fileSystem.exists(to)) return;
+                                    if (yield* fileSystem.exists(to)) {
+                                      preExistingObjects.add(relativeName(name));
+                                      return;
+                                    }
                                     yield* copyAcrossVolumes(from, to);
                                   }),
                               ),
@@ -1530,7 +1536,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                       ),
                       Effect.catchIf(
                         (cause) => cause.reason._tag === "AlreadyExists",
-                        () => Effect.void,
+                        // Another writer linked it after the pre-publish snapshot; it is
+                        // never this capture's to roll back.
+                        () => Effect.sync(() => preExistingObjects.add(relativeName(name))),
                       ),
                     );
                   });

@@ -291,6 +291,16 @@ export const layer: Layer.Layer<
             })
             .pipe(
               Effect.timeout(BASELINE_CAPTURE_BUDGET),
+              Effect.tap((capture) =>
+                capture.skippedPaths.length > 0
+                  ? Effect.logWarning("checkpoint capture skipped unreadable paths", {
+                      scopeId: input.scope.id,
+                      checkpointRef,
+                      skippedCount: capture.skippedPaths.length,
+                      skippedPaths: capture.skippedPaths,
+                    })
+                  : Effect.void,
+              ),
               Effect.catchTags({
                 VcsUnsupportedOperationError: () => Effect.void,
               }),
@@ -412,6 +422,16 @@ export const layer: Layer.Layer<
               checkpointRef,
             })
             .pipe(
+              Effect.tap((capture) =>
+                capture.skippedPaths.length > 0
+                  ? Effect.logWarning("checkpoint capture skipped unreadable paths", {
+                      scopeId: input.scope.id,
+                      checkpointRef,
+                      skippedCount: capture.skippedPaths.length,
+                      skippedPaths: capture.skippedPaths,
+                    })
+                  : Effect.void,
+              ),
               Effect.as("ready" as const),
               Effect.catchTags({
                 VcsUnsupportedOperationError: () => Effect.succeed("missing" as const),

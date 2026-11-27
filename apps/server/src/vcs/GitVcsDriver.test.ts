@@ -580,6 +580,54 @@ it.effect(
     }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
 );
 
+it.effect(
+  "checkpoint publication rollback keeps an object another writer linked between the snapshot and the link",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const driver = yield* GitVcsDriver.makeVcsDriverShape();
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-checkpoint-racelink-" });
+      const { git } = yield* makeCheckpointFixture(driver, cwd);
+      yield* git(["update-ref", "refs/t3/checkpoints/blocked", "HEAD"]);
+      const blockedRef = CheckpointRef.make("refs/t3/checkpoints/blocked/child");
+      yield* fs.writeFileString(path.join(cwd, "raced.txt"), "written by another git\n");
+      const objectId = (yield* git(["hash-object", "--no-filters", "raced.txt"])).stdout.trim();
+      const sharedObject = path.join(cwd, ".git/objects", objectId.slice(0, 2), objectId.slice(2));
+      // Simulate the race: another writer publishes the same object after this capture's
+      // pre-publish snapshot but before the link. The capture's link reports AlreadyExists,
+      // and rollback must leave that writer's copy in place even though it is unreachable.
+      const captureDriver = yield* GitVcsDriver.makeVcsDriverShape().pipe(
+        Effect.provideService(FileSystem.FileSystem, {
+          ...fs,
+          link: (from, to) =>
+            Effect.gen(function* () {
+              if (String(to) === sharedObject && !(yield* fs.exists(sharedObject))) {
+                yield* fs.makeDirectory(path.dirname(sharedObject), { recursive: true });
+                yield* fs.copyFile(from, sharedObject);
+              }
+              return yield* fs.link(from, to);
+            }),
+        }),
+      );
+
+      const error = yield* Effect.flip(
+        captureDriver.checkpoints.captureCheckpoint({ cwd, checkpointRef: blockedRef }),
+      );
+
+      assert.strictEqual(error._tag, "VcsProcessExitError");
+      assert.isTrue(
+        yield* fs.exists(sharedObject),
+        "an object another writer created between the snapshot and the link must survive rollback",
+      );
+      assert.strictEqual(
+        (yield* git(["cat-file", "blob", objectId])).stdout,
+        "written by another git\n",
+      );
+      yield* git(["fsck", "--full"]);
+    }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
 it.effect("checkpoint publication falls back to rename where hardlinks are unavailable", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
