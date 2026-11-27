@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeSqlite from "node:sqlite";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { assert, expect, it } from "@effect/vitest";
@@ -28,6 +30,16 @@ const open = (filename: string) =>
     };
   });
 
+const inTransaction = (db: NodeSqlite.DatabaseSync) => {
+  try {
+    db.exec("BEGIN");
+  } catch (cause) {
+    return cause instanceof Error && cause.message.includes("transaction");
+  }
+  db.exec("ROLLBACK");
+  return false;
+};
+
 const file = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -35,10 +47,48 @@ const file = Effect.gen(function* () {
   return path.join(directory, "ledger.sqlite");
 });
 
-it.effect("两个并发 handover 用同一个 expectedTerm，只有一个成功", () =>
+it.effect("写锁交错的两个 handover，只有一个成功，库里只有一行", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const filename = yield* file;
+      const holder = new NodeSqlite.DatabaseSync(filename);
+      const prepare = NodeSqlite.DatabaseSync.prototype.prepare;
+      let committed = false;
+      // node:sqlite runs a statement to completion, so Effect.all cannot interleave two handovers.
+      // A read that is not inside the write transaction lets the other connection commit first.
+      NodeSqlite.DatabaseSync.prototype.prepare = function (sql, ...rest) {
+        const statement = prepare.call(this, sql, ...rest);
+        if (
+          !/from fleet_coordinator_terms/i.test(String(sql)) ||
+          /^\s*(update|insert)/i.test(String(sql))
+        ) {
+          return statement;
+        }
+        const db = this;
+        const flexible = statement as unknown as {
+          all: (...args: ReadonlyArray<unknown>) => ReadonlyArray<unknown>;
+        };
+        const all = flexible.all.bind(statement);
+        flexible.all = (...args) => {
+          const rows = all(...args);
+          if (!committed && rows.length === 0 && !inTransaction(db)) {
+            committed = true;
+            holder.exec("BEGIN IMMEDIATE");
+            holder.exec(
+              "INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id) VALUES ('fleet-1', 1, 'coord-b')",
+            );
+            holder.exec("COMMIT");
+          }
+          return rows;
+        };
+        return statement;
+      };
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          NodeSqlite.DatabaseSync.prototype.prepare = prepare;
+          holder.close();
+        }),
+      );
       const left = yield* open(filename);
       const right = yield* open(filename);
       const results = yield* Effect.all(
@@ -50,16 +100,12 @@ it.effect("两个并发 handover 用同一个 expectedTerm，只有一个成功"
       const stale = results.find((result) => result._tag === "stale");
       assert(handed?._tag === "current");
       assert(stale?._tag === "stale");
-      expect(handed.term).toBe(1);
-      expect(handed.coordinatorId === "coord-a" || handed.coordinatorId === "coord-b").toBe(true);
-      expect(stale).toEqual({
-        _tag: "stale",
-        term: handed.term,
-        coordinatorId: handed.coordinatorId,
-      });
-      const stored = { term: handed.term, coordinatorId: handed.coordinatorId };
-      expect(yield* left.terms.read(FLEET)).toEqual(stored);
-      expect(yield* right.terms.read(FLEET)).toEqual(stored);
+      expect(handed).toEqual({ _tag: "current", term: 1, coordinatorId: "coord-a" });
+      expect(stale).toEqual({ _tag: "stale", term: 1, coordinatorId: "coord-a" });
+      expect(yield* left.terms.read(FLEET)).toEqual({ term: 1, coordinatorId: "coord-a" });
+      expect(yield* left.sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual([
+        { term: 1, coordinator_id: "coord-a" },
+      ]);
     }),
   ).pipe(Effect.provide(NodeServices.layer)),
 );
@@ -70,7 +116,7 @@ it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任
     const sql = yield* SqlClient.SqlClient;
     expect(yield* terms.read(FLEET)).toEqual({ term: 0, coordinatorId: null });
     expect(yield* terms.observe(FLEET, 0, "coord-a")).toEqual(
-      CoordinatorTerm.ObserveResult.conflict({ term: 0, coordinatorId: null }),
+      CoordinatorTerm.ObserveResult.stale({ term: 0, coordinatorId: null }),
     );
     expect(yield* sql`SELECT fleet_id, term, coordinator_id FROM fleet_coordinator_terms`).toEqual(
       [],
@@ -96,6 +142,13 @@ it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任
     );
     expect(yield* sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual(stored);
     expect(yield* terms.read(FLEET)).toEqual({ term: 3, coordinatorId: "coord-a" });
+    yield* sql`UPDATE fleet_coordinator_terms SET term = 0, coordinator_id = 'coord-z' WHERE fleet_id = ${FLEET}`;
+    expect(yield* terms.observe(FLEET, 0, "coord-a")).toEqual(
+      CoordinatorTerm.ObserveResult.stale({ term: 0, coordinatorId: "coord-z" }),
+    );
+    expect(yield* sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual([
+      { term: 0, coordinator_id: "coord-z" },
+    ]);
   }).pipe(Effect.provide(memoryLayer)),
 );
 

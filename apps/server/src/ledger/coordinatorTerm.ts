@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
-export type TermSnapshot = {
+type TermSnapshot = {
   readonly term: number;
   readonly coordinatorId: string | null;
 };
@@ -72,7 +72,8 @@ const observeUnchanged = (
   term: number,
   coordinatorId: string,
 ): ObserveResult | undefined => {
-  if (term < stored.term) return ObserveResult.stale(stored);
+  // Term 0 means there is no coordinator yet, so it never conflicts and is never adopted.
+  if (term < stored.term || (term === 0 && stored.term === 0)) return ObserveResult.stale(stored);
   if (term > stored.term) return undefined;
   return coordinatorId === stored.coordinatorId
     ? ObserveResult.current(stored)
@@ -157,32 +158,29 @@ const make = Effect.gen(function* () {
     toCoordinatorId: string,
     expectedTerm: number,
   ) {
+    const nextTerm = expectedTerm + 1;
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          const updated = yield* sql<{ readonly term: number }>`
+            UPDATE fleet_coordinator_terms
+            SET term = ${nextTerm}, coordinator_id = ${toCoordinatorId}
+            WHERE fleet_id = ${fleetId} AND term = ${expectedTerm}
+            RETURNING term
+          `;
+          if (updated[0] !== undefined) {
+            return HandoverResult.current({ term: nextTerm, coordinatorId: toCoordinatorId });
+          }
           const row = yield* load(fleetId);
-          const stored = snapshotOf(row);
-          if (stored.term !== expectedTerm) return HandoverResult.stale(stored);
-          const nextTerm = expectedTerm + 1;
-          const written =
-            row === undefined
-              ? yield* sql<{ readonly term: number }>`
-                  INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id)
-                  SELECT ${fleetId}, ${nextTerm}, ${toCoordinatorId}
-                  WHERE NOT EXISTS (
-                    SELECT 1 FROM fleet_coordinator_terms WHERE fleet_id = ${fleetId}
-                  )
-                  RETURNING term
-                `
-              : yield* sql<{ readonly term: number }>`
-                  UPDATE fleet_coordinator_terms
-                  SET term = ${nextTerm}, coordinator_id = ${toCoordinatorId}
-                  WHERE fleet_id = ${fleetId} AND term = ${expectedTerm}
-                  RETURNING term
-                `;
-          if (written[0] === undefined)
-            return HandoverResult.stale(snapshotOf(yield* load(fleetId)));
-          return HandoverResult.current({ term: nextTerm, coordinatorId: toCoordinatorId });
+          // The lock is already held, so a missing row stays missing until this insert commits.
+          if (row === undefined && expectedTerm === 0) {
+            yield* sql`
+              INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id)
+              VALUES (${fleetId}, ${nextTerm}, ${toCoordinatorId})
+            `;
+            return HandoverResult.current({ term: nextTerm, coordinatorId: toCoordinatorId });
+          }
+          return HandoverResult.stale(snapshotOf(row));
         }),
       )
       .pipe(Effect.mapError(guard(fleetId)));
