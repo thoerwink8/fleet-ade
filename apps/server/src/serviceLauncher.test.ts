@@ -143,12 +143,18 @@ it("rejects contradictory service state", () => {
   );
 });
 
-const unitPlan = (root: string, version: string) => ({
-  program: [`${root}/runtime/versions/${version}/t3`, "__service-launcher"],
-  baseDir: root,
-  logPath: `${root}/logs/boot-service.log`,
-  unitPath: `${root}/unit/t3code.service`,
-});
+// Rendered units name POSIX-spelled runtime paths on every host: systemd rejects a backslash
+// outright, and the launcher's repointing only rewrites the version segment in place. Windows
+// accepts the forward slashes when the paths are written to disk or passed to a child.
+const unitPlan = (root: string, version: string) => {
+  const posixRoot = root.replaceAll("\\", "/");
+  return {
+    program: [`${posixRoot}/runtime/versions/${version}/t3`, "__service-launcher"],
+    baseDir: posixRoot,
+    logPath: `${posixRoot}/logs/boot-service.log`,
+    unitPath: `${posixRoot}/unit/t3code.service`,
+  };
+};
 
 const writeFakeRuntime = (
   fs: FileSystem.FileSystem,
@@ -157,10 +163,33 @@ const writeFakeRuntime = (
   childSource: string,
 ) =>
   Effect.gen(function* () {
-    const entryPath = path.join(versionDir, "t3");
     yield* fs.makeDirectory(versionDir, { recursive: true });
-    yield* fs.writeFileString(entryPath, `#!${process.execPath}\n${childSource}`);
-    yield* fs.chmod(entryPath, 0o755);
+    let entryPath: string;
+    if (HostProcess.Platform.defaultValue() === "win32") {
+      // Windows runs `t3.exe`, a self-contained binary. The fixture hardlinks Node itself and
+      // leans on the launcher starting the child in its own runtime directory: `t3 serve` then
+      // resolves `serve` beside the executable, like the POSIX fixture's shebang entry.
+      entryPath = path.join(versionDir, "t3.exe");
+      yield* Effect.promise(() =>
+        NodeFSP.link(process.execPath, entryPath).catch(() =>
+          NodeFSP.copyFile(process.execPath, entryPath),
+        ),
+      );
+      // Windows kill() cannot deliver SIGTERM, so production servers stop over IPC; the same
+      // message drives any SIGTERM handler the fixture installs.
+      const prelude = [
+        'process.on("message", (message) => {',
+        '  if (typeof message !== "object" || message === null || message.type !== "stop") return;',
+        '  if (process.listenerCount("SIGTERM") > 0) process.emit("SIGTERM");',
+        '  else if (process.listenerCount("message") === 1) setImmediate(() => process.exit(0));',
+        "});",
+      ].join("\n");
+      yield* fs.writeFileString(path.join(versionDir, "serve"), `${prelude}\n${childSource}`);
+    } else {
+      entryPath = path.join(versionDir, "t3");
+      yield* fs.writeFileString(entryPath, `#!${process.execPath}\n${childSource}`);
+      yield* fs.chmod(entryPath, 0o755);
+    }
     yield* fs.writeFileString(
       path.join(versionDir, ".install-complete"),
       `${path.basename(versionDir)}\n`,
@@ -426,7 +455,9 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
     }),
   );
 
-  it.effect(
+  // Only Linux runs the systemd manager this fakes: Windows cannot execute the shell-script
+  // busctl and systemctl stand-ins, and its service manager is Task Scheduler.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() !== "linux")(
     "repoints the systemd unit the manager loads when environment.d moves XDG_CONFIG_HOME",
     () =>
       Effect.gen(function* () {
@@ -1061,7 +1092,9 @@ process.exit(0);
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service 100% & <test>-" });
+      // `<` cannot exist in a Windows path at all, so that host exercises `!` instead.
+      const marker = HostProcess.Platform.defaultValue() === "win32" ? "!test!" : "<test>";
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: `t3-service 100% & ${marker}-` });
       const statePath = path.join(root, "runtime", "service-state.json");
       const databasePath = path.join(root, "userdata", "state.sqlite");
       const activatedPath = path.join(root, "activated");
@@ -1254,7 +1287,7 @@ if (context.update?.status === "pending") {
         assert.deepEqual([...created!.bytes.subarray(0, 2)], [0xff, 0xfe]);
         const registered = decodeServiceUnit(created!.bytes);
         assert.equal(registered, unitXml);
-        assert.include(registered, root);
+        assert.include(registered, root.replaceAll("\\", "/"));
         assert.isFalse(serviceTaskIsDisabled(registered));
         // Nothing repointed, so nothing rewrote the legacy file either.
         assert.equal(yield* fs.readFileString(unitPath), unitXml);
@@ -1445,7 +1478,11 @@ if (context.update?.status === "pending") {
         assert.equal(state.activeVersion, "1.0.0");
         assert.equal(state.update?.status, "rolled-back");
         assert.equal(yield* fs.readFileString(databaseFile), original);
-        if (kind !== "file") assert.equal(yield* fs.readLink(databasePath), linkTarget);
+        // Windows stores the separators it prefers in the link itself; the spelling is not load-bearing.
+        if (kind !== "file") {
+          const link = (yield* fs.readLink(databasePath)).replaceAll("\\", "/");
+          assert.equal(link, linkTarget.replaceAll("\\", "/"));
+        }
         assert.isFalse(yield* fs.exists(path.join(root, "original.sqlite")));
         assert.isFalse(yield* fs.exists(`${databasePath}-wal`));
         assert.isFalse(yield* fs.exists(`${databasePath}-shm`));

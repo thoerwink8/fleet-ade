@@ -496,8 +496,12 @@ async function startOnlineDatabaseBackup(
     return undefined;
   };
   let snapshot: InstanceType<typeof NodeSqlite.DatabaseSync> | undefined;
-  // SQLite keeps -wal beside the resolved file, not beside a symlink to it.
-  let dbPath = pending.dbPath;
+  // SQLite names the -wal/-shm files after the spelling passed to open: POSIX resolves
+  // symlinks there, Windows does not. The snapshot must share the server's WAL-index, or the
+  // closing server counts itself the last connection and checkpoints and deletes the live WAL.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
+  const windows = process.platform === "win32";
+  const dbPath = windows ? pending.dbPath : await NodeFSP.realpath(pending.dbPath);
   const release = () => {
     try {
       snapshot?.close();
@@ -507,7 +511,6 @@ async function startOnlineDatabaseBackup(
   try {
     await discardStaging();
     await NodeFSP.mkdir(stagingDir, { recursive: true, mode: 0o700 });
-    dbPath = await NodeFSP.realpath(pending.dbPath);
     snapshot = new NodeSqlite.DatabaseSync(dbPath, { readOnly: true });
     const mode = String(snapshot.prepare("PRAGMA journal_mode").get()?.journal_mode);
     if (mode.toLowerCase() !== "wal") throw new Error(`journal_mode is ${mode}, not wal.`);
@@ -614,10 +617,14 @@ async function restoreDatabaseBackup(
 
   await markDatabaseRestorePending(backupDir);
   const directories = new Set([NodePath.dirname(pending.dbPath)]);
-  // SQLite keeps -wal and -shm beside the resolved database file, not beside a symlink to it.
+  // SQLite names the -wal/-shm files after the spelling passed to open: POSIX resolves symlinks
+  // there, so they live beside the target; Windows keeps them beside the symlink itself.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
+  const windows = process.platform === "win32";
   const mainTarget = await restoreTarget(pending.dbPath);
   for (const suffix of DB_FILE_SUFFIXES) {
-    const livePath = suffix === "" ? pending.dbPath : `${mainTarget}${suffix}`;
+    const livePath =
+      windows || suffix === "" ? `${pending.dbPath}${suffix}` : `${mainTarget}${suffix}`;
     if (livePath !== `${pending.dbPath}${suffix}`) {
       await NodeFSP.rm(`${pending.dbPath}${suffix}`, { force: true });
     }
@@ -1071,6 +1078,9 @@ export class Launcher {
     const spawnArguments = runtimeSpawnArguments(paths);
     const child = NodeChildProcess.spawn(spawnArguments.command, spawnArguments.args, {
       env: { ...this.#environment, [SERVICE_LAUNCHER_CONTEXT_ENV]: JSON.stringify(context) },
+      // An inherited working directory is whatever the service manager happened to use
+      // (Task Scheduler's is System32), so the server starts in its own runtime directory.
+      cwd: paths.versionDir,
       stdio:
         this.#output === undefined
           ? ["inherit", "inherit", "inherit", "ipc"]
