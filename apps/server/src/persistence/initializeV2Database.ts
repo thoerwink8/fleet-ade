@@ -1,9 +1,11 @@
 import * as NodeSqlite from "node:sqlite";
 
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import { processIdentity } from "../legacyServerOwner.ts";
 
 export class V2DatabaseImportError extends Schema.TaggedError<V2DatabaseImportError>()(
   "V2DatabaseImportError",
@@ -16,20 +18,68 @@ export class V2DatabaseImportError extends Schema.TaggedError<V2DatabaseImportEr
 
 const isV2DatabaseImportError = Schema.is(V2DatabaseImportError);
 
-const isProcessAlive = (pid: number): boolean => {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
+/**
+ * Injectable for tests: the probe shells out to `ps` or PowerShell and can fail on hosts without
+ * them, so cleanup distinguishes that failure from proof of PID reuse.
+ */
+export const ProcessIdentityProbe = Context.Reference<
+  (pid: number, platform: NodeJS.Platform) => Promise<string | undefined>
+>("initializeV2Database/ProcessIdentityProbe", {
+  defaultValue: () => processIdentity,
+});
+
+const COPY_OWNER_FILE = "owner.json";
+
+/**
+ * Whether the copy's writer provably stopped existing. Only a dead PID or an identity mismatch
+ * abandons a copy; anything unprovable keeps it. File timestamps never enter the decision: they
+ * can be rolled back or truncated by the filesystem.
+ */
+const copyIsAbandoned = (
+  probeIdentity: (pid: number, platform: NodeJS.Platform) => Promise<string | undefined>,
+  pid: number,
+  ownerContents: string | undefined,
+  platform: NodeJS.Platform,
+): Promise<boolean> => {
+  if (!Number.isInteger(pid) || pid <= 0) return Promise.resolve(true);
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
-    return error instanceof Error && "code" in error && error.code === "EPERM";
+    if (!(error instanceof Error && "code" in error && error.code === "EPERM")) {
+      return Promise.resolve(true);
+    }
   }
+  if (ownerContents === undefined) return Promise.resolve(false);
+  let owner: unknown;
+  try {
+    owner = JSON.parse(ownerContents);
+  } catch {
+    return Promise.resolve(false);
+  }
+  if (
+    typeof owner !== "object" ||
+    owner === null ||
+    !("pid" in owner) ||
+    owner.pid !== pid ||
+    !("processIdentity" in owner) ||
+    typeof owner.processIdentity !== "string"
+  ) {
+    return Promise.resolve(false);
+  }
+  return probeIdentity(pid, platform).then((liveIdentity) =>
+    liveIdentity === undefined ? false : liveIdentity !== owner.processIdentity,
+  );
 };
 
-// Legacy names have no PID; newer copies stay while their process is alive.
+// Legacy names have no PID; newer copies stay while their process may still own them.
 const removeAbandonedCopies = Effect.fn("removeAbandonedCopies")(function* (directory: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  // The probe interrogates the real host kernel, so it uses the real platform, not the
+  // injectable HostProcess.Platform.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+  const platform = process.platform;
+  const probeIdentity = yield* ProcessIdentityProbe;
   const entries = yield* fs.readDirectory(directory).pipe(
     Effect.catchIf(
       (error) => error.reason._tag === "NotFound",
@@ -38,8 +88,18 @@ const removeAbandonedCopies = Effect.fn("removeAbandonedCopies")(function* (dire
   );
   for (const entry of entries) {
     const copy = /^\.v2-import-(?:(\d+)-)?[A-Za-z0-9]{6}$/.exec(entry);
-    if (copy === null || (copy[1] !== undefined && isProcessAlive(Number(copy[1])))) continue;
-    yield* fs.remove(path.join(directory, entry), { recursive: true });
+    if (copy === null) continue;
+    const copyPath = path.join(directory, entry);
+    if (copy[1] !== undefined) {
+      const ownerContents = yield* fs
+        .readFileString(path.join(copyPath, COPY_OWNER_FILE))
+        .pipe(Effect.orElseSucceed(() => undefined as string | undefined));
+      const abandoned = yield* Effect.promise(() =>
+        copyIsAbandoned(probeIdentity, Number(copy[1]), ownerContents, platform),
+      );
+      if (!abandoned) continue;
+    }
+    yield* fs.remove(copyPath, { recursive: true });
   }
 });
 
@@ -60,6 +120,19 @@ export const initializeV2Database = Effect.fn("initializeV2Database")(function* 
       prefix: `.v2-import-${process.pid}-`,
     });
     const snapshotPath = path.join(temporaryDirectory, "snapshot.sqlite");
+    // Prove this copy's writer to the next start: cleanup replays the same probe for the
+    // recorded PID, and only an exact identity match keeps the copy alive. When the probe
+    // cannot answer, the copy is still written — on such a host nothing could verify one.
+    const probeIdentity = yield* ProcessIdentityProbe;
+    // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+    const identity = yield* Effect.promise(() => probeIdentity(process.pid, process.platform));
+    if (identity !== undefined) {
+      yield* fs.writeFileString(
+        path.join(temporaryDirectory, COPY_OWNER_FILE),
+        // @effect-diagnostics-next-line globalJsonInEffect:off - fixed shape; a defect here fails the import, which is correct.
+        JSON.stringify({ pid: process.pid, processIdentity: identity }),
+      );
+    }
     yield* Effect.tryPromise({
       try: async () => {
         const database = new NodeSqlite.DatabaseSync(sourcePath, { readOnly: true });

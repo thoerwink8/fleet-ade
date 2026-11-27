@@ -673,9 +673,19 @@ export const makeProviderInstanceRegistry = Effect.fn(
     },
   };
 
+  const rebuild: ProviderInstanceRegistryMutator.ProviderInstanceRegistryMutatorShape["rebuild"] = (
+    instanceIds,
+  ) =>
+    semaphore.withPermits(1)(
+      Ref.get(configMapRef).pipe(
+        Effect.flatMap((configMap) => reconcileWithR(configMap, new Set(instanceIds))),
+        Effect.provideContext(driverContext),
+      ),
+    );
   const mutator: ProviderInstanceRegistryMutator.ProviderInstanceRegistryMutatorShape = {
     reconcile,
     reloadSecrets,
+    rebuild,
     applySecret,
   };
 
