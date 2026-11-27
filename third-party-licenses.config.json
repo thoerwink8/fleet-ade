@@ -105,6 +105,21 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Orca bot preamble",
+      "bundles": ["server"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/stablyai/orca/blob/7ec0dc7e96ab/src/main/bots/bot-preamble.ts",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2026 Lovecast Inc."],
+          "preamble": [
+            "Bot preamble assembly, the 200-line memory cap, and memory-change notices are adapted from stablyai/orca (MIT): src/main/bots/bot-preamble.ts, src/shared/bot-memory-lines.ts, and src/main/bots/bot-turn-memory-update.ts."
+          ]
+        }
+      ]
     }
   ],
   "packageOverrides": [
