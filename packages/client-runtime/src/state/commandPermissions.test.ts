@@ -1,4 +1,4 @@
-import { requestGuarded, runStreamGuarded } from "../rpc/client.ts";
+import { requestGuarded, runStreamGuarded, RpcPermissionGuard } from "../rpc/client.ts";
 import { EnvironmentSupervisor } from "../connection/supervisor.ts";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as Option from "effect/Option";
@@ -15,6 +15,9 @@ import {
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
+  BotId,
+  CommandId,
+  MessageId,
   ThreadId,
   EnvironmentId,
   ORCHESTRATION_V2_WS_METHODS,
@@ -584,5 +587,103 @@ it.effect("rejects protected unary and streamed RPCs outside a guarded command",
     }).pipe(Stream.runDrain, Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
     expect(streamed._tag).toBe("EnvironmentAuthorizationError");
     expect(writes).toBe(0);
+  }),
+);
+
+it.effect("blocks guarded bot commands without the operate grant before any write", () =>
+  Effect.gen(function* () {
+    const registry = yield* setup;
+    registry.set(sessions(env), AsyncResult.success(grant(false)));
+    let writes = 0;
+    const session = {
+      client: {
+        [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: () =>
+          Effect.sync(() => {
+            writes++;
+            return { sequence: writes };
+          }),
+      },
+    } as unknown as RpcSession;
+    const supervisor = {
+      target: { environmentId: env, label: "target" },
+      session: yield* SubscriptionRef.make(Option.some(session)),
+    } as unknown as EnvironmentSupervisor["Service"];
+    const guard = {
+      authorize: (id: EnvironmentId, method: string, payload: unknown) =>
+        createCommandPermissions(runtime, method).authorize(registry, id, payload),
+    };
+    const pause = {
+      type: "bot.pause" as const,
+      commandId: CommandId.make("pause-bot"),
+      botId: BotId.make("bot:test"),
+      threadId: ThreadId.make("thread:test"),
+    };
+    const denied = yield* requestGuarded(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, pause).pipe(
+      Effect.provideService(EnvironmentSupervisor, supervisor),
+      Effect.provideService(RpcPermissionGuard, guard),
+      Effect.flip,
+    );
+    expect(denied).toMatchObject({
+      _tag: "EnvironmentAuthorizationError",
+      requiredPermission: AuthOrchestrationOperateScope,
+    });
+    expect(writes).toBe(0);
+    registry.set(sessions(env), AsyncResult.success(grant(true)));
+    yield* requestGuarded(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, pause).pipe(
+      Effect.provideService(EnvironmentSupervisor, supervisor),
+      Effect.provideService(RpcPermissionGuard, guard),
+    );
+    expect(writes).toBe(1);
+  }),
+);
+
+it.effect("does not client-block message dispatch or payloads outside the command union", () =>
+  Effect.gen(function* () {
+    const registry = yield* setup;
+    registry.set(sessions(env), AsyncResult.success(grant(false)));
+    let writes = 0;
+    const session = {
+      client: {
+        [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: () =>
+          Effect.sync(() => {
+            writes++;
+            return { sequence: writes };
+          }),
+      },
+    } as unknown as RpcSession;
+    const supervisor = {
+      target: { environmentId: env, label: "target" },
+      session: yield* SubscriptionRef.make(Option.some(session)),
+    } as unknown as EnvironmentSupervisor["Service"];
+    const guard = {
+      authorize: (id: EnvironmentId, method: string, payload: unknown) =>
+        createCommandPermissions(runtime, method).authorize(registry, id, payload),
+    };
+    const message = {
+      type: "message.dispatch" as const,
+      commandId: CommandId.make("send-message"),
+      threadId: ThreadId.make("thread:test"),
+      messageId: MessageId.make("message:test"),
+      text: "hi",
+      attachments: [],
+      dispatchMode: { type: "start_immediately" as const },
+      createdBy: "user" as const,
+      creationSource: "web" as const,
+    };
+    yield* requestGuarded(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, message).pipe(
+      Effect.provideService(EnvironmentSupervisor, supervisor),
+      Effect.provideService(RpcPermissionGuard, guard),
+    );
+    // A payload whose type no command carries is not a guarded command either; the
+    // server rejects it after decoding.
+    const malformed = { type: "not-a-command", commandId: "anything" };
+    yield* requestGuarded(
+      ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+      malformed as unknown as typeof message,
+    ).pipe(
+      Effect.provideService(EnvironmentSupervisor, supervisor),
+      Effect.provideService(RpcPermissionGuard, guard),
+    );
+    expect(writes).toBe(2);
   }),
 );
