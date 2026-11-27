@@ -115,6 +115,7 @@ import Migration0104 from "./Migrations/104_CommandAssistState.ts";
 import Migration0105 from "./Migrations/105_ChildSessionSummaryRemote.ts";
 import Migration0106 from "./Migrations/106_ScheduledTaskPendingDeletes.ts";
 import Migration0107 from "./Migrations/107_ThreadTrash.ts";
+import Migration0108 from "./Migrations/108_Bots.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -225,6 +226,7 @@ const migrationEntries = [
   [105, "ChildSessionSummaryRemote", Migration0105],
   [106, "ScheduledTaskPendingDeletes", Migration0106],
   [107, "ThreadTrash", Migration0107],
+  [108, "Bots", Migration0108],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

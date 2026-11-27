@@ -1269,10 +1269,16 @@ describe("OrchestratorMcpService provider resolution", () => {
   const commanderProjection = (
     subagents: ReadonlyArray<unknown>,
     modelSelection: Parameters<typeof parentProjection>[1],
-  ): OrchestrationV2ThreadProjection => ({
-    ...parentProjection(subagents, modelSelection),
-    thread: { ...parentProjection(subagents, modelSelection).thread, commander: true },
-  });
+  ): OrchestrationV2ThreadProjection =>
+    ({
+      ...parentProjection(subagents, modelSelection),
+      bot: {
+        id: "bot:commander-test",
+        name: "MCP parent",
+        status: "active",
+        currentThreadId: parentThreadId,
+      },
+    }) as unknown as OrchestrationV2ThreadProjection;
 
   const childProjection = {
     thread: { id: childThreadId, title: "Child" },

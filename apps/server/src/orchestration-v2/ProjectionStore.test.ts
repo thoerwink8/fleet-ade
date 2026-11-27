@@ -2,6 +2,7 @@ import * as NodeSqlite from "node:sqlite";
 
 import { assert, it, vi } from "@effect/vitest";
 import {
+  BotId,
   EnvironmentId,
   EventId,
   CommandId,
@@ -3091,40 +3092,57 @@ it.effect("SQL list older settled threads below a cursor", () =>
       readonly snoozedUntilDay?: number;
       readonly commander?: boolean;
     }) =>
-      store.apply({
-        id: EventId.make(`event:older:${input.name}`),
-        type: "thread.created",
-        threadId: id(input.name),
-        occurredAt: now,
-        payload: {
-          createdBy: "user",
-          creationSource: "web",
-          id: id(input.name),
-          projectId: ProjectId.make(input.project ?? "project:a"),
-          title: input.name,
-          providerInstanceId,
-          modelSelection,
-          runtimeMode: "full-access",
-          interactionMode: "default",
-          branch: null,
-          worktreePath: null,
-          activeProviderThreadId: null,
-          lineage: {
-            parentThreadId: input.subagent === true ? id("b") : null,
-            relationshipToParent: input.subagent === true ? "subagent" : null,
-            rootThreadId: input.subagent === true ? id("b") : id(input.name),
+      Effect.gen(function* () {
+        yield* store.apply({
+          id: EventId.make(`event:older:${input.name}`),
+          type: "thread.created",
+          threadId: id(input.name),
+          occurredAt: now,
+          payload: {
+            createdBy: "user",
+            creationSource: "web",
+            id: id(input.name),
+            projectId: ProjectId.make(input.project ?? "project:a"),
+            title: input.name,
+            providerInstanceId,
+            modelSelection,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: null,
+            activeProviderThreadId: null,
+            lineage: {
+              parentThreadId: input.subagent === true ? id("b") : null,
+              relationshipToParent: input.subagent === true ? "subagent" : null,
+              rootThreadId: input.subagent === true ? id("b") : id(input.name),
+            },
+            forkedFrom: null,
+            createdAt: now,
+            updatedAt: now,
+            archivedAt: input.archived === true ? now : null,
+            settledOverride: input.settledDay === null ? null : "settled",
+            settledAt: input.settledDay === null ? null : at(input.settledDay),
+            snoozedUntil: input.snoozedUntilDay === undefined ? null : at(input.snoozedUntilDay),
+            lastVisitedAt: null,
+            deletedAt: null,
           },
-          forkedFrom: null,
-          createdAt: now,
-          updatedAt: now,
-          archivedAt: input.archived === true ? now : null,
-          settledOverride: input.settledDay === null ? null : "settled",
-          commander: input.commander === true,
-          settledAt: input.settledDay === null ? null : at(input.settledDay),
-          snoozedUntil: input.snoozedUntilDay === undefined ? null : at(input.snoozedUntilDay),
-          lastVisitedAt: null,
-          deletedAt: null,
-        },
+        });
+        if (input.commander === true) {
+          yield* store.apply({
+            id: EventId.make(`event:older-bot:${input.name}`),
+            type: "bot.created",
+            threadId: id(input.name),
+            occurredAt: now,
+            payload: {
+              id: BotId.make(`bot:older:${input.name}`),
+              name: input.name,
+              status: "active",
+              currentThreadId: id(input.name),
+              createdAt: now,
+              updatedAt: now,
+            },
+          });
+        }
       });
     yield* createThread({ name: "a", settledDay: 5 });
     yield* createThread({ name: "b", settledDay: 4 });

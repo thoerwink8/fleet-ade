@@ -290,6 +290,8 @@ export const GuestMessageId = makeEntityId("GuestMessageId");
 export type GuestMessageId = typeof GuestMessageId.Type;
 export const AuthSessionId = makeEntityId("AuthSessionId");
 export type AuthSessionId = typeof AuthSessionId.Type;
+export const BotId = makeEntityId("BotId");
+export type BotId = typeof BotId.Type;
 export const RpcClientId = NonNegativeInt.pipe(Schema.brand("RpcClientId"));
 export type RpcClientId = typeof RpcClientId.Type;
 
