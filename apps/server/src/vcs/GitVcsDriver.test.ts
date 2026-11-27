@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off - fs.watch has no Effect FileSystem equivalent.
+import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";
 
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -19,6 +21,7 @@ import * as PlatformError from "effect/PlatformError";
 import { ChildProcessSpawner } from "effect/process";
 import * as Metric from "effect/Metric";
 import { assert, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 
 import { CheckpointRef, GitCommandError, VcsProcessExitError } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -176,9 +179,36 @@ const makeCheckpointFixture = Effect.fn("makeCheckpointFixture")(function* (
   return { git, checkpointRef };
 });
 
-it.effect.each(["interrupt", "timeout", "success"] as const)(
-  "checkpoint bulk staging cleans operation-owned packs after $0 and can retry",
-  (stop) =>
+const objectStoreInventory = Effect.fn("test.objectStoreInventory")(function* (
+  objectsDirectory: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const entries: string[] = [];
+  const walk: (
+    directory: string,
+    depth: number,
+  ) => Effect.Effect<void, PlatformError.PlatformError> = Effect.fnUntraced(function* (
+    directory: string,
+    depth: number,
+  ) {
+    for (const name of (yield* fs.readDirectory(directory)).sort()) {
+      const full = path.join(directory, name);
+      entries.push(path.relative(objectsDirectory, full));
+      if (depth < 3 && (yield* fs.stat(full)).type === "Directory") yield* walk(full, depth + 1);
+    }
+  });
+  yield* walk(objectsDirectory, 0);
+  return entries;
+});
+
+it.effect.each(
+  (["interrupt", "timeout", "success"] as const).flatMap((stop) =>
+    (["fsync", "batch"] as const).map((fsyncMethod) => ({ stop, fsyncMethod })),
+  ),
+)(
+  "checkpoint bulk staging cleans operation-owned temporary objects after $stop with $fsyncMethod fsync and can retry",
+  ({ stop, fsyncMethod }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -206,6 +236,8 @@ it.effect.each(["interrupt", "timeout", "success"] as const)(
         Effect.sync(() =>
           NodeNet.createServer((socket) => {
             sockets.add(socket);
+            // The kernel resets this socket when the killed Git exits mid-write.
+            socket.on("error", () => {});
             connected.resolve(socket);
             // Git can run the filter again while refreshing the staged entry.
             if (released) socket.end();
@@ -241,6 +273,14 @@ it.effect.each(["interrupt", "timeout", "success"] as const)(
           run: (input) => {
             if (input.args.includes("add") && input.env?.GIT_OBJECT_DIRECTORY)
               objectDirectory = input.env.GIT_OBJECT_DIRECTORY;
+            // Linux defaults to fsync; batch is what macOS and Windows capture with.
+            if (fsyncMethod === "batch" && input.args.includes("core.fsyncMethod=fsync"))
+              return liveProcess.run({
+                ...input,
+                args: input.args.map((arg) =>
+                  arg === "core.fsyncMethod=fsync" ? "core.fsyncMethod=batch" : arg,
+                ),
+              });
             return liveProcess.run(input);
           },
         }),
@@ -259,13 +299,61 @@ it.effect.each(["interrupt", "timeout", "success"] as const)(
           ),
         ),
       );
-      const packs = (yield* fs.readDirectory(path.join(objectDirectory, "pack"))).filter(
-        (name) => name.startsWith("tmp_pack_") && name !== "tmp_pack_other_operation",
-      );
-      assert.strictEqual(packs.length, 1);
-      assert.isAbove(
-        Number((yield* fs.stat(path.join(objectDirectory, "pack", packs[0]!))).size),
-        1024 * 1024,
+      // Trigger on whatever temporary artifacts this Git actually writes: a bulk-fsync
+      // tmp_objdir tree with batch, or the pack it holds open with plain fsync. Scan
+      // first so artifacts that landed before the watcher started are still seen.
+      const artifactNames = (entries: ReadonlyArray<string>) =>
+        entries.filter(
+          (entry) => entry.startsWith("tmp_objdir-bulk-fsync-") || entry.startsWith("tmp_pack_"),
+        );
+      const artifactReady = Promise.withResolvers<void>();
+      const scanForArtifacts = Effect.fnUntraced(function* () {
+        const entries = yield* fs.readDirectory(objectDirectory).pipe(Effect.option);
+        if (Option.isNone(entries)) return false;
+        if (artifactNames(entries.value).length > 0) {
+          artifactReady.resolve();
+          return true;
+        }
+        // Plain fsync stages the pack directly in pack/; batch fsync nests it inside
+        // a tmp_objdir tree. Trigger on either.
+        for (const nested of [
+          path.join(objectDirectory, "pack"),
+          ...entries.value
+            .filter((entry) => entry.startsWith("tmp_objdir-bulk-fsync-"))
+            .map((entry) => path.join(objectDirectory, entry, "pack")),
+        ]) {
+          const names = yield* fs.readDirectory(nested).pipe(Effect.option);
+          if (Option.isSome(names) && names.value.some((name) => name.startsWith("tmp_pack_"))) {
+            artifactReady.resolve();
+            return true;
+          }
+        }
+        return false;
+      });
+      // Watch events carry the changed filename, so no rescan is needed here.
+      const watcher = NodeFS.watch(objectDirectory, { recursive: true }, (_event, filename) => {
+        const name = String(filename ?? "");
+        if (name.includes("tmp_objdir-bulk-fsync-") || name.includes("tmp_pack_"))
+          artifactReady.resolve();
+      });
+      const artifactFound = yield* scanForArtifacts();
+      if (!artifactFound) {
+        yield* Effect.promise(() => artifactReady.promise).pipe(
+          Effect.raceFirst(
+            Fiber.join(fiber).pipe(
+              Effect.flatMap((result) =>
+                Exit.isFailure(result)
+                  ? Effect.failCause(result.cause)
+                  : Effect.die("capture ended before temporary objects appeared"),
+              ),
+            ),
+          ),
+        );
+      }
+      watcher.close();
+      assert.isTrue(
+        yield* scanForArtifacts(),
+        "expected the capture's temporary object artifacts inside its isolated store",
       );
       // An overlapping capture publishes the same large blob while the first
       // still owns an unfinished pack. Its objects/ref must survive either exit.
@@ -308,7 +396,7 @@ it.effect.each(["interrupt", "timeout", "success"] as const)(
         sharedPackBytes,
       );
       assert.strictEqual((yield* git(["rev-parse", concurrentRef])).stdout, concurrentOid);
-      assert.isFalse(yield* fs.exists(path.join(objectDirectory, "pack", packs[0]!)));
+      // The whole isolated store is removed, batch tmp_objdir trees included.
       assert.isFalse(yield* fs.exists(objectDirectory));
       assert.strictEqual(yield* fs.readFileString(sharedPack), "owned by another Git operation");
       if (stop !== "success")
@@ -341,6 +429,7 @@ it.effect.each(["failure", "interrupt"] as const)(
       const { git, checkpointRef } = yield* makeCheckpointFixture(driver, cwd);
       yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
       const previous = (yield* git(["show-ref"])).stdout;
+      const objectsBefore = yield* objectStoreInventory(path.join(cwd, ".git/objects"));
       yield* fs.writeFileString(path.join(cwd, "new.txt"), "new checkpoint content\n");
       const published = yield* Deferred.make<void>();
       const captureDriver = yield* GitVcsDriver.makeVcsDriverShape().pipe(
@@ -389,11 +478,104 @@ it.effect.each(["failure", "interrupt"] as const)(
         ),
         [],
       );
+      assert.deepEqual(
+        yield* objectStoreInventory(path.join(cwd, ".git/objects")),
+        objectsBefore,
+        "a failed publication must not leave the objects it linked in the shared store",
+      );
       yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
       assert.strictEqual(
         (yield* git(["show", `${checkpointRef}:new.txt`])).stdout,
         "new checkpoint content\n",
       );
+      yield* git(["fsck", "--full"]);
+    }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
+it.effect("a failed checkpoint ref update rolls back the objects its capture published", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const driver = yield* GitVcsDriver.makeVcsDriverShape();
+    const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-checkpoint-refupdate-" });
+    const { git, checkpointRef } = yield* makeCheckpointFixture(driver, cwd);
+    yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
+    // refs/t3/checkpoints/blocked exists as a file, so its child can never be written.
+    yield* git(["update-ref", "refs/t3/checkpoints/blocked", "HEAD"]);
+    const blockedRef = CheckpointRef.make("refs/t3/checkpoints/blocked/child");
+    const objectsBefore = yield* objectStoreInventory(path.join(cwd, ".git/objects"));
+    yield* fs.writeFileString(path.join(cwd, "blocked.txt"), "never referenced\n");
+
+    const error = yield* Effect.flip(
+      driver.checkpoints.captureCheckpoint({ cwd, checkpointRef: blockedRef }),
+    );
+
+    assert.strictEqual(error._tag, "VcsProcessExitError");
+    assert.deepEqual(
+      yield* objectStoreInventory(path.join(cwd, ".git/objects")),
+      objectsBefore,
+      "objects published for a capture whose ref never landed must not survive in the shared store",
+    );
+    // The pre-existing sibling ref still resolves and its objects are untouched.
+    assert.strictEqual((yield* git(["show", `${checkpointRef}:file.txt`])).stdout, "unstaged\n");
+    const retryRef = CheckpointRef.make("refs/t3/checkpoints/retry-child");
+    yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef: retryRef });
+    assert.strictEqual(
+      (yield* git(["show", `${retryRef}:blocked.txt`])).stdout,
+      "never referenced\n",
+    );
+    yield* git(["fsck", "--full"]);
+  }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
+it.effect(
+  "checkpoint publication rollback keeps objects a concurrent ref write started needing",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const driver = yield* GitVcsDriver.makeVcsDriverShape();
+      const liveProcess = yield* VcsProcess.VcsProcess;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-checkpoint-reachable-" });
+      const { git } = yield* makeCheckpointFixture(driver, cwd);
+      yield* git(["update-ref", "refs/t3/checkpoints/blocked", "HEAD"]);
+      const blockedRef = CheckpointRef.make("refs/t3/checkpoints/blocked/child");
+      yield* fs.writeFileString(path.join(cwd, "staged-copy.txt"), "reused content\n");
+      // A user's own Git commit can land a ref that needs the same object while the
+      // capture is between publication and ref update. The rollback must keep any
+      // object that is reachable from any ref, not only ones this capture wrote.
+      const captureDriver = yield* GitVcsDriver.makeVcsDriverShape().pipe(
+        Effect.provideService(VcsProcess.VcsProcess, {
+          run: (input) =>
+            Effect.gen(function* () {
+              if (input.args.includes("update-ref") && input.args.includes(blockedRef)) {
+                yield* fs.writeFileString(path.join(cwd, "user-copy.txt"), "reused content\n");
+                yield* liveProcess.run({
+                  operation: "test.user-commit",
+                  command: "git",
+                  cwd,
+                  args: ["add", "user-copy.txt"],
+                });
+                yield* liveProcess.run({
+                  operation: "test.user-commit",
+                  command: "git",
+                  cwd,
+                  args: ["commit", "-m", "user commit reusing the blob"],
+                });
+              }
+              return yield* liveProcess.run(input);
+            }),
+        }),
+      );
+
+      const error = yield* Effect.flip(
+        captureDriver.checkpoints.captureCheckpoint({ cwd, checkpointRef: blockedRef }),
+      );
+
+      assert.strictEqual(error._tag, "VcsProcessExitError");
+      const blob = (yield* git(["hash-object", "user-copy.txt"])).stdout.trim();
+      assert.strictEqual((yield* git(["cat-file", "blob", blob])).stdout, "reused content\n");
+      assert.strictEqual((yield* git(["show", "HEAD:user-copy.txt"])).stdout, "reused content\n");
       yield* git(["fsck", "--full"]);
     }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
 );
@@ -428,6 +610,127 @@ it.effect("checkpoint publication falls back to rename where hardlinks are unava
     assert.match((yield* git(["count-objects", "-v"])).stdout, /^garbage: 0$/m);
     yield* git(["fsck", "--full"]);
   }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
+it.effect("checkpoint publication copies across volumes when rename reports EXDEV", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const driver = yield* GitVcsDriver.makeVcsDriverShape();
+    const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-publish-exdev-" });
+    const { git, checkpointRef } = yield* makeCheckpointFixture(driver, cwd);
+    yield* fs.writeFileString(path.join(cwd, "cross-volume.txt"), "published cross-volume\n");
+    const exdev = (method: string) =>
+      PlatformError.systemError({
+        _tag: "Unknown",
+        module: "FileSystem",
+        method,
+      });
+    const captureDriver = yield* GitVcsDriver.makeVcsDriverShape().pipe(
+      Effect.provideService(FileSystem.FileSystem, {
+        ...fs,
+        link: () => Effect.fail(exdev("link")),
+        rename: (from, to) =>
+          String(from).includes(".t3-cp-") ? fs.rename(from, to) : Effect.fail(exdev("rename")),
+      }),
+    );
+    yield* captureDriver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
+    assert.strictEqual(
+      (yield* git(["show", `${checkpointRef}:cross-volume.txt`])).stdout,
+      "published cross-volume\n",
+    );
+    assert.strictEqual(
+      (yield* git(["cat-file", "blob", `${checkpointRef}:cross-volume.txt`])).stdout,
+      "published cross-volume\n",
+    );
+    // Copy temporaries must not survive the rename.
+    const leftovers = (yield* objectStoreInventory(path.join(cwd, ".git/objects"))).filter((name) =>
+      name.includes(".t3-cp-"),
+    );
+    assert.deepEqual(leftovers, []);
+    yield* git(["fsck", "--full"]);
+  }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
+it.effect("checkpoint publication cleans the copy temporary when the final rename fails", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const driver = yield* GitVcsDriver.makeVcsDriverShape();
+    const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-publish-exdev-fail-" });
+    const { checkpointRef } = yield* makeCheckpointFixture(driver, cwd);
+    yield* fs.writeFileString(path.join(cwd, "unlucky.txt"), "never published\n");
+    const exdev = (method: string) =>
+      PlatformError.systemError({
+        _tag: "Unknown",
+        module: "FileSystem",
+        method,
+      });
+    const captureDriver = yield* GitVcsDriver.makeVcsDriverShape().pipe(
+      Effect.provideService(FileSystem.FileSystem, {
+        ...fs,
+        link: () => Effect.fail(exdev("link")),
+        rename: () => Effect.fail(exdev("rename")),
+      }),
+    );
+    const error = yield* Effect.flip(
+      captureDriver.checkpoints.captureCheckpoint({ cwd, checkpointRef }),
+    );
+    assert.strictEqual(error._tag, "VcsCheckpointStorageError");
+    const leftovers = (yield* objectStoreInventory(path.join(cwd, ".git/objects"))).filter((name) =>
+      name.includes(".t3-cp-"),
+    );
+    assert.deepEqual(leftovers, []);
+  }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
+);
+
+it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+  "checkpoint publication publishes into a fanout that lives on another volume",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const driver = yield* GitVcsDriver.makeVcsDriverShape();
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cross-volume-" });
+      const { git, checkpointRef } = yield* makeCheckpointFixture(driver, cwd);
+      // Pick the fanout by its first two hex digits, then symlink it to tmpfs so the
+      // hardlink and the rename of any object landing there fail with EXDEV.
+      const fanout = "5e";
+      // tmpfs under /dev/shm is a separate mount, so linking or renaming into it fails with EXDEV.
+      const shmProbe = yield* fs
+        .writeFileString("/dev/shm/t3-cross-volume-probe", "")
+        .pipe(Effect.andThen(fs.remove("/dev/shm/t3-cross-volume-probe")), Effect.option);
+      if (Option.isNone(shmProbe)) return;
+      const foreignBase = yield* fs.makeTempDirectory({
+        directory: "/dev/shm",
+        prefix: "t3-cross-volume-objects-",
+      });
+      const foreign = path.join(foreignBase, fanout);
+      yield* fs.makeDirectory(foreign);
+      const fanoutPath = path.join(cwd, ".git/objects", fanout);
+      yield* fs.remove(fanoutPath, { recursive: true, force: true });
+      yield* fs.symlink(foreign, fanoutPath);
+      // Write files until one hashes into the linked fanout.
+      let targetFile = "";
+      for (let candidate = 0; candidate < 500; candidate += 1) {
+        const name = `volume-${candidate}.txt`;
+        yield* fs.writeFileString(path.join(cwd, name), `volume candidate ${candidate}\n`);
+        const oid = (yield* git(["hash-object", "--no-filters", name])).stdout.trim();
+        if (oid.startsWith(fanout)) {
+          targetFile = name;
+          break;
+        }
+      }
+      assert.notStrictEqual(targetFile, "", "expected one of 500 candidates in fanout 5e");
+
+      yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
+
+      assert.strictEqual(
+        (yield* git(["cat-file", "blob", `${checkpointRef}:${targetFile}`])).stdout,
+        yield* fs.readFileString(path.join(cwd, targetFile)),
+      );
+      yield* git(["fsck", "--full"]);
+    }).pipe(Effect.scoped, Effect.provide(layerGitContract)),
 );
 
 it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
@@ -499,14 +802,10 @@ it.effect(
       yield* fs.makeDirectory(foreign);
       // A nested repository without a commit exercises the recovery probe as well.
       yield* git(["init", "empty-nested"]);
-      const inherited = process.env.GIT_QUARANTINE_PATH;
-      process.env.GIT_QUARANTINE_PATH = foreign;
-      try {
-        yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
-      } finally {
-        if (inherited === undefined) delete process.env.GIT_QUARANTINE_PATH;
-        else process.env.GIT_QUARANTINE_PATH = inherited;
-      }
+      vi.stubEnv("GIT_QUARANTINE_PATH", foreign);
+      yield* Effect.addFinalizer(() => Effect.sync(() => vi.unstubAllEnvs()));
+
+      yield* driver.checkpoints.captureCheckpoint({ cwd, checkpointRef });
       assert.strictEqual((yield* git(["show", `${checkpointRef}:file.txt`])).stdout, "unstaged\n");
       // Nothing may have been written into the foreign quarantine store.
       assert.deepEqual(yield* fs.readDirectory(foreign), []);
