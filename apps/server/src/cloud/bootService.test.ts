@@ -132,6 +132,40 @@ it("reads the served T3 home and log back out of a rendered unit, plist, or task
   expect(BootService.bootServiceBaseDirOf("[Service]\nExecStart=/x\n")).toBeUndefined();
 });
 
+it("starts the service in the user's home directory on every platform", () => {
+  const task = BootService.renderBootServiceTask(
+    {
+      program: ["C:\\Users\\theo\\.t3\\runtime\\versions\\1.2.3\\t3.exe", "__service-launcher"],
+      baseDir: "C:\\Users\\theo\\.t3",
+      logPath: "C:\\Users\\theo\\.t3\\userdata\\logs\\boot-service.log",
+      unitPath: "C:\\Users\\theo\\AppData\\Local\\t3code\\t3code-task.xml",
+    },
+    { ...windowsTaskOptions, homeDir: "C:\\Users\\theo" },
+  );
+  // Task Scheduler defaults to the system directory without this element.
+  const exec = task.slice(task.indexOf("<Exec>"), task.indexOf("</Exec>"));
+  expect(exec).toContain("<WorkingDirectory>C:\\Users\\theo</WorkingDirectory>");
+  // systemd expands %h to the user's home; launchd takes the literal path.
+  expect(
+    BootService.renderBootServiceUnit({
+      program: ["/home/theo/.t3/runtime/versions/1.2.3/t3", "__service-launcher"],
+      baseDir: "/home/theo/.t3",
+      logPath: "/home/theo/.t3/userdata/logs/boot-service.log",
+      unitPath: "/home/theo/.config/systemd/user/t3code.service",
+    }),
+  ).toContain("\nWorkingDirectory=%h\n");
+  const plist = BootService.renderBootServicePlist(
+    {
+      program: ["/Users/theo/.t3/runtime/versions/1.2.3/t3", "__service-launcher"],
+      baseDir: "/Users/theo/.t3",
+      logPath: "/Users/theo/.t3/userdata/logs/boot-service.log",
+      unitPath: "/Users/theo/Library/LaunchAgents/com.t3tools.t3code.service.plist",
+    },
+    { homeDir: "/Users/theo", environmentPath: "/usr/bin" },
+  );
+  expect(plist).toContain("<key>WorkingDirectory</key>\n  <string>/Users/theo</string>");
+});
+
 it("protects the server unit from agents under CPU and memory pressure", () => {
   const unit = BootService.renderBootServiceUnit({
     program: ["/home/theo/.t3/runtime/versions/1.2.3/t3", "__service-launcher"],
