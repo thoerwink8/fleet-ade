@@ -6,6 +6,7 @@ import { expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Clock from "effect/Clock";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -22,6 +23,7 @@ import { serviceLauncherLockPath } from "../serviceLauncher.ts";
 import * as BootService from "./bootService.ts";
 import { pinnedRuntimePaths } from "./pinnedRuntime.ts";
 import {
+  decodeServiceUnit,
   disabledServiceTask,
   parseServiceState,
   serviceTaskIsDisabled,
@@ -185,10 +187,11 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
   xdgConfigHome?: string,
   managerXdgConfigHome = xdgConfigHome,
   installBinDir?: string,
+  homeName = "t3-boot-service-test-",
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-boot-service-test-" });
+  const home = yield* fs.makeTempDirectoryScoped({ prefix: homeName });
   const managerUnitDir = path.join(
     managerXdgConfigHome !== undefined && path.isAbsolute(managerXdgConfigHome)
       ? managerXdgConfigHome
@@ -204,6 +207,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
   yield* fs.writeFileString(runtime.sentinelPath, "1.2.3\n");
 
   const commands: string[] = [];
+  const taskRegistrations: Array<{ readonly xmlPath: string; readonly bytes: Uint8Array }> = [];
   const invocations: ProcessRunner.ProcessRunInput[] = [];
   const timeouts = new Map<string, unknown>();
   const control: {
@@ -221,6 +225,8 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
     launcher?: { readonly close: () => void };
     /** Task Scheduler's own copy of the task. */
     task?: { xml: string; enabled: boolean };
+    /** Runs after a service reads a file and before the bytes reach its caller. */
+    readFileInterceptor?: (file: string) => Effect.Effect<void>;
   } = {
     failCommand: undefined,
     linger: "yes",
@@ -248,7 +254,9 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
         input.command === "schtasks" && input.args[0] !== "/Create" && control.task === undefined;
       if (input.command === "schtasks" && !failed) {
         if (input.args[0] === "/Create") {
-          const xml = yield* fs.readFileString(input.args[2] ?? "");
+          const bytes = yield* fs.readFile(input.args[2] ?? "");
+          taskRegistrations.push({ xmlPath: input.args[2] ?? "", bytes });
+          const xml = decodeServiceUnit(bytes);
           control.task = { xml, enabled: !serviceTaskIsDisabled(xml) };
         }
         if (control.task !== undefined && input.args[0] === "/Change") {
@@ -345,6 +353,14 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
       });
     }).pipe(
       Effect.provideService(ProcessRunner.ProcessRunner, runner),
+      Effect.provideService(
+        FileSystem.FileSystem,
+        // `pipe` and the iterator live on the implementation's prototype, so a spread loses them.
+        Object.assign(Object.create(Object.getPrototypeOf(fs)), fs, {
+          readFile: (file: string) =>
+            Effect.tap(fs.readFile(file), () => control.readFileInterceptor?.(file) ?? Effect.void),
+        }),
+      ),
       Effect.provide(
         Layer.mergeAll(
           Layer.succeed(HostProcess.Platform, platform),
@@ -389,6 +405,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
     fs,
     home,
     baseDir,
+    taskRegistrations,
     statePath,
     commands,
     invocations,
@@ -1430,7 +1447,7 @@ process.disconnect();
       const { service, fs, statePath, commands, control, runtime } = yield* makeHarness("win32");
       const path = yield* Path.Path;
       const plan = yield* service.install();
-      const task = yield* fs.readFileString(plan.unitPath);
+      const task = decodeServiceUnit(yield* fs.readFile(plan.unitPath));
 
       expect(plan.unitPath).toBe(
         path.join(path.dirname(plan.baseDir), "AppData", "Local", "t3code", "t3code-task.xml"),
@@ -1439,6 +1456,9 @@ process.disconnect();
       expect(BootService.bootServiceBaseDirOf(task)).toBe(plan.baseDir);
       expect(task).toContain("<UserId>PC\\theo</UserId>");
       expect(task).toContain("<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>");
+      // schtasks decodes undeclared UTF-8 with the ANSI code page; UTF-16LE with a BOM is read as is.
+      expect([...(yield* fs.readFile(plan.unitPath)).subarray(0, 2)]).toEqual([0xff, 0xfe]);
+
       expect(parseServiceState(yield* fs.readFileString(statePath))).toEqual({
         protocol: SERVICE_LAUNCHER_PROTOCOL,
         activeVersion: "1.2.3",
@@ -1537,6 +1557,110 @@ process.disconnect();
       expect(yield* inside.restart).toBe("queued");
       expect(commands).toEqual(handoff);
     }),
+  );
+
+  it.effect("registers a legacy UTF-8 task file as UTF-16LE on service restarts on Windows", () =>
+    Effect.gen(function* () {
+      const { service, fs, taskRegistrations, control, makeService } = yield* makeHarness(
+        "win32",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "t3-boot-service-测试-",
+      );
+      const plan = yield* service.install();
+      expect(plan.baseDir).toContain("测试");
+
+      // A unit written before UTF-16LE task files: restarting must not hand it to
+      // Task Scheduler unchanged, where it decodes in the ANSI code page.
+      const utf8Text = decodeServiceUnit(yield* fs.readFile(plan.unitPath));
+      const expectUtf16Registration = (index: number) => {
+        const registration = taskRegistrations[index];
+        expect(registration).toBeDefined();
+        expect([...registration!.bytes.subarray(0, 2)]).toEqual([0xff, 0xfe]);
+        expect(BootService.bootServiceBaseDirOf(decodeServiceUnit(registration!.bytes))).toBe(
+          plan.baseDir,
+        );
+      };
+
+      // From outside the service: stop, register, run.
+      yield* fs.writeFileString(plan.unitPath, utf8Text);
+      taskRegistrations.length = 0;
+      expect(yield* service.restart).toBe("restarted");
+      expect(taskRegistrations.length).toBe(1);
+      expectUtf16Registration(0);
+      expect(control.task).toMatchObject({ enabled: true });
+      // The migration rewrites the unit in place, so later restarts register it as is.
+      expect([...(yield* fs.readFile(plan.unitPath)).subarray(0, 2)]).toEqual([0xff, 0xfe]);
+
+      // From inside the service: the handoff registers the replacement.
+      yield* fs.writeFileString(plan.unitPath, utf8Text);
+      taskRegistrations.length = 0;
+      const inside = yield* makeService(undefined, "1.2.3", undefined, true);
+      expect(yield* inside.restart).toBe("queued");
+      expect(taskRegistrations.length).toBe(1);
+      expectUtf16Registration(0);
+      expect(control.task).toMatchObject({ enabled: true });
+    }),
+  );
+
+  it.effect(
+    "keeps a concurrently published unit when a legacy restart migrates it on Windows",
+    () =>
+      Effect.gen(function* () {
+        const { service, fs, taskRegistrations, control, makeService, statePath } =
+          yield* makeHarness(
+            "win32",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            "t3-boot-service-测试-",
+          );
+        const plan = yield* service.install();
+        // A unit written before UTF-16LE task files, which the restart below picks up.
+        yield* fs.writeFileString(
+          plan.unitPath,
+          decodeServiceUnit(yield* fs.readFile(plan.unitPath)),
+        );
+
+        // The restart reads the legacy bytes, then stalls before using them; meanwhile a
+        // 1.2.4 install publishes its own unit under the selection lock.
+        const readStalled = yield* Deferred.make<void>();
+        const proceed = yield* Deferred.make<void>();
+        let stalled = false;
+        control.readFileInterceptor = (file) =>
+          file === plan.unitPath && !stalled
+            ? Effect.gen(function* () {
+                stalled = true;
+                yield* Deferred.succeed(readStalled, undefined);
+                yield* Deferred.await(proceed);
+              })
+            : Effect.void;
+
+        const restarting = yield* Effect.forkChild(service.restart);
+        yield* Deferred.await(readStalled);
+
+        const newer = yield* makeService(undefined, "1.2.4");
+        yield* newer.install({ start: false });
+
+        yield* Deferred.succeed(proceed, undefined);
+        expect(yield* Fiber.join(restarting)).toBe("restarted");
+
+        // The migration must not roll the published 1.2.4 unit back to 1.2.3.
+        const newerRuntime = pinnedRuntimePaths(yield* Path.Path, plan.baseDir, "1.2.4", "win32");
+        expect(
+          BootService.bootServiceProgramOf(decodeServiceUnit(yield* fs.readFile(plan.unitPath))),
+        ).toBe(newerRuntime.entryPath);
+        expect(BootService.bootServiceProgramOf(control.task?.xml ?? "")).toBe(
+          newerRuntime.entryPath,
+        );
+        expect(parseServiceState(yield* fs.readFileString(statePath))?.activeVersion).toBe("1.2.4");
+        const registration = taskRegistrations.at(-1);
+        expect(registration).toBeDefined();
+        expect([...registration!.bytes.subarray(0, 2)]).toEqual([0xff, 0xfe]);
+      }),
   );
 
   // regression: #8173 keep provider CLIs available in the macOS service

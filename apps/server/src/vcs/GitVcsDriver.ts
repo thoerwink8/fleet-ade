@@ -4,14 +4,18 @@ import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as PlatformError from "effect/PlatformError";
 import * as Path from "effect/Path";
 import { ChildProcessSpawner } from "effect/process";
+import * as Semaphore from "effect/Semaphore";
 
 import {
   GitCommandError,
+  VcsCheckpointStorageError,
   VcsProcessExitError,
   VcsUnsupportedOperationError,
   type VcsSwitchRefInput,
@@ -37,6 +41,7 @@ import {
 } from "@t3tools/contracts";
 import { isMissingExecutable } from "@t3tools/source-control-core/server/discovery";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { quoteGitPatchPath } from "@t3tools/shared/gitPatchPath";
 import {
   makeGitVcsDriverCore,
   PATCH_RENDER_PREFIX_ARGS,
@@ -537,6 +542,19 @@ function parseGitRemoteVerboseOutput(
   return remotes;
 }
 
+// Publication and its rollback form one critical section per object store: a capture that
+// reuses an AlreadyExists object must not see it disappear between decision and ref write.
+// Module scope because tests and callers may hold separate driver instances for one repository.
+const publicationMutexes = new Map<string, Semaphore.Semaphore>();
+const publicationMutexFor = (objectsDirectory: string): Semaphore.Semaphore => {
+  let mutex = publicationMutexes.get(objectsDirectory);
+  if (mutex === undefined) {
+    mutex = Semaphore.makeUnsafe(1);
+    publicationMutexes.set(objectsDirectory, mutex);
+  }
+  return mutex;
+};
+
 // Trace output and deprecation warnings can precede Git's own message, so check every line.
 const hasStderrLine = (stderr: string, prefixes: ReadonlyArray<string>) =>
   stderr.split("\n").some((line) => prefixes.some((prefix) => line.startsWith(prefix)));
@@ -558,6 +576,8 @@ const gitCommand = Effect.fn("GitVcsDriver.gitCommand")(
       readonly maxOutputBytes?: number;
       readonly outputMode?: VcsProcess.VcsProcessInput["outputMode"];
       readonly appendTruncationMarker?: boolean;
+      readonly onStdoutChunk?: (chunk: Uint8Array) => void;
+      readonly onStderrChunk?: (chunk: Uint8Array) => void;
     },
   ) =>
     process.run({
@@ -577,6 +597,8 @@ const gitCommand = Effect.fn("GitVcsDriver.gitCommand")(
       ...(options?.appendTruncationMarker !== undefined
         ? { appendTruncationMarker: options.appendTruncationMarker }
         : {}),
+      ...(options?.onStdoutChunk !== undefined ? { onStdoutChunk: options.onStdoutChunk } : {}),
+      ...(options?.onStderrChunk !== undefined ? { onStderrChunk: options.onStderrChunk } : {}),
     }),
 );
 
@@ -642,6 +664,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       ...(input.appendTruncationMarker !== undefined
         ? { appendTruncationMarker: input.appendTruncationMarker }
         : {}),
+      ...(input.onStdoutChunk !== undefined ? { onStdoutChunk: input.onStdoutChunk } : {}),
+      ...(input.onStderrChunk !== undefined ? { onStderrChunk: input.onStderrChunk } : {}),
     });
 
   const detectRepository: VcsDriver.VcsDriver["Service"]["detectRepository"] = Effect.fn(
@@ -980,8 +1004,42 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       const indexId = yield* random.uuidV4();
       const tempIndexPath = path.join(gitCommonDir, `t3-checkpoint-index-${indexId}`);
       const hostEnv = yield* HostProcess.Environment;
+      // VcsProcess clears inherited object selectors, so every other command uses this store.
+      const sharedObjects = path.join(gitCommonDir, "objects");
+      const quotedObjects = quoteGitPatchPath(sharedObjects);
+      // Isolate bulk-checkin packs so cleanup cannot remove another Git writer's objects.
+      const privateObjects = yield* Effect.acquireRelease(
+        fileSystem
+          .makeTempDirectory({ directory: sharedObjects, prefix: "tmp_objdir-t3-checkpoint-" })
+          .pipe(
+            Effect.mapError(
+              (cause) =>
+                new VcsCheckpointStorageError({
+                  operation,
+                  cwd: input.cwd,
+                  stage: "isolate",
+                  cause,
+                }),
+            ),
+          ),
+        (directory) =>
+          fileSystem.remove(directory, { recursive: true, force: true }).pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Could not remove private checkpoint objects", {
+                reason: cause.reason._tag,
+              }),
+            ),
+          ),
+      );
       const commitEnv: NodeJS.ProcessEnv = {
         GIT_INDEX_FILE: tempIndexPath,
+        GIT_OBJECT_DIRECTORY: privateObjects,
+        // A filter must not publish refs that depend on our disposable store.
+        GIT_QUARANTINE_PATH: privateObjects,
+        // Git accepts C-quoted alternate paths, including path-list separators.
+        GIT_ALTERNATE_OBJECT_DIRECTORIES: quotedObjects.startsWith('"')
+          ? quotedObjects
+          : `"${quotedObjects}"`,
         GIT_AUTHOR_NAME: "T3 Code",
         GIT_AUTHOR_EMAIL: "t3code@users.noreply.github.com",
         GIT_COMMITTER_NAME: "T3 Code",
@@ -994,7 +1052,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         { discard: true },
       );
 
-      yield* Effect.gen(function* () {
+      return yield* Effect.gen(function* () {
         const sparseConfig = yield* execute({
           operation,
           cwd: input.cwd,
@@ -1231,6 +1289,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           }
         }
 
+        // stderr arrives in chunks that can split a line; buffer everything and parse after.
+        const skippedChunks: Array<Uint8Array> = [];
         const stageFiles = (exclusions: ReadonlyArray<string>, ignoreErrors = false) =>
           execute({
             operation,
@@ -1253,6 +1313,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               ...exclusions,
             ],
             env: commitEnv,
+            ...(ignoreErrors
+              ? { onStderrChunk: (chunk: Uint8Array) => skippedChunks.push(chunk) }
+              : {}),
           }).pipe(
             // With --ignore-errors, exit 1 only reports the files it skipped.
             Effect.catchIf(
@@ -1294,6 +1357,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                   GIT_INDEX_FILE: undefined,
                   GIT_OBJECT_DIRECTORY: undefined,
                   GIT_ALTERNATE_OBJECT_DIRECTORIES: undefined,
+                  GIT_QUARANTINE_PATH: undefined,
                 };
                 const exclusions: Array<string> = [];
                 for (const entry of candidates) {
@@ -1316,6 +1380,16 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
               ),
           }),
         );
+
+        const skippedPaths = [
+          ...new Set(
+            [
+              ...Buffer.concat(skippedChunks)
+                .toString("utf8")
+                .matchAll(/^error: unable to index file '(.+)'\r?$/gm),
+            ].map((match) => match[1]!),
+          ),
+        ];
 
         const writeTreeResult = yield* execute({
           operation,
@@ -1360,13 +1434,288 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           });
         }
 
-        yield* execute({
+        // Rollback candidates: renames that moved out of the private store plus objects
+        // still in it (their shared copies are this capture's), minus the pre-publish
+        // snapshot of the shared store and anything reachable from refs.
+        const movedObjects: Array<string> = [];
+        const createdDirectories: Array<string> = [];
+        const preExistingObjects = new Set<string>();
+        // Git writers have exited; bound publication by fanout directory.
+        const publish = fileSystem.readDirectory(privateObjects).pipe(
+          Effect.flatMap((directories) =>
+            Effect.forEach(
+              directories.filter(
+                (directory) => directory === "pack" || /^[0-9a-f]{2}$/.test(directory),
+              ),
+              (directory) =>
+                Effect.gen(function* () {
+                  const source = path.join(privateObjects, directory);
+                  const destination = path.join(sharedObjects, directory);
+                  // Most fanouts already exist; avoid constructing an EEXIST error
+                  // for each of them on every capture. mkdir still handles the race.
+                  if (!(yield* fileSystem.exists(destination)))
+                    yield* fileSystem.makeDirectory(destination).pipe(
+                      Effect.andThen(
+                        Effect.gen(function* () {
+                          createdDirectories.push(destination);
+                          // Git has already applied core.sharedRepository to the source.
+                          // chmod bypasses umask, but never changes a pre-existing bucket.
+                          const { mode } = yield* fileSystem.stat(source);
+                          yield* fileSystem.chmod(destination, mode & 0o7777);
+                        }),
+                      ),
+                      Effect.catchIf(
+                        (cause) => cause.reason._tag === "AlreadyExists",
+                        () => Effect.void,
+                      ),
+                      Effect.uninterruptible,
+                    );
+                  const names = yield* fileSystem.readDirectory(source);
+                  const relativeName = (name: string) => path.join(directory, name);
+                  // Snapshot which of this scan's objects already exist in the shared store.
+                  // Objects present before publication are never rolled back.
+                  yield* Effect.forEach(
+                    names,
+                    (name) =>
+                      Effect.gen(function* () {
+                        if (yield* fileSystem.exists(path.join(destination, name)))
+                          preExistingObjects.add(relativeName(name));
+                      }),
+                    { concurrency: 16, discard: true },
+                  );
+                  // Cross-volume stores reject both hardlinks and renames with EXDEV;
+                  // copy into a same-directory temporary, flush it, then rename locally.
+                  const copyAcrossVolumes = Effect.fnUntraced(function* (from: string, to: string) {
+                    const temporary = `${to}.t3-cp-${indexId}`;
+                    yield* Effect.gen(function* () {
+                      yield* fileSystem.copy(from, temporary);
+                      yield* Effect.scoped(
+                        Effect.flatMap(fileSystem.open(temporary), (file) => file.sync),
+                      );
+                      yield* fileSystem.rename(temporary, to);
+                    }).pipe(
+                      Effect.ensuring(
+                        fileSystem.remove(temporary, { force: true }).pipe(Effect.ignore),
+                      ),
+                    );
+                  });
+                  // Per-object spans would swamp the capture span for large workspaces.
+                  const linkObject = Effect.fnUntraced(function* (name: string) {
+                    const from = path.join(source, name);
+                    const to = path.join(destination, name);
+                    yield* fileSystem.link(from, to).pipe(
+                      Effect.catchIf(
+                        (cause) =>
+                          cause.reason._tag === "PermissionDenied" ||
+                          cause.reason._tag === "Unknown",
+                        () =>
+                          Effect.gen(function* () {
+                            if (yield* fileSystem.exists(to)) {
+                              preExistingObjects.add(relativeName(name));
+                              return;
+                            }
+                            // Git also falls back to rename without hardlinks; identical object names are interchangeable.
+                            // Renames move the object out of the private store, so they are tracked for rollback.
+                            yield* fileSystem.rename(from, to).pipe(
+                              Effect.andThen(
+                                Effect.sync(() => movedObjects.push(relativeName(name))),
+                              ),
+                              Effect.catchIf(
+                                (cause) => cause.reason._tag === "Unknown",
+                                () =>
+                                  Effect.gen(function* () {
+                                    if (yield* fileSystem.exists(to)) {
+                                      preExistingObjects.add(relativeName(name));
+                                      return;
+                                    }
+                                    yield* copyAcrossVolumes(from, to);
+                                  }),
+                              ),
+                            );
+                          }),
+                      ),
+                      Effect.catchIf(
+                        (cause) => cause.reason._tag === "AlreadyExists",
+                        // Another writer linked it after the pre-publish snapshot; it is
+                        // never this capture's to roll back.
+                        () => Effect.sync(() => preExistingObjects.add(relativeName(name))),
+                      ),
+                    );
+                  });
+                  if (directory !== "pack") {
+                    yield* Effect.forEach(
+                      names.filter((name) => /^(?:[0-9a-f]{38}|[0-9a-f]{62})$/.test(name)),
+                      linkObject,
+                      { discard: true },
+                    );
+                    return;
+                  }
+                  const files = new Set(names);
+                  for (const name of names) {
+                    if (!/^pack-(?:[0-9a-f]{40}|[0-9a-f]{64})\.pack$/.test(name)) continue;
+                    const base = name.slice(0, -5);
+                    if (!files.has(`${base}.idx`)) continue;
+                    // Link metadata before the pack so an I/O error cannot strand a
+                    // large unindexed pack. Defer cancellation across this short group
+                    // of links. Ref publication still happens last.
+                    yield* Effect.forEach(
+                      [".keep", ".promisor", ".rev", ".idx", ".pack"]
+                        .map((extension) => `${base}${extension}`)
+                        .filter((file) => files.has(file)),
+                      linkObject,
+                      { discard: true },
+                    ).pipe(Effect.uninterruptible);
+                  }
+                }),
+              { concurrency: 16, discard: true },
+            ),
+          ),
+        );
+
+        const updateRef = execute({
           operation,
           cwd: input.cwd,
           args: [...durableWrite, "update-ref", input.checkpointRef, commitOid],
         });
+
+        // Reachability is the only safe ownership test: a capture can never delete the
+        // object copy another ref needs. Loose objects go when unreachable; a pack is
+        // atomic, so one reachable object inside keeps the whole family.
+        const rollbackPublished = Effect.fnUntraced(function* () {
+          // fs.rm refuses directories without recursive, and recursive would delete objects
+          // another writer moved in, so only directories that are empty at removal time go.
+          const removeEmptyDirectory = (directory: string) =>
+            fileSystem.readDirectory(directory).pipe(
+              Effect.flatMap((entries) =>
+                entries.length === 0
+                  ? fileSystem.remove(directory, { recursive: true, force: true })
+                  : Effect.void,
+              ),
+              Effect.ignore,
+            );
+          // Candidates: objects still in the private store (a link that created its
+          // copy before failing leaves the source here) plus renames that moved out,
+          // minus anything the pre-publication snapshot saw in the shared store.
+          const candidates = new Set<string>(movedObjects);
+          const privateScan = yield* fileSystem.readDirectory(privateObjects).pipe(Effect.option);
+          if (Option.isSome(privateScan))
+            for (const directory of privateScan.value) {
+              if (!(directory === "pack" || /^[0-9a-f]{2}$/.test(directory))) continue;
+              const entries = yield* fileSystem
+                .readDirectory(path.join(privateObjects, directory))
+                .pipe(Effect.option);
+              if (Option.isNone(entries)) continue;
+              for (const name of entries.value) candidates.add(path.join(directory, name));
+            }
+          for (const present of preExistingObjects) candidates.delete(present);
+          const publishedObjects = [...candidates].filter(
+            (relative) =>
+              /^pack\/pack-/.test(relative) ||
+              /^[0-9a-f]{2}\/(?:[0-9a-f]{38}|[0-9a-f]{62})$/.test(relative),
+          );
+          if (publishedObjects.length === 0) {
+            for (const directory of createdDirectories) yield* removeEmptyDirectory(directory);
+            return;
+          }
+          const reachableResult = yield* execute({
+            operation,
+            cwd: input.cwd,
+            args: ["rev-list", "--objects", "--all", "--reflog"],
+            // A truncated listing cannot prove reachability, so error out instead.
+            maxOutputBytes: 512 * 1024 * 1024,
+          }).pipe(Effect.option);
+          if (Option.isNone(reachableResult)) {
+            yield* Effect.logWarning(
+              "Could not list reachable objects; leaving failed checkpoint capture objects in place",
+            );
+            return;
+          }
+          const reachable = new Set(
+            reachableResult.value.stdout
+              .split("\n")
+              .map((line) => /^([0-9a-f]{40}|[0-9a-f]{64})\b/.exec(line)?.[1])
+              .filter((oid): oid is string => oid !== undefined),
+          );
+          const packOids = new Map<string, Array<string> | null>();
+          for (const relative of publishedObjects) {
+            const packMatch = /^pack\/(pack-[0-9a-f]{40,64})\.pack$/.exec(relative);
+            if (packMatch === null) continue;
+            if (!packOids.has(packMatch[1]!)) {
+              const verified = yield* execute({
+                operation,
+                cwd: input.cwd,
+                args: [
+                  "verify-pack",
+                  "-v",
+                  path.join(sharedObjects, "pack", `${packMatch[1]}.idx`),
+                ],
+                allowNonZeroExit: true,
+                maxOutputBytes: 512 * 1024 * 1024,
+              }).pipe(Effect.option);
+              // An unreadable or truncated listing cannot prove the pack is unreferenced,
+              // so it stays: residue in the failure direction, never corruption.
+              packOids.set(
+                packMatch[1]!,
+                verified._tag === "Some" &&
+                  verified.value.exitCode === 0 &&
+                  !verified.value.stdoutTruncated
+                  ? verified.value.stdout
+                      .split("\n")
+                      .map((line) => /^([0-9a-f]{40}|[0-9a-f]{64}) /.exec(line)?.[1])
+                      .filter((oid): oid is string => oid !== undefined)
+                  : null,
+              );
+            }
+          }
+          const keepPacks = new Set<string>();
+          for (const [base, oids] of packOids)
+            if (oids === null || oids.some((oid) => reachable.has(oid))) keepPacks.add(base);
+          const removals: Array<string> = [];
+          for (const relative of publishedObjects) {
+            const packBase = /^pack\/(pack-[0-9a-f]{40,64})\.(?:pack|idx|rev|keep|promisor)$/.exec(
+              relative,
+            )?.[1];
+            if (packBase !== undefined) {
+              if (!keepPacks.has(packBase)) removals.push(relative);
+              continue;
+            }
+            const objectMatch = /^([0-9a-f]{2})\/([0-9a-f]{38}|[0-9a-f]{62})$/.exec(relative);
+            if (objectMatch !== null && !reachable.has(`${objectMatch[1]}${objectMatch[2]}`))
+              removals.push(relative);
+          }
+          for (const relative of removals)
+            yield* fileSystem.remove(path.join(sharedObjects, relative), { force: true }).pipe(
+              Effect.catch((cause) =>
+                Effect.logWarning("Could not roll back a published checkpoint object", {
+                  object: relative,
+                  reason: cause.reason._tag,
+                }),
+              ),
+            );
+          for (const directory of createdDirectories) yield* removeEmptyDirectory(directory);
+        });
+
+        // Publish failures are file-system errors; update-ref failures are VcsErrors.
+        // Wrap the former in the storage stage error and leave the latter untouched.
+        const publishAndUpdateRef = Effect.andThen(publish, updateRef).pipe(
+          Effect.mapError((cause) =>
+            PlatformError.isPlatformError(cause)
+              ? new VcsCheckpointStorageError({
+                  operation,
+                  cwd: input.cwd,
+                  stage: "publish",
+                  cause,
+                })
+              : cause,
+          ),
+          Effect.onExit((exit) =>
+            Exit.isSuccess(exit) ? Effect.void : Effect.uninterruptible(rollbackPublished()),
+          ),
+        );
+        yield* publicationMutexFor(sharedObjects).withPermits(1)(publishAndUpdateRef);
+        return { skippedPaths };
       }).pipe(Effect.ensuring(cleanupTempIndex));
-    }),
+    }, Effect.scoped),
 
     hasCheckpointRef: (input) =>
       resolveCheckpointCommit(input.cwd, input.checkpointRef).pipe(

@@ -16,6 +16,11 @@ export interface VcsCaptureCheckpointInput {
   readonly checkpointRef: CheckpointRef;
 }
 
+export interface VcsCaptureCheckpointResult {
+  /** Paths Git could not read during staging, relative to the capture cwd. */
+  readonly skippedPaths: ReadonlyArray<string>;
+}
+
 export interface VcsRestoreCheckpointInput {
   readonly cwd: string;
   readonly checkpointRef: CheckpointRef;
@@ -49,7 +54,9 @@ export interface VcsDeleteCheckpointRefsInput {
 }
 
 export interface VcsCheckpointOps {
-  readonly captureCheckpoint: (input: VcsCaptureCheckpointInput) => Effect.Effect<void, VcsError>;
+  readonly captureCheckpoint: (
+    input: VcsCaptureCheckpointInput,
+  ) => Effect.Effect<VcsCaptureCheckpointResult, VcsError>;
   readonly hasCheckpointRef: (
     input: Omit<VcsRestoreCheckpointInput, "fallbackToHead">,
   ) => Effect.Effect<boolean, VcsError>;

@@ -37,7 +37,7 @@ import {
 import { bootServiceProgramOf, bootServiceUnitPath } from "./bootService.ts";
 import { decodeServicePreflightResult } from "./servicePreflight.ts";
 import * as ServiceLauncherClient from "./serviceLauncherClient.ts";
-import { isExactServiceVersion } from "./serviceProtocol.ts";
+import { decodeServiceUnit, isExactServiceVersion } from "./serviceProtocol.ts";
 
 // A staged runtime's cold start can take over a minute on a loaded, swapping host.
 const PREFLIGHT_TIMEOUT = Duration.minutes(3);
@@ -83,7 +83,7 @@ export const pruneRuntimesOnStart = Effect.fn("cloud.server_self_update.prune_on
     const unit =
       unitPath === undefined
         ? Option.none<string>()
-        : yield* fs.readFileString(unitPath).pipe(Effect.option);
+        : yield* fs.readFile(unitPath).pipe(Effect.map(decodeServiceUnit), Effect.option);
     const program = Option.flatMapNullishOr(unit, bootServiceProgramOf);
     // The unit may name it through another spelling of a symlinked T3 home.
     const references = Option.isNone(program)
