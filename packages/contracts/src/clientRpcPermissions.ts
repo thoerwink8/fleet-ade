@@ -10,7 +10,7 @@ import {
   AuthSourceControlWriteScope,
   type AuthEnvironmentScope,
 } from "./auth.ts";
-import { ORCHESTRATION_V2_WS_METHODS, OrchestrationV2Command } from "./orchestrationV2.ts";
+import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
@@ -65,18 +65,22 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksUnlink]: AuthAccessWriteScope,
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
-  // Bot state transitions and thread moves are orchestration commands inside
-  // `orchestration.dispatchCommand`; these keys match the command `type`, and
-  // `clientRpcRequiredScopes` applies them when it decodes one in the payload.
+} as const;
+export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
+
+/**
+ * Orchestration commands inside `orchestration.dispatchCommand` that need more than the
+ * method's scope, keyed by their `type` string. The key alone decides execution, so no
+ * schema decode is needed here: the server re-decodes and rejects malformed commands.
+ */
+const CLIENT_GUARDED_COMMAND_SCOPES = {
   "bot.pause": AuthOrchestrationOperateScope,
   "bot.resume": AuthOrchestrationOperateScope,
   "bot.switch-thread": AuthOrchestrationOperateScope,
 } as const;
-export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);
 const decodeStackedAction = Schema.decodeUnknownSync(GitRunStackedActionInput);
-const decodeOrchestrationCommand = Schema.decodeUnknownExit(OrchestrationV2Command);
 
 export function clientRpcRequiredScopes(
   method: string,
@@ -96,14 +100,18 @@ export function clientRpcRequiredScopes(
       return [AuthSourceControlWriteScope, AuthOrchestrationReadScope];
   }
   if (method === ORCHESTRATION_V2_WS_METHODS.dispatchCommand && input !== undefined) {
-    // Per-command-type entries in CLIENT_GUARDED_RPC_SCOPES apply to the decoded
-    // command. Anything undecodable or unlisted falls through to the method scope.
-    const decoded = decodeOrchestrationCommand(input);
+    // Guarded command types key CLIENT_GUARDED_COMMAND_SCOPES by their `type` string,
+    // which decides execution. Anything unlisted or malformed falls through to the
+    // method scope; the server rejects malformed commands after decoding.
+    const commandType =
+      typeof input === "object" && input !== null && "type" in input ? input.type : undefined;
     if (
-      decoded._tag === "Success" &&
-      Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, decoded.value.type)
+      typeof commandType === "string" &&
+      Object.hasOwn(CLIENT_GUARDED_COMMAND_SCOPES, commandType)
     ) {
-      return [CLIENT_GUARDED_RPC_SCOPES[decoded.value.type as ClientGuardedRpcTag]];
+      return [
+        CLIENT_GUARDED_COMMAND_SCOPES[commandType as keyof typeof CLIENT_GUARDED_COMMAND_SCOPES],
+      ];
     }
   }
   return Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, method)

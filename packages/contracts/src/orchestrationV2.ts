@@ -2156,6 +2156,8 @@ export const OrchestrationV2DomainEvent = Schema.Union([
     /**
      * The full bot after the move plus the thread it left. Emitted on both the old
      * and the new thread's stream, so each side's projection and shell recompute.
+     * Only the copy with `event.threadId === payload.currentThreadId` counts as the bot
+     * living on that thread; the copy on the old thread removes it there.
      */
     payload: Schema.Struct({
       ...OrchestrationV2Bot.fields,

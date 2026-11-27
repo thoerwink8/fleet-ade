@@ -4195,6 +4195,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     if (targetThread.deletedAt !== null) {
       return yield* refuse(`Thread ${command.targetThreadId} is deleted.`);
     }
+    // Deletes lock a parent before its side chats; holding a side chat's lock here while
+    // waiting on the current thread's could invert that order and deadlock.
+    if (targetThread.lineage.sideChat === true) {
+      return yield* refuse(`Thread ${command.targetThreadId} is a side chat.`);
+    }
     // The partial unique index makes this race-free as a backstop; the read gives the
     // user a refusal instead of a constraint failure.
     const occupant = (yield* projectionStore
@@ -16432,6 +16437,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     if (command.type === "bot.switch-thread") {
       // The move writes to both threads' streams, so it holds both locks in sorted
       // order; pause and resume need only the current thread's, already taken above.
+      // A side chat target would invert the parent-before-side-chat lock order deletes
+      // take; dispatch refuses those, so they skip the second lock like fork does.
+      const target = yield* findThread(command.targetThreadId);
+      if (target === null || target.lineage.sideChat === true) return yield* dispatch;
       const lockIds = [...new Set([command.threadId, command.targetThreadId])]
         .toSorted()
         .toReversed();

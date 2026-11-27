@@ -87,6 +87,7 @@ it.effect("pause and resume transition the bot status with no-op repeats", () =>
     const before = yield* projections.getThreadProjection(threadId);
     assert.equal(before.bot?.status, "active");
 
+    yield* TestClock.adjust("1 second");
     const paused = yield* orchestrator.dispatch({
       type: "bot.pause",
       commandId: CommandId.make("pause-bot-1"),
@@ -111,6 +112,14 @@ it.effect("pause and resume transition the bot status with no-op repeats", () =>
     );
     assert.equal(shell?.commander, true);
 
+    // Bot status changes do not bump the thread's updatedAt.
+    assert.equal(
+      DateTime.toEpochMillis(afterPause.thread.updatedAt),
+      DateTime.toEpochMillis(before.thread.updatedAt),
+    );
+
+    yield* TestClock.adjust("1 second");
+
     // Pausing again is a no-op: no events, still an accepted receipt.
     const pausedAgain = yield* orchestrator.dispatch({
       type: "bot.pause",
@@ -132,6 +141,10 @@ it.effect("pause and resume transition the bot status with no-op repeats", () =>
     );
     const afterResume = yield* projections.getThreadProjection(threadId);
     assert.equal(afterResume.bot?.status, "active");
+    assert.equal(
+      DateTime.toEpochMillis(afterResume.thread.updatedAt),
+      DateTime.toEpochMillis(before.thread.updatedAt),
+    );
 
     const resumedAgain = yield* orchestrator.dispatch({
       type: "bot.resume",
@@ -295,7 +308,7 @@ it.effect(
     }).pipe(Effect.provide(layerTest)),
 );
 
-it.effect("switch-thread refuses occupied, missing, and deleted targets without events", () =>
+it.effect("switch-thread refuses occupied, missing, deleted, and side chat targets", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
@@ -316,6 +329,8 @@ it.effect("switch-thread refuses occupied, missing, and deleted targets without 
       threadId: deletedId,
     });
 
+    const occupiedSequenceBefore = (yield* orchestrator.getThreadSnapshot(occupiedId))
+      .snapshotSequence;
     const occupied = yield* orchestrator
       .dispatch({
         type: "bot.switch-thread",
@@ -326,6 +341,11 @@ it.effect("switch-thread refuses occupied, missing, and deleted targets without 
       })
       .pipe(Effect.flip);
     assert.equal(occupied._tag, "OrchestratorDispatchError");
+    // A refused move commits nothing on the target's stream.
+    assert.equal(
+      (yield* orchestrator.getThreadSnapshot(occupiedId)).snapshotSequence,
+      occupiedSequenceBefore,
+    );
 
     const missing = yield* orchestrator
       .dispatch({
@@ -348,6 +368,31 @@ it.effect("switch-thread refuses occupied, missing, and deleted targets without 
       })
       .pipe(Effect.flip);
     assert.equal(deleted._tag, "OrchestratorDispatchError");
+
+    // A bot cannot land on a side chat: deletes lock parents before their side chats,
+    // so holding a side chat's lock here would invert that order.
+    const sideChatId = ThreadId.make("thread:bot-sidechat");
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("fork-bot-sidechat"),
+      sourceThreadId: freeId,
+      targetThreadId: sideChatId,
+      sideChat: true,
+      sourcePoint: { type: "latest_stable" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const sideChat = yield* orchestrator
+      .dispatch({
+        type: "bot.switch-thread",
+        commandId: CommandId.make("switch-to-sidechat"),
+        botId,
+        threadId: homeId,
+        targetThreadId: sideChatId,
+      })
+      .pipe(Effect.flip);
+    assert.equal(sideChat._tag, "OrchestratorDispatchError");
+    assert.isNull((yield* projections.getThreadProjection(sideChatId)).bot);
 
     // Nothing moved: the bot is still home and no events were committed anywhere.
     const home = yield* projections.getThreadProjection(homeId);
