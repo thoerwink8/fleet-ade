@@ -754,7 +754,7 @@ describe("readLiveServerRuntimeState", () => {
   );
 
   it.effect(
-    "reports unknown when the identity probe has no answer, even for a complete record",
+    "a probe with no answer falls back to the ownership lock, wherever identity came from",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -767,6 +767,8 @@ describe("readLiveServerRuntimeState", () => {
           Promise.resolve(undefined),
         );
 
+        // The fallback ignores whatever the record stored for identity: with no lock holder
+        // the ownership proof is missing, so even a complete record is stale.
         yield* fs.writeFileString(
           statePath,
           JSON.stringify(
@@ -776,20 +778,17 @@ describe("readLiveServerRuntimeState", () => {
             }),
           ),
         );
-        assert.equal(
-          yield* failingProbe(
-            ServerRuntimeState.verifyRecordedServerProcessLiveness(
-              JSON.parse(yield* fs.readFileString(statePath)),
-              statePath,
-            ),
-          ),
-          "unknown",
+        const verifyLiveness = ServerRuntimeState.verifyRecordedServerProcessLiveness(
+          JSON.parse(yield* fs.readFileString(statePath)),
+          statePath,
         );
-        assert.isTrue(
-          Option.isNone(
-            yield* failingProbe(ServerRuntimeState.readLiveServerRuntimeState(statePath)),
-          ),
-        );
+        assert.equal(yield* failingProbe(verifyLiveness), "stale");
+
+        // With a live owner holding the lock the same record reads live: on hosts without a
+        // generation-precise probe this degraded verdict is the best verification can do.
+        const holder = yield* lockHoldingProcess(path.join(root, "server-owner.sqlite"));
+        assert(holder.pid !== undefined);
+        assert.equal(yield* failingProbe(verifyLiveness), "live");
       }).pipe(Effect.provide(layerIdentity)),
   );
 
@@ -932,6 +931,63 @@ describe("readLiveServerRuntimeState", () => {
             statePath,
           ),
           "live",
+        );
+      }).pipe(Effect.provide(layerIdentity)),
+  );
+  it.effect(
+    "falls back to owner and lock proof when the host cannot answer the identity probe",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-livestate-noprobe-" });
+        const statePath = path.join(root, "server-runtime.json");
+        const holder = yield* lockHoldingProcess(path.join(root, "server-owner.sqlite"));
+        assert(holder.pid !== undefined);
+        const blindProbe = Effect.provideService(ServerRuntimeState.ProcessIdentityProbe, () =>
+          Promise.resolve(undefined),
+        );
+
+        // Platforms without a generation-precise probe (macOS) publish records that carry no
+        // processIdentity at all. Verification on those hosts must fall back to PID liveness,
+        // ownerId presence, and the ownership lock — the pre-identity judgement — or no record
+        // could ever read live and pairing would be impossible there.
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(
+            recordFor(holder.pid, { ownerId: "4ec9f94a-0000-4000-8000-000000000000" }),
+          ),
+        );
+        assert.equal(
+          yield* blindProbe(
+            ServerRuntimeState.verifyRecordedServerProcessLiveness(
+              JSON.parse(yield* fs.readFileString(statePath)),
+              statePath,
+            ),
+          ),
+          "live",
+        );
+        assert.isTrue(
+          Option.isSome(
+            yield* blindProbe(ServerRuntimeState.readLiveServerRuntimeState(statePath)),
+          ),
+        );
+
+        // Fallback never resurrects a dead PID, and a missing ownerId still cannot read live.
+        yield* fs.writeFileString(
+          statePath,
+          JSON.stringify(
+            recordFor(2_147_483_647, { ownerId: "4ec9f94a-0000-4000-8000-000000000000" }),
+          ),
+        );
+        assert.equal(
+          yield* blindProbe(
+            ServerRuntimeState.verifyRecordedServerProcessLiveness(
+              JSON.parse(yield* fs.readFileString(statePath)),
+              statePath,
+            ),
+          ),
+          "stale",
         );
       }).pipe(Effect.provide(layerIdentity)),
   );

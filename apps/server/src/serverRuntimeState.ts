@@ -198,8 +198,9 @@ export type RecordedServerLiveness = "live" | "stale" | "unknown";
 
 /**
  * Whether the record describes a server that still runs and still owns its home. Live needs an
- * ownerId, the stored identity exactly equal to a fresh probe, and the lock held; unverifiable
- * is "unknown", a proven contradiction "stale".
+ * ownerId, a lock proof, and — where the probe can answer — the stored identity exactly equal
+ * to a fresh probe. A host without a probe answer (macOS) falls back to PID liveness, ownerId,
+ * and the lock, or no record could ever read live there.
  */
 export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServerProcessLiveness")(
   function* (
@@ -218,21 +219,24 @@ export const verifyRecordedServerProcessLiveness = Effect.fn("verifyRecordedServ
     const registeredOwnerId = inProcessOwners.get(statePath);
     if (registeredOwnerId !== undefined && state.ownerId !== registeredOwnerId) return "stale";
 
-    // Without a stored identity the process generation cannot be bound at all — not even for
-    // this process's own registered ownerId.
-    if (state.processIdentity === undefined) return "unknown";
-
     const probeIdentity = yield* ProcessIdentityProbe;
     // The probe interrogates the real host kernel, so it must use the real platform, not the
     // injectable HostProcess.Platform — tests override that one to emulate another OS's behavior.
     // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
     const liveIdentity = yield* Effect.promise(() => probeIdentity(state.pid, process.platform));
-    if (liveIdentity === undefined) return "unknown";
-    if (liveIdentity !== state.processIdentity) return "stale";
 
-    // The identity match proves this process is the recorded owner instance. A registered
-    // ownerId match with our own PID is the in-process lock proof: the registry entry exists
-    // only while the acquisition scope holds the lock.
+    if (liveIdentity !== undefined) {
+      // The probe answered, so identity verifies strictly. Without a stored identity the
+      // process generation cannot be bound at all — not even for this process's own
+      // registered ownerId.
+      if (state.processIdentity === undefined) return "unknown";
+      if (liveIdentity !== state.processIdentity) return "stale";
+    }
+    // With no probe answer the identity proof is impossible on this host; the checks above
+    // already cover PID liveness and ownerId, so ownership degrades to the lock proof.
+
+    // A registered ownerId match with our own PID is the in-process lock proof: the registry
+    // entry exists only while the acquisition scope holds the lock.
     if (state.pid === process.pid) {
       // Without a registration for this home the record's claim is false outright: nothing in
       // this process ever owned it, so the record can never read live regardless of who else
