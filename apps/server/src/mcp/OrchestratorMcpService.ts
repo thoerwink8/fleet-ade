@@ -7,6 +7,7 @@ import {
   NodeId,
   ORCHESTRATOR_MCP_RUNNING_TASK_NEXT,
   TurnItemId,
+  type OrchestrationV2Bot,
   type OrchestrationV2Run,
   type OrchestrationV2Subagent,
   type OrchestrationV2ThreadProjection,
@@ -1244,15 +1245,15 @@ const make = Effect.gen(function* () {
 
   const fillCommanderDispatchModel = Effect.fn("OrchestratorMcpService.fillCommanderDispatchModel")(
     function* (
-      thread: {
-        readonly commander?: boolean | undefined;
+      parent: {
+        readonly bot: Pick<OrchestrationV2Bot, "id"> | null | undefined;
         readonly projectId: ProjectId;
       },
       input: OrchestratorMcpDelegateTaskInput,
     ) {
       const target = input.target;
       if (
-        thread.commander !== true ||
+        parent.bot == null ||
         target?.model !== undefined ||
         target?.options !== undefined ||
         target?.providerInstanceId !== undefined ||
@@ -1264,11 +1265,11 @@ const make = Effect.gen(function* () {
         Effect.mapError(() => failure("orchestration_error", "Unable to read server settings.")),
       );
       const role = input.dispatchRole ?? "code";
-      const selection = resolveDispatchAssignment(settings, thread.projectId).roles[role];
+      const selection = resolveDispatchAssignment(settings, parent.projectId).roles[role];
       if (selection === null) {
         return yield* failure(
           "model_unavailable",
-          `Dispatch role ${role} has no model, and project ${thread.projectId} has no default model.`,
+          `Dispatch role ${role} has no model, and project ${parent.projectId} has no default model.`,
         );
       }
       return {
@@ -1311,8 +1312,9 @@ const make = Effect.gen(function* () {
       );
 
   // Runs on every MCP call, and long threads hold thousands of records; callers need only active runs.
+  // The bot row is cheap and decides whether the caller is a commander, so it always joins.
   const loadCallerRecords = <K extends "runs">(threadId: ThreadId, fields: ReadonlyArray<K>) =>
-    loadThreadRecords(threadId, fields, {
+    loadThreadRecords(threadId, [...fields, "bot"], {
       runStatuses: ThreadManagementService.ACTIVE_RUN_STATUSES,
     });
 
@@ -2537,7 +2539,7 @@ const make = Effect.gen(function* () {
           ) ?? [],
         runtimeMode: limits.runtimeMode,
         interactionMode: limits.interactionMode,
-        ...(parent?.thread.commander !== true
+        ...(parent === undefined || parent.bot == null
           ? {}
           : { dispatch: resolveDispatchAssignment(settings, parent.thread.projectId) }),
         providers: providers.map((provider) => {
@@ -2652,7 +2654,10 @@ const make = Effect.gen(function* () {
       const isRetryOfAcceptedDelegation = yield* threadManagement.hasReceipt(commandId);
       const request = isRetryOfAcceptedDelegation
         ? input
-        : yield* fillCommanderDispatchModel(parent.thread, input);
+        : yield* fillCommanderDispatchModel(
+            { bot: parent.bot, projectId: parent.thread.projectId },
+            input,
+          );
       // A retry replays the accepted command. Resolving again would follow settings
       // that no longer match the snapshot stored on that command.
       const target = isRetryOfAcceptedDelegation

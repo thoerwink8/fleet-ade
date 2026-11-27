@@ -10,6 +10,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
@@ -104,8 +105,9 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
       .childThreadId!;
     const before = yield* projections.getThreadProjection(parentThreadId);
     const childBefore = yield* projections.getThreadProjection(childThreadId);
-    assert.notEqual(before.thread.commander, true);
+    assert.isNull(before.bot);
     assert.equal(childBefore.thread.lineage.parentThreadId, parentThreadId);
+    yield* TestClock.adjust("1 second");
 
     const marked = yield* orchestrator.dispatch({
       type: "thread.commander.mark",
@@ -129,13 +131,19 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
     const markedOther = yield* projections.getThreadProjection(otherThreadId);
     assert.deepEqual(
       marked.storedEvents.map((stored) => stored.event.type),
-      ["thread.commander-marked"],
+      ["bot.created"],
     );
     assert.equal(marked.storedEvents[0]?.event.threadId, parentThreadId);
     assert.lengthOf(markedAgain.storedEvents, 0);
-    assert.equal(markedParent.thread.commander, true);
+    // The thread payload carries no commander key: the bot is the only record.
+    assert.isFalse("commander" in markedParent.thread);
+    assert.equal(markedParent.bot?.currentThreadId, parentThreadId);
+    assert.equal(markedParent.bot?.name, "Parent");
+    assert.equal(markedParent.bot?.status, "active");
+    const firstBotId = markedParent.bot?.id;
+    assert.isDefined(firstBotId);
     assert.equal(markedShell?.commander, true);
-    assert.equal(markedOther.thread.commander, true);
+    assert.isNotNull(markedOther.bot);
     assert.equal(
       DateTime.toEpochMillis(markedParent.thread.updatedAt),
       DateTime.toEpochMillis(before.thread.updatedAt),
@@ -148,6 +156,8 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
 
     const childStillAttached = yield* projections.getThreadProjection(childThreadId);
     assert.deepEqual(childStillAttached.thread, childBefore.thread);
+    yield* TestClock.adjust("1 second");
+
     const unmarked = yield* orchestrator.dispatch({
       type: "thread.commander.unmark",
       commandId: CommandId.make("unmark-commander-parent"),
@@ -163,10 +173,24 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
       unmarked.storedEvents.map((stored) => stored.event.threadId),
       [parentThreadId],
     );
-    assert.equal(unmarked.storedEvents[0]?.event.type, "thread.commander-unmarked");
-    assert.equal(unmarkedParent.thread.commander, false);
+    assert.equal(unmarked.storedEvents[0]?.event.type, "bot.retired");
+    const retiredEvent = unmarked.storedEvents[0]?.event;
+    assert.equal(
+      retiredEvent?.type === "bot.retired" ? retiredEvent.payload.id : undefined,
+      firstBotId,
+    );
+    assert.equal(
+      retiredEvent?.type === "bot.retired" ? retiredEvent.payload.status : undefined,
+      "retired",
+    );
+    assert.isNull(unmarkedParent.bot);
+    assert.isFalse("commander" in unmarkedParent.thread);
     assert.equal(unmarkedShell?.commander, false);
-    assert.equal(otherAfter.thread.commander, true);
+    assert.isNotNull(otherAfter.bot);
+    assert.equal(
+      DateTime.toEpochMillis(unmarkedParent.thread.updatedAt),
+      DateTime.toEpochMillis(before.thread.updatedAt),
+    );
     assert.equal(unmarkedParent.thread.deletedAt, null);
     assert.deepEqual(childAfter.thread, childBefore.thread);
     assert.equal(childAfter.thread.lineage.parentThreadId, parentThreadId);
@@ -178,6 +202,26 @@ it.effect("marks and unmarks a commander without detaching its child", () =>
       unmarkedParent.runs.map((run) => [run.id, run.status]),
       before.runs.map((run) => [run.id, run.status]),
     );
+
+    // A retired bot does not block a new mark: the thread gets a fresh bot id.
+    const remarked = yield* orchestrator.dispatch({
+      type: "thread.commander.mark",
+      commandId: CommandId.make("remark-commander-parent"),
+      threadId: parentThreadId,
+    });
+    const remarkedParent = yield* projections.getThreadProjection(parentThreadId);
+    assert.equal(remarked.storedEvents[0]?.event.type, "bot.created");
+    const recreated = remarked.storedEvents[0]?.event;
+    assert.isDefined(remarkedParent.bot);
+    assert.notEqual(remarkedParent.bot?.id, firstBotId);
+    assert.equal(
+      recreated?.type === "bot.created" ? recreated.payload.id : undefined,
+      remarkedParent.bot?.id,
+    );
+    const remarkedShell = (yield* orchestrator.getShellSnapshot()).threads.find(
+      (thread) => thread.id === parentThreadId,
+    );
+    assert.equal(remarkedShell?.commander, true);
   }).pipe(Effect.provide(layerTest)),
 );
 
@@ -217,7 +261,8 @@ it.effect("fails to mark a missing thread and writes no thread", () =>
     const after = yield* projections.getThreadProjection(existingThreadId);
     const afterShell = yield* orchestrator.getShellSnapshot();
     const missing = yield* projections.getThreadProjection(missingThreadId).pipe(Effect.flip);
-    assert.equal(after.thread.commander, before.thread.commander);
+    assert.isNull(before.bot);
+    assert.isNull(after.bot);
     assert.equal(
       DateTime.toEpochMillis(after.thread.updatedAt),
       DateTime.toEpochMillis(before.thread.updatedAt),
