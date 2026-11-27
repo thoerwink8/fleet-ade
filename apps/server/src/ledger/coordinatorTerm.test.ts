@@ -47,67 +47,69 @@ const file = Effect.gen(function* () {
   return path.join(directory, "ledger.sqlite");
 });
 
-it.effect("同一期望任期的两次 handover 只有一次成功；去掉事务时第二次会在交错写入下破坏唯一性", () =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const filename = yield* file;
-      const holder = new NodeSqlite.DatabaseSync(filename);
-      const prepare = NodeSqlite.DatabaseSync.prototype.prepare;
-      let committed = false;
-      // node:sqlite runs a statement to completion, so Effect.all cannot interleave two handovers.
-      // A read that is not inside the write transaction lets the other connection commit first.
-      NodeSqlite.DatabaseSync.prototype.prepare = function (sql, ...rest) {
-        const statement = prepare.call(this, sql, ...rest);
-        if (
-          !/from fleet_coordinator_terms/i.test(String(sql)) ||
-          /^\s*(update|insert)/i.test(String(sql))
-        ) {
-          return statement;
-        }
-        const db = this;
-        const flexible = statement as unknown as {
-          all: (...args: ReadonlyArray<unknown>) => ReadonlyArray<unknown>;
-        };
-        const all = flexible.all.bind(statement);
-        flexible.all = (...args) => {
-          const rows = all(...args);
-          if (!committed && rows.length === 0 && !inTransaction(db)) {
-            committed = true;
-            holder.exec("BEGIN IMMEDIATE");
-            holder.exec(
-              "INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id) VALUES ('fleet-1', 1, 'coord-b')",
-            );
-            holder.exec("COMMIT");
+it.effect(
+  "同一期望任期的两次 handover 只有一次成功；去掉事务时第二次会在交错写入下破坏唯一性",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const filename = yield* file;
+        const holder = new NodeSqlite.DatabaseSync(filename);
+        const prepare = NodeSqlite.DatabaseSync.prototype.prepare;
+        let committed = false;
+        // node:sqlite runs a statement to completion, so Effect.all cannot interleave two handovers.
+        // A read that is not inside the write transaction lets the other connection commit first.
+        NodeSqlite.DatabaseSync.prototype.prepare = function (sql, ...rest) {
+          const statement = prepare.call(this, sql, ...rest);
+          if (
+            !/from fleet_coordinator_terms/i.test(String(sql)) ||
+            /^\s*(update|insert)/i.test(String(sql))
+          ) {
+            return statement;
           }
-          return rows;
+          const db = this;
+          const flexible = statement as unknown as {
+            all: (...args: ReadonlyArray<unknown>) => ReadonlyArray<unknown>;
+          };
+          const all = flexible.all.bind(statement);
+          flexible.all = (...args) => {
+            const rows = all(...args);
+            if (!committed && rows.length === 0 && !inTransaction(db)) {
+              committed = true;
+              holder.exec("BEGIN IMMEDIATE");
+              holder.exec(
+                "INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id) VALUES ('fleet-1', 1, 'coord-b')",
+              );
+              holder.exec("COMMIT");
+            }
+            return rows;
+          };
+          return statement;
         };
-        return statement;
-      };
-      yield* Effect.addFinalizer(() =>
-        Effect.sync(() => {
-          NodeSqlite.DatabaseSync.prototype.prepare = prepare;
-          holder.close();
-        }),
-      );
-      const left = yield* open(filename);
-      const right = yield* open(filename);
-      const results = yield* Effect.all(
-        [left.terms.handover(FLEET, "coord-a", 0), right.terms.handover(FLEET, "coord-b", 0)],
-        { concurrency: "unbounded" },
-      );
-      expect(results.map((result) => result._tag).toSorted()).toEqual(["current", "stale"]);
-      const handed = results.find((result) => result._tag === "current");
-      const stale = results.find((result) => result._tag === "stale");
-      assert(handed?._tag === "current");
-      assert(stale?._tag === "stale");
-      expect(handed).toEqual({ _tag: "current", term: 1, coordinatorId: "coord-a" });
-      expect(stale).toEqual({ _tag: "stale", term: 1, coordinatorId: "coord-a" });
-      expect(yield* left.terms.read(FLEET)).toEqual({ term: 1, coordinatorId: "coord-a" });
-      expect(yield* left.sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual([
-        { term: 1, coordinator_id: "coord-a" },
-      ]);
-    }),
-  ).pipe(Effect.provide(NodeServices.layer)),
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            NodeSqlite.DatabaseSync.prototype.prepare = prepare;
+            holder.close();
+          }),
+        );
+        const left = yield* open(filename);
+        const right = yield* open(filename);
+        const results = yield* Effect.all(
+          [left.terms.handover(FLEET, "coord-a", 0), right.terms.handover(FLEET, "coord-b", 0)],
+          { concurrency: "unbounded" },
+        );
+        expect(results.map((result) => result._tag).toSorted()).toEqual(["current", "stale"]);
+        const handed = results.find((result) => result._tag === "current");
+        const stale = results.find((result) => result._tag === "stale");
+        assert(handed?._tag === "current");
+        assert(stale?._tag === "stale");
+        expect(handed).toEqual({ _tag: "current", term: 1, coordinatorId: "coord-a" });
+        expect(stale).toEqual({ _tag: "stale", term: 1, coordinatorId: "coord-a" });
+        expect(yield* left.terms.read(FLEET)).toEqual({ term: 1, coordinatorId: "coord-a" });
+        expect(yield* left.sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual([
+          { term: 1, coordinator_id: "coord-a" },
+        ]);
+      }),
+    ).pipe(Effect.provide(NodeServices.layer)),
 );
 
 it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任期不同协调者是 conflict", () =>
