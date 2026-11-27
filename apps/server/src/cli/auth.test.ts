@@ -12,7 +12,9 @@ import type * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import {
   makePersistedServerRuntimeState,
   persistServerRuntimeState,
+  registerInProcessOwner,
 } from "../serverRuntimeState.ts";
+import { processIdentity } from "../legacyServerOwner.ts";
 import { revokeSessionLiveOrOffline } from "./auth.ts";
 
 it.effect(
@@ -32,7 +34,20 @@ it.effect(
         },
         port: 3773,
       });
-      yield* persistServerRuntimeState({ path: statePath, state });
+      // The fixture stands in for this same process owning the home, the binding a real server
+      // gets from acquireServerOwnership: a registered ownerId plus this process's exact probe
+      // identity, the same proof a real server's publish writes.
+      yield* registerInProcessOwner(statePath, "4ec9f94a-0000-4000-8000-000000000000");
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- The probe must interrogate the real host, not a test platform.
+      const identity = yield* Effect.promise(() => processIdentity(process.pid, process.platform));
+      yield* persistServerRuntimeState({
+        path: statePath,
+        state: {
+          ...state,
+          ownerId: "4ec9f94a-0000-4000-8000-000000000000",
+          ...(identity === undefined ? {} : { processIdentity: identity }),
+        },
+      });
 
       const revokedOffline: Array<AuthSessionId> = [];
       const liveRequests: Array<{

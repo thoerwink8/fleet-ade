@@ -12,6 +12,7 @@ import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
 import * as Fiber from "effect/Fiber";
@@ -29,6 +30,7 @@ import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderL
 import * as ModelManifest from "./ModelManifest.ts";
 import { applyProviderCompatibility } from "./providerCompatibility.ts";
 import * as ServerConfig from "../config.ts";
+import { refreshWindowsPath } from "../os-jank.ts";
 import * as ProviderInstanceRegistry from "./ProviderInstanceRegistry.ts";
 import * as ProviderInstanceRegistryMutator from "./ProviderInstanceRegistryMutator.ts";
 import {
@@ -625,12 +627,33 @@ export const layer = Layer.effect(
       );
     });
 
+    // A refresh is how a user asks T3 to see a CLI installed since launch; a burst shares one probe.
+    // Drivers copy the environment when built, so instances still missing their CLI are rebuilt
+    // on the new PATH. They cannot have live sessions, and installed ones keep theirs.
+    const refreshHostPath = yield* refreshWindowsPath().pipe(
+      Effect.flatMap((changed) =>
+        changed
+          ? Ref.get(providersRef).pipe(
+              Effect.flatMap((providers) => {
+                const missing = providers
+                  .filter((provider) => provider.enabled && !provider.installed)
+                  .map((provider) => provider.instanceId);
+                return missing.length === 0
+                  ? Effect.void
+                  : instanceRegistryMutator.rebuild(missing);
+              }),
+            )
+          : Effect.void,
+      ),
+      Effect.cachedWithTTL(Duration.seconds(10)),
+    );
     type RefreshAllCompletion = Deferred.Deferred<ReadonlyArray<ServerProvider>>;
     const refreshAllInFlightRef = yield* Ref.make<Option.Option<RefreshAllCompletion>>(
       Option.none(),
     );
 
     const refreshAll = Effect.fn("refreshAll")(function* () {
+      yield* refreshHostPath;
       const claimed = yield* Ref.modify(
         refreshAllInFlightRef,
         (
@@ -673,16 +696,13 @@ export const layer = Layer.effect(
       if (provider === undefined) {
         return yield* refreshAll();
       }
-      const instance = (yield* Ref.get(liveSubsRef)).get(defaultInstanceIdForDriver(provider));
-      if (!instance) {
-        return yield* Ref.get(providersRef);
-      }
-      return yield* refreshOneSource(instance);
+      return yield* refreshInstance(defaultInstanceIdForDriver(provider));
     });
 
     const refreshInstance = Effect.fn("refreshInstance")(function* (
       instanceId: ProviderInstanceId,
     ) {
+      yield* refreshHostPath;
       yield* syncLiveSourcesAndContinue;
       const instance = (yield* Ref.get(liveSubsRef)).get(instanceId);
       if (!instance) {

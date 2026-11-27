@@ -13,7 +13,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { assert, it, vi } from "vite-plus/test";
 
-import { fixPath, hydratePosixHome, resolveBaseDir } from "./os-jank.ts";
+import { fixPath, hydratePosixHome, refreshWindowsPath, resolveBaseDir } from "./os-jank.ts";
 
 vi.mock("node:child_process", { spy: true });
 
@@ -192,6 +192,56 @@ effectIt.effect("hydrates a missing JAVA_HOME from the login shell and keeps an 
       }),
     (probe) => Effect.sync(() => probe.mockRestore()),
   ),
+);
+
+effectIt.effect("adds a directory an installer wrote to the registry after launch", () =>
+  Effect.gen(function* () {
+    const env: NodeJS.ProcessEnv = { Path: "C:\\Tools;C:\\Windows" };
+    const installed = "C:\\Users\\me\\AppData\\Local\\cursor-agent";
+
+    yield* refreshWindowsPath().pipe(
+      Effect.provideService(HostProcess.Platform, "win32"),
+      Effect.provideService(HostProcess.Environment, env),
+      Effect.provideService(WindowsShellEnvironment, () =>
+        Effect.succeed({ PATH: `C:\\Windows;${installed}` }),
+      ),
+    );
+
+    assert.deepEqual(env, { PATH: `C:\\Tools;C:\\Windows;${installed}` });
+  }),
+);
+
+effectIt.effect("leaves a current Windows PATH alone and skips the probe off Windows", () =>
+  Effect.gen(function* () {
+    const env: NodeJS.ProcessEnv = { PATH: "C:\\Tools;C:\\Windows" };
+    let probes = 0;
+
+    const unchanged = yield* refreshWindowsPath().pipe(
+      Effect.provideService(HostProcess.Platform, "win32"),
+      Effect.provideService(HostProcess.Environment, env),
+      Effect.provideService(WindowsShellEnvironment, () =>
+        Effect.sync(() => {
+          probes += 1;
+          return { PATH: "C:\\Tools;C:\\Windows" };
+        }),
+      ),
+    );
+    const skipped = yield* refreshWindowsPath().pipe(
+      Effect.provideService(HostProcess.Platform, "linux"),
+      Effect.provideService(HostProcess.Environment, env),
+      Effect.provideService(WindowsShellEnvironment, () =>
+        Effect.sync(() => {
+          probes += 1;
+          return {};
+        }),
+      ),
+    );
+
+    assert.strictEqual(unchanged, false);
+    assert.strictEqual(skipped, false);
+    assert.strictEqual(probes, 1);
+    assert.deepEqual(env, { PATH: "C:\\Tools;C:\\Windows" });
+  }),
 );
 
 effectIt.effect("replaces a Path-spelled Windows PATH instead of adding a second key", () =>

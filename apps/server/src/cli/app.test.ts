@@ -14,6 +14,7 @@ import { resolveDesktopAppControlAddress } from "@t3tools/shared/desktopAppContr
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as NetService from "@t3tools/shared/Net";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -207,7 +208,7 @@ describe("t3 server command safety", () => {
           pid: child.pid,
           port: 3773,
           origin: "http://127.0.0.1:3773",
-          startedAt: "2026-10-01T00:00:00.000Z",
+          startedAt: DateTime.formatIso(DateTime.nowUnsafe()),
           serviceManaged: true,
         });
         yield* Effect.promise(() => NodeFSP.mkdir(stateDir, { recursive: true }));

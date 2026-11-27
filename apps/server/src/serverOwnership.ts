@@ -27,16 +27,14 @@ import {
   compareExactServiceVersions,
   serviceStateActiveVersion,
 } from "./cloud/serviceProtocol.ts";
-import {
-  legacyOwnerStartedBeforeRecord,
-  legacyOwnerStartTimeCommand,
-} from "./legacyServerOwner.ts";
 import * as ProcessRunner from "./processRunner.ts";
 import {
   clearPersistedServerRuntimeState,
-  isProcessAlive,
   persistServerRuntimeState,
+  ProcessIdentityProbe,
   readPersistedServerRuntimeState,
+  registerInProcessOwner,
+  verifyRecordedServerProcessLiveness,
   type PersistedServerRuntimeState,
 } from "./serverRuntimeState.ts";
 
@@ -77,27 +75,13 @@ const isSqliteBusy = (cause: unknown) =>
   (("errcode" in cause && cause.errcode === 5) ||
     ("code" in cause && cause.code === "SQLITE_BUSY"));
 
-// Pre-lock servers publish only runtime state; require start-time proof of PID reuse before treating it as stale.
+// Pre-lock servers publish only runtime state. An unsure identity refuses startup: the
+// ownership lock cannot prove anything about a server that predates it.
 const legacyOwnerIsLive = Effect.fn("legacyOwnerIsLive")(function* (
   state: PersistedServerRuntimeState,
+  statePath: string,
 ) {
-  if (!isProcessAlive(state.pid)) return false;
-  const recordedAt = Date.parse(state.startedAt);
-  if (!Number.isFinite(recordedAt)) return true;
-  const platform = yield* HostProcess.Platform;
-  const runner = yield* ProcessRunner.ProcessRunner;
-  const result = yield* runner
-    .run({
-      ...legacyOwnerStartTimeCommand(state.pid, platform),
-      timeout: Duration.seconds(2),
-      maxOutputBytes: 16_384,
-    })
-    .pipe(Effect.option);
-  return legacyOwnerStartedBeforeRecord(
-    Option.isSome(result) && result.value.code === 0 ? result.value.stdout : undefined,
-    recordedAt,
-    platform,
-  );
+  return (yield* verifyRecordedServerProcessLiveness(state, statePath)) !== "stale";
 });
 
 // Pre-lock services become invisible when another server replaces their runtime
@@ -237,6 +221,7 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
       Effect.ensuring(Effect.sync(() => db.close())),
     ),
   );
+  yield* registerInProcessOwner(statePath, ownerId);
 
   const previous = yield* readPersistedServerRuntimeState(statePath).pipe(
     Effect.orElseSucceed(() => Option.none<PersistedServerRuntimeState>()),
@@ -244,7 +229,7 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
   if (
     Option.isSome(previous) &&
     previous.value.ownerId === undefined &&
-    (yield* legacyOwnerIsLive(previous.value))
+    (yield* legacyOwnerIsLive(previous.value, statePath))
   ) {
     return yield* new ServerAlreadyRunningError({ stateDir });
   }
@@ -287,7 +272,23 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
   }).pipe(Effect.forkScoped);
 
   return {
-    publish: (state: PersistedServerRuntimeState) =>
-      persistServerRuntimeState({ path: statePath, state: { ...state, ownerId } }),
+    publish: Effect.fn("serverOwnership.publish")(function* (state: PersistedServerRuntimeState) {
+      // The record proves its writer by the probe's exact answer for this PID. When the probe
+      // cannot answer, the record is still published without one: nothing on this host could
+      // verify an identity anyway, and verification falls back to unknown.
+      const probeIdentity = yield* ProcessIdentityProbe;
+      // The probe interrogates the real host kernel; use the real platform, not the injectable
+      // HostProcess.Platform, so writer and verifier always agree (they both probe the host).
+      // oxlint-disable-next-line t3code/no-global-process-runtime -- Process probing must match the host, not an emulated platform.
+      const identity = yield* Effect.promise(() => probeIdentity(process.pid, process.platform));
+      yield* persistServerRuntimeState({
+        path: statePath,
+        state: {
+          ...state,
+          ownerId,
+          ...(identity === undefined ? {} : { processIdentity: identity }),
+        },
+      });
+    }),
   };
 });
