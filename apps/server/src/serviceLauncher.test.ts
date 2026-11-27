@@ -1,10 +1,14 @@
 // @effect-diagnostics-next-line nodeBuiltinImport:off - observes the children the launcher spawns with Node built-ins.
-import type * as NodeChildProcess from "node:child_process";
+import * as NodeChildProcess from "node:child_process";
 // @effect-diagnostics-next-line nodeBuiltinImport:off - the free-space probe is a plain Promise callback.
 import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off - models the service manager reading disk through the launcher's Promise callback.
 import * as NodeFSP from "node:fs/promises";
+import * as NodeOS from "node:os";
+// @effect-diagnostics-next-line nodeBuiltinImport:off - builds the Windows single-executable fixture once per file.
+import * as NodePath from "node:path";
 import * as NodeSqlite from "node:sqlite";
+import * as NodeUtil from "node:util";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it } from "@effect/vitest";
@@ -13,7 +17,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
-import { vi } from "vite-plus/test";
+import { afterAll, vi } from "vite-plus/test";
 
 import {
   renderBootServicePlist,
@@ -150,6 +154,63 @@ const unitPlan = (root: string, version: string) => ({
   unitPath: `${root}/unit/t3code.service`,
 });
 
+// systemd refuses an executable with a backslash and unescapes them in Environment=, so the
+// systemd-shaped tests render units for a POSIX-spelled home; on Windows the systemd manager
+// never runs, and the launcher's repointing is what these tests exercise.
+const systemdUnitPlan = (root: string, version: string) => {
+  const posixRoot = root.replaceAll("\\", "/");
+  return unitPlan(posixRoot, version);
+};
+
+// systemd renders use the POSIX spelling (see systemdUnitPlan); every other manager's verbatim.
+const unitPlanFor = (render: unknown) =>
+  render === renderBootServiceUnit ? systemdUnitPlan : unitPlan;
+
+// Windows runs `t3.exe`, a self-contained binary. The fixture is one too, built once per file:
+// production embeds its CLI and reads it through a load hook in bin.ts; the fixture's hook
+// instead reads the `serve` file beside each copy of the executable, so version directories can
+// carry their own child script like the POSIX fixture's shebang entry.
+const seaFixtureSource = `const fs = require("node:fs");
+const path = require("node:path");
+const url = require("node:url");
+const Module = require("node:module");
+const servePath = path.join(path.dirname(process.execPath), "serve");
+const serveUrl = url.pathToFileURL(servePath).href;
+Module.registerHooks({
+  load(requested, context, next) {
+    if (requested !== serveUrl) return next(requested, context);
+    return { format: "module", source: fs.readFileSync(servePath, "utf8"), shortCircuit: true };
+  },
+});
+Module.createRequire(process.execPath + "/t3.cjs")(servePath);
+`;
+
+let seaFixtureDir: string | undefined;
+let seaFixtureBuild: Promise<string> | undefined;
+const buildWindowsSeaFixture = (): Promise<string> =>
+  (seaFixtureBuild ??= (async () => {
+    seaFixtureDir = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-test-sea-"));
+    const entryPath = NodePath.join(seaFixtureDir, "sea-entry.cjs");
+    const configPath = NodePath.join(seaFixtureDir, "sea-config.json");
+    const outputPath = NodePath.join(seaFixtureDir, "t3.exe");
+    await NodeFSP.writeFile(entryPath, seaFixtureSource);
+    await NodeFSP.writeFile(
+      configPath,
+      JSON.stringify({ main: entryPath, output: outputPath, disableExperimentalSEAWarning: true }),
+    );
+    await NodeUtil.promisify(NodeChildProcess.execFile)(
+      process.execPath,
+      [`--build-sea=${configPath}`],
+      { windowsHide: true },
+    );
+    return outputPath;
+  })());
+
+afterAll(async () => {
+  if (seaFixtureDir !== undefined)
+    await NodeFSP.rm(seaFixtureDir, { recursive: true, force: true });
+});
+
 const writeFakeRuntime = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -157,10 +218,32 @@ const writeFakeRuntime = (
   childSource: string,
 ) =>
   Effect.gen(function* () {
-    const entryPath = path.join(versionDir, "t3");
     yield* fs.makeDirectory(versionDir, { recursive: true });
-    yield* fs.writeFileString(entryPath, `#!${process.execPath}\n${childSource}`);
-    yield* fs.chmod(entryPath, 0o755);
+    let entryPath: string;
+    if (HostProcess.Platform.defaultValue() === "win32") {
+      entryPath = path.join(versionDir, "t3.exe");
+      yield* Effect.promise(async () => {
+        const fixture = await buildWindowsSeaFixture();
+        await NodeFSP.link(fixture, entryPath).catch(() => NodeFSP.copyFile(fixture, entryPath));
+      });
+      // The hook loads `serve` as ESM; the require shim keeps child scripts that use CJS
+      // require() working. Windows kill() cannot deliver SIGTERM, so production servers stop
+      // over IPC; the same message drives any SIGTERM handler the child installs.
+      const prelude = [
+        'import { createRequire } from "node:module";',
+        "const require = createRequire(import.meta.url);",
+        'process.on("message", (message) => {',
+        '  if (typeof message !== "object" || message === null || message.type !== "stop") return;',
+        '  if (process.listenerCount("SIGTERM") > 0) process.emit("SIGTERM");',
+        '  else if (process.listenerCount("message") === 1) setImmediate(() => process.exit(0));',
+        "});",
+      ].join("\n");
+      yield* fs.writeFileString(path.join(versionDir, "serve"), `${prelude}\n${childSource}`);
+    } else {
+      entryPath = path.join(versionDir, "t3");
+      yield* fs.writeFileString(entryPath, `#!${process.execPath}\n${childSource}`);
+      yield* fs.chmod(entryPath, 0o755);
+    }
     yield* fs.writeFileString(
       path.join(versionDir, ".install-complete"),
       `${path.basename(versionDir)}\n`,
@@ -190,7 +273,7 @@ const fakeServiceUnit = (
   unitName = "t3code.service",
 ) =>
   Effect.gen(function* () {
-    const plan = unitPlan(root, version);
+    const plan = unitPlanFor(render)(root, version);
     const unitPath = `${root}/unit/${unitName}`;
     yield* fs.makeDirectory(path.dirname(unitPath), { recursive: true });
     // The file starts as the installer's write: UTF-8 without a BOM on every platform.
@@ -426,7 +509,9 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
     }),
   );
 
-  it.effect(
+  // Windows cannot execute the shell-script busctl and systemctl stand-ins; its service manager
+  // is Task Scheduler. Linux and macOS both run them.
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
     "repoints the systemd unit the manager loads when environment.d moves XDG_CONFIG_HOME",
     () =>
       Effect.gen(function* () {
@@ -437,7 +522,7 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
         const managerUnitDir = path.join(home, ".config", "systemd", "user");
         const unitPath = path.join(managerUnitDir, "t3code.service");
         const render = (version: string) =>
-          renderBootServiceUnit({ ...unitPlan(root, version), unitPath });
+          renderBootServiceUnit({ ...systemdUnitPlan(root, version), unitPath });
         yield* fs.makeDirectory(managerUnitDir, { recursive: true });
         yield* fs.writeFileString(unitPath, render("1.0.0"));
         // Fake manager: busctl reports the unit search path, systemctl reloads.
@@ -728,7 +813,7 @@ process.exit(0);
         );
         const unit = yield* fakeServiceUnit(fs, path, root, unitVersion);
         const expected = renderBootServiceUnit(
-          unitPlan(root, unitVersion === "1.0.0" ? "1.1.0" : unitVersion),
+          systemdUnitPlan(root, unitVersion === "1.0.0" ? "1.1.0" : unitVersion),
         );
         const createLauncher = Effect.gen(function* () {
           return new Launcher(root, yield* Effect.promise(() => readServiceState(statePath)), {
@@ -780,7 +865,7 @@ process.exit(0);
           }),
         );
         const selectedUnit = renderBootServiceUnit({
-          ...unitPlan(selectedRoot, "1.0.0"),
+          ...systemdUnitPlan(selectedRoot, "1.0.0"),
           unitPath: unit.path,
         });
         yield* fs.writeFileString(unit.path, selectedUnit);
@@ -1061,7 +1146,9 @@ process.exit(0);
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service 100% & <test>-" });
+      // `<` cannot exist in a Windows path at all, so that host exercises `!` instead.
+      const marker = HostProcess.Platform.defaultValue() === "win32" ? "!test!" : "<test>";
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: `t3-service 100% & ${marker}-` });
       const statePath = path.join(root, "runtime", "service-state.json");
       const databasePath = path.join(root, "userdata", "state.sqlite");
       const activatedPath = path.join(root, "activated");
@@ -1183,7 +1270,7 @@ if (context.update?.status === "pending") {
     ({ render, legacyInstall, unitName }) =>
       Effect.gen(function* () {
         const { root, unit } = yield* commitUpdate(render, false, legacyInstall, unitName);
-        const expected = render(unitPlan(root, "1.1.0"));
+        const expected = render(unitPlanFor(render)(root, "1.1.0"));
         const rewritten = yield* Effect.promise(() => NodeFSP.readFile(unit.path));
         assert.equal(decodeServiceUnit(rewritten), expected);
         if (unit.path.endsWith(".xml")) {
@@ -1268,8 +1355,8 @@ if (context.update?.status === "pending") {
       Effect.gen(function* () {
         const { fs, root, unit, recover } = yield* commitUpdate(renderBootServiceUnit, true);
         assert.equal(unit.reloads, 0);
-        const original = renderBootServiceUnit(unitPlan(root, "1.0.0"));
-        const expected = renderBootServiceUnit(unitPlan(root, "1.1.0"));
+        const original = renderBootServiceUnit(systemdUnitPlan(root, "1.0.0"));
+        const expected = renderBootServiceUnit(systemdUnitPlan(root, "1.1.0"));
         assert.equal(unit.loadedContents, original);
         yield* fs.writeFileString(unit.path, original);
         unit.failReload = true;
@@ -1355,7 +1442,7 @@ if (context.update?.status === "pending") {
       assert.equal(state.update?.status, "rolled-back");
       assert.equal(
         yield* fs.readFileString(unit.path),
-        renderBootServiceUnit(unitPlan(root, "1.0.0")),
+        renderBootServiceUnit(systemdUnitPlan(root, "1.0.0")),
       );
       assert.equal(unit.reloads, 1);
       assert.equal(
@@ -1445,7 +1532,11 @@ if (context.update?.status === "pending") {
         assert.equal(state.activeVersion, "1.0.0");
         assert.equal(state.update?.status, "rolled-back");
         assert.equal(yield* fs.readFileString(databaseFile), original);
-        if (kind !== "file") assert.equal(yield* fs.readLink(databasePath), linkTarget);
+        // Windows stores the separators it prefers in the link itself; the spelling is not load-bearing.
+        if (kind !== "file") {
+          const link = (yield* fs.readLink(databasePath)).replaceAll("\\", "/");
+          assert.equal(link, linkTarget.replaceAll("\\", "/"));
+        }
         assert.isFalse(yield* fs.exists(path.join(root, "original.sqlite")));
         assert.isFalse(yield* fs.exists(`${databasePath}-wal`));
         assert.isFalse(yield* fs.exists(`${databasePath}-shm`));
@@ -1466,7 +1557,9 @@ if (context.update?.status === "pending") {
         const databasePath = path.join(root, "userdata", "state.sqlite");
         const observationsPath = path.join(root, "observations.json");
         yield* fs.makeDirectory(path.dirname(databasePath), { recursive: true });
-        // SQLite keeps -wal beside the symlink's target, so the backup must restore it there.
+        // POSIX resolves the symlink at open, so -wal/-shm live beside the target; Windows
+        // names them after the literal open path, so beside this symlink. Either way the backup
+        // must restore them where the server wrote them.
         yield* fs.symlink("actual.sqlite", databasePath);
         const seed = new NodeSqlite.DatabaseSync(databasePath);
         seed.exec(`

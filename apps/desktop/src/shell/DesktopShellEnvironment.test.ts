@@ -25,6 +25,9 @@ import * as DesktopShellEnvironment from "./DesktopShellEnvironment.ts";
 vi.mock("node:os", { spy: true });
 
 const textEncoder = new TextEncoder();
+// The tests swap `process.env` for simulated shells, which drops TEMP on Windows and leaves
+// os.tmpdir() joining "undefined"; the cache directory goes to the real temp root instead.
+const hostTempDirectory = NodeOS.tmpdir();
 const cacheCodec = Schema.fromJsonString(
   Schema.Struct({
     version: Schema.Number,
@@ -114,7 +117,8 @@ function runShellEnvironment(input: {
     DesktopEnvironment.DesktopEnvironment,
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const stateDir = input.stateDir ?? (yield* fs.makeTempDirectoryScoped());
+      const stateDir =
+        input.stateDir ?? (yield* fs.makeTempDirectoryScoped({ directory: hostTempDirectory }));
       return DesktopEnvironment.DesktopEnvironment.of({
         platform: input.platform,
         stateDir,

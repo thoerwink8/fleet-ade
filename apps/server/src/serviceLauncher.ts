@@ -496,7 +496,11 @@ async function startOnlineDatabaseBackup(
     return undefined;
   };
   let snapshot: InstanceType<typeof NodeSqlite.DatabaseSync> | undefined;
-  // SQLite keeps -wal beside the resolved file, not beside a symlink to it.
+  // SQLite names -wal/-shm after the spelling passed to open: POSIX resolves symlinks there,
+  // Windows does not, so the snapshot must open the same spelling the server opened to share
+  // its WAL.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
+  const windows = process.platform === "win32";
   let dbPath = pending.dbPath;
   const release = () => {
     try {
@@ -507,7 +511,7 @@ async function startOnlineDatabaseBackup(
   try {
     await discardStaging();
     await NodeFSP.mkdir(stagingDir, { recursive: true, mode: 0o700 });
-    dbPath = await NodeFSP.realpath(pending.dbPath);
+    if (!windows) dbPath = await NodeFSP.realpath(pending.dbPath);
     snapshot = new NodeSqlite.DatabaseSync(dbPath, { readOnly: true });
     const mode = String(snapshot.prepare("PRAGMA journal_mode").get()?.journal_mode);
     if (mode.toLowerCase() !== "wal") throw new Error(`journal_mode is ${mode}, not wal.`);
@@ -614,10 +618,14 @@ async function restoreDatabaseBackup(
 
   await markDatabaseRestorePending(backupDir);
   const directories = new Set([NodePath.dirname(pending.dbPath)]);
-  // SQLite keeps -wal and -shm beside the resolved database file, not beside a symlink to it.
+  // POSIX resolves symlinks at open, so -wal/-shm live beside the target; Windows names them
+  // after the literal open path, so beside the symlink itself.
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher has no Effect runtime.
+  const windows = process.platform === "win32";
   const mainTarget = await restoreTarget(pending.dbPath);
   for (const suffix of DB_FILE_SUFFIXES) {
-    const livePath = suffix === "" ? pending.dbPath : `${mainTarget}${suffix}`;
+    const livePath =
+      windows || suffix === "" ? `${pending.dbPath}${suffix}` : `${mainTarget}${suffix}`;
     if (livePath !== `${pending.dbPath}${suffix}`) {
       await NodeFSP.rm(`${pending.dbPath}${suffix}`, { force: true });
     }
