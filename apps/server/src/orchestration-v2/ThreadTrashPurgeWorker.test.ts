@@ -478,13 +478,22 @@ it.effect("resumes committed cleanup effects after a restart without a second ev
         purgeCommands,
       });
 
-      const firstPurge = yield* Effect.scoped(
+      yield* Effect.scoped(
         Effect.gen(function* () {
           const thread = yield* createThread("resume-purge");
           yield* seedAttachment(thread, "message:resume-purge");
           yield* deleteThread(thread, "resume-purge");
+        }).pipe(Effect.provide(layer)),
+      );
+      // A sweep that outlasts TestClock's one-second wait keeps the scheduler permit,
+      // so a multi-day adjust while it runs skips the due tick and the live event never comes.
+      // Advance the window with the scheduler down; the next start already sees it due.
+      yield* TestClock.adjust(RETENTION);
+      yield* TestClock.adjust("5 seconds");
+
+      const firstPurge = yield* Effect.scoped(
+        Effect.gen(function* () {
           const events = yield* watchPurged();
-          yield* TestClock.adjust(RETENTION);
           yield* TestClock.adjust("5 seconds");
           const purged = yield* takePurged(events, 1);
           // The purge committed; this scope never drained the outbox, standing in for a crash.
