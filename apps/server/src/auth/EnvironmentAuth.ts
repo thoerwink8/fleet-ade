@@ -453,6 +453,14 @@ export class EnvironmentAuth extends Context.Service<
       session: Pick<AuthenticatedSession, "sessionId" | "proofKeyThumbprint">,
       input?: { readonly use?: AuthWebSocketTicketUse },
     ) => Effect.Effect<AuthWebSocketTicketResult, ServerAuthInternalError>;
+    /**
+     * Verifies a ticket carried outside the WebSocket handshake, such as the fleet
+     * board path token. The ticket must have been minted for this exact use.
+     */
+    readonly verifyWebSocketTicket: (
+      token: string,
+      use: AuthWebSocketTicketUse,
+    ) => Effect.Effect<AuthenticatedSession, ServerAuthCredentialError | ServerAuthInternalError>;
     readonly issueStartupPairingUrl: (
       baseUrl: string,
     ) => Effect.Effect<string, ServerAuthInternalError>;
@@ -562,6 +570,30 @@ const mapSessionVerificationErrors = <A, R>(
         : new ServerAuthSessionCredentialValidationError({ cause }),
     ),
   );
+
+/**
+ * Real ticket verification, exported so tests can run the same signing, decoding,
+ * expiry and audience logic the service method uses instead of a reimplementation.
+ */
+export const verifyWebSocketTicketEffect = Effect.fn("EnvironmentAuth.verifyWebSocketTicket")(
+  function* (token: string, use: AuthWebSocketTicketUse) {
+    const sessions = yield* SessionStore.SessionStore;
+    const session = yield* sessions.verifyWebSocketToken(token).pipe(mapSessionVerificationErrors);
+    if (session.audience !== undefined && session.audience !== use) {
+      return yield* new ServerAuthInvalidCredentialError({
+        diagnostic: `WebSocket ticket was issued for the ${session.audience} route.`,
+      });
+    }
+    return {
+      sessionId: session.sessionId,
+      subject: session.subject,
+      method: session.method,
+      scopes: session.scopes,
+      ...(session.proofKeyThumbprint ? { proofKeyThumbprint: session.proofKeyThumbprint } : {}),
+      ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}),
+    } satisfies AuthenticatedSession;
+  },
+);
 
 export function parseBearerToken(request: HttpServerRequest.HttpServerRequest): string | null {
   const header = request.headers["authorization"];
@@ -1326,6 +1358,12 @@ export const make = Effect.gen(function* () {
     authenticateHttpRequest,
     authenticateWebSocketUpgrade,
     issueWebSocketTicket,
+    verifyWebSocketTicket: Effect.fn("EnvironmentAuth.verifyWebSocketTicket")(
+      (token: string, use: AuthWebSocketTicketUse) =>
+        verifyWebSocketTicketEffect(token, use).pipe(
+          Effect.provideService(SessionStore.SessionStore, sessions),
+        ),
+    ),
     issueStartupPairingUrl,
     authenticateMcpClient,
     issueMcpClientSession,

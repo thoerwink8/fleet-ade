@@ -117,6 +117,28 @@ const routesFor = (
     }
   });
 
+  /**
+   * The ticket opens the board under its session's read scope for every method:
+   * the board is a local read view whose own write endpoints (marking entries
+   * viewed) cannot reach orchestration.
+   */
+  const requireTicketSession = Effect.fn("FleetBoardHttp.requireTicketSession")(function* (
+    token: string,
+  ) {
+    const principal = yield* auth
+      .verifyWebSocketTicket(token, "fleet-board")
+      .pipe(
+        Effect.mapError((error) =>
+          EnvironmentAuth.isServerAuthCredentialError(error)
+            ? reject(401, "invalid_ticket", "机群票据无效或已过期，请刷新机群页重新打开看板")
+            : reject(503, "login_unreadable", "登录态读不了，不当成没登录"),
+        ),
+      );
+    if (!principal.scopes.includes(AuthOrchestrationReadScope)) {
+      return yield* reject(403, "insufficient_scope", "缺少机群权限，用不了机群看板");
+    }
+  });
+
   const scopeForMethod = (method: string) =>
     method === "GET" || method === "HEAD"
       ? AuthOrchestrationReadScope
@@ -125,9 +147,12 @@ const routesFor = (
   const proxyToBoard = Effect.fn("FleetBoardHttp.proxyToBoard")(function* (
     suffix: string,
     search: string,
+    ticket?: string,
   ) {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    yield* requireSession(scopeForMethod(request.method));
+    yield* ticket === undefined
+      ? requireSession(scopeForMethod(request.method))
+      : requireTicketSession(ticket);
 
     // The board is the only program this port may serve. An unknown listener means a
     // squatter would run its HTML and scripts on this origin, so nothing is forwarded.
@@ -205,6 +230,22 @@ const routesFor = (
         });
       }
       const suffix = pathname.slice(FLEET_BOARD_ROUTE_PREFIX.length);
+      // /t/<token>/<rest> carries the iframe ticket; the token segment is consumed
+      // by authentication here and never forwarded to the board.
+      if (suffix.startsWith("/t/")) {
+        const remainder = suffix.slice("/t/".length);
+        const separator = remainder.indexOf("/");
+        const token = separator === -1 ? remainder : remainder.slice(0, separator);
+        const rest = separator === -1 ? "/" : remainder.slice(separator);
+        if (token.length === 0) {
+          return yield* reject(
+            401,
+            "invalid_ticket",
+            "机群票据无效或已过期，请刷新机群页重新打开看板",
+          );
+        }
+        return yield* proxyToBoard(rest, url.search, token);
+      }
       return yield* proxyToBoard(suffix, url.search);
     }),
   );

@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off -- fixture upstream is a plain node:http listener.
 import * as NodeHttp from "node:http";
 
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import {
@@ -25,7 +26,12 @@ import {
 } from "effect/http";
 import * as TestClock from "effect/testing/TestClock";
 
+import * as ServerConfig from "../config.ts";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
+import * as SessionStore from "../auth/SessionStore.ts";
+import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerHttp from "../http.ts";
 import * as FleetBoardService from "./FleetBoardService.ts";
 import * as FleetBoardHttp from "./http.ts";
@@ -41,14 +47,28 @@ const principalFor = (
   scopes,
 });
 
-const sessionAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth)({
-  authenticateHttpRequest: (request) =>
-    request.headers.authorization === TEST_AUTHORIZATION
-      ? Effect.succeed(principalFor([AuthOrchestrationReadScope, AuthOrchestrationOperateScope]))
-      : request.headers.authorization === "Bearer fleet-board-noscope"
-        ? Effect.succeed(principalFor([]))
-        : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
-});
+// Bearer authentication stays mocked, but ticket verification runs the real signing,
+// decoding, expiry and session-revocation logic of the same SessionStore as the test.
+const sessionAuth = (sessions: SessionStore.SessionStore["Service"]) =>
+  Layer.mock(EnvironmentAuth.EnvironmentAuth)({
+    authenticateHttpRequest: (request) =>
+      request.headers.authorization === TEST_AUTHORIZATION
+        ? Effect.succeed(principalFor([AuthOrchestrationReadScope, AuthOrchestrationOperateScope]))
+        : request.headers.authorization === "Bearer fleet-board-noscope"
+          ? Effect.succeed(principalFor([]))
+          : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
+    verifyWebSocketTicket: (token, use) =>
+      EnvironmentAuth.verifyWebSocketTicketEffect(token, use).pipe(
+        Effect.provideService(SessionStore.SessionStore, sessions),
+      ),
+  });
+
+const layerSessionStore = SessionStore.layer.pipe(
+  Layer.provide(SqlitePersistence.layerMemory),
+  Layer.provide(ServerSecretStore.layer),
+  Layer.provide(ServerEnvironment.layerIdentity),
+  Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-fleet-board-http-test-" })),
+);
 
 const closeServer = (server: NodeHttp.Server) =>
   Effect.promise(() => {
@@ -152,14 +172,20 @@ const testBoardService = (upstreamPort: number) =>
 const serveFleetBoard = Effect.fnUntraced(function* (
   serviceLayer: Layer.Layer<FleetBoardService.FleetBoardService, never>,
 ) {
+  const sessionServices = yield* Layer.build(
+    layerSessionStore.pipe(Layer.provide(Layer.mergeAll(NodeCrypto.layer, NodeServices.layer))),
+  );
+  const sessions = Context.get(sessionServices, SessionStore.SessionStore);
   const services = yield* Layer.build(
     HttpRouter.serve(Layer.mergeAll(FleetBoardHttp.layer, ServerHttp.layerHttpCompression), {
       disableListenLog: true,
       disableLogger: true,
     }).pipe(
       Layer.provideMerge(serviceLayer),
-      Layer.provideMerge(sessionAuth),
+      Layer.provideMerge(sessionAuth(sessions)),
+      Layer.provideMerge(Layer.succeed(SessionStore.SessionStore, sessions)),
       Layer.provideMerge(Layer.fresh(FetchHttpClient.layer)),
+      Layer.provideMerge(Layer.mergeAll(NodeCrypto.layer, NodeServices.layer)),
       Layer.provideMerge(
         NodeHttpServer.layer(() => NodeHttp.createServer(), { port: 0, host: "127.0.0.1" }),
       ),
@@ -173,7 +199,25 @@ const serveFleetBoard = Effect.fnUntraced(function* (
   return {
     origin: `http://127.0.0.1:${address.port}`,
     client: Context.get(services, HttpClient.HttpClient),
+    sessions: Context.get(services, SessionStore.SessionStore),
   };
+});
+
+const issueFleetBoardTicket = Effect.fnUntraced(function* (
+  sessions: SessionStore.SessionStore["Service"],
+  input?: {
+    readonly audience?: "fleet-board" | "media";
+    readonly scopes?: ReadonlyArray<typeof AuthOrchestrationReadScope>;
+  },
+) {
+  const session = yield* sessions.issue({
+    subject: "fleet-board-ticket-test",
+    ...(input?.scopes ? { scopes: input.scopes } : {}),
+  });
+  const ticket = yield* sessions.issueWebSocketToken(session.sessionId, {
+    audience: input?.audience ?? "fleet-board",
+  });
+  return { session, token: ticket.token };
 });
 
 const authed = { headers: { authorization: TEST_AUTHORIZATION } } as const;
@@ -531,5 +575,156 @@ it.live("ensure 路由返回服务的结果", () =>
       HttpClientRequest.get(`${origin}/api/fleet-board/ensure`, authed),
     );
     expect(getEnsure.status).toBe(404);
+  }).pipe(Effect.scoped),
+);
+
+it.live("路径里的机群票据通过真实验签后照样转发，票据不透给上游", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client, sessions } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+    const { token } = yield* issueFleetBoardTicket(sessions);
+
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${token}/api/status`),
+    );
+    expect(response.status).toBe(200);
+    // The token segment is local authentication material; it never crosses to the board.
+    expect(upstream.hits.some((hit) => hit.url === "/api/status")).toBe(true);
+    expect(upstream.hits.every((hit) => hit.url === undefined || !hit.url.includes(token))).toBe(
+      true,
+    );
+  }).pipe(Effect.scoped),
+);
+
+it.live("票据当 Bearer 用在 /fleet-board 常规路径被拒，真实验签不当会话用", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client, sessions } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+    const { token } = yield* issueFleetBoardTicket(sessions);
+
+    const wrongPath = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, {
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    );
+    expect(wrongPath.status).toBe(401);
+    expect(upstream.hits.every((hit) => hit.url === "/api/health")).toBe(true);
+
+    // A ticket presented as a session credential fails real verification: websocket-kind
+    // tokens are never accepted as sessions anywhere on the server.
+    const asSession = yield* Effect.flip(sessions.verify(token));
+    expect(asSession._tag).toBe("InvalidSessionTokenPayloadError");
+  }).pipe(Effect.scoped),
+);
+
+it.effect("过期的机群票据被 401，过期前同一个票据能转发", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client, sessions } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+    const { token } = yield* issueFleetBoardTicket(sessions);
+
+    const fresh = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${token}/api/status`),
+    );
+    expect(fresh.status).toBe(200);
+
+    // Tickets carry the default five-minute TTL; past it the real verifier rejects them.
+    yield* TestClock.adjust(Duration.minutes(5));
+    const expired = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${token}/api/status`),
+    );
+    expect(expired.status).toBe(401);
+    expect(upstream.hits.filter((hit) => hit.url === "/api/status")).toHaveLength(1);
+  }).pipe(Effect.scoped),
+);
+
+it.live("非机群用途的票据和已撤销会话的票据都被 401，而机群票据能过", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client, sessions } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+    const media = yield* issueFleetBoardTicket(sessions, { audience: "media" });
+    const revoked = yield* issueFleetBoardTicket(sessions);
+    yield* sessions.revoke(revoked.session.sessionId);
+
+    const mediaResponse = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${media.token}/api/status`),
+    );
+    expect(mediaResponse.status).toBe(401);
+    expect(((yield* mediaResponse.json) as { error: { code: string } }).error.code).toBe(
+      "invalid_ticket",
+    );
+
+    const revokedResponse = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${revoked.token}/api/status`),
+    );
+    expect(revokedResponse.status).toBe(401);
+
+    // A genuine fleet-board ticket passes in the same setup, so the 401s are the
+    // audience mismatch and the revocation, not a missing ticket path.
+    const valid = yield* issueFleetBoardTicket(sessions);
+    const validResponse = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${valid.token}/api/status`),
+    );
+    expect(validResponse.status).toBe(200);
+    expect(
+      upstream.hits.every((hit) => hit.url === "/api/health" || hit.url === "/api/status"),
+    ).toBe(true);
+    expect(upstream.hits.some((hit) => hit.url === "/api/status")).toBe(true);
+  }).pipe(Effect.scoped),
+);
+
+it.live("会话缺少机群读权限时票据被 403，票据本身有效也救不回来", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client, sessions } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+    const { token } = yield* issueFleetBoardTicket(sessions, { scopes: [] });
+
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/t/${token}/api/status`),
+    );
+    expect(response.status).toBe(403);
+    expect(upstream.hits.every((hit) => hit.url === "/api/health")).toBe(true);
+  }).pipe(Effect.scoped),
+);
+
+it.live("只读会话的票据照样能用看板的写接口：票据只看机群页，不拦看板自己的标记", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client, sessions } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+    const { token } = yield* issueFleetBoardTicket(sessions, {
+      scopes: [AuthOrchestrationReadScope],
+    });
+
+    const response = yield* client.execute(
+      HttpClientRequest.post(`${origin}/fleet-board/t/${token}/api/viewed`),
+    );
+    expect(response.status).toBe(204);
+    expect(upstream.hits.some((hit) => hit.method === "POST" && hit.url === "/api/viewed")).toBe(
+      true,
+    );
   }).pipe(Effect.scoped),
 );

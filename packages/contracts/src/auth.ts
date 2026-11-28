@@ -249,12 +249,12 @@ export const AuthWebSocketTicketResult = Schema.Struct({
 export type AuthWebSocketTicketResult = typeof AuthWebSocketTicketResult.Type;
 
 /**
- * Media routes share a ticket across requests; RPC uses a separate ticket.
- * Use a path segment so the DPoP mint proof covers it; `htu` excludes query parameters,
- * which could be stripped to change the ticket's use.
- * Older clients mint at the bare path and receive tickets valid for either use.
+ * The fleet board embed carries its ticket in the path because iframes and event
+ * streams cannot send authorization headers. `use` travels in the mint path, never
+ * a query parameter, so the DPoP proof's `htu` covers it. Older clients mint at the
+ * bare path and receive tickets valid for either use.
  */
-export const AuthWebSocketTicketUse = Schema.Literals(["rpc", "media"]);
+export const AuthWebSocketTicketUse = Schema.Literals(["rpc", "media", "fleet-board"]);
 export type AuthWebSocketTicketUse = typeof AuthWebSocketTicketUse.Type;
 
 export const AuthWebSocketTicketParams = Schema.Struct({ use: AuthWebSocketTicketUse });

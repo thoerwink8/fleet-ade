@@ -52,4 +52,11 @@ describe("fleet route search", () => {
       expect.objectContaining({ machine: "machine-a", row: "adhoc\nmachine-a\nt1" }),
     );
   });
+
+  it("keeps only the two known tab values", () => {
+    expect(matchedSearch("/fleet?tab=board")?.tab).toBe("board");
+    expect(matchedSearch("/fleet?tab=tasks")?.tab).toBe("tasks");
+    expect(matchedSearch("/fleet?tab=bogus")?.tab).toBeUndefined();
+    expect(matchedSearch("/fleet")?.tab).toBeUndefined();
+  });
 });
