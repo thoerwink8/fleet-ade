@@ -11,6 +11,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as NodeClaims from "./nodeClaims.ts";
 import * as FleetClaims from "./FleetClaims.ts";
+import * as CoordinatorTerm from "./coordinatorTerm.ts";
 
 const ledgerLayer = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -555,4 +556,56 @@ it.effect("claim 和 renew 使用服务端配置的 fleet lease TTL", () =>
       ).pipe(Layer.provideMerge(FleetClaims.layerForTest(":memory:", "coordinator", 15_000))),
     ),
   ),
+);
+
+it.effect("协调者是别的机器时领续还和心跳整次拒绝，交回本机后恢复", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const terms = yield* CoordinatorTerm.CoordinatorTerm;
+    const sql = yield* SqlClient.SqlClient;
+    const self = yield* terms.read(CoordinatorTerm.FLEET_TERM_KEY);
+    assert.strictEqual(self.term, 0);
+
+    const claimed = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
+    assert.strictEqual(claimed.outcome, "claimed");
+    const rowsBefore =
+      yield* sql`SELECT task_id, state, attempt, lease_until FROM node_claims ORDER BY task_id`;
+
+    assert.strictEqual(
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0))._tag,
+      "current",
+    );
+
+    const claimError = yield* claims
+      .claim(caller("node-a"), input("child-1", "claim-child"))
+      .pipe(Effect.flip);
+    assert.strictEqual(claimError.reason, "not-coordinator");
+    const lease = input("root", "renew-a", 1, claimed.claim!.fencing);
+    const renewError = yield* claims.renew(caller("node-a"), lease).pipe(Effect.flip);
+    assert.strictEqual(renewError.reason, "not-coordinator");
+    const releaseError = yield* claims
+      .release(caller("node-a"), { ...lease, idempotencyKey: "release-a" })
+      .pipe(Effect.flip);
+    assert.strictEqual(releaseError.reason, "not-coordinator");
+    const heartbeatError = yield* claims
+      .heartbeat("node-a", beat("node-a", [{ taskId: "root", attempt: 1 }]).input)
+      .pipe(Effect.flip);
+    assert.strictEqual(heartbeatError.reason, "not-coordinator");
+
+    assert.deepEqual(
+      yield* sql`SELECT task_id, state, attempt, lease_until FROM node_claims ORDER BY task_id`,
+      rowsBefore,
+    );
+    assert.deepEqual(yield* sql`SELECT environment_id FROM fleet_environment_heartbeats`, []);
+
+    assert.strictEqual(
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1))._tag,
+      "current",
+    );
+    assert.strictEqual((yield* claims.renew(caller("node-a"), lease)).outcome, "renewed");
+    assert.strictEqual(
+      (yield* claims.claim(caller("node-a"), input("child-1", "claim-child"))).outcome,
+      "claimed",
+    );
+  }).pipe(Effect.provide(ledgerLayer)),
 );

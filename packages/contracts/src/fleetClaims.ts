@@ -87,7 +87,7 @@ export const FleetLeaseConfirmation = Schema.Literals(["confirmed", "unconfirmed
 export type FleetLeaseConfirmation = typeof FleetLeaseConfirmation.Type;
 
 export class FleetClaimsError extends Schema.TaggedError<FleetClaimsError>()("FleetClaimsError", {
-  reason: Schema.Literals(["storage", "unknown-repo"]),
+  reason: Schema.Literals(["storage", "unknown-repo", "not-coordinator"]),
   message: Schema.String,
   cause: Schema.optional(Schema.Defect()),
 }) {}
