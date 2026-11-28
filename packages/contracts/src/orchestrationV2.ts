@@ -875,6 +875,11 @@ export const OrchestrationV2Run = Schema.Struct({
   workspacePreparation: Schema.optional(OrchestrationV2ThreadLaunchWorkspaceStrategy),
   /** Starts a new provider conversation; earlier runs stay visible but never reach the provider. */
   freshContext: Schema.optional(Schema.Boolean),
+  /**
+   * Server-written only: the opening turn a bot rotation dispatches itself, so its failure or
+   * crash says nothing about user work waiting behind it. Never read from client input.
+   */
+  rotationOpening: Schema.optional(Schema.Boolean),
 });
 export type OrchestrationV2Run = typeof OrchestrationV2Run.Type;
 

@@ -417,6 +417,13 @@ export const make = Effect.gen(function* () {
         });
       }
       runs = runs.filter((run) => !retryableRunIds.has(run.id));
+      // User work the crash cut holds the queue for a user's decision. A rotation opening is
+      // housekeeping: when it is all that died, the carried queue resumes on its own through
+      // resumeQueuedRuns instead of waiting for queue.resume.
+      const housekeepingOnly =
+        runs.length > 0 &&
+        retryableRuns.length === 0 &&
+        runs.every((run) => run.rotationOpening === true);
       const heldRuns = [
         ...retryableRuns,
         ...queuedRunsInDeliveryOrder({ runs: queuedRuns, messages: queuedMessages }),
@@ -426,6 +433,7 @@ export const make = Effect.gen(function* () {
           runs.push(run);
           continue;
         }
+        if (housekeepingOnly) continue;
         if (run.queueHeld === true && retryableRuns.length === 0) continue;
         const { awaitingSlot: _awaitingSlot, ...recoveredRun } = run;
         events.push({
