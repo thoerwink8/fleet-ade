@@ -274,6 +274,7 @@ const make = Effect.gen(function* () {
     // snapshot here, so the row read afterwards is the largest term this
     // machine can know. Unreachable peers are the ones this call exists for.
     const peers = yield* links.list.pipe(Effect.mapError(linkError));
+    const answered = new Set<string>();
     for (const peer of peers) {
       const local = yield* readSnapshot;
       const reply = yield* peerClient
@@ -288,7 +289,9 @@ const make = Effect.gen(function* () {
           success: FleetTermExchangeResultSchema,
         })
         .pipe(Effect.timeoutOption(Duration.seconds(3)), Effect.orElseSucceed(Option.none));
-      if (Option.isSome(reply) && reply.value.coordinatorId !== null && reply.value.term > 0) {
+      if (Option.isNone(reply)) continue;
+      answered.add(peer.environmentId);
+      if (reply.value.coordinatorId !== null && reply.value.term > 0) {
         yield* adopt(reply.value.term, reply.value.coordinatorId, {
           environmentId: peer.environmentId,
         }).pipe(Effect.catch(() => Effect.void));
@@ -299,8 +302,8 @@ const make = Effect.gen(function* () {
       return { outcome: "taken-over" as const, ...snapshotOf(known) };
     }
     const coordinatorId = known.coordinatorId;
-    if (coordinatorId !== null) {
-      // Reachable for the exchange above: the coordinator hands over online.
+    if (coordinatorId !== null && answered.has(coordinatorId)) {
+      // The coordinator answered the exchange above, so it hands over online.
       const handed = yield* peerClient
         .call({
           environmentId: EnvironmentId.make(coordinatorId),
@@ -310,28 +313,30 @@ const make = Effect.gen(function* () {
           success: FleetTermHandoverResultSchema,
         })
         .pipe(Effect.timeoutOption(Duration.seconds(10)), Effect.orElseSucceed(Option.none));
+      if (Option.isSome(handed) && handed.value.coordinatorId !== null && handed.value.term > 0) {
+        yield* adopt(handed.value.term, handed.value.coordinatorId, {
+          environmentId: coordinatorId,
+        });
+      }
+      // The handover may have committed on the coordinator even when its reply
+      // timed out or got lost: the local row, not the reply, decides.
+      const after = yield* readSnapshot;
+      if (after.coordinatorId === selfId) {
+        return { outcome: "taken-over" as const, ...snapshotOf(after) };
+      }
       if (Option.isSome(handed)) {
-        if (handed.value.coordinatorId !== null && handed.value.term > 0) {
-          yield* adopt(handed.value.term, handed.value.coordinatorId, {
-            environmentId: coordinatorId,
-          });
-        }
-        const after = yield* readSnapshot;
-        return {
-          outcome: after.coordinatorId === selfId ? ("taken-over" as const) : ("stale" as const),
-          ...snapshotOf(after),
-        };
+        // A reachable coordinator refused the handover; bypassing it would split the fleet.
+        return { outcome: "stale" as const, ...snapshotOf(after) };
       }
-      // The coordinator answered the exchange but the handover never came back:
-      // nothing is written, so asking again starts over cleanly.
       if (!options.force) {
-        return { outcome: "needs-confirmation" as const, ...snapshotOf(known) };
+        return { outcome: "needs-confirmation" as const, ...snapshotOf(after) };
       }
-    } else if (!options.force && known.term > 0) {
+    } else if (coordinatorId !== null && !options.force) {
       return { outcome: "needs-confirmation" as const, ...snapshotOf(known) };
     }
+    const latest = yield* readSnapshot;
     const written = yield* terms
-      .handover(CoordinatorTerm.FLEET_TERM_KEY, selfId, known.term)
+      .handover(CoordinatorTerm.FLEET_TERM_KEY, selfId, latest.term, latest.coordinatorId)
       .pipe(Effect.mapError(storageError));
     if (written._tag === "stale") {
       // Already this machine, as when a retry meets its own first write.
@@ -343,12 +348,7 @@ const make = Effect.gen(function* () {
     }
     yield* Effect.forEach(
       peers,
-      (peer) =>
-        pushTo(
-          peer.environmentId,
-          { term: written.term, coordinatorId: selfId },
-          { environmentId: selfId },
-        ),
+      (peer) => pushTo(peer.environmentId, { term: written.term, coordinatorId: selfId }),
       { concurrency: "unbounded", discard: true },
     );
     return {

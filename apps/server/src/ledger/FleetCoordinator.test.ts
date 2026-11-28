@@ -7,12 +7,15 @@ import {
   type FleetClaimClaimInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
+import * as TestClock from "effect/testing/TestClock";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as SqlClient from "effect/sql/SqlClient";
 
@@ -297,18 +300,18 @@ it.effect("三机分区各自强制接管后交换收敛到最大 ID，输的一
         coordinatorId: "node-c",
       });
 
-      // The partition heals: one pairwise exchange converges both.
+      // The partition heals: C pushes its snapshot to B and B's own server adopts
+      // the same-term winner. The reply converges C's side; the other direction is
+      // not exercised here.
       yield* linkTo(bMachine.links, cMachine);
       yield* linkTo(cMachine.links, bMachine);
-      const bTerm = yield* readTerm(bLedger);
       const reply = yield* exchangeOnce(
-        bMachine.client,
-        nodeC.environmentId,
-        bTerm.term,
-        EnvironmentId.make(bTerm.coordinatorId!),
+        cMachine.client,
+        nodeB.environmentId,
+        8,
+        EnvironmentId.make("node-c"),
       );
       expect(reply).toEqual({ term: 8, coordinatorId: "node-c" });
-      yield* writeTerm(bLedger, reply.term, reply.coordinatorId!);
       expect(yield* readTerm(bLedger)).toEqual({ term: 8, coordinatorId: "node-c" });
       expect(yield* readTerm(cLedger)).toEqual({ term: 8, coordinatorId: "node-c" });
 
@@ -354,6 +357,126 @@ it.effect("旧协调者可达时接管走在线交出，两边收敛到新任期
       expect(taken).toEqual({ outcome: "taken-over", term: 4, coordinatorId: "node-b" });
       expect(yield* readTerm(aLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
       expect(yield* readTerm(bLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+const nodeD = descriptorOf("node-d", "Node D");
+
+/**
+ * A machine whose coordinator service accepts connections but never answers a
+ * term exchange. Its ledger file can still be written directly, so it can pose
+ * as a coordinator that went silent after the write.
+ */
+const serveNeverMachine = (descriptor: typeof nodeA, exchangeSeen: Deferred.Deferred<void>) =>
+  Layer.build(Layer.fresh(NodeHttpServer.layerTest)).pipe(
+    Effect.flatMap((server) =>
+      servePeer(
+        descriptor,
+        McpHttpServer.layerFleetCoordinatorToolkit.pipe(
+          Layer.provide(
+            Layer.succeed(
+              FleetCoordinator.FleetCoordinator,
+              FleetCoordinator.FleetCoordinator.of({
+                exchange: () =>
+                  Deferred.succeed(exchangeSeen, undefined).pipe(Effect.andThen(Effect.never)),
+                handover: () => Effect.never,
+                requestHandover: () => Effect.never,
+                takeover: () => Effect.never,
+                current: Effect.never,
+                pendingPush: Effect.succeed([]),
+              }),
+            ),
+          ),
+        ),
+      ).pipe(Effect.provideContext(server)),
+    ),
+  );
+
+it.effect("旧协调者可达、第三台配对机离线时接管仍走在线交出", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      const dLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 3, "node-a"))._tag).toBe("current");
+      expect((yield* writeTerm(bLedger, 3, "node-a"))._tag).toBe("current");
+      const aMachine = yield* serveMachine(nodeA, aLedger);
+      const bMachine = yield* serveMachine(nodeB, bLedger);
+      const dMachine = yield* serveMachine(nodeD, dLedger);
+      yield* linkTo(bMachine.links, aMachine);
+      yield* linkTo(aMachine.links, bMachine);
+      yield* linkTo(bMachine.links, dMachine);
+      yield* linkTo(dMachine.links, bMachine);
+      yield* linkTo(aMachine.links, dMachine);
+      yield* linkTo(dMachine.links, aMachine);
+      // The third machine goes silent: revoked sessions fail every linked call
+      // the same way an unreachable machine does, without retrying.
+      for (const session of yield* dMachine.linkedSessions) {
+        yield* dMachine.auth.revokeSession(session.sessionId);
+      }
+      const bContext = yield* coordinatorOnPeer(bMachine, bLedger);
+      const bCoordinator = Context.get(bContext, FleetCoordinator.FleetCoordinator);
+
+      // The coordinator hands over while its best-effort push to the dead third
+      // machine fails in the background; the takeover reads its own row instead
+      // of trusting the handover reply.
+      const taken = yield* bCoordinator.takeover({ force: false });
+      expect(taken).toEqual({ outcome: "taken-over", term: 4, coordinatorId: "node-b" });
+      expect(yield* readTerm(bLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
+      expect(yield* readTerm(aLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("旧协调者交换轮不应答就不调交出，直接要确认", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const bLedger = yield* tempLedger;
+      expect((yield* writeTerm(bLedger, 5, "node-a"))._tag).toBe("current");
+      const exchangeSeen = yield* Deferred.make<void>();
+      const aMachine = yield* serveNeverMachine(nodeA, exchangeSeen);
+      const bMachine = yield* serveMachine(nodeB, bLedger);
+      yield* linkTo(bMachine.links, aMachine);
+      yield* linkTo(aMachine.links, bMachine);
+
+      // Count the handover calls this machine makes; the coordinator never
+      // answered its exchange, so it must not be asked to hand over at all.
+      let handoverCalls = 0;
+      const realClient = bMachine.client;
+      const countingClient = PeerMcpClient.PeerMcpClient.of({
+        call: (input) => {
+          if (input.tool === "fleet_term_handover") handoverCalls += 1;
+          return realClient.call(input);
+        },
+      });
+      const bContext = yield* FleetCoordinator.layerForTest(bLedger).pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(
+            Layer.succeed(PeerLinks.PeerLinks, bMachine.links),
+            Layer.succeed(PeerMcpClient.PeerMcpClient, countingClient),
+            Layer.succeed(ServerEnvironment.ServerEnvironment, {
+              getEnvironmentId: Ref.get(bMachine.descriptor).pipe(
+                Effect.map((current) => current.environmentId),
+              ),
+              getDescriptor: Ref.get(bMachine.descriptor),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const bCoordinator = Context.get(bContext, FleetCoordinator.FleetCoordinator);
+
+      const fiber = yield* bCoordinator.takeover({ force: false }).pipe(Effect.forkChild);
+      yield* Deferred.await(exchangeSeen);
+      yield* TestClock.adjust("5 seconds");
+      expect(yield* Fiber.join(fiber)).toEqual({
+        outcome: "needs-confirmation",
+        term: 5,
+        coordinatorId: "node-a",
+      });
+      expect(handoverCalls).toBe(0);
+      expect(yield* readTerm(bLedger)).toEqual({ term: 5, coordinatorId: "node-a" });
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
