@@ -691,6 +691,10 @@ export const layer = Layer.effect(
             THEN excluded.thread_id
             WHEN excluded.thread_mode = 'new_thread' THEN NULL
             WHEN excluded.project_id != scheduled_tasks.project_id THEN excluded.thread_id
+            -- Unbinding starts clean: the stored thread only recorded where the
+            -- bot-bound runs went, so it must not become the task's destination.
+            WHEN excluded.bot_id IS NULL AND scheduled_tasks.bot_id IS NOT NULL
+            THEN excluded.thread_id
             ELSE COALESCE(excluded.thread_id, scheduled_tasks.thread_id)
           END,
           thread_mode = excluded.thread_mode,
@@ -1116,6 +1120,10 @@ export const layer = Layer.effect(
             const reason = `Bot ${active.botId} is paused.`;
             if (webhook !== undefined) return yield* new WebhookDeliverySkipped({ reason });
             if (trigger === "manual") return yield* taskError(reason, { taskId: task.id });
+            // A once task has no later slot: it keeps its time and retries next poll.
+            if (active.schedule.type === "once") {
+              return { task: active, threadId: null, dispatchFailed: false };
+            }
             yield* rescheduleMissedRun(active, startedAt, "bot paused", reason);
             return {
               task: { ...active, lastRunStatus: "failed" as const, lastRunError: reason },
@@ -1152,8 +1160,9 @@ export const layer = Layer.effect(
             return { task: active, threadId: null, dispatchFailed: false };
           }
         }
-        // An interval task on a bot whose wake is still executing also waits: the
-        // queue check above only sees rests, not a run in flight. Same reschedule.
+        // A bot whose wake is still executing also waits: the queue check above
+        // only sees rests, not a run in flight. A once task has no later slot,
+        // so it keeps its time and retries next poll instead of rescheduling to null.
         if (trigger === "scheduled" && active.botId != null) {
           const runningOthers = yield* sql<{ task_id: string }>`
             SELECT task_id FROM scheduled_tasks
@@ -1164,7 +1173,9 @@ export const layer = Layer.effect(
             Effect.orElseSucceed(() => []),
           );
           if (runningOthers.length > 0) {
-            yield* rescheduleMissedRun(active, startedAt, "bot still running another wake");
+            if (active.schedule.type !== "once") {
+              yield* rescheduleMissedRun(active, startedAt, "bot still running another wake");
+            }
             return { task: active, threadId: null, dispatchFailed: false };
           }
         }

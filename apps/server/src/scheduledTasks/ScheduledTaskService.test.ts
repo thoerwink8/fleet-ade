@@ -1601,7 +1601,7 @@ it.effect("does not stack a second wake while the bot's earlier wake is still qu
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
 
-it.effect("does not fire the same due occurrence twice while the bot is still busy", () =>
+it.effect("does not fire the next due occurrence while the previous wake is still queued", () =>
   Effect.gen(function* () {
     const now = "2026-11-03T00:00:00.000Z";
     const sends = yield* Ref.make<ReadonlyArray<ThreadId>>([]);
@@ -1692,6 +1692,124 @@ it.effect("does not stack a second wake when the bot's other task is still runni
       `;
       assert.equal(row?.last_run_status, "never");
       assert.notEqual(row?.next_run_at, now);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("keeps a due once task waiting while its bot is paused and fires after resume", () =>
+  Effect.gen(function* () {
+    const now = "2026-11-03T00:00:00.000Z";
+    const sends = yield* Ref.make(0);
+    const harness = botHarness({
+      getThreadShell: () => Effect.succeed(threadShell(ProjectId.make("project:test"))),
+      getThreadRecords: () => Effect.succeed({ runs: [], messages: [] } as never),
+      sendToThread: () => Ref.update(sends, (n) => n + 1).pipe(Effect.as({} as never)),
+    });
+    yield* TestClock.setTime(Date.parse(now));
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha", status: "paused" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      const { task } = yield* service.upsert({
+        ...botTaskInput("task:bot-once-paused"),
+        schedule: { type: "once", runAt: "2026-11-03T00:01:00.000Z" },
+      });
+      yield* sql`UPDATE scheduled_tasks SET next_run_at = ${now} WHERE task_id = ${task.id}`;
+      yield* TestClock.adjust("1 millis");
+      yield* Ref.get(harness.runDueWork).pipe(Effect.flatten);
+
+      // No skip is recorded and the time stays: a once task has no later slot to move to.
+      assert.equal(yield* Ref.get(sends), 0);
+      const [waiting] = yield* sql<{ next_run_at: string | null; run_count: number }>`
+        SELECT next_run_at, run_count FROM scheduled_tasks WHERE task_id = ${task.id}
+      `;
+      assert.equal(waiting?.next_run_at, now);
+      assert.equal(waiting?.run_count, 0);
+
+      yield* sql`UPDATE orchestration_v2_projection_bots SET status = 'active'
+        WHERE bot_id = 'bot:watcher'`;
+      yield* Ref.get(harness.runDueWork).pipe(Effect.flatten);
+      assert.equal(yield* Ref.get(sends), 1);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("keeps a due once task waiting while the bot's other task is still running", () =>
+  Effect.gen(function* () {
+    const now = "2026-11-03T00:00:00.000Z";
+    const sends = yield* Ref.make<ReadonlyArray<ThreadId>>([]);
+    const harness = botHarness({
+      getThreadShell: () => Effect.succeed(threadShell(ProjectId.make("project:test"))),
+      getThreadRecords: () => Effect.succeed({ runs: [], messages: [] } as never),
+      sendToThread: (input) =>
+        Ref.update(sends, (all) => [...all, input.threadId]).pipe(Effect.as({} as never)),
+    });
+    yield* TestClock.setTime(Date.parse(now));
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      const { task: running } = yield* service.upsert(botTaskInput("task:bot-still-running-once"));
+      const { task } = yield* service.upsert({
+        ...botTaskInput("task:bot-once-waits"),
+        schedule: { type: "once", runAt: "2026-11-03T00:01:00.000Z" },
+      });
+      yield* sql`
+        UPDATE scheduled_tasks SET last_run_status = 'running'
+        WHERE task_id = ${running.id}
+      `;
+      yield* sql`UPDATE scheduled_tasks SET next_run_at = ${now} WHERE task_id = ${task.id}`;
+      yield* TestClock.adjust("1 millis");
+      yield* Ref.get(harness.runDueWork).pipe(Effect.flatten);
+
+      // A once task cannot take a later slot: its time stays so it fires when the bot frees.
+      assert.equal(yield* Ref.get(sends).pipe(Effect.map((all) => all.length)), 0);
+      const [waiting] = yield* sql<{ next_run_at: string | null; last_run_status: string }>`
+        SELECT next_run_at, last_run_status FROM scheduled_tasks WHERE task_id = ${task.id}
+      `;
+      assert.isNotNull(waiting?.next_run_at);
+      assert.equal(waiting?.last_run_status, "never");
+
+      yield* sql`
+        UPDATE scheduled_tasks SET last_run_status = 'succeeded'
+        WHERE task_id = ${running.id}
+      `;
+      yield* Ref.get(harness.runDueWork).pipe(Effect.flatten);
+      assert.equal(yield* Ref.get(sends).pipe(Effect.map((all) => all.length)), 1);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("unbinding a bot drops the recorded thread so the task starts clean", () =>
+  Effect.gen(function* () {
+    const harness = botHarness({
+      getThreadShell: () => Effect.succeed(threadShell(ProjectId.make("project:test"))),
+      sendToThread: () => Effect.succeed({} as never),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      const { task } = yield* service.upsert({
+        ...botTaskInput("task:bot-unbind"),
+        threadMode: "fresh_session",
+      });
+      yield* service.runNow({ id: task.id });
+      const [recorded] = yield* sql<{ thread_id: string | null }>`
+        SELECT thread_id FROM scheduled_tasks WHERE task_id = ${task.id}
+      `;
+      assert.equal(recorded?.thread_id, "thread:alpha");
+
+      const { task: unbound } = yield* service.upsert({
+        ...botTaskInput("task:bot-unbind"),
+        botId: null,
+      });
+      assert.isNull(unbound.threadId);
+      const [cleared] = yield* sql<{ thread_id: string | null; bot_id: string | null }>`
+        SELECT thread_id, bot_id FROM scheduled_tasks WHERE task_id = ${task.id}
+      `;
+      assert.isNull(cleared?.bot_id);
+      assert.isNull(cleared?.thread_id);
     }).pipe(Effect.provide(harness.layer));
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
