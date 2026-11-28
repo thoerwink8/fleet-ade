@@ -202,6 +202,7 @@ interface ScheduledTaskRow {
   readonly project_id: string;
   readonly thread_id: string | null;
   readonly thread_mode: string;
+  readonly bot_id: string | null;
   readonly workspace_strategy_json: string;
   readonly model_selection_json: string;
   readonly runtime_mode: string;
@@ -386,6 +387,7 @@ const decodeRow = Effect.fnUntraced(
       projectId: row.project_id,
       threadId: row.thread_id,
       threadMode: row.thread_mode,
+      botId: row.bot_id,
       workspaceStrategy,
       modelSelection,
       runtimeMode: row.runtime_mode,
@@ -503,6 +505,7 @@ export const layer = Layer.effect(
         project_id,
         thread_id,
         thread_mode,
+        bot_id,
         workspace_strategy_json,
         model_selection_json,
         runtime_mode,
@@ -543,6 +546,7 @@ export const layer = Layer.effect(
         project_id,
         thread_id,
         thread_mode,
+        bot_id,
         workspace_strategy_json,
         model_selection_json,
         runtime_mode,
@@ -625,6 +629,7 @@ export const layer = Layer.effect(
           project_id,
           thread_id,
           thread_mode,
+          bot_id,
           workspace_strategy_json,
           model_selection_json,
           runtime_mode,
@@ -650,6 +655,7 @@ export const layer = Layer.effect(
           ${task.projectId},
           ${task.threadId},
           ${scheduledTaskThreadMode(task)},
+          ${task.botId ?? null},
           ${JSON.stringify(task.workspaceStrategy)},
           ${JSON.stringify(task.modelSelection)},
           ${task.runtimeMode},
@@ -688,6 +694,7 @@ export const layer = Layer.effect(
             ELSE COALESCE(excluded.thread_id, scheduled_tasks.thread_id)
           END,
           thread_mode = excluded.thread_mode,
+          bot_id = excluded.bot_id,
           workspace_strategy_json = excluded.workspace_strategy_json,
           model_selection_json = excluded.model_selection_json,
           runtime_mode = excluded.runtime_mode,
@@ -888,7 +895,7 @@ export const layer = Layer.effect(
     // Reads every run row but only the queued runs' messages, so the cost per
     // due interval tracks the thread's run count, not its transcript.
     const hasQueuedOccurrence = Effect.fn("ScheduledTaskService.hasQueuedOccurrence")(function* (
-      taskId: ScheduledTaskId,
+      taskIds: ReadonlyArray<ScheduledTaskId>,
       threadId: ThreadId,
     ) {
       const { runs } = yield* threadManagement.getThreadRecords(threadId, ["runs"]);
@@ -898,8 +905,12 @@ export const layer = Layer.effect(
       const { messages } = yield* threadManagement.getThreadRecords(threadId, ["messages"], {
         messageIds: [...queuedMessageIds],
       });
+      const binding = new Set<string>(taskIds);
       return messages.some(
-        (message) => queuedMessageIds.has(message.id) && message.scheduledTaskId === taskId,
+        (message) =>
+          queuedMessageIds.has(message.id) &&
+          message.scheduledTaskId !== undefined &&
+          binding.has(message.scheduledTaskId),
       );
     });
 
@@ -978,6 +989,62 @@ export const layer = Layer.effect(
       if (updated.length > 0) yield* notifyChanged;
     });
 
+    // The bots projection lives in the same database; the trash lookup above reads
+    // orchestration projections the same way. A missing row means the bot is gone.
+    const readBotRow = Effect.fnUntraced(function* (botId: string) {
+      const rows = yield* sql<{
+        readonly status: string;
+        readonly current_thread_id: string;
+      }>`
+        SELECT status, current_thread_id
+        FROM orchestration_v2_projection_bots
+        WHERE bot_id = ${botId}
+      `.pipe(NodeSqliteClient.readOnly);
+      return rows[0] ?? null;
+    });
+
+    // One run for a retired bot counts, because the task did reach its time and the
+    // wake is permanently impossible; then the row is idle again for the next due time.
+    const recordUndispatchableRun = Effect.fnUntraced(function* (
+      task: ScheduledTask,
+      startedAtIso: string,
+      message: string,
+    ) {
+      const now = yield* localNow;
+      yield* sql`
+        UPDATE scheduled_tasks
+        SET last_run_at = ${startedAtIso},
+            last_run_status = 'failed',
+            last_run_error = ${message},
+            next_run_at = ${nextRunAfterRun({ ...task, lastRunAt: startedAtIso }, now)},
+            updated_at = ${iso(now)},
+            run_count = run_count + 1
+        WHERE task_id = ${task.id}
+      `.pipe(
+        Effect.mapError((cause) =>
+          taskError("Could not record the undispatchable run.", { taskId: task.id, cause }),
+        ),
+      );
+      yield* notifyChanged;
+    });
+
+    // A bot-bound run records where it went; binding guards do not apply because the
+    // stored thread is a log of the last dispatch, not a destination.
+    const recordDispatchThread = Effect.fnUntraced(function* (
+      task: ScheduledTask,
+      threadId: ThreadId,
+    ) {
+      yield* sql`
+        UPDATE scheduled_tasks SET thread_id = ${threadId}
+        WHERE task_id = ${task.id} AND created_at = ${task.createdAt}
+          AND (thread_id IS NULL OR thread_id != ${threadId})
+      `.pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Could not record a bot-bound run's thread.", cause),
+        ),
+      );
+    });
+
     const runTask = Effect.fn("ScheduledTaskService.runTask")(function* (
       task: ScheduledTask,
       trigger: "scheduled" | "manual" | "webhook",
@@ -1025,18 +1092,81 @@ export const layer = Layer.effect(
         ) {
           return { task: active, threadId: null, dispatchFailed: false };
         }
+        // A bot-bound task resolves its target now: the bot's current thread, never
+        // the recorded one. A retired or missing bot can never run again, so the due
+        // time counts as a failed run; a paused one only misses this occurrence.
+        let botThreadId: ThreadId | null = null;
+        if (active.botId != null) {
+          const bot = yield* readBotRow(active.botId);
+          if (bot === null || bot.status === "retired") {
+            const reason =
+              bot === null
+                ? `Bot ${active.botId} no longer exists.`
+                : `Bot ${active.botId} is retired.`;
+            if (webhook !== undefined) return yield* new WebhookDeliverySkipped({ reason });
+            if (trigger === "manual") return yield* taskError(reason, { taskId: task.id });
+            yield* recordUndispatchableRun(active, startedAtIso, reason);
+            return {
+              task: { ...active, lastRunStatus: "failed" as const, lastRunError: reason },
+              threadId: null,
+              dispatchFailed: true,
+            };
+          }
+          if (bot.status === "paused") {
+            const reason = `Bot ${active.botId} is paused.`;
+            if (webhook !== undefined) return yield* new WebhookDeliverySkipped({ reason });
+            if (trigger === "manual") return yield* taskError(reason, { taskId: task.id });
+            yield* rescheduleMissedRun(active, startedAt, "bot paused", reason);
+            return {
+              task: { ...active, lastRunStatus: "failed" as const, lastRunError: reason },
+              threadId: null,
+              dispatchFailed: false,
+            };
+          }
+          botThreadId = ThreadId.make(bot.current_thread_id);
+        }
+        const dispatchThreadId = botThreadId ?? active.threadId;
         // A thread that stays busy would otherwise collect one copy of the
-        // prompt per interval. A failed read falls through to the normal send.
+        // prompt per interval. For a bot, every task bound to it counts as one
+        // wake. A failed read falls through to the normal send.
         if (
           trigger === "scheduled" &&
           active.schedule.type !== "once" &&
-          active.threadId !== null &&
-          (yield* hasQueuedOccurrence(active.id, ThreadId.make(active.threadId)).pipe(
-            Effect.orElseSucceed(() => false),
-          ))
+          dispatchThreadId !== null
         ) {
-          yield* rescheduleMissedRun(active, startedAt, "previous occurrence still queued");
-          return { task: active, threadId: null, dispatchFailed: false };
+          const boundIds =
+            active.botId == null
+              ? [active.id]
+              : (yield* sql<{ task_id: string }>`
+                  SELECT task_id FROM scheduled_tasks WHERE bot_id = ${active.botId}
+                `.pipe(
+                  NodeSqliteClient.readOnly,
+                  Effect.orElseSucceed(() => []),
+                )).map((row) => ScheduledTaskId.make(row.task_id));
+          if (
+            yield* hasQueuedOccurrence(boundIds, ThreadId.make(dispatchThreadId)).pipe(
+              Effect.orElseSucceed(() => false),
+            )
+          ) {
+            yield* rescheduleMissedRun(active, startedAt, "previous occurrence still queued");
+            return { task: active, threadId: null, dispatchFailed: false };
+          }
+        }
+        // An interval task on a bot whose wake is still executing also waits: the
+        // queue check above only sees rests, not a run in flight. Same reschedule.
+        if (trigger === "scheduled" && active.botId != null) {
+          const runningOthers = yield* sql<{ task_id: string }>`
+            SELECT task_id FROM scheduled_tasks
+            WHERE bot_id = ${active.botId} AND task_id != ${active.id}
+              AND last_run_status = 'running'
+          `.pipe(
+            NodeSqliteClient.readOnly,
+            Effect.orElseSucceed(() => []),
+          );
+          if (runningOthers.length > 0) {
+            yield* rescheduleMissedRun(active, startedAt, "bot still running another wake");
+            return { task: active, threadId: null, dispatchFailed: false };
+          }
         }
         // Reject queued deliveries after pause, same-id recreation or trigger changes.
         if (webhook !== undefined) {
@@ -1095,7 +1225,9 @@ export const layer = Layer.effect(
               text: prompt,
               attachments: [],
               mode: "queue",
-              ...(threadMode === "fresh_session" ? { freshContext: true } : {}),
+              ...(threadMode === "fresh_session" && active.botId == null
+                ? { freshContext: true }
+                : {}),
               createdBy: active.createdBy,
               creationSource: active.creationSource,
             })
@@ -1117,7 +1249,7 @@ export const layer = Layer.effect(
 
         // Capture defects and interrupts too so dispatch failures still reach markCompleted.
         const result =
-          active.threadId === null
+          dispatchThreadId === null
             ? yield* Effect.exit(
                 threadLaunch
                   .launch({
@@ -1146,9 +1278,15 @@ export const layer = Layer.effect(
               )
             : yield* Effect.exit(
                 // The stored selection only seeds fresh threads. A bound run
-                // follows the thread's current provider, so it passes none.
-                sendBound(ThreadId.make(active.threadId), active.projectId, 2).pipe(
-                  Effect.as(ThreadId.make(active.threadId)),
+                // follows the thread's current provider, so it passes none. A
+                // bot-bound run never starts a fresh session: it continues the bot.
+                sendBound(ThreadId.make(dispatchThreadId), active.projectId, 2).pipe(
+                  Effect.tap(() =>
+                    active.botId == null
+                      ? Effect.void
+                      : recordDispatchThread(active, ThreadId.make(dispatchThreadId)),
+                  ),
+                  Effect.as(ThreadId.make(dispatchThreadId)),
                 ),
               );
 
@@ -1507,13 +1645,43 @@ export const layer = Layer.effect(
       // of silently resetting an existing row.
       const existingTask = yield* findTask(id);
       const threadMode = resolveThreadMode(input, existingTask);
-      const keptThreadId = input.threadId ?? existingTask?.threadId ?? null;
+      // A task binds a thread or a bot, never both. An explicit thread rebinds
+      // away from a bot; a bot keeps its `thread_id` only as the last run's record.
+      if (input.botId != null && input.threadId != null) {
+        return yield* taskError("A task binds a bot or a thread, not both.", { taskId: id });
+      }
+      const botId =
+        input.botId !== undefined
+          ? input.botId
+          : input.threadId != null
+            ? null
+            : (existingTask?.botId ?? null);
+      if (botId !== null && botId !== (existingTask?.botId ?? null)) {
+        const bot = yield* readBotRow(botId).pipe(
+          Effect.mapError((cause) => taskError("Could not read the bot.", { taskId: id, cause })),
+        );
+        if (bot === null) {
+          return yield* taskError("That bot no longer exists.", { taskId: id });
+        }
+        if (bot.status === "retired") {
+          return yield* taskError("That bot is retired.", { taskId: id });
+        }
+      }
+      // A bot-bound task's stored thread is only its last run's record, so unbinding
+      // the bot starts clean rather than pinning the task to that thread.
+      const keptThreadId =
+        input.threadId ??
+        (existingTask !== null && (existingTask.botId ?? null) === null && input.botId === undefined
+          ? (existingTask.threadId ?? null)
+          : null);
       // A bound thread belongs to its project, so moving the task leaves it for a new one.
       const movedOffThread =
         existingTask !== null &&
         existingTask.projectId !== input.projectId &&
-        keptThreadId === existingTask.threadId;
-      const threadId = threadMode === "new_thread" || movedOffThread ? null : keptThreadId;
+        keptThreadId === existingTask.threadId &&
+        botId === null;
+      const threadId =
+        botId !== null || threadMode === "new_thread" || movedOffThread ? null : keptThreadId;
       // An unchanged destination is not rechecked, so a task on an archived thread stays editable.
       if (threadId !== null && threadId !== existingTask?.threadId) {
         yield* requireDestinationThread(threadId, input.projectId, id);
@@ -1607,6 +1775,7 @@ export const layer = Layer.effect(
         schedule,
         projectId: input.projectId,
         threadId,
+        botId,
         threadMode,
         workspaceStrategy,
         modelSelection: input.modelSelection,
@@ -1757,27 +1926,32 @@ export const layer = Layer.effect(
     ) {
       // Check the current binding in the transaction: an automation may have
       // been unbound or moved since thread deletion queued this cleanup.
+      // Bot-bound tasks only record where their last run went, so they survive.
       const removed = yield* sql
         .withTransaction(
           Effect.gen(function* () {
             yield* sql`
             DELETE FROM scheduled_task_webhook_deliveries
-            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks
+              WHERE thread_id = ${threadId} AND bot_id IS NULL)
           `;
             yield* sql`
             DELETE FROM scheduled_task_webhook_pending
-            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks
+              WHERE thread_id = ${threadId} AND bot_id IS NULL)
           `;
             yield* sql`
             DELETE FROM scheduled_task_webhook_relay_deliveries
-            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks
+              WHERE thread_id = ${threadId} AND bot_id IS NULL)
           `;
             yield* sql`
             DELETE FROM scheduled_task_pending_deletes
-            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks
+              WHERE thread_id = ${threadId} AND bot_id IS NULL)
           `;
             return yield* sql<{ task_id: ScheduledTaskId }>`
-            DELETE FROM scheduled_tasks WHERE thread_id = ${threadId} RETURNING task_id
+            DELETE FROM scheduled_tasks WHERE thread_id = ${threadId} AND bot_id IS NULL RETURNING task_id
           `;
           }),
         )
@@ -1798,7 +1972,8 @@ export const layer = Layer.effect(
       if (input.threadIds.length === 0) return;
       const moved = yield* sql<{ task_id: ScheduledTaskId }>`
         UPDATE scheduled_tasks SET project_id = ${input.projectId}
-        WHERE project_id != ${input.projectId} AND thread_id IN ${sql.in(input.threadIds)}
+        WHERE project_id != ${input.projectId} AND bot_id IS NULL
+          AND thread_id IN ${sql.in(input.threadIds)}
         RETURNING task_id
       `.pipe(
         Effect.mapError((cause) =>

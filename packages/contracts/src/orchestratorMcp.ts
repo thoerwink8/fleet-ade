@@ -4,6 +4,7 @@ import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import { AuthMcpClientAccess } from "./auth.ts";
 import {
+  BotId,
   ContextTransferId,
   EnvironmentId,
   IsoDateTime,
@@ -748,6 +749,12 @@ export const OrchestratorMcpScheduleTaskInput = Schema.Struct({
         "Runs share one thread but each starts a fresh session. Unbound: the first run makes the thread.",
     }),
   ),
+  botId: Schema.optional(
+    Schema.NullOr(BotId).annotate({
+      description:
+        "Wake this bot instead: each run posts to the bot's current thread, follows it across threads, and a paused bot is skipped. Null unbinds. Cannot combine with bindToCurrentThread.",
+    }),
+  ),
   clientRequestId: Schema.optional(OrchestratorMcpClientRequestId),
 });
 export type OrchestratorMcpScheduleTaskInput = typeof OrchestratorMcpScheduleTaskInput.Type;
@@ -769,6 +776,8 @@ export const OrchestratorMcpScheduledTask = Schema.Struct({
   enabled: Schema.Boolean,
   projectId: ProjectId,
   boundThreadId: Schema.NullOr(ThreadId),
+  /** The bot this task wakes, or null when it is thread-bound. Absent from older servers. */
+  boundBotId: Schema.optional(Schema.NullOr(BotId)),
   freshSession: Schema.Boolean,
   schedule: ScheduledTaskSchedule,
   nextRunAt: Schema.NullOr(IsoDateTime),
@@ -810,6 +819,8 @@ export const OrchestratorMcpUpdateScheduledTaskInput = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
   bindToCurrentThread: Schema.optional(Schema.Boolean),
   freshSession: Schema.optional(Schema.Boolean),
+  /** Bind the task to a bot, or unbind it with null. Omitted keeps the stored binding. */
+  botId: Schema.optional(Schema.NullOr(BotId)),
 });
 export type OrchestratorMcpUpdateScheduledTaskInput =
   typeof OrchestratorMcpUpdateScheduledTaskInput.Type;

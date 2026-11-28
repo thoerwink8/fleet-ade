@@ -3375,6 +3375,97 @@ describe("OrchestratorMcpService provider resolution", () => {
       }),
     );
 
+    it.effect("passes the bot binding through create, keep, unbind, and the conflict check", () =>
+      Effect.gen(function* () {
+        const bindings = yield* Ref.make<
+          ReadonlyArray<{
+            threadId: ThreadId | null | undefined;
+            botId: BotId | null | undefined;
+          }>
+        >([]);
+        const botTask = {
+          ...existing,
+          botId: BotId.make("bot:commander"),
+          threadId: ThreadId.make("thread:last-run"),
+        } as ScheduledTask;
+        const mcp = yield* OrchestratorMcpService.OrchestratorMcpService.pipe(
+          Effect.provide(
+            OrchestratorMcpService.layer.pipe(
+              Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
+              Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)(masterRepository)),
+              Layer.provide(ChildSessionSummary.layer),
+              Layer.provide(SqlitePersistence.layerMemory),
+              Layer.provide(
+                Layer.mergeAll(
+                  NodeServices.layer,
+                  NodeCrypto.layer,
+                  Layer.mock(ThreadManagementService.ThreadManagementService)({
+                    getThreadShell: () => Effect.succeed(null),
+                  }),
+                  ServerSettings.layerTest(),
+                  Layer.mock(ProviderRegistry.ProviderRegistry)({
+                    getProviders: Effect.succeed([]),
+                  }),
+                  Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({
+                    list: () => Effect.succeed([]),
+                  }),
+                  Layer.mock(ProjectService.ProjectService)({
+                    getById: () =>
+                      Effect.succeedSome({
+                        id: projectId,
+                        workspaceRoot,
+                        defaultModelSelection: existing.modelSelection,
+                      } as never),
+                  }),
+                  Layer.mock(SecretRequests.SecretRequests)({}),
+                  Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+                  Layer.mock(ScheduledTaskService.ScheduledTaskService)({
+                    list: () => Effect.succeed({ tasks: [botTask] }),
+                    upsert: (input) =>
+                      Ref.update(bindings, (all) => [
+                        ...all,
+                        { threadId: input.threadId, botId: input.botId },
+                      ]).pipe(Effect.as({ task: botTask })),
+                  }),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        yield* mcp.scheduleTask(client, {
+          projectId,
+          prompt: "Wake the bot",
+          schedule,
+          botId: BotId.make("bot:commander"),
+        });
+        // An update that names no binding keeps it: the stored thread is a run
+        // record, so it must not become the destination.
+        yield* mcp.updateScheduledTask(client, {
+          scheduledTaskId: botTask.id,
+          prompt: "Changed",
+        });
+        yield* mcp.updateScheduledTask(client, {
+          scheduledTaskId: botTask.id,
+          botId: null,
+        });
+        const conflict = yield* mcp
+          .updateScheduledTask(client, {
+            scheduledTaskId: botTask.id,
+            botId: BotId.make("bot:commander"),
+            bindToCurrentThread: true,
+          })
+          .pipe(Effect.flip);
+
+        assert.equal(conflict.code, "invalid_request");
+        assert.deepEqual(yield* Ref.get(bindings), [
+          { threadId: null, botId: BotId.make("bot:commander") },
+          { threadId: undefined, botId: BotId.make("bot:commander") },
+          { threadId: null, botId: null },
+        ]);
+      }),
+    );
+
     it.effect("keeps the saved workspace when an unbound task stays unbound", () =>
       Effect.gen(function* () {
         const saved = yield* Ref.make<ReadonlyArray<ScheduledTask["workspaceStrategy"]>>([]);
