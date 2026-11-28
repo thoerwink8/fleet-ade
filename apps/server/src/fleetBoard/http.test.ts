@@ -48,16 +48,20 @@ const principalFor = (
 });
 
 // Bearer authentication stays mocked, but ticket verification runs the real signing,
-// decoding, expiry and session-revocation logic of a real SessionStore.
-const sessionAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth)({
-  authenticateHttpRequest: (request) =>
-    request.headers.authorization === TEST_AUTHORIZATION
-      ? Effect.succeed(principalFor([AuthOrchestrationReadScope, AuthOrchestrationOperateScope]))
-      : request.headers.authorization === "Bearer fleet-board-noscope"
-        ? Effect.succeed(principalFor([]))
-        : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
-  verifyWebSocketTicket: (token, use) => EnvironmentAuth.verifyWebSocketTicketEffect(token, use),
-});
+// decoding, expiry and session-revocation logic of the same SessionStore as the test.
+const sessionAuth = (sessions: SessionStore.SessionStore["Service"]) =>
+  Layer.mock(EnvironmentAuth.EnvironmentAuth)({
+    authenticateHttpRequest: (request) =>
+      request.headers.authorization === TEST_AUTHORIZATION
+        ? Effect.succeed(principalFor([AuthOrchestrationReadScope, AuthOrchestrationOperateScope]))
+        : request.headers.authorization === "Bearer fleet-board-noscope"
+          ? Effect.succeed(principalFor([]))
+          : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
+    verifyWebSocketTicket: (token, use) =>
+      EnvironmentAuth.verifyWebSocketTicketEffect(token, use).pipe(
+        Effect.provideService(SessionStore.SessionStore, sessions),
+      ),
+  });
 
 const layerSessionStore = SessionStore.layer.pipe(
   Layer.provide(SqlitePersistence.layerMemory),
@@ -168,14 +172,18 @@ const testBoardService = (upstreamPort: number) =>
 const serveFleetBoard = Effect.fnUntraced(function* (
   serviceLayer: Layer.Layer<FleetBoardService.FleetBoardService, never>,
 ) {
+  const sessionServices = yield* Layer.build(
+    layerSessionStore.pipe(Layer.provide(Layer.mergeAll(NodeCrypto.layer, NodeServices.layer))),
+  );
+  const sessions = Context.get(sessionServices, SessionStore.SessionStore);
   const services = yield* Layer.build(
     HttpRouter.serve(Layer.mergeAll(FleetBoardHttp.layer, ServerHttp.layerHttpCompression), {
       disableListenLog: true,
       disableLogger: true,
     }).pipe(
       Layer.provideMerge(serviceLayer),
-      Layer.provideMerge(sessionAuth),
-      Layer.provideMerge(layerSessionStore),
+      Layer.provideMerge(sessionAuth(sessions)),
+      Layer.provideMerge(Layer.succeed(SessionStore.SessionStore, sessions)),
       Layer.provideMerge(Layer.fresh(FetchHttpClient.layer)),
       Layer.provideMerge(Layer.mergeAll(NodeCrypto.layer, NodeServices.layer)),
       Layer.provideMerge(
