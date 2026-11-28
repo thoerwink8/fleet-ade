@@ -6238,3 +6238,123 @@ it.effect.each([
       }).pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 60_000 })));
     }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
+
+it.effect.each([
+  { rotated: true, expectThread: true },
+  { rotated: false, expectThread: false },
+] as const)(
+  "a late provider thread update lands on a detached thread only when it rotated (rotated: $rotated)",
+  ({ rotated, expectThread }) =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      yield* Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        const now = yield* DateTime.now;
+        const projectId = yield* idAllocator.allocate.project({
+          fixtureName: "provider-session-manager-rotation-thread-tail",
+        });
+        const rotatedThreadId = yield* idAllocator.allocate.thread({
+          fixtureName: "rotation-thread-tail-source",
+          projectId,
+        });
+        const keepAliveThreadId = yield* idAllocator.allocate.thread({
+          fixtureName: "rotation-thread-tail-keepalive",
+          projectId,
+        });
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId: rotatedThreadId,
+        });
+        const lateThread = makeProviderThread({
+          idAllocator,
+          threadId: rotatedThreadId,
+          providerSessionId,
+          now,
+          nativeThreadId: "native-thread-late",
+        });
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: rotatedThreadId, now }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: keepAliveThreadId, now }),
+          ],
+        });
+        yield* manager.open({
+          threadId: rotatedThreadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        yield* manager.open({
+          threadId: keepAliveThreadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        const rotatedShell = yield* projectionStore.getThread(rotatedThreadId);
+        yield* eventSink.write({
+          events: [
+            {
+              id: yield* idAllocator.allocate.event({ threadId: rotatedThreadId }),
+              type: "thread.metadata-updated",
+              threadId: rotatedThreadId,
+              providerInstanceId: modelSelection.instanceId,
+              occurredAt: now,
+              payload: rotated
+                ? {
+                    ...rotatedShell,
+                    rotatedTo: {
+                      threadId: ThreadId.make("thread:rotation-thread-tail-successor"),
+                      botId: BotId.make("bot:rotation-thread-tail"),
+                      rotatedAt: now,
+                    },
+                  }
+                : rotatedShell,
+            },
+          ],
+        });
+        yield* manager.detach({ providerSessionId, threadId: rotatedThreadId });
+
+        const adapterEvents = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId));
+        assert.isDefined(adapterEvents);
+        yield* Queue.offer(adapterEvents!, {
+          type: "provider_thread.updated",
+          driver: CODEX_DRIVER,
+          sessionScoped: true,
+          providerThread: lateThread,
+        });
+        // Artifact ingestion is permit-ordered per session, so the provider-thread update for
+        // the still-attached thread is stored only after the late row's verdict is final.
+        const keepAliveProviderThread = makeProviderThread({
+          idAllocator,
+          threadId: keepAliveThreadId,
+          providerSessionId,
+          now,
+        });
+        yield* Queue.offer(adapterEvents!, {
+          type: "provider_thread.updated",
+          driver: CODEX_DRIVER,
+          sessionScoped: true,
+          providerThread: keepAliveProviderThread,
+        });
+        const afterSequence = yield* eventSink.latestSequence({ threadId: keepAliveThreadId });
+        yield* eventSink.stream({ afterSequence, threadId: keepAliveThreadId }).pipe(
+          Stream.filter(
+            (stored) =>
+              stored.event.type === "provider-thread.updated" &&
+              stored.event.payload.id === keepAliveProviderThread.id,
+          ),
+          Stream.take(1),
+          Stream.runDrain,
+        );
+        const lateRow = (yield* projectionStore.getThreadProjection(rotatedThreadId))
+          .providerThreads;
+        assert.equal(
+          lateRow.some((thread) => thread.id === lateThread.id),
+          expectThread,
+        );
+      }).pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 60_000 })));
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);

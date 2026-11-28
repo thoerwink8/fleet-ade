@@ -1988,9 +1988,15 @@ export const layer = Layer.effect(
     const rebindThread: ScheduledTaskService["Service"]["rebindThread"] = Effect.fn(
       "ScheduledTaskService.rebindThread",
     )(function* (input) {
+      // Both reads feed a deletion decision: an error means retry, never absence — swallowing
+      // either once deleted every task the target ever had.
       const targetDeleted = yield* threadManagement
         .getThreadShell(input.targetThreadId)
-        .pipe(Effect.orElseSucceed(() => null));
+        .pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not read the rebind target thread.", { cause }),
+          ),
+        );
       const targetIsTrash =
         targetDeleted?.deletedAt != null &&
         (yield* sql<{ readonly present: number }>`
@@ -1998,7 +2004,11 @@ export const layer = Layer.effect(
             SELECT 1 FROM orchestration_v2_projection_thread_trash
             WHERE thread_id = ${input.targetThreadId}
           ) AS present
-        `.pipe(Effect.orElseSucceed(() => [{ present: 0 }])))[0]?.present === 1;
+        `.pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not read the rebind target's trash record.", { cause }),
+          ),
+        ))[0]?.present === 1;
       const rebound = yield* sql<{ task_id: ScheduledTaskId }>`
         UPDATE scheduled_tasks SET thread_id = ${input.targetThreadId}
         WHERE thread_id = ${input.sourceThreadId} AND bot_id IS NULL
@@ -2008,8 +2018,10 @@ export const layer = Layer.effect(
           taskError("Could not rebind the thread's schedule tasks.", { cause }),
         ),
       );
+      // The cleanup does not depend on this execution moving rows: a replay after a crash that
+      // already moved them rebinds nothing, and the stranded rows still die with their thread.
       if (targetDeleted === null || (targetDeleted.deletedAt != null && !targetIsTrash)) {
-        if (rebound.length > 0) yield* deleteForThread(input.targetThreadId);
+        yield* deleteForThread(input.targetThreadId);
       }
       if (rebound.length > 0) yield* notifyChanged;
     });
