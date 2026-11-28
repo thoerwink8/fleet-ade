@@ -379,9 +379,9 @@ it.effect("协调者换成别的机器后远程调用解出拒绝码和提示，
 
       yield* Effect.gen(function* () {
         const terms = yield* CoordinatorTerm.CoordinatorTerm;
-        expect((yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1))._tag).toBe(
-          "current",
-        );
+        expect(
+          (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1, "node-a"))._tag,
+        ).toBe("current");
       }).pipe(Effect.provide(fileClaims));
 
       expect((yield* renew(aClient, lease)).outcome).toBe("renewed");

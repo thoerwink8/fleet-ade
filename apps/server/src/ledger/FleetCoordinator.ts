@@ -8,6 +8,7 @@ import {
 } from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -113,7 +114,6 @@ const make = Effect.gen(function* () {
   const pushTo = (
     environmentId: EnvironmentId,
     snapshot: { readonly term: number; readonly coordinatorId: EnvironmentId },
-    caller: { readonly environmentId: string },
   ) =>
     peerClient
       .call({
@@ -125,11 +125,14 @@ const make = Effect.gen(function* () {
       })
       .pipe(
         // The peer may know a larger term; adopting it is how the fleet converges.
+        // The reply came from the pushed machine, so contended-term warnings name it.
         Effect.tap((reply) =>
           reply.coordinatorId === null || reply.term === 0
             ? Effect.void
-            : adopt(reply.term, reply.coordinatorId, caller),
+            : adopt(reply.term, reply.coordinatorId, { environmentId }),
         ),
+        // A push that never answers must not hold up the handover reply.
+        Effect.timeout(Duration.seconds(3)),
         Effect.tap(() =>
           Ref.update(pending, (set) => {
             const next = new Set(set);
@@ -165,9 +168,29 @@ const make = Effect.gen(function* () {
     const before = yield* readSnapshot;
     let pushed: { readonly term: number; readonly coordinatorId: EnvironmentId };
     if (before.coordinatorId === to) {
-      // Already handed to this machine: resume the push. A repeat after a lost
-      // confirmation lands here, so it ends as a success without touching the row.
-      pushed = { term: before.term, coordinatorId: to };
+      // Already handed: resume the push without touching the row. Any row naming the
+      // target counts; the validation adopts a larger term the target knows, so a
+      // stale row converges instead of winning back.
+      const validation = yield* peerClient
+        .call({
+          environmentId: to,
+          tool: "fleet_term_exchange",
+          arguments: { term: before.term, coordinatorId: to },
+          limits: { runtimeMode: "auto", interactionMode: "default" },
+          success: FleetTermExchangeResultSchema,
+        })
+        .pipe(
+          Effect.timeout(Duration.seconds(3)),
+          Effect.orElseSucceed(() => null),
+        );
+      if (validation !== null && validation.coordinatorId !== null && validation.term > 0) {
+        yield* adopt(validation.term, validation.coordinatorId, { environmentId: to });
+      }
+      const settled = yield* readSnapshot;
+      if (settled.coordinatorId !== to) {
+        return { outcome: "stale" as const, ...snapshotOf(settled) };
+      }
+      pushed = { term: settled.term, coordinatorId: to };
     } else {
       if (before.coordinatorId !== selfId) {
         return { outcome: "stale" as const, ...snapshotOf(before) };
@@ -183,6 +206,7 @@ const make = Effect.gen(function* () {
           success: FleetTermExchangeResultSchema,
         })
         .pipe(
+          Effect.timeout(Duration.seconds(3)),
           Effect.mapError(
             (error) =>
               new FleetCoordinatorError({
@@ -205,7 +229,7 @@ const make = Effect.gen(function* () {
           return { outcome: "stale" as const, ...snapshotOf(current) };
         }
         const written = yield* terms
-          .handover(CoordinatorTerm.FLEET_TERM_KEY, to, current.term)
+          .handover(CoordinatorTerm.FLEET_TERM_KEY, to, current.term, current.coordinatorId)
           .pipe(Effect.mapError(storageError));
         if (written._tag === "stale") {
           return { outcome: "stale" as const, ...snapshotOf(written) };
@@ -215,13 +239,13 @@ const make = Effect.gen(function* () {
         pushed = { term: written.term, coordinatorId: to };
       }
     }
-    const confirmed = yield* pushTo(to, pushed, { environmentId: selfId });
+    const confirmed = yield* pushTo(to, pushed);
     const others = yield* links.list.pipe(Effect.mapError(linkError));
     // Best effort: every other paired machine learns the new term now. Failures
     // land on the pending list the re-push loop drains.
     yield* Effect.forEach(
       others.filter((link) => link.environmentId !== to),
-      (link) => pushTo(link.environmentId, pushed, { environmentId: selfId }),
+      (link) => pushTo(link.environmentId, pushed),
       { concurrency: "unbounded", discard: true },
     );
     return {

@@ -77,7 +77,7 @@ it.effect("交给目标机时推送失败返回未确认并把目标记入待重
       );
       yield* linkTo(links, b);
       // The coordinator record already sits on the target; only its push is owed.
-      expect((yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0))._tag).toBe(
+      expect((yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0, null))._tag).toBe(
         "current",
       );
       const session = (yield* b.linkedSessions)[0];
