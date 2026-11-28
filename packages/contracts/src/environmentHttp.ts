@@ -434,7 +434,8 @@ class EnvironmentAuthHttpApi extends HttpApiGroup.make("auth")
       headers: OptionalBearerHeaders,
       params: AuthWebSocketTicketParams,
       success: AuthWebSocketTicketResult,
-      error: [EnvironmentInternalError],
+      // fleet-board tickets additionally answer 403 when the session lacks orchestration:read.
+      error: [EnvironmentInternalError, EnvironmentScopeRequiredError],
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(

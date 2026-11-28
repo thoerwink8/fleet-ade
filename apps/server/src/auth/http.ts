@@ -1,5 +1,6 @@
 import {
   authScopeRequiredResponse,
+  AuthOrchestrationReadScope,
   AuthAccessWriteScope,
   AuthStandardClientScopes,
   AuthGrantScope,
@@ -401,7 +402,12 @@ export const layer = HttpApiBuilder.group(
         Effect.fn("environment.auth.webSocketTicketFor")(
           function* (args) {
             yield* annotateEnvironmentRequest(args.endpoint.name);
-            const session = yield* EnvironmentAuthenticatedPrincipal;
+            // The fleet board ticket stands in for the session on proxied reads, so
+            // minting it requires the same orchestration:read the proxy would ask for.
+            const session =
+              args.params.use === "fleet-board"
+                ? yield* requireEnvironmentScope(AuthOrchestrationReadScope)
+                : yield* EnvironmentAuthenticatedPrincipal;
             yield* appendCredentialResponseHeaders;
             return yield* serverAuth.issueWebSocketTicket(session, { use: args.params.use });
           },

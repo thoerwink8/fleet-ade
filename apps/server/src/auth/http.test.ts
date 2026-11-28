@@ -224,6 +224,23 @@ it.effect("does not route a retired guest redeem", () =>
 
 const decodeAuthInvalid = Schema.decodeSync(Schema.fromJsonString(EnvironmentAuthInvalidError));
 
+// The wire encodes DateTimeUtc as ISO text, so these decode the transport shape,
+// not the domain schema's structured DateTime representation.
+const decodeAccessTokenResult = Schema.decodeSync(
+  Schema.fromJsonString(Schema.Struct({ access_token: Schema.NonEmptyString })),
+);
+const decodeTicketResult = Schema.decodeSync(
+  Schema.fromJsonString(
+    Schema.Struct({
+      ticket: Schema.NonEmptyString,
+      expiresAt: Schema.NonEmptyString,
+    }),
+  ),
+);
+const decodePairingResult = Schema.decodeSync(
+  Schema.fromJsonString(Schema.Struct({ credential: Schema.NonEmptyString })),
+);
+
 const postTokenExchange = (subjectToken: string) =>
   new Request("http://127.0.0.1/oauth/token", {
     method: "POST",
@@ -357,4 +374,95 @@ it.effect.each([{ endpoint: "browser-session" }, { endpoint: "oauth-token" }])(
         ({ web }) => Effect.promise(() => web.dispose()),
       );
     }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);
+
+it.effect("机群票据只发给有机群读权限的会话，票据真实编码带机群用途", () =>
+  Effect.gen(function* () {
+    const random = yield* SecureRandom.SecureRandom;
+    const unusedSecretStore = ServerSecretStore.ServerSecretStore.of({
+      get: () => Effect.succeedNone,
+      set: () => Effect.void,
+      create: () => Effect.void,
+      getOrCreateRandom: () => Effect.die("Not used by these routes."),
+      remove: () => Effect.void,
+    });
+    const requestContext = Context.make(SecureRandom.SecureRandom, random).pipe(
+      Context.add(ServerSecretStore.ServerSecretStore, unusedSecretStore),
+    );
+    return yield* Effect.acquireUseRelease(
+      Effect.sync(() => HttpRouter.toWebHandler(layerRoutes, { disableLogger: true })),
+      (environment) =>
+        Effect.promise(async () => {
+          // Full-scoped bearer mints a fleet-board ticket; the payload is the real signed encoding.
+          const exchange = await environment.handler(postTokenExchange(DEV_TOKEN), requestContext);
+          expect(exchange.status).toBe(200);
+          const accessToken = decodeAccessTokenResult(await exchange.text()).access_token;
+
+          const minted = await environment.handler(
+            new Request("http://127.0.0.1/api/auth/websocket-ticket/fleet-board", {
+              method: "POST",
+              headers: { authorization: `Bearer ${accessToken}` },
+            }),
+            requestContext,
+          );
+          expect(minted.status).toBe(200);
+          const result = decodeTicketResult(await minted.text());
+          const encodedClaims = result.ticket.split(".")[0] ?? "";
+          const claims = JSON.parse(Buffer.from(encodedClaims, "base64url").toString("utf8")) as {
+            aud?: string;
+            kind?: string;
+          };
+          expect(claims.kind).toBe("websocket");
+          expect(claims.aud).toBe("fleet-board");
+
+          // A media ticket still mints without the orchestration read scope check.
+          const media = await environment.handler(
+            new Request("http://127.0.0.1/api/auth/websocket-ticket/media", {
+              method: "POST",
+              headers: { authorization: `Bearer ${accessToken}` },
+            }),
+            requestContext,
+          );
+          expect(media.status).toBe(200);
+
+          // A session whose pairing link dropped orchestration:read must not mint one.
+          const cookieExchange = await environment.handler(
+            postJson("/api/auth/browser-session", { credential: DEV_TOKEN }),
+            requestContext,
+          );
+          const devCookie = cookieExchange.headers
+            .getSetCookie()
+            .find((cookie) => cookie.startsWith("t3_dev_session_"))
+            ?.split(";", 1)[0];
+          const pairingResponse = await environment.handler(
+            postJson(
+              "/api/auth/pairing-token",
+              { scopes: ["settings:write"] },
+              {
+                cookie: devCookie ?? "",
+              },
+            ),
+            requestContext,
+          );
+          expect(pairingResponse.status).toBe(200);
+          const pairing = decodePairingResult(await pairingResponse.text());
+          const narrowExchange = await environment.handler(
+            postTokenExchange(pairing.credential),
+            requestContext,
+          );
+          expect(narrowExchange.status).toBe(200);
+          const narrowToken = decodeAccessTokenResult(await narrowExchange.text()).access_token;
+
+          const refused = await environment.handler(
+            new Request("http://127.0.0.1/api/auth/websocket-ticket/fleet-board", {
+              method: "POST",
+              headers: { authorization: `Bearer ${narrowToken}` },
+            }),
+            requestContext,
+          );
+          expect(refused.status).toBe(403);
+        }),
+      (environment) => Effect.promise(() => environment.dispose()),
+    );
+  }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
