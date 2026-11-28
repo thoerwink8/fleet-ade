@@ -202,6 +202,50 @@ const makeOpener = Effect.gen(function* () {
       changes: acceptanceItems(draft.issueBody),
       verification: recordedChecks(logged.stdout.split("\u0000")),
     });
+    const remoteConfig = yield* driver
+      .execute({
+        operation: "OpenPullRequest.pushRemote",
+        cwd: draft.cwd,
+        args: ["config", "--get", `branch.${draft.branch}.remote`],
+        allowNonZeroExit: true,
+      })
+      .pipe(Effect.orElseSucceed(() => null));
+    const remoteName =
+      remoteConfig !== null && remoteConfig.exitCode === 0 && remoteConfig.stdout.trim().length > 0
+        ? remoteConfig.stdout.trim()
+        : "origin";
+    if (remoteName !== ".") {
+      // Refuse before pushing: the remote head must be an ancestor of HEAD. Git itself
+      // also rejects a non-fast-forward push; this turns that rejection into a
+      // structured error without touching the remote.
+      const lsRemote = yield* driver
+        .execute({
+          operation: "OpenPullRequest.remoteHead",
+          cwd: draft.cwd,
+          args: ["ls-remote", remoteName, `refs/heads/${draft.branch}`],
+          allowNonZeroExit: true,
+        })
+        .pipe(Effect.mapError((error) => failOpen(error.message)));
+      if (lsRemote.exitCode !== 0) {
+        return yield* failOpen("the remote branch head was not read");
+      }
+      const remoteSha = lsRemote.stdout.split("\n")[0]?.split(/\s+/)[0] ?? "";
+      if (/^[0-9a-f]{40,64}$/i.test(remoteSha)) {
+        const ancestor = yield* driver
+          .execute({
+            operation: "OpenPullRequest.isAncestor",
+            cwd: draft.cwd,
+            args: ["merge-base", "--is-ancestor", remoteSha, "HEAD"],
+            allowNonZeroExit: true,
+          })
+          .pipe(Effect.mapError((error) => failOpen(error.message)));
+        if (ancestor.exitCode !== 0) {
+          return yield* failOpen(
+            `push refused: ${remoteName}/${draft.branch} is not an ancestor of HEAD; the push would not fast-forward`,
+          );
+        }
+      }
+    }
     const pushedBranch = yield* git
       .runStackedAction({
         actionId: `pipeline-pr-${draft.branch}`,

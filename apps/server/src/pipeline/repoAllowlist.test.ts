@@ -16,6 +16,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -58,6 +59,17 @@ const githubIssue = (number: number, title: string): GitHubIssue => ({
   labels: [{ name: ELIGIBLE_LABEL }],
   user: { login: "thoerwink8", id: 1, type: "User" },
 });
+
+const emptyDriver = Layer.succeed(GitVcsDriver.GitVcsDriver, {
+  execute: () =>
+    Effect.succeed({
+      exitCode: 0,
+      stdout: "",
+      stderr: "",
+      stdoutTruncated: false,
+      stderrTruncated: false,
+    }),
+} as unknown as GitVcsDriver.GitVcsDriver["Service"]);
 
 const projectFor = (owner: string, name: string): Project => ({
   id: ProjectId.make(`project:${owner}/${name}`),
@@ -268,6 +280,7 @@ describe("repo allowlist", () => {
         created.branches.push(branch);
         return Effect.succeed({ worktree: { path: `/worktrees/${branch}`, refName: branch } });
       },
+      listLocalBranchNames: () => Effect.succeed([]),
     } as unknown as GitWorkflowService.GitWorkflowService["Service"]);
     const opener = Layer.succeed(DispatchSession.SessionOpener, {
       open: () =>
@@ -286,6 +299,7 @@ describe("repo allowlist", () => {
       Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
       Layer.provide(opener),
       Layer.provide(git),
+      Layer.provide(emptyDriver),
       Layer.provide(projects),
       Layer.provide(inboxLayer),
       Layer.provide(remote.layer),
@@ -317,6 +331,7 @@ describe("repo allowlist", () => {
             Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
             Layer.provide(opener),
             Layer.provide(git),
+            Layer.provide(emptyDriver),
             Layer.provide(projects),
             Layer.provide(inboxLayer),
             Layer.provide(remote.layer),
@@ -413,6 +428,7 @@ describe("repo allowlist", () => {
         created.branches.push(branch);
         return Effect.succeed({ worktree: { path: `/worktrees/${branch}`, refName: branch } });
       },
+      listLocalBranchNames: () => Effect.succeed([]),
     } as unknown as GitWorkflowService.GitWorkflowService["Service"]);
     const opener = Layer.succeed(DispatchSession.SessionOpener, {
       open: (session) =>
@@ -429,6 +445,7 @@ describe("repo allowlist", () => {
       Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
       Layer.provide(opener),
       Layer.provide(git),
+      Layer.provide(emptyDriver),
       Layer.provide(projects),
       Layer.provide(inboxLayer),
       Layer.provide(remote.layer),

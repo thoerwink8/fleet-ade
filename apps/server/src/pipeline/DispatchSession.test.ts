@@ -12,11 +12,13 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import * as TestClock from "effect/testing/TestClock";
 import * as MigrationError from "effect/sql/Migrator";
 import * as SqlError from "effect/sql/SqlError";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -76,10 +78,20 @@ interface PipelinePatch {
   readonly pipelineSessionTimeoutMinutes?: number;
 }
 
+interface FakeGit {
+  readonly branches: Set<string>;
+  readonly checkouts: Map<string, string>;
+}
+
+class FakeWorktreeError extends Schema.TaggedError<FakeWorktreeError>()("FakeWorktreeError", {
+  detail: Schema.String,
+}) {}
+
 interface Handles {
   readonly opened: Ref.Ref<ReadonlyArray<DispatchSession.DispatchedSession>>;
   readonly created: Ref.Ref<ReadonlyArray<string>>;
   readonly visible: Ref.Ref<ReadonlyArray<PipelineIssue>>;
+  readonly git: FakeGit;
 }
 
 const sessionLayer = (
@@ -87,6 +99,7 @@ const sessionLayer = (
   visible: Ref.Ref<ReadonlyArray<PipelineIssue>>,
   opened: Ref.Ref<ReadonlyArray<DispatchSession.DispatchedSession>>,
   created: Ref.Ref<ReadonlyArray<string>>,
+  fake: FakeGit,
   options?: {
     readonly claims?: Layer.Layer<
       ClaimLease.ClaimLeasePort | CoordinatorTerm.CoordinatorTerm | FleetClaims.FleetClaims,
@@ -133,11 +146,53 @@ const sessionLayer = (
       Effect.succeed({ commitSha: "base", remoteRefName: "origin/main" }),
     createWorktree: (input: VcsCreateWorktreeInput) => {
       const branch = input.newRefName ?? input.refName;
+      const path = `/worktrees/${branch}`;
+      if (input.newRefName !== undefined && fake.branches.has(input.newRefName)) {
+        return Effect.fail(
+          new FakeWorktreeError({
+            detail: `fatal: a branch named '${input.newRefName}' already exists`,
+          }),
+        );
+      }
+      const checkedOut = fake.checkouts.get(branch);
+      if (checkedOut !== undefined) {
+        return Effect.fail(new FakeWorktreeError({ detail: `fatal: '${branch}' is already used` }));
+      }
+      fake.branches.add(branch);
+      fake.checkouts.set(branch, path);
       return Ref.update(created, (current) => [...current, branch]).pipe(
-        Effect.as({ worktree: { path: `/worktrees/${branch}`, refName: branch } }),
+        Effect.as({ worktree: { path, refName: branch } }),
       );
     },
+    listLocalBranchNames: () => Effect.succeed([...fake.branches]),
   } as unknown as GitWorkflowService.GitWorkflowService["Service"]);
+  const vcs = Layer.succeed(GitVcsDriver.GitVcsDriver, {
+    execute: (entry: { readonly args: ReadonlyArray<string> }) => {
+      const args = entry.args;
+      if (args[0] === "worktree" && args[1] === "list") {
+        const records = [...fake.checkouts.entries()]
+          .map(
+            ([branch, path]) =>
+              `worktree ${path}\0head 0000000000000000000000000000000000000000\0branch refs/heads/${branch}\0`,
+          )
+          .join("\0");
+        return Effect.succeed({
+          exitCode: 0,
+          stdout: `${records}\0`,
+          stderr: "",
+          stdoutTruncated: false,
+          stderrTruncated: false,
+        });
+      }
+      return Effect.succeed({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      });
+    },
+  } as unknown as GitVcsDriver.GitVcsDriver["Service"]);
   const projects = Layer.succeed(ProjectService.ProjectService, {
     listPage: () => Effect.succeed({ projects: [PROJECT], nextCursor: null }),
   } as unknown as ProjectService.ProjectService["Service"]);
@@ -158,6 +213,7 @@ const sessionLayer = (
     ),
     Layer.provide(opener),
     Layer.provide(git),
+    Layer.provide(vcs),
     Layer.provide(projects),
     Layer.provide(issues),
     Layer.provideMerge(settings),
@@ -178,8 +234,9 @@ const run = <E, R>(
     const opened = yield* Ref.make<ReadonlyArray<DispatchSession.DispatchedSession>>([]);
     const created = yield* Ref.make<ReadonlyArray<string>>([]);
     const visible = yield* Ref.make(issues);
-    yield* body({ opened, created, visible }).pipe(
-      Effect.provide(sessionLayer(patch, visible, opened, created, options)),
+    const git: FakeGit = { branches: new Set(), checkouts: new Map() };
+    yield* body({ opened, created, visible, git }).pipe(
+      Effect.provide(sessionLayer(patch, visible, opened, created, git, options)),
     );
   });
 
@@ -408,11 +465,11 @@ describe("DispatchSession", () => {
   );
 
   it.effect("失败先续一次，第二次才卡住并带上原终态", () =>
-    run(enabled, [issue(5)], () =>
+    run(enabled, [issue(5)], ({ opened, created }) =>
       Effect.gen(function* () {
         const runs = yield* PipelineRuns;
-        const opened = yield* openClaimed;
-        const firstThread = opened.threadId;
+        const first = yield* openClaimed;
+        const firstThread = first.threadId;
         yield* recordEnd(firstThread!, "failed", "unavailable");
         const renewed = (yield* runs.list).runs;
         assert.strictEqual(renewed.length, 1);
@@ -425,6 +482,12 @@ describe("DispatchSession", () => {
         const retried = (yield* runs.list).runs[0];
         assert.strictEqual(retried?.status, "session");
         assert.notStrictEqual(retried?.threadId, firstThread);
+        const sessions = yield* Ref.get(opened);
+        assert.strictEqual(sessions.length, 2);
+        // 重派沿用原分支和原工作树，不新建。
+        assert.strictEqual(sessions[0]?.branch, sessions[1]?.branch);
+        assert.strictEqual(sessions[0]?.worktreePath, sessions[1]?.worktreePath);
+        assert.strictEqual((yield* Ref.get(created)).length, 1);
         yield* recordEnd(retried?.threadId ?? "", "failed", "unavailable");
         const listed = (yield* runs.list).runs;
         assert.strictEqual(listed.length, 1);
@@ -433,6 +496,21 @@ describe("DispatchSession", () => {
         assert.strictEqual(listed[0]?.stuckReason, "会话失败");
         assert.strictEqual(listed[0]?.detail, "原终态 failed");
         assert.strictEqual(listed[0]?.renewedOnce, true);
+      }),
+    ),
+  );
+
+  it.effect("分支已存在但没人占着时沿用这条分支而不新建", () =>
+    run(enabled, [issue(5)], ({ created, opened, git }) =>
+      Effect.gen(function* () {
+        const branch = DispatchSession.sessionBranch(5, "fix tests");
+        git.branches.add(branch);
+        yield* (yield* PipelineRuns).tick;
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        const session = (yield* Ref.get(opened))[0];
+        assert.strictEqual(session?.branch, branch);
+        assert.strictEqual(session?.worktreePath, `/worktrees/${branch}`);
+        assert.deepEqual(yield* Ref.get(created), [branch]);
       }),
     ),
   );
