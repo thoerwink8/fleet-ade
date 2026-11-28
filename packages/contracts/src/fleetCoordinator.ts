@@ -35,6 +35,18 @@ export const FleetTermHandoverResult = Schema.Struct({
 });
 export type FleetTermHandoverResult = typeof FleetTermHandoverResult.Type;
 
+/**
+ * `taken-over` when this machine is now the coordinator, `needs-confirmation` when
+ * the current coordinator cannot be reached and no force was given: nothing changed.
+ * `stale` carries the snapshot that won instead; this machine adopts it.
+ */
+export const FleetTermTakeoverResult = Schema.Struct({
+  outcome: Schema.Literals(["taken-over", "needs-confirmation", "stale"]),
+  term: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  coordinatorId: Schema.NullOr(EnvironmentId),
+});
+export type FleetTermTakeoverResult = typeof FleetTermTakeoverResult.Type;
+
 export class FleetCoordinatorError extends Schema.TaggedError<FleetCoordinatorError>()(
   "FleetCoordinatorError",
   {

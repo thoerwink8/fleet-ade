@@ -5,6 +5,8 @@ import {
   type FleetTermExchangeResult,
   FleetTermExchangeResult as FleetTermExchangeResultSchema,
   type FleetTermHandoverResult,
+  FleetTermHandoverResult as FleetTermHandoverResultSchema,
+  type FleetTermTakeoverResult,
 } from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Context from "effect/Context";
@@ -45,6 +47,15 @@ export class FleetCoordinator extends Context.Service<
       caller: { readonly environmentId: EnvironmentId },
       target?: EnvironmentId,
     ) => Effect.Effect<FleetTermHandoverResult, FleetCoordinatorError>;
+    /**
+     * Makes this machine the coordinator. Exchanges with every reachable peer
+     * first, so the term it writes sits above anything the fleet knows. The
+     * reachable coordinator is asked to hand over; only an unreachable one may
+     * be bypassed, and only with `force`.
+     */
+    readonly takeover: (options: {
+      readonly force: boolean;
+    }) => Effect.Effect<FleetTermTakeoverResult, FleetCoordinatorError>;
     /** The coordinator term as this machine last heard it. */
     readonly current: Effect.Effect<FleetTermExchangeResult, FleetCoordinatorError>;
     /** Machines a handover push failed to reach; the re-push loop drains this. */
@@ -255,6 +266,98 @@ const make = Effect.gen(function* () {
     };
   });
 
+  const takeover = Effect.fn("FleetCoordinator.takeover")(function* (options: {
+    readonly force: boolean;
+  }) {
+    const selfId = yield* environment.getEnvironmentId;
+    // Ask every peer its term first: each pairwise exchange leaves the larger
+    // snapshot here, so the row read afterwards is the largest term this
+    // machine can know. Unreachable peers are the ones this call exists for.
+    const peers = yield* links.list.pipe(Effect.mapError(linkError));
+    for (const peer of peers) {
+      const local = yield* readSnapshot;
+      const reply = yield* peerClient
+        .call({
+          environmentId: peer.environmentId,
+          tool: "fleet_term_exchange",
+          arguments: {
+            term: local.term,
+            coordinatorId: local.coordinatorId ?? selfId,
+          },
+          limits: { runtimeMode: "auto", interactionMode: "default" },
+          success: FleetTermExchangeResultSchema,
+        })
+        .pipe(Effect.timeoutOption(Duration.seconds(3)), Effect.orElseSucceed(Option.none));
+      if (Option.isSome(reply) && reply.value.coordinatorId !== null && reply.value.term > 0) {
+        yield* adopt(reply.value.term, reply.value.coordinatorId, {
+          environmentId: peer.environmentId,
+        }).pipe(Effect.catch(() => Effect.void));
+      }
+    }
+    const known = yield* readSnapshot;
+    if (known.coordinatorId === selfId) {
+      return { outcome: "taken-over" as const, ...snapshotOf(known) };
+    }
+    const coordinatorId = known.coordinatorId;
+    if (coordinatorId !== null) {
+      // Reachable for the exchange above: the coordinator hands over online.
+      const handed = yield* peerClient
+        .call({
+          environmentId: EnvironmentId.make(coordinatorId),
+          tool: "fleet_term_handover",
+          arguments: { target: selfId },
+          limits: { runtimeMode: "auto", interactionMode: "default" },
+          success: FleetTermHandoverResultSchema,
+        })
+        .pipe(Effect.timeoutOption(Duration.seconds(10)), Effect.orElseSucceed(Option.none));
+      if (Option.isSome(handed)) {
+        if (handed.value.coordinatorId !== null && handed.value.term > 0) {
+          yield* adopt(handed.value.term, handed.value.coordinatorId, {
+            environmentId: coordinatorId,
+          });
+        }
+        const after = yield* readSnapshot;
+        return {
+          outcome: after.coordinatorId === selfId ? ("taken-over" as const) : ("stale" as const),
+          ...snapshotOf(after),
+        };
+      }
+      // The coordinator answered the exchange but the handover never came back:
+      // nothing is written, so asking again starts over cleanly.
+      if (!options.force) {
+        return { outcome: "needs-confirmation" as const, ...snapshotOf(known) };
+      }
+    } else if (!options.force && known.term > 0) {
+      return { outcome: "needs-confirmation" as const, ...snapshotOf(known) };
+    }
+    const written = yield* terms
+      .handover(CoordinatorTerm.FLEET_TERM_KEY, selfId, known.term)
+      .pipe(Effect.mapError(storageError));
+    if (written._tag === "stale") {
+      // Already this machine, as when a retry meets its own first write.
+      const current = yield* readSnapshot;
+      return {
+        outcome: current.coordinatorId === selfId ? ("taken-over" as const) : ("stale" as const),
+        ...snapshotOf(current),
+      };
+    }
+    yield* Effect.forEach(
+      peers,
+      (peer) =>
+        pushTo(
+          peer.environmentId,
+          { term: written.term, coordinatorId: selfId },
+          { environmentId: selfId },
+        ),
+      { concurrency: "unbounded", discard: true },
+    );
+    return {
+      outcome: "taken-over" as const,
+      term: written.term,
+      coordinatorId: selfId,
+    };
+  });
+
   const requestHandover = Effect.fn("FleetCoordinator.requestHandover")(function* (
     caller: { readonly environmentId: EnvironmentId },
     target?: EnvironmentId,
@@ -272,6 +375,7 @@ const make = Effect.gen(function* () {
     exchange,
     handover,
     requestHandover,
+    takeover,
     current: readSnapshot.pipe(Effect.map(snapshotOf)),
     pendingPush: Ref.get(pending).pipe(Effect.map((set) => Array.from(set))),
   });
