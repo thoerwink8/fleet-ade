@@ -156,6 +156,7 @@ import type { OrchestrationEffectRequestV2, PendingOrchestrationEffectV2 } from 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import { DispatchModeLimit, exceededDispatchModeLimit } from "./DispatchModeLimit.ts";
+import { rotationBlockedReason, messageBindsOldRun } from "./BotRotation.ts";
 import {
   applyToProjection,
   emptyProjection,
@@ -301,6 +302,19 @@ export class OrchestratorSubagentThreadReadOnlyError extends Schema.TaggedError<
 ) {
   override get message(): string {
     return "This subagent is run by its provider and cannot take messages. Message the parent thread instead.";
+  }
+}
+export class OrchestratorThreadRotatedError extends Schema.TaggedError<OrchestratorThreadRotatedError>()(
+  "OrchestratorThreadRotatedError",
+  {
+    commandId: CommandId,
+    threadId: ThreadId,
+    successorThreadId: ThreadId,
+    botId: BotId,
+  },
+) {
+  override get message(): string {
+    return `Thread ${this.threadId} is read-only; the bot moved to ${this.successorThreadId}.`;
   }
 }
 
@@ -493,6 +507,7 @@ export const OrchestratorV2Error = Schema.Union([
   OrchestratorCommandPreviouslyRejectedError,
   OrchestratorCommandIdConflictError,
   OrchestratorSubagentThreadReadOnlyError,
+  OrchestratorThreadRotatedError,
   OrchestratorThreadAboveModeLimitError,
   OrchestratorProviderSelectionBusyError,
   OrchestratorDispatchConcurrencyLimitError,
@@ -760,6 +775,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.commander.unmark":
     case "bot.pause":
     case "bot.resume":
+    case "bot.rotate-session":
     case "bot.switch-thread":
     case "thread.pin.reorder":
     case "thread.active.reorder":
@@ -4077,6 +4093,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: `Thread ${command.threadId} is deleted.`,
       });
     }
+    if (command.type === "thread.commander.mark" && thread.rotatedTo != null) {
+      return yield* new OrchestratorThreadRotatedError({
+        commandId: command.commandId,
+        threadId: command.threadId,
+        successorThreadId: thread.rotatedTo.threadId,
+        botId: thread.rotatedTo.botId,
+      });
+    }
     // The mark is a bot on the thread since migration 108; the thread payload stays untouched.
     const bot = (yield* projectionStore.getThreadRecords(command.threadId, ["bot"]).pipe(
       Effect.mapError(
@@ -4146,6 +4170,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     if (bot.status === "retired") {
       return yield* refuse(`Bot ${command.botId} is retired.`);
     }
+    if (command.type === "bot.switch-thread") {
+      const sourceThread = yield* projectionStore
+        .getThread(command.threadId)
+        .pipe(
+          Effect.mapError(
+            (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+          ),
+        );
+      if (sourceThread.rotatedTo != null) {
+        return yield* new OrchestratorThreadRotatedError({
+          commandId: command.commandId,
+          threadId: command.threadId,
+          successorThreadId: sourceThread.rotatedTo.threadId,
+          botId: sourceThread.rotatedTo.botId,
+        });
+      }
+    }
     // The sender's current thread is optimistic concurrency: a bot that moved since
     // refuses rather than acting from stale state.
     if (bot.currentThreadId !== command.threadId) {
@@ -4195,6 +4236,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     if (targetThread.deletedAt !== null) {
       return yield* refuse(`Thread ${command.targetThreadId} is deleted.`);
     }
+    if (targetThread.rotatedTo != null) {
+      return yield* new OrchestratorThreadRotatedError({
+        commandId: command.commandId,
+        threadId: command.targetThreadId,
+        successorThreadId: targetThread.rotatedTo.threadId,
+        botId: targetThread.rotatedTo.botId,
+      });
+    }
     // Deletes lock a parent before its side chats; holding a side chat's lock here while
     // waiting on the current thread's could invert that order and deadlock.
     if (targetThread.lineage.sideChat === true) {
@@ -4229,6 +4278,256 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         occurredAt: now,
         payload: { ...movedBot, previousThreadId: bot.currentThreadId },
       });
+    }
+  });
+
+  const dispatchBotRotate = Effect.fn("orchestrationV2.dispatch.botRotate")(function* (
+    command: Extract<OrchestrationV2ServerCommand, { readonly type: "bot.rotate-session" }>,
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+  ) {
+    const refuse = (cause: string) =>
+      new OrchestratorDispatchError({
+        commandId: command.commandId,
+        commandType: command.type,
+        cause,
+      });
+    if (command.targetThreadId === command.threadId) {
+      return yield* refuse("The target thread is the bot's current thread.");
+    }
+    const bot = yield* projectionStore
+      .getBot(command.botId)
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    if (bot === null) return yield* refuse(`Bot ${command.botId} does not exist.`);
+    if (bot.status !== "active") return yield* refuse(`Bot ${command.botId} is ${bot.status}.`);
+    const sourceThread = yield* projectionStore
+      .getThread(command.threadId)
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    if (sourceThread.rotatedTo != null) {
+      return yield* new OrchestratorThreadRotatedError({
+        commandId: command.commandId,
+        threadId: command.threadId,
+        successorThreadId: sourceThread.rotatedTo.threadId,
+        botId: sourceThread.rotatedTo.botId,
+      });
+    }
+    if (bot.currentThreadId !== command.threadId) {
+      return yield* refuse(
+        `Bot ${command.botId} is on thread ${bot.currentThreadId}, not ${command.threadId}.`,
+      );
+    }
+    const projection = yield* projectionStore
+      .getThreadRecords(command.threadId, [
+        "runs",
+        "messages",
+        "runtimeRequests",
+        "contextTransfers",
+        "providerThreads",
+        "providerTurns",
+        "turnItems",
+        "subagents",
+        "providerSessions",
+        "attempts",
+      ])
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    const unsettled = yield* effectOutbox
+      .listUnsettledByThread(command.threadId)
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    const blocked = rotationBlockedReason({
+      ...projection,
+      unsettledEffectCount: unsettled.length,
+    });
+    if (blocked !== null) return yield* refuse(`Thread ${command.threadId} ${blocked}.`);
+    if ((yield* findThread(command.targetThreadId)) !== null) {
+      return yield* refuse(`Thread ${command.targetThreadId} already exists.`);
+    }
+    const adapter = yield* providerAdapters.get(projection.thread.providerInstanceId).pipe(
+      Effect.mapError(
+        (cause) =>
+          new OrchestratorProviderAdapterError({
+            commandId: command.commandId,
+            providerInstanceId: projection.thread.providerInstanceId,
+            cause,
+          }),
+      ),
+    );
+    const capabilities = yield* adapter.getCapabilities().pipe(
+      Effect.mapError(
+        (cause) =>
+          new OrchestratorProviderAdapterError({
+            commandId: command.commandId,
+            providerInstanceId: projection.thread.providerInstanceId,
+            cause,
+          }),
+      ),
+    );
+    yield* mapDispatchError(command)(
+      commandPolicy.ensureContextHandoff({
+        commandId: command.commandId,
+        threadId: command.threadId,
+        providerInstanceId: projection.thread.providerInstanceId,
+        capabilities,
+        strategy: "full_thread_summary",
+      }),
+    );
+    const sourceRun =
+      projection.runs
+        .filter((run) => isForkableSourceRunStatus(run.status))
+        .toSorted((left, right) => right.ordinal - left.ordinal)[0] ?? null;
+    // A runless thread can carry an unconsumed fork the rotation must not strand: the new
+    // transfer keeps the original source, and the old one is superseded below.
+    const inheritedTransfers =
+      sourceRun !== null
+        ? []
+        : projection.contextTransfers.filter(
+            (candidate) =>
+              candidate.type === "fork" &&
+              candidate.targetThreadId === projection.thread.id &&
+              candidate.status === "pending",
+          );
+    const inheritedTransfer = latestContextTransfer(inheritedTransfers);
+    const sourceProviderThread =
+      sourceRun === null ? undefined : providerThreadForRun(projection, sourceRun);
+    const now = yield* DateTime.now;
+    const transferId = yield* mapDispatchError(command)(
+      idAllocator.allocate.contextTransfer({
+        sourceThreadId: projection.thread.id,
+        targetThreadId: command.targetThreadId,
+        type: "fork",
+      }),
+    );
+    const { targetThread, transfer } = yield* threadForkService
+      .plan({
+        sourceProjection: projection,
+        sourceRun,
+        sourceProviderThread,
+        sourceTokenUsage:
+          sourceRun === null ? undefined : providerTurnForRun(projection, sourceRun)?.tokenUsage,
+        canonicalSourcePoint:
+          sourceRun !== null
+            ? contextSourcePointForRun(projection, sourceRun)
+            : (inheritedTransfer?.sourcePoint ?? { threadId: projection.thread.id }),
+        transferId,
+        targetThreadId: command.targetThreadId,
+        title: projection.thread.title,
+        requiresPortable: true,
+        createdBy: command.reason === "manual" ? "user" : "agent",
+        creationSource: "server",
+        ...(inheritedTransfer === undefined
+          ? {}
+          : {
+              transferSource: {
+                threadId: inheritedTransfer.sourceThreadId,
+                providerInstanceId: inheritedTransfer.sourceProviderInstanceId,
+              },
+            }),
+        createdAt: now,
+      })
+      .pipe(mapDispatchError(command));
+    const emitEvent = emit(events, command);
+    yield* emitEvent({
+      type: "thread.created",
+      threadId: command.targetThreadId,
+      providerInstanceId: targetThread.providerInstanceId,
+      occurredAt: now,
+      payload: targetThread,
+    });
+    for (const superseded of inheritedTransfers) {
+      yield* emitEvent({
+        type: "context-transfer.updated",
+        threadId: command.threadId,
+        providerInstanceId:
+          superseded.sourceProviderInstanceId ?? projection.thread.providerInstanceId,
+        occurredAt: now,
+        payload: {
+          ...superseded,
+          status: "superseded",
+          error: `Superseded by rotation transfer ${transferId}.`,
+          updatedAt: now,
+        },
+      });
+    }
+    if (sourceRun !== null || inheritedTransfer !== undefined) {
+      yield* emitEvent({
+        type: "context-transfer.created",
+        threadId: command.targetThreadId,
+        providerInstanceId: transfer.sourceProviderInstanceId ?? targetThread.providerInstanceId,
+        occurredAt: now,
+        payload: transfer,
+      });
+    }
+    const movedBot = {
+      ...bot,
+      currentThreadId: command.targetThreadId,
+      updatedAt: now,
+    };
+    for (const streamThreadId of [bot.currentThreadId, command.targetThreadId]) {
+      yield* emitEvent({
+        type: "bot.current-thread-changed",
+        threadId: streamThreadId,
+        occurredAt: now,
+        payload: { ...movedBot, previousThreadId: bot.currentThreadId },
+      });
+    }
+    yield* emitEvent({
+      type: "thread.metadata-updated",
+      threadId: command.threadId,
+      providerInstanceId: projection.thread.providerInstanceId,
+      occurredAt: now,
+      payload: {
+        ...projection.thread,
+        rotatedTo: {
+          threadId: command.targetThreadId,
+          botId: bot.id,
+          rotatedAt: now,
+        },
+      },
+    });
+    const liveSessions = projection.providerSessions.filter(
+      (session) => session.status !== "stopped" && session.status !== "error",
+    );
+    for (const session of liveSessions) {
+      yield* emitEvent({
+        type: "provider-session.detached",
+        threadId: command.threadId,
+        driver: session.driver,
+        providerInstanceId: session.providerInstanceId,
+        occurredAt: now,
+        payload: {
+          providerSessionId: session.id,
+          detachedAt: now,
+          reason: "指挥已换到新会话。",
+        },
+      });
+      yield* Ref.update(effects, (existing) => [
+        ...existing,
+        {
+          id: `effect:${command.commandId}:provider-session.detach:${session.id}`,
+          commandId: command.commandId,
+          threadId: command.threadId,
+          request: {
+            type: "provider-session.detach" as const,
+            providerSessionId: session.id,
+            detail: "指挥已换到新会话。",
+          },
+        },
+      ]);
     }
   });
 
@@ -8453,6 +8752,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               sourceRunStatus: sourceRun.status,
               fromSpecificTurn: sourceRun !== null,
               sourceBusy: sourceRunsAfterFork.some(isActiveRun),
+              requiresPortable: pendingForkTransfer.requiresPortable === true,
             }),
           );
     const canResolveForkNatively = forkExecution === "native_fork";
@@ -15833,6 +16133,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "bot.switch-thread":
         yield* dispatchBotCommand(command, events);
         break;
+      case "bot.rotate-session":
+        yield* dispatchBotRotate(command, events, effects);
+        break;
       case "thread.pull-request-watch.checks-reopen":
         yield* dispatchThreadMutation(command, events, effects);
         break;
@@ -15854,6 +16157,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
             ),
           );
+        if (thread.rotatedTo != null) {
+          return yield* new OrchestratorThreadRotatedError({
+            commandId: command.commandId,
+            threadId: command.threadId,
+            successorThreadId: thread.rotatedTo.threadId,
+            botId: thread.rotatedTo.botId,
+          });
+        }
         if (isProviderNativeSubagentThread(thread)) {
           return yield* new OrchestratorSubagentThreadReadOnlyError({
             commandId: command.commandId,
@@ -16225,6 +16536,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             command.type === "bot.pause" ||
             command.type === "bot.resume" ||
             command.type === "bot.switch-thread" ||
+            command.type === "bot.rotate-session" ||
+            cause._tag === "OrchestratorThreadRotatedError" ||
             (cause._tag === "OrchestratorDispatchError" &&
               cause.code !== undefined &&
               isThreadTrashFailureCode(cause.code))
@@ -16415,7 +16728,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     );
 
   // dispatchWithReceiptEffect owns the dispatch span; this wrapper selects the thread locks.
-  const dispatchWithReceipt = Effect.fnUntraced(function* (command: OrchestrationV2ServerCommand) {
+  const lockAndDispatch = Effect.fnUntraced(function* (command: OrchestrationV2ServerCommand) {
     const dispatch = threadDispatch.withLock(
       commandThreadId(command),
       dispatchWithReceiptEffect(command),
@@ -16433,6 +16746,16 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* source === null || source.lineage.sideChat === true || target !== null
         ? dispatch
         : threadDispatch.withLock(command.sourceThreadId, dispatch);
+    }
+    if (command.type === "bot.rotate-session") {
+      // The target does not exist yet; locking its id still serializes two creators.
+      const lockIds = [...new Set([command.threadId, command.targetThreadId])]
+        .toSorted()
+        .toReversed();
+      return yield* lockIds.reduce(
+        (locked, threadId) => threadDispatch.withLock(threadId, locked),
+        dispatchWithReceiptEffect(command),
+      );
     }
     if (command.type === "bot.switch-thread") {
       // The move writes to both threads' streams, so it holds both locks in sorted
@@ -16543,17 +16866,97 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     }
     // Taken before the lineage read, so a message whose read yields keeps its
     // place ahead of later messages to the same thread.
-    if (command.type === "message.dispatch")
+    if (command.type === "message.dispatch") {
       return yield* messageIntake.withLock(
         command.threadId,
-        mayStartSubagentFollowup(command)
-          ? withSubagentParentLock(command.threadId, dispatch)
-          : dispatch,
+        Effect.gen(function* () {
+          const forwarded = yield* followRotatedMessage(command);
+          if (forwarded === command) {
+            return yield* mayStartSubagentFollowup(command)
+              ? withSubagentParentLock(command.threadId, dispatch)
+              : dispatch;
+          }
+          const forwardDispatch = threadDispatch.withLock(
+            commandThreadId(forwarded),
+            dispatchWithReceiptEffect(forwarded),
+          );
+          return yield* mayStartSubagentFollowup(forwarded)
+            ? withSubagentParentLock(commandThreadId(forwarded), forwardDispatch)
+            : forwardDispatch;
+        }),
       );
+    }
     // Answering a message-mode question can also start a follow-up.
     return yield* command.type === "runtime-request.respond"
       ? withSubagentParentLock(command.threadId, dispatch)
       : dispatch;
+  });
+
+  const ROTATION_HOP_LIMIT = 8;
+  const followRotatedMessage = Effect.fn("orchestrationV2.dispatch.followRotatedMessage")(
+    function* (
+      command: Extract<OrchestrationV2ServerCommand, { readonly type: "message.dispatch" }>,
+    ) {
+      let threadId = command.threadId;
+      const seen: Record<string, true> = {};
+      for (let hop = 0; hop <= ROTATION_HOP_LIMIT; hop++) {
+        if (seen[threadId] === true) {
+          return yield* new OrchestratorDispatchError({
+            commandId: command.commandId,
+            commandType: command.type,
+            cause: `Thread ${command.threadId} rotation chain loops.`,
+          });
+        }
+        seen[threadId] = true;
+        const thread = yield* findThread(threadId);
+        if (thread?.rotatedTo == null) {
+          return threadId === command.threadId ? command : { ...command, threadId };
+        }
+        // A copy accepted on this hop before the rotation is that thread's command:
+        // forwarding it again would fight the original receipt, so intake replays in place.
+        const receipt = yield* commandReceipts.getByCommandId(command.commandId).pipe(
+          Effect.mapError(
+            (cause) =>
+              new OrchestratorDispatchError({
+                commandId: command.commandId,
+                commandType: command.type,
+                cause,
+              }),
+          ),
+        );
+        if (Option.isSome(receipt) && receipt.value.threadId === threadId) {
+          return threadId === command.threadId ? command : { ...command, threadId };
+        }
+        if (hop === ROTATION_HOP_LIMIT || messageBindsOldRun(command)) {
+          return yield* new OrchestratorThreadRotatedError({
+            commandId: command.commandId,
+            threadId: messageBindsOldRun(command) ? command.threadId : threadId,
+            successorThreadId: thread.rotatedTo.threadId,
+            botId: thread.rotatedTo.botId,
+          });
+        }
+        threadId = thread.rotatedTo.threadId;
+      }
+      return command;
+    },
+  );
+
+  const dispatchWithReceipt = Effect.fnUntraced(function* (command: OrchestrationV2ServerCommand) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const exit = yield* Effect.exit(lockAndDispatch(command));
+      if (Exit.isSuccess(exit)) return exit.value;
+      const failure = Cause.findErrorOption(exit.cause);
+      // A rotate that lands while a forwarded message waits in the lock trips the in-lock
+      // guard; re-walking the chain once lands the message on the final successor.
+      const canRetry =
+        attempt === 0 &&
+        command.type === "message.dispatch" &&
+        !messageBindsOldRun(command) &&
+        Option.isSome(failure) &&
+        failure.value._tag === "OrchestratorThreadRotatedError";
+      if (!canRetry) return yield* Effect.failCause(exit.cause);
+    }
+    return yield* Effect.die(new Error("Unreachable rotation retry state."));
   });
 
   const handleRunUpdate = Effect.fn("Orchestrator.handleRunUpdate")(

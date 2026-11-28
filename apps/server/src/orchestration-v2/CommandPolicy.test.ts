@@ -302,4 +302,44 @@ layer("CommandPolicyV2", (it) => {
       assert.equal(yield* decide(true), "portable_context");
     }),
   );
+
+  it.effect("requiresPortable fails closed instead of native-forking", () =>
+    Effect.gen(function* () {
+      const policy = yield* CommandPolicy.CommandPolicyV2;
+      const portable = yield* policy.decideForkExecution({
+        commandId,
+        threadId,
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        capabilities: CodexProviderCapabilitiesV2,
+        sameProvider: true,
+        hasStrongNativeSource: true,
+        sourceRunStatus: "completed",
+        fromSpecificTurn: true,
+        sourceBusy: false,
+        requiresPortable: true,
+      });
+      assert.equal(portable, "portable_context");
+      const unsupported = yield* policy
+        .decideForkExecution({
+          commandId,
+          threadId,
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          capabilities: {
+            ...CodexProviderCapabilitiesV2,
+            context: {
+              ...CodexProviderCapabilitiesV2.context,
+              supportsFullThreadHandoff: false,
+            },
+          },
+          sameProvider: true,
+          hasStrongNativeSource: true,
+          sourceRunStatus: "completed",
+          fromSpecificTurn: true,
+          sourceBusy: false,
+          requiresPortable: true,
+        })
+        .pipe(Effect.flip);
+      assert.equal(unsupported._tag, "CommandPolicyCapabilityUnsupportedError");
+    }),
+  );
 });

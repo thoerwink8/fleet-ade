@@ -974,7 +974,6 @@ export function applyToProjection(
     case "thread.pinned":
     case "thread.unpinned":
     case "thread.pin-reordered":
-    case "thread.metadata-updated":
     case "thread.runtime-mode-updated":
     case "thread.interaction-mode-updated":
     case "thread.model-selection-updated":
@@ -983,6 +982,15 @@ export function applyToProjection(
       return {
         ...base,
         thread: event.payload,
+      };
+    case "thread.metadata-updated":
+      // Rotation is permanent even when a writer builds its payload from stale state.
+      return {
+        ...base,
+        thread:
+          event.payload.rotatedTo === undefined && projection.thread.rotatedTo !== undefined
+            ? { ...event.payload, rotatedTo: projection.thread.rotatedTo }
+            : event.payload,
       };
     // Reordering and PR refreshes preserve the orchestrator's activity timestamp.
     case "thread.active-reordered":
@@ -1252,6 +1260,11 @@ const encodeBotPayload = Schema.encodeEffect(Schema.fromJsonString(Orchestration
 const encodeThreadPayload = Schema.encodeEffect(
   Schema.fromJsonString(OrchestrationV2AppThreadJsonSchema),
 );
+const decodeJsonUnknown = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+const decodeJsonRecord = Schema.decodeEffect(
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
+);
+const encodeJsonUnknown = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const encodeThreadUpdatedAt = Schema.encodeEffect(
   OrchestrationV2AppThreadJsonSchema.fields.updatedAt,
 );
@@ -2510,7 +2523,32 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             case "thread.model-selection-updated":
             case "thread.provider-switched":
             case "thread.guest-share-updated": {
-              const payloadJson = yield* encodeThreadPayload(event.payload);
+              // Rotation is permanent even when a writer builds its payload from stale state.
+              // The merge stays at JSON level so no schema decode enters this writer's errors.
+              let payloadJson = yield* encodeThreadPayload(event.payload);
+              if (
+                event.type === "thread.metadata-updated" &&
+                event.payload.rotatedTo === undefined
+              ) {
+                const rows = yield* sql<{ readonly rotatedTo: string | null }>`
+                  SELECT json_extract(payload_json, '$.rotatedTo') AS rotatedTo
+                  FROM orchestration_v2_projection_threads
+                  WHERE thread_id = ${event.payload.id}
+                `;
+                const stored = rows[0]?.rotatedTo;
+                if (typeof stored === "string" && stored !== "") {
+                  const merged = yield* decodeJsonUnknown(stored).pipe(
+                    Effect.flatMap((rotatedTo) =>
+                      decodeJsonRecord(payloadJson).pipe(
+                        Effect.map((payload) => ({ ...payload, rotatedTo })),
+                        Effect.flatMap(encodeJsonUnknown),
+                      ),
+                    ),
+                    Effect.orElseSucceed(() => payloadJson),
+                  );
+                  payloadJson = merged;
+                }
+              }
               const payload = parseEncodedPayload(payloadJson);
               // Only a live thread enters the trash. A repeat delete of a tombstone (permanently
               // deleted, or deleted before the trash existed) must not make it recoverable.

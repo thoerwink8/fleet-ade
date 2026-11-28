@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   DEFAULT_SERVER_SETTINGS,
   EventId,
+  BotId,
   MessageId,
   type OrchestrationV2ThreadProjection,
   NodeId,
@@ -182,6 +183,16 @@ describe("idleCompactionWindow", () => {
     const archived = records(cache);
     archived.thread = { ...archived.thread, archivedAt: at() };
     expect(idleCompactionWindow(archived, NOW_MS)).toBeNull();
+    const rotated = records(cache);
+    rotated.thread = {
+      ...rotated.thread,
+      rotatedTo: {
+        threadId: ThreadId.make("rotated-successor"),
+        botId: BotId.make("bot:rotated"),
+        rotatedAt: at(),
+      },
+    };
+    expect(idleCompactionWindow(rotated, NOW_MS)).toBeNull();
     const sideChat = records(cache);
     expect(idleCompactionWindow(sideChat, NOW_MS)).not.toBeNull();
     sideChat.thread = {

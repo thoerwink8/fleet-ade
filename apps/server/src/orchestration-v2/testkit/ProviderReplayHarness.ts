@@ -277,6 +277,14 @@ export interface ProviderReplayHarnessOptions {
   readonly wrapProjectionStore?: (
     store: ProjectionStore.ProjectionStoreV2Shape,
   ) => ProjectionStore.ProjectionStoreV2Shape;
+  /** Lets a test fail or hold effect outbox writes. */
+  readonly wrapEffectOutbox?: (
+    store: EffectOutbox.EffectOutboxV2Shape,
+  ) => EffectOutbox.EffectOutboxV2Shape;
+  /** Lets a test fail handoff preparation. */
+  readonly wrapContextHandoffService?: (
+    service: ContextHandoffService.ContextHandoffServiceV2Shape,
+  ) => ContextHandoffService.ContextHandoffServiceV2Shape;
 }
 
 export function layerWithRegistry<Error>(
@@ -323,7 +331,17 @@ export function layerWithRegistry<Error>(
       : { continueThreadsAfterServerUpdate: options.continueThreadsAfterServerUpdate }),
     ...options.settingsOverrides,
   }).pipe(Layer.orDie);
-  const layerEffectOutboxProvided = EffectOutbox.layer.pipe(Layer.provide(layerDatabase));
+  const wrapEffectOutbox = options.wrapEffectOutbox;
+  const layerEffectOutboxProvided = (
+    wrapEffectOutbox === undefined
+      ? EffectOutbox.layer
+      : Layer.effect(
+          EffectOutbox.EffectOutboxV2,
+          Effect.gen(function* () {
+            return wrapEffectOutbox(yield* EffectOutbox.EffectOutboxV2);
+          }),
+        ).pipe(Layer.provide(EffectOutbox.layer))
+  ).pipe(Layer.provide(layerDatabase));
   const wrapProjectionStore = options.wrapProjectionStore;
   const layerProjectionStore =
     wrapProjectionStore === undefined
@@ -378,9 +396,17 @@ export function layerWithRegistry<Error>(
   const layerCheckpointServiceProvided = CheckpointService.layer.pipe(
     Layer.provide(Layer.mergeAll(layerCheckpointStore, IdAllocator.layer)),
   );
-  const layerContextHandoffServiceProvided = ContextHandoffService.layer.pipe(
-    Layer.provide(IdAllocator.layer),
-  );
+  const wrapContextHandoffService = options.wrapContextHandoffService;
+  const layerContextHandoffServiceProvided = (
+    wrapContextHandoffService === undefined
+      ? ContextHandoffService.layer
+      : Layer.effect(
+          ContextHandoffService.ContextHandoffServiceV2,
+          Effect.gen(function* () {
+            return wrapContextHandoffService(yield* ContextHandoffService.ContextHandoffServiceV2);
+          }),
+        ).pipe(Layer.provide(ContextHandoffService.layer))
+  ).pipe(Layer.provide(IdAllocator.layer));
   const layerPersistence = Layer.mergeAll(
     layerStores,
     layerEventSinkProvided,

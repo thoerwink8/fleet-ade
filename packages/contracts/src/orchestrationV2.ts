@@ -275,6 +275,8 @@ export const OrchestrationV2ContextTransfer = Schema.Struct({
     "superseded",
   ]),
   resolution: Schema.NullOr(OrchestrationV2ContextTransferResolution),
+  /** When true, the first turn must use a portable summary and must not native-fork. */
+  requiresPortable: Schema.optional(Schema.Boolean),
   createdBy: OrchestrationV2Actor,
   error: Schema.NullOr(Schema.String),
   createdAt: Schema.DateTimeUtc,
@@ -603,6 +605,17 @@ export const OrchestrationV2AppThread = Schema.Struct({
    * cancel command's id. Cleared when the next rewind is requested.
    */
   rollbackCancelledRequestId: Schema.optional(Schema.NullOr(CommandId)),
+  /**
+   * Set when a bot left this thread for a fresh one. Absent on older threads.
+   * The thread stays readable and refuses new work; ordinary late messages follow the chain.
+   */
+  rotatedTo: Schema.optional(
+    Schema.Struct({
+      threadId: ThreadId,
+      botId: BotId,
+      rotatedAt: Schema.DateTimeUtc,
+    }),
+  ),
   deletedAt: Schema.NullOr(Schema.DateTimeUtc),
 });
 export type OrchestrationV2AppThread = typeof OrchestrationV2AppThread.Type;
@@ -2664,6 +2677,13 @@ export const OrchestrationV2AppThreadJson = OrchestrationV2AppThread.mapFields((
       })),
     ),
   ),
+  rotatedTo: Schema.optional(
+    Schema.Struct({
+      threadId: ThreadId,
+      botId: BotId,
+      rotatedAt: Schema.DateTimeUtcFromString,
+    }),
+  ),
   deletedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 }));
 export type OrchestrationV2AppThreadJson = typeof OrchestrationV2AppThreadJson.Type;
@@ -3484,6 +3504,18 @@ export const OrchestrationV2Command = Schema.Union([
     botId: BotId,
     threadId: ThreadId,
     targetThreadId: ThreadId,
+  }),
+  /**
+   * Moves a bot onto a new thread that continues via a portable summary.
+   * `threadId` is the bot's current thread. The old thread becomes permanently read-only.
+   */
+  Schema.Struct({
+    type: Schema.Literal("bot.rotate-session"),
+    commandId: CommandId,
+    botId: BotId,
+    threadId: ThreadId,
+    targetThreadId: ThreadId,
+    reason: Schema.Literals(["manual", "context_pressure", "compaction_exhausted", "history_size"]),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.tag.set"),

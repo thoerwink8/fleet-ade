@@ -128,6 +128,14 @@ describe("RPC authorization scopes", () => {
         threadId: "thread-1",
         targetThreadId: "thread-2",
       },
+      {
+        type: "bot.rotate-session",
+        commandId: "rotate-1",
+        botId: "bot-1",
+        threadId: "thread-1",
+        targetThreadId: "thread-2",
+        reason: "manual",
+      },
     ]) {
       expect(Exit.isSuccess(decode(command))).toBe(true);
       expect(clientRpcRequiredScopes(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, command)).toEqual(

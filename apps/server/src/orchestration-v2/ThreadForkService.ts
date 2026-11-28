@@ -62,6 +62,16 @@ export interface ThreadForkServiceV2Shape {
     readonly sideChat?: boolean;
     readonly createdBy: OrchestrationV2Actor;
     readonly creationSource: OrchestrationV2CreationSource;
+    /** Rotation sets this so the first turn cannot native-fork. */
+    readonly requiresPortable?: boolean;
+    /**
+     * Rotation of a runless thread carries its unconsumed fork forward: the new transfer names
+     * that transfer's original source, and the old one is superseded.
+     */
+    readonly transferSource?: {
+      readonly threadId: ThreadId;
+      readonly providerInstanceId: OrchestrationV2ContextTransfer["sourceProviderInstanceId"];
+    };
     readonly createdAt: DateTime.Utc;
   }) => Effect.Effect<ThreadForkPlanV2, ThreadForkPlanError>;
 }
@@ -100,7 +110,11 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
         });
       }
       // The remote parent delegated the source thread, not its forks.
-      const { delegatedFrom: _delegatedFrom, ...inherited } = input.sourceProjection.thread;
+      const {
+        delegatedFrom: _delegatedFrom,
+        rotatedTo: _rotatedTo,
+        ...inherited
+      } = input.sourceProjection.thread;
       const targetThread: OrchestrationV2AppThread = {
         ...inherited,
         // PR context follows the conversation; watching remains the source thread's responsibility.
@@ -146,12 +160,14 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
       const transfer: OrchestrationV2ContextTransfer = {
         id: input.transferId,
         type: "fork",
-        sourceThreadId: input.sourceProjection.thread.id,
+        sourceThreadId: input.transferSource?.threadId ?? input.sourceProjection.thread.id,
         targetThreadId: input.targetThreadId,
         sourcePoint: input.canonicalSourcePoint,
         basePoint: null,
         sourceProviderInstanceId:
-          sourceRun?.providerInstanceId ?? input.sourceProjection.thread.providerInstanceId,
+          input.transferSource !== undefined
+            ? input.transferSource.providerInstanceId
+            : (sourceRun?.providerInstanceId ?? input.sourceProjection.thread.providerInstanceId),
         // Only native forks retain this context; portable handoffs rebuild it.
         sourceTokenUsage:
           (sourceRun?.status === "completed" || sourceRun?.status === "waiting") &&
@@ -164,12 +180,14 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
         resolution: null,
         createdBy: input.createdBy,
         error:
+          input.transferSource !== undefined ||
           input.sourceProviderThread?.nativeThreadRef?.strength === "strong"
             ? null
             : "Source provider thread does not expose a strong native thread ref.",
         createdAt: input.createdAt,
         updatedAt: input.createdAt,
         consumedAt: null,
+        ...(input.requiresPortable === true ? { requiresPortable: true } : {}),
       };
       return { targetThread, transfer };
     }),
