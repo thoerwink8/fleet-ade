@@ -2,6 +2,7 @@
 import * as NodeSqlite from "node:sqlite";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
+import * as Logger from "effect/Logger";
 import { assert, expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -112,8 +113,14 @@ it.effect(
     ).pipe(Effect.provide(NodeServices.layer)),
 );
 
-it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任期按协调者 ID 字典序收敛", () =>
-  Effect.gen(function* () {
+it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任期按协调者 ID 字典序收敛", () => {
+  const warnings: Array<{ readonly message: string; readonly annotations: unknown }> = [];
+  const captureWarnings = Logger.make<unknown, void>(({ logLevel, message }) => {
+    if (logLevel !== "Warn") return;
+    const parts = message as ReadonlyArray<unknown>;
+    warnings.push({ message: String(parts[0]), annotations: parts[1] });
+  });
+  return Effect.gen(function* () {
     const terms = yield* CoordinatorTerm.CoordinatorTerm;
     const sql = yield* SqlClient.SqlClient;
     expect(yield* terms.read(FLEET)).toEqual({ term: 0, coordinatorId: null });
@@ -163,8 +170,42 @@ it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任
     expect(yield* sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual([
       { term: 0, coordinator_id: "coord-z" },
     ]);
-  }).pipe(Effect.provide(memoryLayer)),
-);
+
+    expect(warnings).toEqual([
+      {
+        message: "coordinator term contended at equal term",
+        annotations: {
+          storedCoordinatorId: "coord-a",
+          observedCoordinatorId: "coord-0",
+          term: 3,
+          outcome: "stale",
+        },
+      },
+      {
+        message: "coordinator term contended at equal term",
+        annotations: {
+          storedCoordinatorId: "coord-a",
+          observedCoordinatorId: "coord-c",
+          term: 3,
+          outcome: "current",
+        },
+      },
+      {
+        message: "coordinator term contended at equal term",
+        annotations: {
+          storedCoordinatorId: "coord-c",
+          observedCoordinatorId: "coord-b",
+          term: 3,
+          outcome: "stale",
+        },
+      },
+    ]);
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(memoryLayer, Logger.layer([captureWarnings], { mergeWithExisting: false })),
+    ),
+  );
+});
 
 it.effect("关掉数据库再用同一文件重开，read 仍是最大任期和对应协调者", () =>
   Effect.scoped(

@@ -61,27 +61,9 @@ const make = Effect.gen(function* () {
         message: `Coordinator ${input.coordinatorId} is neither this environment nor a linked one.`,
       });
     }
-    const before = yield* terms
-      .read(CoordinatorTerm.FLEET_TERM_KEY)
-      .pipe(Effect.mapError(storageError));
     const observed = yield* terms
       .observe(CoordinatorTerm.FLEET_TERM_KEY, input.term, input.coordinatorId)
       .pipe(Effect.mapError(storageError));
-    // Equal terms with different coordinators mean two machines both took over; the
-    // lexicographic order only converges them, so every overwrite and refusal is worth a look.
-    if (
-      before.term === input.term &&
-      before.term > 0 &&
-      before.coordinatorId !== input.coordinatorId
-    ) {
-      yield* Effect.logWarning("coordinator term exchanged at equal term", {
-        storedCoordinatorId: before.coordinatorId,
-        observedCoordinatorId: input.coordinatorId,
-        term: input.term,
-        callerEnvironmentId: caller.environmentId,
-        outcome: observed._tag,
-      });
-    }
     return {
       term: observed.term,
       // Rows only ever hold environment ids this machine or a linked one wrote.
