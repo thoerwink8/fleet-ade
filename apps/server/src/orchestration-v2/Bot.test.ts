@@ -23,19 +23,23 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
+import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
-import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as EffectWorker from "./EffectWorker.ts";
+import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
+import * as ProviderRuntimeRecoveryService from "./ProviderRuntimeRecoveryService.ts";
+import { queuedRunsInDeliveryOrder } from "./QueuedRunOrder.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 
 const instanceId = ProviderInstanceId.make("codex");
 const modelSelection = { instanceId, model: "gpt-5.1-codex" };
@@ -544,6 +548,8 @@ const applyRun = (
       | "rolled_back";
     readonly providerThreadId?: ProviderThreadId | null;
     readonly userMessageId?: MessageId;
+    readonly queuePosition?: number;
+    readonly queueHeld?: boolean;
   },
 ) =>
   Effect.gen(function* () {
@@ -573,6 +579,8 @@ const applyRun = (
         completedAt: completed ? now : null,
         checkpointId: null,
         contextHandoffId: null,
+        ...(input.queuePosition === undefined ? {} : { queuePosition: input.queuePosition }),
+        ...(input.queueHeld === true ? { queueHeld: true } : {}),
       },
     });
   });
@@ -665,6 +673,54 @@ const sendText = (
     creationSource: "web",
   });
 
+const queueText = (
+  orchestrator: Orchestrator.OrchestratorV2["Service"],
+  threadId: ThreadId,
+  commandId: string,
+  text: string,
+) =>
+  orchestrator.dispatch({
+    type: "message.dispatch",
+    commandId: CommandId.make(commandId),
+    threadId,
+    messageId: MessageId.make(`message:${commandId}`),
+    text,
+    attachments: [],
+    dispatchMode: { type: "queue_after_active" },
+    createdBy: "user",
+    creationSource: "web",
+  });
+
+/** Settles the fixture-started turn effect and ends active runs the way finished provider turns do. */
+const finishRunsInFixture = (
+  projections: ProjectionStore.ProjectionStoreV2Shape,
+  outbox: EffectOutbox.EffectOutboxV2Shape,
+  threadId: ThreadId,
+) =>
+  Effect.gen(function* () {
+    yield* outbox
+      .cancelUnsettled({
+        threadId,
+        effectTypes: ["provider-turn.start"],
+        reason: "turn finished in fixture",
+      })
+      .pipe(Effect.asVoid);
+    const runs = (yield* projections.getThreadRecords(threadId, ["runs"])).runs;
+    const now = yield* DateTime.now;
+    for (const run of runs) {
+      if (run.status !== "preparing" && run.status !== "starting" && run.status !== "running")
+        continue;
+      yield* projections.apply({
+        id: EventId.make(`event:${run.id}:finished`),
+        type: "run.updated",
+        threadId,
+        runId: run.id,
+        occurredAt: now,
+        payload: { ...run, status: "completed", completedAt: now },
+      });
+    }
+  });
+
 it.effect(
   "rotate-session seals the old thread, moves the bot, and forces a portable first turn",
   () =>
@@ -747,7 +803,10 @@ it.effect(
       const homeProjection = yield* projections.getThreadProjection(home);
       assert.equal(homeProjection.bot?.currentThreadId, home);
       assert.equal(homeProjection.contextTransfers[0]?.requiresPortable, true);
-      assert.equal(homeProjection.contextTransfers[0]?.status, "pending");
+      // The rotation's opening turn consumes the handoff as it is dispatched; nothing waits
+      // for a user message anymore.
+      assert.equal(homeProjection.contextTransfers[0]?.status, "consumed");
+      assert.equal(homeProjection.contextTransfers[0]?.resolution?.strategy, "portable_context");
 
       const replayed = yield* rotateSession(orchestrator, {
         commandId: "rotate-source",
@@ -769,14 +828,499 @@ it.effect(
       }
 
       yield* sendText(orchestrator, home, "rotate-home-turn", "continue");
-      assert.equal(
-        (yield* projections.getThreadProjection(home)).contextTransfers[0]?.resolution?.strategy,
-        "portable_context",
-      );
       assert.isNull(
         (yield* projections.getThreadProjection(home)).providerThreads[0]?.forkedFrom ?? null,
       );
     }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("rotate-session moves watches and pinning to the new thread and strips them here", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const alpha = ThreadId.make("thread:watch-a");
+    const bravo = ThreadId.make("thread:watch-b");
+    yield* createThread(orchestrator, alpha, "Watch A");
+    yield* markCommander(orchestrator, alpha, "mark-watch-a");
+    const thread = yield* projections.getThread(alpha);
+    const now = yield* DateTime.now;
+    const nowIso = DateTime.formatIso(now);
+    yield* projections.apply({
+      id: EventId.make("event:watch-a-metadata"),
+      type: "thread.metadata-updated",
+      threadId: alpha,
+      occurredAt: now,
+      payload: {
+        ...thread,
+        pinnedAt: now,
+        pinOrderKey: "a0",
+        pullRequests: [
+          {
+            host: "github.com",
+            repository: "example/repo",
+            number: 7,
+            url: "https://github.com/example/repo/pull/7",
+            source: "agent" as const,
+            linkedAt: nowIso,
+            snapshot: null,
+            stack: null,
+            watch: {
+              startedAt: nowIso,
+              headSha: "watch-head",
+              failedChecks: [] as Array<string>,
+              passed: false,
+              passedChecks: [] as Array<string>,
+              remarksThrough: nowIso,
+              remarkIds: [] as Array<string>,
+              conflicting: false,
+              wakes: 0,
+            },
+          },
+        ],
+      },
+    });
+    yield* rotateSession(orchestrator, {
+      commandId: "rotate-watch",
+      markCommandId: "mark-watch-a",
+      threadId: alpha,
+      targetThreadId: bravo,
+    });
+    const bravoThread = (yield* projections.getThreadProjection(bravo)).thread;
+    assert.equal(bravoThread.pullRequests?.length, 1);
+    assert.equal(bravoThread.pullRequests?.[0]?.watch?.headSha, "watch-head");
+    assert.deepEqual(bravoThread.pinnedAt, now);
+    assert.equal(bravoThread.pinOrderKey, "a0");
+    const alphaThread = (yield* projections.getThreadProjection(alpha)).thread;
+    assert.equal(alphaThread.pullRequests?.length, 1);
+    assert.isUndefined(alphaThread.pullRequests?.[0]?.watch);
+    assert.isNull(alphaThread.pinnedAt);
+    assert.isNull(alphaThread.pinOrderKey);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect(
+  "a crash after rotation re-queues the carried messages held and queue.resume drains them",
+  () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const recovery = yield* ProviderRuntimeRecoveryService.ProviderRuntimeRecoveryService;
+      const alpha = ThreadId.make("thread:crash-a");
+      const bravo = ThreadId.make("thread:crash-b");
+      yield* createThread(orchestrator, alpha, "Crash A");
+      yield* markCommander(orchestrator, alpha, "mark-crash-a");
+      yield* sendText(orchestrator, alpha, "crash-first", "first turn");
+      yield* queueText(orchestrator, alpha, "crash-q1", "queued 1");
+      yield* queueText(orchestrator, alpha, "crash-q2", "queued 2");
+      yield* finishRunsInFixture(projections, outbox, alpha);
+      yield* rotateSession(orchestrator, {
+        commandId: "rotate-crash",
+        markCommandId: "mark-crash-a",
+        threadId: alpha,
+        targetThreadId: bravo,
+      });
+      // The worker claims the opening turn start and the process dies before settling it.
+      const claimed = yield* outbox.claimNext({ workerId: "worker-dead" });
+      assert.isTrue(Option.isSome(claimed));
+      if (Option.isSome(claimed)) {
+        assert.equal(
+          claimed.value.id,
+          `effect:rotate-crash:opening:provider-turn.start:${`run:thread:${encodeURIComponent(bravo)}:ordinal:1`}`,
+        );
+      }
+      yield* outbox.reconcileAfterProcessLoss;
+      yield* recovery.reconcile("startup");
+      const bravoAfter = yield* projections.getThreadProjection(bravo);
+      const opening = bravoAfter.runs.find((run) => run.userMessageId.startsWith("bot-rotation:"));
+      assert.equal(opening?.status, "cancelled");
+      const held = queuedRunsInDeliveryOrder(bravoAfter);
+      assert.lengthOf(held, 2);
+      assert.deepEqual(
+        held.map((run) => run.userMessageId),
+        ["crash-q1", "crash-q2"].map((key) => MessageId.make(`message:${key}~${bravo}`)),
+      );
+      assert.deepEqual(
+        held.map((run) => run.queueHeld === true),
+        [true, true],
+      );
+      // The migration is exactly-once: the old thread's copies stay cancelled, no duplicates.
+      const alphaAfter = yield* projections.getThreadProjection(alpha);
+      assert.lengthOf(queuedRunsInDeliveryOrder(alphaAfter), 0);
+      assert.lengthOf(
+        bravoAfter.messages.filter((message) => message.text === "queued 1"),
+        1,
+      );
+      // A held queue waits for the user; resuming starts the first carried message.
+      yield* orchestrator.dispatch({
+        type: "queue.resume",
+        commandId: CommandId.make("crash-resume"),
+        threadId: bravo,
+      });
+      const bravoResumed = yield* projections.getThreadProjection(bravo);
+      assert.deepEqual(
+        queuedRunsInDeliveryOrder(bravoResumed).map((run) => run.userMessageId),
+        [MessageId.make(`message:crash-q2~${bravo}`)],
+      );
+      assert.notEqual(
+        bravoResumed.runs.find((run) => run.userMessageId === `message:crash-q1~${bravo}`)?.status,
+        "queued",
+      );
+    }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect(
+  "when the opening turn fails to start, the carried queue still starts instead of stranding",
+  () => {
+    const failingAdapter = {
+      instanceId,
+      driver,
+      getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
+      planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" as const }),
+      openSession: (input: { readonly providerSessionId: ProviderSessionId }) =>
+        Effect.fail(
+          new ProviderAdapter.ProviderAdapterOpenSessionError({
+            driver,
+            providerSessionId: input.providerSessionId,
+            notInstalled: true,
+          }),
+        ),
+    } as unknown as ProviderAdapter.ProviderAdapterV2["Service"];
+    const layerFailingOpen = Layer.mergeAll(
+      layerDatabase,
+      ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+      ProviderReplayHarness.layerWithRegistry(
+        { name: "bot-rotate-failing-open" },
+        ProviderAdapterRegistry.layerFromAdapters([failingAdapter]),
+        { databaseLayer: layerDatabase, runEffectWorker: false },
+      ),
+    );
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const alpha = ThreadId.make("thread:failopen-a");
+      const bravo = ThreadId.make("thread:failopen-b");
+      yield* createThread(orchestrator, alpha, "Fail open A");
+      yield* markCommander(orchestrator, alpha, "mark-failopen-a");
+      yield* sendText(orchestrator, alpha, "failopen-first", "first turn");
+      yield* queueText(orchestrator, alpha, "failopen-q1", "queued 1");
+      yield* queueText(orchestrator, alpha, "failopen-q2", "queued 2");
+      yield* finishRunsInFixture(projections, outbox, alpha);
+      yield* rotateSession(orchestrator, {
+        commandId: "rotate-failopen",
+        markCommandId: "mark-failopen-a",
+        threadId: alpha,
+        targetThreadId: bravo,
+      });
+      // The opening turn start fails fast with a provider failure, the way a broken provider
+      // install does; the queue must move on to the first carried message on its own.
+      const sink = yield* EventSink.EventSinkV2;
+      const afterSequence = yield* sink.latestSequence().pipe(Effect.orDie);
+      yield* worker.drain();
+      // Queue promotion is an asynchronous reaction to the opening's terminal events; the first
+      // carried run starting is the milestone it finished. Its own start then fails in the drain.
+      yield* sink.stream({ afterSequence, eventType: "run.updated" }).pipe(
+        Stream.filter(
+          (stored) =>
+            stored.event.type === "run.updated" &&
+            stored.event.threadId === bravo &&
+            stored.event.payload.status === "starting" &&
+            stored.event.payload.userMessageId === `message:failopen-q1~${bravo}`,
+        ),
+        Stream.take(1),
+        Stream.runDrain,
+      );
+      yield* worker.drain();
+      const bravoAfter = yield* projections.getThreadProjection(bravo);
+      const opening = bravoAfter.runs.find((run) => run.userMessageId.startsWith("bot-rotation:"));
+      assert.equal(opening?.status, "failed");
+      // The housekeeping failure does not freeze user work: the first carried run left the
+      // queue without being held. It fails for the same broken provider here, and that real
+      // failure does hold the rest.
+      const first = bravoAfter.runs.find(
+        (run) => run.userMessageId === `message:failopen-q1~${bravo}`,
+      );
+      assert.notEqual(first?.status, "queued");
+      const second = bravoAfter.runs.find(
+        (run) => run.userMessageId === `message:failopen-q2~${bravo}`,
+      );
+      assert.equal(second?.status, "queued");
+      assert.equal(second?.queueHeld, true);
+    }).pipe(Effect.provide(layerFailingOpen));
+  },
+);
+
+it.effect(
+  "a projection failure mid-migration rolls the whole rotation back and the same command retries",
+  () => {
+    // The first store read of the new thread is the opening turn's projection read; the second
+    // is the first carried message's. Failing exactly that read lands inside the migration,
+    // after the opening was already decided.
+    let bravoReads = 0;
+    let armed = true;
+    const layerMidFault = Layer.mergeAll(
+      layerDatabase,
+      ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+      ProviderReplayHarness.layerWithRegistry(
+        { name: "bot-rotate-mid-fault" },
+        ProviderAdapterRegistry.layerFromAdapters([adapter]),
+        {
+          databaseLayer: layerDatabase,
+          runEffectWorker: false,
+          wrapProjectionStore: (store) => ({
+            ...store,
+            getThreadRecords: (threadId, fields, filter) => {
+              if (
+                threadId === ThreadId.make("thread:midfault-b") &&
+                (fields as ReadonlyArray<string>).includes("runs")
+              ) {
+                bravoReads += 1;
+                if (armed && bravoReads === 2) {
+                  armed = false;
+                  return Effect.die("injected mid-migration projection failure") as never;
+                }
+              }
+              return store.getThreadRecords(threadId, fields, filter);
+            },
+          }),
+        },
+      ),
+    );
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const alpha = ThreadId.make("thread:midfault-a");
+      const bravo = ThreadId.make("thread:midfault-b");
+      yield* createThread(orchestrator, alpha, "Mid fault A");
+      yield* markCommander(orchestrator, alpha, "mark-midfault-a");
+      yield* sendText(orchestrator, alpha, "midfault-first", "first turn");
+      yield* queueText(orchestrator, alpha, "midfault-q1", "queued 1");
+      yield* finishRunsInFixture(projections, outbox, alpha);
+      const failed = yield* rotateSession(orchestrator, {
+        commandId: "rotate-midfault",
+        markCommandId: "mark-midfault-a",
+        threadId: alpha,
+        targetThreadId: bravo,
+      }).pipe(Effect.exit);
+      // A projection read defect dies the command before any commit, so the failure is
+      // untyped here; what matters is that nothing below it committed.
+      assert.isTrue(Exit.isFailure(failed));
+      // Nothing committed: no new thread, the bot still owns the old one, and the queued copy
+      // there is untouched, so the same command id can be retried without a replay shortcut.
+      assert.isNull(yield* projections.getThreadShell(bravo));
+      assert.equal(
+        (yield* projections.getBot(BotId.make("bot:mark-midfault-a")))?.currentThreadId,
+        alpha,
+      );
+      assert.lengthOf(
+        (yield* projections.getThreadProjection(alpha)).runs.filter(
+          (run) => run.status === "queued",
+        ),
+        1,
+      );
+      yield* noReceipt("rotate-midfault");
+      const accepted = yield* rotateSession(orchestrator, {
+        commandId: "rotate-midfault",
+        markCommandId: "mark-midfault-a",
+        threadId: alpha,
+        targetThreadId: bravo,
+      });
+      assert.isUndefined(accepted.replayed);
+      const bravoAfter = yield* projections.getThreadProjection(bravo);
+      assert.lengthOf(queuedRunsInDeliveryOrder(bravoAfter), 1);
+    }).pipe(Effect.provide(layerMidFault));
+  },
+);
+
+it.effect(
+  "queue progression and rotation are serialized: neither order delivers a queued message twice",
+  () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      // Both sides decide under the same per-thread lock, so the only interleavings are the two
+      // orderings below: whichever command decides first wins cleanly, and the loser sees the
+      // result instead of acting on stale queue state.
+      const alpha = ThreadId.make("thread:order-a");
+      const bravo = ThreadId.make("thread:order-b");
+      yield* createThread(orchestrator, alpha, "Order A");
+      yield* markCommander(orchestrator, alpha, "mark-order-a");
+      yield* sendText(orchestrator, alpha, "order-first", "first turn");
+      yield* queueText(orchestrator, alpha, "order-q1", "queued 1");
+      yield* finishRunsInFixture(projections, outbox, alpha);
+      const queuedRunId = (yield* projections.getThreadProjection(alpha)).runs.find(
+        (run) => run.status === "queued",
+      )!.id;
+
+      // Rotation first: the late start command is refused by the rotated read-only guard, and
+      // the only copy of the message is the carried one.
+      yield* rotateSession(orchestrator, {
+        commandId: "rotate-order",
+        markCommandId: "mark-order-a",
+        threadId: alpha,
+        targetThreadId: bravo,
+      });
+      const lateStart = yield* orchestrator
+        .dispatch({
+          type: "queued-run.start",
+          commandId: CommandId.make("order-start-late"),
+          threadId: alpha,
+          runId: queuedRunId,
+        })
+        .pipe(Effect.flip);
+      assert.include(lateStart.cause, "queued");
+      const bravoAfter = yield* projections.getThreadProjection(bravo);
+      assert.lengthOf(queuedRunsInDeliveryOrder(bravoAfter), 1);
+      assert.lengthOf(
+        bravoAfter.messages.filter((message) => message.text === "queued 1"),
+        1,
+      );
+
+      // Delivery first: the run it started keeps the thread busy, so rotation refuses and
+      // migrates nothing.
+      const gamma = ThreadId.make("thread:order-c");
+      const delta = ThreadId.make("thread:order-d");
+      yield* createThread(orchestrator, gamma, "Order C");
+      yield* markCommander(orchestrator, gamma, "mark-order-c");
+      yield* sendText(orchestrator, gamma, "order2-first", "first turn");
+      yield* queueText(orchestrator, gamma, "order2-q1", "queued 1");
+      yield* finishRunsInFixture(projections, outbox, gamma);
+      const gammaQueuedRunId = (yield* projections.getThreadProjection(gamma)).runs.find(
+        (run) => run.status === "queued",
+      )!.id;
+      yield* orchestrator.dispatch({
+        type: "queued-run.start",
+        commandId: CommandId.make("order2-start"),
+        threadId: gamma,
+        runId: gammaQueuedRunId,
+      });
+      const refused = yield* rotateSession(orchestrator, {
+        commandId: "rotate-order2",
+        markCommandId: "mark-order-c",
+        threadId: gamma,
+        targetThreadId: delta,
+      }).pipe(Effect.flip);
+      assert.equal(refused._tag, "OrchestratorDispatchError");
+      assert.isNull(yield* projections.getThreadShell(delta));
+      const gammaAfter = yield* projections.getThreadProjection(gamma);
+      assert.lengthOf(
+        gammaAfter.messages.filter((message) => message.text === "queued 1"),
+        1,
+      );
+      assert.lengthOf(
+        gammaAfter.runs.filter((run) => run.userMessageId === MessageId.make("message:order2-q1")),
+        1,
+      );
+    }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("rotate-session carries queued messages in delivery order behind the opening turn", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const alpha = ThreadId.make("thread:migrate-a");
+    const bravo = ThreadId.make("thread:migrate-b");
+    yield* createThread(orchestrator, alpha, "Migrate A");
+    yield* markCommander(orchestrator, alpha, "mark-migrate-a");
+    yield* sendText(orchestrator, alpha, "migrate-first", "first turn");
+    for (const [index, key] of ["mig-q1", "mig-q2", "mig-q3"].entries()) {
+      yield* TestClock.adjust("1 second");
+      yield* queueText(orchestrator, alpha, key, `queued ${index + 1}`);
+    }
+    const before = yield* projections.getThreadProjection(alpha);
+    assert.lengthOf(
+      before.runs.filter((run) => run.status === "queued"),
+      3,
+    );
+    yield* finishRunsInFixture(projections, outbox, alpha);
+    yield* rotateSession(orchestrator, {
+      commandId: "rotate-migrate",
+      markCommandId: "mark-migrate-a",
+      threadId: alpha,
+      targetThreadId: bravo,
+    });
+
+    // The three queued copies are cancelled on the sealed thread and deliver nothing there.
+    const alphaAfter = yield* projections.getThreadProjection(alpha);
+    for (const key of ["mig-q1", "mig-q2", "mig-q3"]) {
+      const tombstone = alphaAfter.runs.find(
+        (run) => run.userMessageId === MessageId.make(`message:${key}`),
+      );
+      assert.equal(tombstone?.status, "cancelled");
+      assert.isNull(tombstone?.queuePosition ?? null);
+    }
+    assert.lengthOf(queuedRunsInDeliveryOrder(alphaAfter), 0);
+
+    const bravoAfter = yield* projections.getThreadProjection(bravo);
+    const opening = bravoAfter.runs.find((run) => run.userMessageId.startsWith("bot-rotation:"));
+    assert.equal(opening?.status, "starting");
+    const carried = queuedRunsInDeliveryOrder(bravoAfter);
+    assert.lengthOf(carried, 3);
+    assert.deepEqual(
+      carried.map((run) => run.userMessageId),
+      ["mig-q1", "mig-q2", "mig-q3"].map((key) => MessageId.make(`message:${key}~${bravo}`)),
+    );
+    assert.deepEqual(
+      carried.map((run) => run.queuePosition),
+      [1, 2, 3],
+    );
+    assert.deepEqual(
+      carried.map(
+        (run) => bravoAfter.messages.find((message) => message.id === run.userMessageId)?.text,
+      ),
+      ["queued 1", "queued 2", "queued 3"],
+    );
+    // Nothing stays queued on the old thread and nothing is duplicated.
+    assert.lengthOf(
+      bravoAfter.runs.filter((run) => !run.userMessageId.startsWith("bot-rotation:")),
+      3,
+    );
+
+    // The opening finishes first; only then does the queue start in the same order.
+    yield* finishRunsInFixture(projections, outbox, bravo);
+    const startQueued = (runId: RunId, commandId: string) =>
+      orchestrator.dispatch({
+        type: "queued-run.start",
+        commandId: CommandId.make(commandId),
+        threadId: bravo,
+        runId,
+      });
+    yield* startQueued(carried[0]!.id, "migrate-start-1");
+    const afterFirst = yield* projections.getThreadProjection(bravo);
+    assert.notEqual(afterFirst.runs.find((run) => run.id === carried[0]!.id)?.status, "queued");
+    assert.deepEqual(
+      queuedRunsInDeliveryOrder(afterFirst).map((run) => run.id),
+      [carried[1]!.id, carried[2]!.id],
+    );
+    yield* finishRunsInFixture(projections, outbox, bravo);
+    yield* startQueued(carried[1]!.id, "migrate-start-2");
+    const afterSecond = yield* projections.getThreadProjection(bravo);
+    assert.deepEqual(
+      queuedRunsInDeliveryOrder(afterSecond).map((run) => run.id),
+      [carried[2]!.id],
+    );
+
+    // Replaying the rotation command replays the receipt instead of migrating twice.
+    const replayed = yield* rotateSession(orchestrator, {
+      commandId: "rotate-migrate",
+      markCommandId: "mark-migrate-a",
+      threadId: alpha,
+      targetThreadId: bravo,
+    });
+    assert.equal(replayed.replayed, true);
+    const bravoFinal = yield* projections.getThreadProjection(bravo);
+    assert.lengthOf(
+      bravoFinal.messages.filter((message) => message.id.startsWith("message:mig-q1~")),
+      1,
+    );
+  }).pipe(Effect.provide(layerTest)),
 );
 
 const noReceipt = (commandId: string) =>
@@ -813,9 +1357,17 @@ it.effect("late messages follow rotatedTo and a second copy is not written", () 
     });
     yield* sendText(orchestrator, origin, "follow-message", "hello");
     yield* sendText(orchestrator, origin, "follow-message", "hello");
-    assert.lengthOf((yield* projections.getThreadProjection(later)).runs, 1);
+    // Each rotation writes one opening run on the new thread, so the forwarded message shares
+    // the final thread with exactly one of them and the hop thread keeps its cancelled opening.
+    const laterRuns = (yield* projections.getThreadProjection(later)).runs;
+    const laterUserRuns = laterRuns.filter((run) => !run.userMessageId.startsWith("bot-rotation:"));
+    assert.lengthOf(laterUserRuns, 1);
+    assert.lengthOf(laterRuns, 2);
     assert.lengthOf((yield* projections.getThreadProjection(origin)).runs, 0);
-    assert.lengthOf((yield* projections.getThreadProjection(home)).runs, 0);
+    const homeRuns = (yield* projections.getThreadProjection(home)).runs;
+    assert.lengthOf(homeRuns, 1);
+    assert.equal(homeRuns[0]?.status, "cancelled");
+    assert.equal(homeRuns[0]?.userMessageId, MessageId.make(`bot-rotation:${home}`));
 
     const bound = yield* orchestrator
       .dispatch({
@@ -835,7 +1387,12 @@ it.effect("late messages follow rotatedTo and a second copy is not written", () 
       assert.equal(bound.successorThreadId, home);
     }
     yield* noReceipt("follow-steer");
-    assert.lengthOf((yield* projections.getThreadProjection(later)).runs, 1);
+    assert.lengthOf(
+      (yield* projections.getThreadProjection(later)).runs.filter(
+        (run) => !run.userMessageId.startsWith("bot-rotation:"),
+      ),
+      1,
+    );
   }).pipe(Effect.provide(layerTest)),
 );
 
@@ -858,7 +1415,13 @@ it.effect("rotation forwarding stops after eight hops and rejects a cycle", () =
       current = next;
     }
     yield* sendText(orchestrator, origin, "hop-message", "arrived");
-    assert.lengthOf((yield* projections.getThreadProjection(current)).runs, 1);
+    const hopRuns = (yield* projections.getThreadProjection(current)).runs;
+    assert.lengthOf(
+      hopRuns.filter((run) => !run.userMessageId.startsWith("bot-rotation:")),
+      1,
+    );
+    // The opening turn itself also lives there; only one copy of the user message does.
+    assert.lengthOf(hopRuns, 2);
 
     const farOrigin = ThreadId.make("thread:far-0");
     yield* createThread(orchestrator, farOrigin, "Far origin");
@@ -879,7 +1442,12 @@ it.effect("rotation forwarding stops after eight hops and rejects a cycle", () =
     );
     assert.equal(tooFar._tag, "OrchestratorThreadRotatedError");
     yield* noReceipt("hop-message-too-far");
-    assert.lengthOf((yield* projections.getThreadProjection(farCurrent)).runs, 0);
+    assert.lengthOf(
+      (yield* projections.getThreadProjection(farCurrent)).runs.filter(
+        (run) => !run.userMessageId.startsWith("bot-rotation:"),
+      ),
+      0,
+    );
 
     const left = ThreadId.make("thread:cycle-left");
     const right = ThreadId.make("thread:cycle-right");
@@ -1032,13 +1600,15 @@ const patchThread = (
 const quietCases = [
   quietCase(
     "queued",
-    "has queued messages",
+    "has queued messages it cannot carry",
     (ctx) =>
       applyRun(ctx.projections, {
         threadId: ctx.threadId,
         runId: RunId.make(`run:${ctx.key}`),
         ordinal: 1,
         status: "queued",
+        queuePosition: 1,
+        queueHeld: true,
       }),
     (ctx) =>
       applyRun(ctx.projections, {
@@ -1509,24 +2079,21 @@ it.effect(
         threadId: alpha,
         targetThreadId: bravo,
       });
-      // The transfer A could never consume now names Z as its source and is superseded;
-      // B carries that same source instead of the runless A.
+      // A's opening never reached a provider, so the rotation onto B supersedes the transfer it
+      // had consumed and B carries that same source forward instead of the runless A. B's own
+      // opening consumes the fresh copy at dispatch, so nothing stays pending for a user message.
       const alphaTransfers = (yield* projections.getThreadProjection(alpha)).contextTransfers;
       assert.lengthOf(alphaTransfers, 1);
       assert.equal(alphaTransfers[0]?.status, "superseded");
       const bravoTransfers = (yield* projections.getThreadProjection(bravo)).contextTransfers;
       assert.lengthOf(bravoTransfers, 1);
       const transfer = bravoTransfers[0]!;
-      assert.equal(transfer.status, "pending");
+      assert.equal(transfer.status, "consumed");
+      assert.equal(transfer.resolution?.strategy, "portable_context");
       assert.equal(transfer.requiresPortable, true);
       assert.equal(transfer.sourceThreadId, zulu);
       assert.equal(transfer.sourcePoint.runId, RunId.make("run:inherit-z"));
       assert.equal(transfer.sourceProviderInstanceId, instanceId);
-
-      yield* sendText(orchestrator, bravo, "inherit-message", "continue");
-      const consumed = (yield* projections.getThreadProjection(bravo)).contextTransfers[0];
-      assert.equal(consumed?.status, "consumed");
-      assert.equal(consumed?.resolution?.strategy, "portable_context");
     }).pipe(Effect.provide(layerTest)),
 );
 
@@ -1568,7 +2135,13 @@ it.effect("a message accepted before rotation replays in place instead of forwar
     });
     const replayed = yield* sendText(orchestrator, alpha, "replay-message", "hello");
     assert.equal(replayed.replayed, true);
-    assert.lengthOf((yield* projections.getThreadProjection(bravo)).runs, 0);
+    // Bravo holds only its opening run: the replayed receipt keeps the message on alpha and
+    // writes no copy.
+    const bravoRuns = (yield* projections.getThreadProjection(bravo)).runs;
+    assert.lengthOf(
+      bravoRuns.filter((run) => !run.userMessageId.startsWith("bot-rotation:")),
+      0,
+    );
     assert.lengthOf((yield* projections.getThreadProjection(alpha)).runs, 1);
   }).pipe(Effect.provide(layerTest)),
 );
@@ -1769,7 +2342,12 @@ it.effect("metadata updates never strip a rotated thread's successor", () =>
     );
     assert.equal(marked._tag, "OrchestratorThreadRotatedError");
     yield* sendText(orchestrator, alpha, "persist-message", "late");
-    assert.lengthOf((yield* projections.getThreadProjection(bravo)).runs, 1);
+    assert.lengthOf(
+      (yield* projections.getThreadProjection(bravo)).runs.filter(
+        (run) => !run.userMessageId.startsWith("bot-rotation:"),
+      ),
+      1,
+    );
     assert.lengthOf((yield* projections.getThreadProjection(alpha)).runs, 0);
   }).pipe(Effect.provide(layerTest)),
 );
@@ -1834,8 +2412,15 @@ it.effect("a rotate that lands while a forwarded message waits is followed once"
     });
     yield* Deferred.succeed(walkReadRelease, undefined);
     yield* Fiber.join(message);
-    assert.lengthOf((yield* projections.getThreadProjection(newer)).runs, 1);
-    assert.lengthOf((yield* projections.getThreadProjection(home)).runs, 0);
+    const newerRuns = (yield* projections.getThreadProjection(newer)).runs;
+    assert.lengthOf(
+      newerRuns.filter((run) => !run.userMessageId.startsWith("bot-rotation:")),
+      1,
+    );
+    // The forwarded message shares the final thread with its opening; the hop thread keeps
+    // only its cancelled opening.
+    assert.lengthOf(newerRuns, 2);
+    assert.lengthOf((yield* projections.getThreadProjection(home)).runs, 1);
     assert.lengthOf((yield* projections.getThreadProjection(origin)).runs, 0);
   }).pipe(Effect.provide(layerGated));
 });
@@ -1930,13 +2515,18 @@ it.effect("rotation detach effects have stable ids and stay idempotent after pro
       targetThreadId: targetId,
     });
     const effectId = `effect:rotate-detach:provider-session.detach:${sessionId}`;
+    // The rotation also enqueues the opening turn's start; what matters here is that the
+    // detach row exists under exactly this stable id.
+    assert.isTrue(Option.isSome(yield* outbox.get(effectId)));
     // A worker that claimed the effect and died before settling it leaves the lease;
     // recovery requeues the same row instead of enqueueing a copy.
-    const workerA = yield* outbox.claimNext({ workerId: "worker-a" });
-    assert.isTrue(Option.isSome(workerA));
-    if (Option.isSome(workerA)) {
-      assert.equal(workerA.value.id, effectId);
+    let detachClaimed = false;
+    for (let claim = 0; claim < 4 && !detachClaimed; claim++) {
+      const workerA = yield* outbox.claimNext({ workerId: "worker-a" });
+      if (!Option.isSome(workerA)) break;
+      detachClaimed = workerA.value.id === effectId;
     }
+    assert.isTrue(detachClaimed);
     const reconciled = yield* outbox.reconcileAfterProcessLoss;
     assert.isAtLeast(reconciled.requeued, 1);
     const settled = yield* worker.drain();
@@ -1959,64 +2549,76 @@ it.effect("rotation detach effects have stable ids and stay idempotent after pro
   }).pipe(Effect.provide(layerTest)),
 );
 
-it.effect("a failed handoff prepare commits nothing and the first message retries", () => {
-  const failPrepares = { count: 1 };
-  const layerFailingPrepare = Layer.mergeAll(
-    layerDatabase,
-    ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
-    EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
-    ProviderReplayHarness.layerWithRegistry(
-      { name: "bot-rotate-prepare-fault" },
-      ProviderAdapterRegistry.layerFromAdapters([adapter]),
-      {
-        databaseLayer: layerDatabase,
-        runEffectWorker: false,
-        wrapContextHandoffService: (service) => ({
-          ...service,
-          prepareProviderHandoff: (input) => {
-            if (failPrepares.count <= 0) return service.prepareProviderHandoff(input);
-            failPrepares.count -= 1;
-            return Effect.fail(
-              new ContextHandoffService.ContextHandoffPrepareError({
-                threadId: input.threadId,
-                targetRunId: input.targetRunId,
-                fromProviderThreadIds: Array.from(input.fromProviderThreadIds),
-                toProviderThreadId: input.toProviderThreadId,
-                cause: "injected handoff prepare failure",
-              }),
-            );
-          },
-        }),
-      },
-    ),
-  );
-  return Effect.gen(function* () {
-    const orchestrator = yield* Orchestrator.OrchestratorV2;
-    const projections = yield* ProjectionStore.ProjectionStoreV2;
-    const source = ThreadId.make("thread:prepare-source");
-    const home = ThreadId.make("thread:prepare-home");
-    yield* createThread(orchestrator, source, "Prepare source");
-    yield* markCommander(orchestrator, source, "mark-prepare-source");
-    yield* seedForkableTurn(projections, { threadId: source, key: "prepare-source" });
-    yield* rotateSession(orchestrator, {
-      commandId: "rotate-prepare",
-      markCommandId: "mark-prepare-source",
-      threadId: source,
-      targetThreadId: home,
-    });
-    const failed = yield* sendText(orchestrator, home, "prepare-message", "continue").pipe(
-      Effect.flip,
+it.effect(
+  "a failed opening handoff prepare rolls the whole rotation back and the same command retries",
+  () => {
+    const failPrepares = { count: 1 };
+    const layerFailingPrepare = Layer.mergeAll(
+      layerDatabase,
+      ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+      ProviderReplayHarness.layerWithRegistry(
+        { name: "bot-rotate-prepare-fault" },
+        ProviderAdapterRegistry.layerFromAdapters([adapter]),
+        {
+          databaseLayer: layerDatabase,
+          runEffectWorker: false,
+          wrapContextHandoffService: (service) => ({
+            ...service,
+            prepareProviderHandoff: (input) => {
+              if (failPrepares.count <= 0) return service.prepareProviderHandoff(input);
+              failPrepares.count -= 1;
+              return Effect.fail(
+                new ContextHandoffService.ContextHandoffPrepareError({
+                  threadId: input.threadId,
+                  targetRunId: input.targetRunId,
+                  fromProviderThreadIds: Array.from(input.fromProviderThreadIds),
+                  toProviderThreadId: input.toProviderThreadId,
+                  cause: "injected handoff prepare failure",
+                }),
+              );
+            },
+          }),
+        },
+      ),
     );
-    assert.equal(failed._tag, "OrchestratorDispatchError");
-    assert.lengthOf((yield* projections.getThreadProjection(home)).runs, 0);
-    assert.equal(
-      (yield* projections.getThreadProjection(home)).contextTransfers[0]?.status,
-      "pending",
-    );
-    yield* sendText(orchestrator, home, "prepare-message-retry", "continue");
-    assert.lengthOf((yield* projections.getThreadProjection(home)).runs, 1);
-  }).pipe(Effect.provide(layerFailingPrepare));
-});
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const source = ThreadId.make("thread:prepare-source");
+      const home = ThreadId.make("thread:prepare-home");
+      yield* createThread(orchestrator, source, "Prepare source");
+      yield* markCommander(orchestrator, source, "mark-prepare-source");
+      yield* seedForkableTurn(projections, { threadId: source, key: "prepare-source" });
+      // The opening consumes the handoff inside the rotation transaction, so a prepare failure
+      // there must commit nothing at all.
+      const failed = yield* rotateSession(orchestrator, {
+        commandId: "rotate-prepare",
+        markCommandId: "mark-prepare-source",
+        threadId: source,
+        targetThreadId: home,
+      }).pipe(Effect.flip);
+      assert.equal(failed._tag, "OrchestratorDispatchError");
+      assert.isNull(yield* projections.getThreadShell(home));
+      assert.equal(
+        (yield* projections.getBot(BotId.make("bot:mark-prepare-source")))?.currentThreadId,
+        source,
+      );
+      assert.isNull((yield* projections.getThreadProjection(source)).thread.rotatedTo ?? null);
+      yield* noReceipt("rotate-prepare");
+      const accepted = yield* rotateSession(orchestrator, {
+        commandId: "rotate-prepare",
+        markCommandId: "mark-prepare-source",
+        threadId: source,
+        targetThreadId: home,
+      });
+      assert.isUndefined(accepted.replayed);
+      const homeProjection = yield* projections.getThreadProjection(home);
+      assert.equal(homeProjection.bot?.currentThreadId, home);
+      assert.equal(homeProjection.contextTransfers[0]?.status, "consumed");
+    }).pipe(Effect.provide(layerFailingPrepare));
+  },
+);
 
 it.effect("rotation refuses when the provider cannot consume a full-thread handoff", () => {
   const adapterNoHandoff = {

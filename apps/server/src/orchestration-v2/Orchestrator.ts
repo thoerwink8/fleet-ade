@@ -156,7 +156,11 @@ import type { OrchestrationEffectRequestV2, PendingOrchestrationEffectV2 } from 
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import { DispatchModeLimit, exceededDispatchModeLimit } from "./DispatchModeLimit.ts";
-import { rotationBlockedReason, messageBindsOldRun } from "./BotRotation.ts";
+import {
+  rotationBlockedReason,
+  messageBindsOldRun,
+  rotationCarriableQueuedRun,
+} from "./BotRotation.ts";
 import {
   applyToProjection,
   emptyProjection,
@@ -2558,8 +2562,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       }
       // Failed worktree creation would run queued work in the project checkout; wait for the user.
       const failedRun = latestExecutedRun(projection.runs);
+      // A rotation opening is housekeeping, not user work: its failure says nothing the first real
+      // turn would not say again, so it must not freeze the queue it was dispatched ahead of.
+      const failureIsRotationOpening =
+        failedRun?.userMessageId.startsWith("bot-rotation:") === true;
       const failureClass =
-        failedRun?.id === options?.failedRunId
+        failedRun?.id === options?.failedRunId && !failureIsRotationOpening
           ? latestRootProviderFailure(failedRun, projection.turnItems)?.class
           : undefined;
       const worktreeMissing =
@@ -4349,9 +4357,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
         ),
       );
+    // An opening whose turn never started is housekeeping, not work: the rotation that replaces it
+    // cancels it below and writes a fresh opening on the next thread. One that finished is a
+    // completed turn like any other.
+    const isRotationOpeningRun = (run: (typeof projection.runs)[number]) =>
+      run.userMessageId === MessageId.make(`bot-rotation:${command.threadId}`) &&
+      (run.status === "queued" || run.status === "starting");
+    const unsettledOpeningTurnStarts = unsettled.flatMap((effect) => {
+      const request = effect.request;
+      if (request.type !== "provider-turn.start") return [];
+      return projection.runs.some((run) => isRotationOpeningRun(run) && request.runId === run.id)
+        ? [effect]
+        : [];
+    });
     const blocked = rotationBlockedReason({
       ...projection,
-      unsettledEffectCount: unsettled.length,
+      runs: projection.runs.filter((run) => !isRotationOpeningRun(run)),
+      unsettledEffectCount: unsettled.length - unsettledOpeningTurnStarts.length,
     });
     if (blocked !== null) return yield* refuse(`Thread ${command.threadId} ${blocked}.`);
     if ((yield* findThread(command.targetThreadId)) !== null) {
@@ -4386,12 +4408,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         strategy: "full_thread_summary",
       }),
     );
+    // A forkable run with no resolvable provider thread never actually ran (queued copies
+    // cancelled by an earlier rotation land here): there is nothing to summarize, so no transfer.
     const sourceRun =
       projection.runs
-        .filter((run) => isForkableSourceRunStatus(run.status))
+        .filter(
+          (run) =>
+            isForkableSourceRunStatus(run.status) &&
+            !isRotationOpeningRun(run) &&
+            providerThreadForRun(projection, run) !== undefined,
+        )
         .toSorted((left, right) => right.ordinal - left.ordinal)[0] ?? null;
     // A runless thread can carry an unconsumed fork the rotation must not strand: the new
-    // transfer keeps the original source, and the old one is superseded below.
+    // transfer keeps the original source, and the old one is superseded below. A transfer the
+    // cancelled opening consumed counts as unconsumed too: its handoff never reached a provider.
+    const strandedOpeningRunIds = new Set(
+      projection.runs.filter((run) => isRotationOpeningRun(run)).map((run) => run.id),
+    );
     const inheritedTransfers =
       sourceRun !== null
         ? []
@@ -4399,7 +4432,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             (candidate) =>
               candidate.type === "fork" &&
               candidate.targetThreadId === projection.thread.id &&
-              candidate.status === "pending",
+              (candidate.status === "pending" ||
+                (candidate.status === "consumed" &&
+                  candidate.targetRunId !== null &&
+                  strandedOpeningRunIds.has(candidate.targetRunId))),
           );
     const inheritedTransfer = latestContextTransfer(inheritedTransfers);
     const sourceProviderThread =
@@ -4427,6 +4463,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         targetThreadId: command.targetThreadId,
         title: projection.thread.title,
         requiresPortable: true,
+        carryWorkspace: true,
         createdBy: command.reason === "manual" ? "user" : "agent",
         creationSource: "server",
         ...(inheritedTransfer === undefined
@@ -4472,6 +4509,98 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         payload: transfer,
       });
     }
+    // The opening turn consumes the portable handoff and runs first; the queue the old thread
+    // still owed is re-dispatched behind it. Both are new messages: the old copies stay cancelled
+    // on the sealed thread, so a receipt reading the old id can only describe that copy.
+    yield* dispatchMessage(
+      {
+        type: "message.dispatch",
+        commandId: CommandId.make(`${command.commandId}:opening`),
+        threadId: command.targetThreadId,
+        messageId: MessageId.make(`bot-rotation:${command.targetThreadId}`),
+        text: "指挥已换到这个新会话。先读交接，再继续完成之前没做完的工作。",
+        attachments: [],
+        dispatchMode: { type: "start_immediately" },
+        createdBy: "agent",
+        creationSource: "server",
+      },
+      events,
+      effects,
+    );
+    const carriedQueuedRuns = queuedRunsInDeliveryOrder(projection).flatMap((run) => {
+      if (isRotationOpeningRun(run)) return [];
+      const message = projection.messages.find((candidate) => candidate.id === run.userMessageId);
+      return rotationCarriableQueuedRun({ run, message }) && message !== undefined
+        ? [{ run, message }]
+        : [];
+    });
+    for (const { run, message } of carriedQueuedRuns) {
+      const carriedCommandId = CommandId.make(`${command.commandId}:migrate:${run.id}`);
+      yield* dispatchMessage(
+        {
+          type: "message.dispatch",
+          commandId: carriedCommandId,
+          threadId: command.targetThreadId,
+          messageId: MessageId.make(`${message.id}~${command.targetThreadId}`),
+          text: message.text,
+          attachments: message.attachments,
+          ...(message.context === undefined ? {} : { context: message.context }),
+          dispatchMode: { type: "queue_after_active" },
+          createdBy: message.createdBy,
+          creationSource: message.creationSource,
+          ...(message.scheduledTaskId === undefined
+            ? {}
+            : { scheduledTaskId: message.scheduledTaskId }),
+          ...(message.senderThreadId === undefined
+            ? {}
+            : { senderThreadId: message.senderThreadId }),
+          ...(message.linkedSender === undefined ? {} : { linkedSender: message.linkedSender }),
+          ...(message.idleCompaction === undefined
+            ? {}
+            : { idleCompaction: message.idleCompaction }),
+          ...(message.notification === undefined ? {} : { notification: message.notification }),
+          ...(run.freshContext === true ? { freshContext: true } : {}),
+        },
+        events,
+        effects,
+      );
+      // The sealed thread's copy can never start: it stays as the cancelled original the
+      // migrated message id points back to.
+      yield* emitEvent({
+        type: "run.updated",
+        threadId: command.threadId,
+        runId: run.id,
+        providerInstanceId: run.providerInstanceId,
+        occurredAt: now,
+        payload: {
+          ...run,
+          status: "cancelled",
+          queuePosition: null,
+          completedAt: now,
+        },
+      });
+    }
+    // The stranded opening this rotation replaces never reached a provider: cancel it. Its queued
+    // start effect is cancelled at commit through the command's cancelUnsettledEffects, because a
+    // cancellation written here would survive even if the rotation itself rolled back.
+    let cancelOpeningTurnStarts = false;
+    for (const run of projection.runs) {
+      if (!isRotationOpeningRun(run)) continue;
+      yield* emitEvent({
+        type: "run.updated",
+        threadId: command.threadId,
+        runId: run.id,
+        providerInstanceId: run.providerInstanceId,
+        occurredAt: now,
+        payload: {
+          ...run,
+          status: "cancelled",
+          queuePosition: null,
+          completedAt: now,
+        },
+      });
+      cancelOpeningTurnStarts = cancelOpeningTurnStarts || unsettledOpeningTurnStarts.length > 0;
+    }
     const movedBot = {
       ...bot,
       currentThreadId: command.targetThreadId,
@@ -4497,6 +4626,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           botId: bot.id,
           rotatedAt: now,
         },
+        // Watching and pinning moved to the new thread with the bot; keeping them here too
+        // would wake both copies.
+        pullRequests: projection.thread.pullRequests?.map(({ watch: _watch, ...link }) => link),
+        pinnedAt: null,
+        pinOrderKey: null,
       },
     });
     const liveSessions = projection.providerSessions.filter(
@@ -4529,6 +4663,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         },
       ]);
     }
+    return cancelOpeningTurnStarts;
   });
 
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
@@ -16134,7 +16269,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         yield* dispatchBotCommand(command, events);
         break;
       case "bot.rotate-session":
-        yield* dispatchBotRotate(command, events, effects);
+        cancelUnsettledEffects = (yield* dispatchBotRotate(command, events, effects))
+          ? {
+              effectTypes: ["provider-turn.start"],
+              reason: "Opening replaced by the next rotation.",
+            }
+          : undefined;
         break;
       case "thread.pull-request-watch.checks-reopen":
         yield* dispatchThreadMutation(command, events, effects);

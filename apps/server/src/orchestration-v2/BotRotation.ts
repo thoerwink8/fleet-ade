@@ -15,7 +15,10 @@ import type {
 import { derivePendingBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 
 import { isActiveRun } from "./CommandPolicy.ts";
-import { isUndeliveredMailboxSteer } from "./NotificationMailbox.ts";
+import {
+  isBufferedProviderNotification,
+  isUndeliveredMailboxSteer,
+} from "./NotificationMailbox.ts";
 
 const TERMINAL_SUBAGENT_STATUS: Record<OrchestrationV2SubagentStatus, boolean> = {
   completed: true,
@@ -42,14 +45,49 @@ export interface RotationQuietInput {
   readonly unsettledEffectCount: number;
 }
 
+/** A queued run rotation re-dispatches onto the new thread only when nothing ties it to the old one. */
+export function rotationCarriableQueuedRun(input: {
+  readonly run: OrchestrationV2Run;
+  readonly message:
+    | Pick<
+        OrchestrationV2ConversationMessage,
+        "notification" | "delegatedCompletion" | "createdBy" | "creationSource"
+      >
+    | undefined;
+}): boolean {
+  const { run, message } = input;
+  return (
+    message !== undefined &&
+    run.queueHeld !== true &&
+    run.restartContinuationOfRunId === undefined &&
+    run.usageLimitContinuationOfRunId === undefined &&
+    run.delegatedTaskId === undefined &&
+    run.steerWhenReadyRunId === undefined &&
+    run.sourcePlanRef === undefined &&
+    message.delegatedCompletion === undefined &&
+    !isBufferedProviderNotification(message)
+  );
+}
+
 /**
  * Why an old thread cannot be sealed, or null when nothing in flight would write back to it.
- * Queued messages, including held ones, are not quiet: slice 4a does not move them.
+ * Queued work rotation can re-dispatch onto the new thread does not block; what stays bound to the
+ * old thread or its provider session does.
  */
 export function rotationBlockedReason(input: RotationQuietInput): string | null {
   const { thread } = input;
   if (thread.deletedAt !== null) return "is deleted";
-  if (input.runs.some((run) => run.status === "queued")) return "has queued messages";
+  if (
+    input.runs.some(
+      (run) =>
+        run.status === "queued" &&
+        !rotationCarriableQueuedRun({
+          run,
+          message: input.messages.find((message) => message.id === run.userMessageId),
+        }),
+    )
+  )
+    return "has queued messages it cannot carry";
   if (input.runs.some(isActiveRun)) return "has a live run";
   if (input.runtimeRequests.some((request) => request.status === "pending")) {
     return "has a pending runtime request";
