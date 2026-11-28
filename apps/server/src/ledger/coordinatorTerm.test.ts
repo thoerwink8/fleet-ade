@@ -112,7 +112,7 @@ it.effect(
     ).pipe(Effect.provide(NodeServices.layer)),
 );
 
-it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任期不同协调者是 conflict", () =>
+it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任期按协调者 ID 字典序收敛", () =>
   Effect.gen(function* () {
     const terms = yield* CoordinatorTerm.CoordinatorTerm;
     const sql = yield* SqlClient.SqlClient;
@@ -139,11 +139,23 @@ it.effect("observe 更小任期是 stale 且库不变，更大则采纳，同任
     expect(yield* terms.observe(FLEET, 1, "coord-b")).toEqual(
       CoordinatorTerm.ObserveResult.stale({ term: 3, coordinatorId: "coord-a" }),
     );
-    expect(yield* terms.observe(FLEET, 3, "coord-c")).toEqual(
-      CoordinatorTerm.ObserveResult.conflict({ term: 3, coordinatorId: "coord-a" }),
+    expect(yield* terms.observe(FLEET, 3, "coord-0")).toEqual(
+      CoordinatorTerm.ObserveResult.stale({ term: 3, coordinatorId: "coord-a" }),
     );
     expect(yield* sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual(stored);
-    expect(yield* terms.read(FLEET)).toEqual({ term: 3, coordinatorId: "coord-a" });
+    expect(yield* terms.observe(FLEET, 3, "coord-c")).toEqual(
+      CoordinatorTerm.ObserveResult.current({ term: 3, coordinatorId: "coord-c" }),
+    );
+    expect(yield* sql`SELECT term, coordinator_id FROM fleet_coordinator_terms`).toEqual([
+      { term: 3, coordinator_id: "coord-c" },
+    ]);
+    expect(yield* terms.observe(FLEET, 3, "coord-b")).toEqual(
+      CoordinatorTerm.ObserveResult.stale({ term: 3, coordinatorId: "coord-c" }),
+    );
+    expect(yield* terms.observe(FLEET, 4, "coord-a")).toEqual(
+      CoordinatorTerm.ObserveResult.current({ term: 4, coordinatorId: "coord-a" }),
+    );
+    expect(yield* terms.read(FLEET)).toEqual({ term: 4, coordinatorId: "coord-a" });
     yield* sql`UPDATE fleet_coordinator_terms SET term = 0, coordinator_id = 'coord-z' WHERE fleet_id = ${FLEET}`;
     expect(yield* terms.observe(FLEET, 0, "coord-a")).toEqual(
       CoordinatorTerm.ObserveResult.stale({ term: 0, coordinatorId: "coord-z" }),

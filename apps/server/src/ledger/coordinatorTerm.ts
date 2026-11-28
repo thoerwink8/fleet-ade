@@ -16,7 +16,6 @@ export const FLEET_TERM_KEY = "fleet";
 export type ObserveResult = Data.TaggedEnum<{
   current: TermSnapshot;
   stale: TermSnapshot;
-  conflict: TermSnapshot;
 }>;
 export const ObserveResult = Data.taggedEnum<ObserveResult>();
 
@@ -70,17 +69,29 @@ const snapshotOf = (row: TermRow | undefined): TermSnapshot =>
     ? { term: 0, coordinatorId: null }
     : { term: row.term, coordinatorId: row.coordinator_id };
 
+/** Ties on term are broken lexicographically by coordinator id, for eventual convergence only. */
+const outranks = (
+  stored: TermSnapshot,
+  term: number,
+  coordinatorId: string,
+): boolean | undefined =>
+  term < stored.term ||
+  (term === stored.term && stored.coordinatorId !== null && coordinatorId < stored.coordinatorId)
+    ? false
+    : term === stored.term && coordinatorId === stored.coordinatorId
+      ? undefined
+      : true;
+
 const observeUnchanged = (
   stored: TermSnapshot,
   term: number,
   coordinatorId: string,
 ): ObserveResult | undefined => {
-  // Term 0 means there is no coordinator yet, so it never conflicts and is never adopted.
-  if (term < stored.term || (term === 0 && stored.term === 0)) return ObserveResult.stale(stored);
-  if (term > stored.term) return undefined;
-  return coordinatorId === stored.coordinatorId
-    ? ObserveResult.current(stored)
-    : ObserveResult.conflict(stored);
+  // Term 0 means there is no coordinator yet, so it is never adopted.
+  if (term === 0 && stored.term === 0) return ObserveResult.stale(stored);
+  const higher = outranks(stored, term, coordinatorId);
+  if (higher === undefined) return ObserveResult.current(stored);
+  return higher ? undefined : ObserveResult.stale(stored);
 };
 
 const migrate = Effect.fn("CoordinatorTerm.migrate")(function* () {
@@ -140,7 +151,8 @@ const make = Effect.gen(function* () {
               : yield* sql<{ readonly term: number }>`
                   UPDATE fleet_coordinator_terms
                   SET term = ${term}, coordinator_id = ${coordinatorId}
-                  WHERE fleet_id = ${fleetId} AND term < ${term}
+                  WHERE fleet_id = ${fleetId}
+                    AND (term < ${term} OR (term = ${term} AND coordinator_id < ${coordinatorId}))
                   RETURNING term
                 `;
           if (written[0] !== undefined) return ObserveResult.current({ term, coordinatorId });
