@@ -107,14 +107,18 @@ export function rotationBlockedReason(input: RotationQuietInput): string | null 
   ) {
     return "has unconsumed merge-back context";
   }
-  const latestRun = input.runs.reduce<OrchestrationV2Run | null>(
+  // Queued work rotation re-dispatches onto the new thread is not settled input either: it never
+  // ran here, so it must not mask background work an executed run still owes. The non-carriable
+  // ones already blocked above, so the filter drops queued work wholesale.
+  const executableRuns = input.runs.filter((run) => run.status !== "queued");
+  const latestRun = executableRuns.reduce<OrchestrationV2Run | null>(
     (latest, run) => (latest === null || run.ordinal > latest.ordinal ? run : latest),
     null,
   );
   if (
     derivePendingBackgroundWork({
       latestRun,
-      runs: input.runs,
+      runs: executableRuns,
       providerThreads: input.providerThreads,
       turnItems: input.turnItems,
       activeProviderThreadId: thread.activeProviderThreadId,

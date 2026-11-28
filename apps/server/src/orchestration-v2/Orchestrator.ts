@@ -2563,9 +2563,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       // Failed worktree creation would run queued work in the project checkout; wait for the user.
       const failedRun = latestExecutedRun(projection.runs);
       // A rotation opening is housekeeping, not user work: its failure says nothing the first real
-      // turn would not say again, so it must not freeze the queue it was dispatched ahead of.
-      const failureIsRotationOpening =
-        failedRun?.userMessageId.startsWith("bot-rotation:") === true;
+      // turn would not say again, so it must not freeze the queue it was dispatched ahead of. The
+      // server-written marker decides, never the client-fillable message id.
+      const failureIsRotationOpening = failedRun?.rotationOpening === true;
       const failureClass =
         failedRun?.id === options?.failedRunId && !failureIsRotationOpening
           ? latestRootProviderFailure(failedRun, projection.turnItems)?.class
@@ -4361,8 +4361,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     // cancels it below and writes a fresh opening on the next thread. One that finished is a
     // completed turn like any other.
     const isRotationOpeningRun = (run: (typeof projection.runs)[number]) =>
-      run.userMessageId === MessageId.make(`bot-rotation:${command.threadId}`) &&
-      (run.status === "queued" || run.status === "starting");
+      run.rotationOpening === true && (run.status === "queued" || run.status === "starting");
     const unsettledOpeningTurnStarts = unsettled.flatMap((effect) => {
       const request = effect.request;
       if (request.type !== "provider-turn.start") return [];
@@ -4526,6 +4525,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       },
       events,
       effects,
+      { rotationOpening: true },
     );
     const carriedQueuedRuns = queuedRunsInDeliveryOrder(projection).flatMap((run) => {
       if (isRotationOpeningRun(run)) return [];
@@ -4546,6 +4546,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           attachments: message.attachments,
           ...(message.context === undefined ? {} : { context: message.context }),
           dispatchMode: { type: "queue_after_active" },
+          // The run's selection, not the thread default: a queued pick that changed model must
+          // survive the move.
+          modelSelection: run.modelSelection,
           createdBy: message.createdBy,
           creationSource: message.creationSource,
           ...(message.scheduledTaskId === undefined
@@ -7184,6 +7187,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     command: Extract<OrchestrationV2Command, { readonly type: "message.dispatch" }>,
     events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
     effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    internal?: { readonly rotationOpening?: true },
   ) {
     // A compacted thread reads every run and turn item, but attempts, nodes, messages and provider
     // turns only for its recent runs and the runs this command names. An idle compaction reads
@@ -8106,6 +8110,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           : { usageLimitContinuationOfRunId: command.usageLimitContinuationOfRunId }),
         ...(continuedTaskId === undefined ? {} : { delegatedTaskId: continuedTaskId }),
         ...(freshContext ? { freshContext: true } : {}),
+        ...(internal?.rotationOpening === true ? { rotationOpening: true } : {}),
       };
       const attempt: OrchestrationV2RunAttempt = {
         id: attemptId,
@@ -8518,6 +8523,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ...(continuedTaskId === undefined ? {} : { delegatedTaskId: continuedTaskId }),
         ...wakeWorkStartedAt(projection, command),
         ...(freshContext ? { freshContext: true } : {}),
+        ...(internal?.rotationOpening === true ? { rotationOpening: true } : {}),
       };
       const attempt: OrchestrationV2RunAttempt = {
         id: attemptId,
@@ -9307,6 +9313,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         : { usageLimitContinuationOfRunId: command.usageLimitContinuationOfRunId }),
       ...(continuedTaskId === undefined ? {} : { delegatedTaskId: continuedTaskId }),
       ...wakeWorkStartedAt(projection, command),
+      ...(internal?.rotationOpening === true ? { rotationOpening: true } : {}),
     };
     const attempt: OrchestrationV2RunAttempt = {
       id: attemptId,
