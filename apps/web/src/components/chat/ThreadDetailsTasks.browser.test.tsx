@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   version: 0,
   listeners: new Set<() => void>(),
   children: [] as unknown[],
+  providers: [] as unknown[],
   canOperateWorkflow: true,
   commandCalls: [] as Array<{ command: unknown; environmentId: string; input: unknown }>,
   commandResult: "failure" as "failure" | "success" | "pending",
@@ -41,6 +42,10 @@ vi.mock(import("../../state/entities"), () => ({
     );
     return ref === null ? null : { projection: state.projection };
   }) as never,
+}));
+
+vi.mock(import("../../state/environments"), () => ({
+  useEnvironmentProviders: (() => new Map([["environment", state.providers]])) as never,
 }));
 
 vi.mock(import("../../state/query"), async (original) => ({
@@ -118,6 +123,8 @@ function setup(
     readonly providerThreads?: ReadonlyArray<unknown>;
     readonly turnItems?: ReadonlyArray<unknown>;
     readonly children?: ReadonlyArray<unknown>;
+    readonly providers?: ReadonlyArray<unknown>;
+    readonly providerInstanceId?: string;
     readonly canOperateWorkflow?: boolean;
   },
 ) {
@@ -125,10 +132,17 @@ function setup(
   state.commandResult = "failure";
   state.canOperateWorkflow = extra?.canOperateWorkflow ?? true;
   state.children = [...(extra?.children ?? [])];
+  state.providers = [...(extra?.providers ?? [])];
   const projection = makeThreadProjectionFixture();
   state.projection = {
     ...projection,
-    thread: { ...projection.thread, id: threadId },
+    thread: {
+      ...projection.thread,
+      id: threadId,
+      ...(extra?.providerInstanceId !== undefined
+        ? { providerInstanceId: extra.providerInstanceId }
+        : {}),
+    },
     // A completed run: the roster only derives once the turn that spawned it has settled.
     runs: [{ id: "run-1", ordinal: 1, status: "completed" }],
     subagents: [...subagents],
@@ -139,10 +153,10 @@ function setup(
   for (const listener of state.listeners) listener();
 }
 
-function Section() {
+function Section(props?: { readonly width?: number }) {
   return (
     <ToastProvider timeout={0}>
-      <div className="w-70">
+      <div style={props?.width === undefined ? undefined : { width: props.width }}>
         <ThreadDetailsTasks environmentId={environmentId} threadId={threadId} />
       </div>
     </ToastProvider>
@@ -207,6 +221,14 @@ it("shows no stop button on commands or Codex native subagents and uses session 
           ],
         },
       ],
+      providers: [
+        {
+          instanceId: "devReplay",
+          driver: "acpRegistry",
+          displayName: "Replay (dev)",
+        },
+      ],
+      providerInstanceId: "devReplay",
     },
   );
   await using screen = await render(<Section />);
@@ -217,8 +239,35 @@ it("shows no stop button on commands or Codex native subagents and uses session 
 
   const commandRow = rows.find((entry) => entry.textContent?.includes("sleep 300"));
   expect(commandRow).toBeDefined();
-  // Uses the session driver's initial (Claude -> C), never the command title's initial ("S").
-  expect(commandRow!.querySelector(".fa-agent")?.textContent).toBe("C");
+  // The session agent's own initials, exactly as the sidebar draws "Replay (dev)" -> RD;
+  // never the command title's initial ("S") or the driver's.
+  expect(commandRow!.querySelector(".fa-agent")?.textContent).toBe("RD");
+});
+
+it("falls back to the driver display name when the session instance is not listed", async () => {
+  setup([], {
+    providerThreads: [
+      {
+        id: "provider-thread-1",
+        driver: "claudeAgent",
+        providerInstanceId: "claude",
+        pendingBackgroundTasks: [
+          {
+            taskId: "task-1",
+            kind: "command",
+            description: "sleep 300",
+            status: "running",
+            startedAt: at(NOW - 8 * MINUTE),
+            itemId: "item-1",
+          },
+        ],
+      },
+    ],
+  });
+  await using screen = await render(<Section />);
+
+  const commandRow = screen.container.querySelector("[data-background-task]");
+  expect(commandRow?.querySelector(".fa-agent")?.textContent).toBe("CL");
 });
 
 it("dispatches a stop for the row's subagent and rolls back with the reason on failure", async () => {
@@ -294,7 +343,41 @@ it("keeps 正在停止 across multiple rows until each row leaves active status"
   });
 });
 
-it("keeps at least six Chinese characters of title visible at 1024 and 390 widths", async () => {
+it("clears 正在停止 once the row leaves active status so a reused id starts clean", async () => {
+  setup([subagent({ id: NodeId.make("agent-1"), title: "复审 PR" })]);
+  state.commandResult = "success";
+  await using screen = await render(<Section />);
+
+  await screen.getByRole("button", { name: "停止 复审 PR" }).click();
+  expect(screen.container.querySelector("[data-background-task]")?.textContent).toContain(
+    "正在停止",
+  );
+
+  // The stop lands: the row folds into 已完成 and its stop marker is dropped.
+  setup([
+    subagent({
+      id: NodeId.make("agent-1"),
+      title: "复审 PR",
+      status: "cancelled",
+      completedAt: at(NOW),
+    }),
+  ]);
+  await vi.waitFor(() => {
+    expect(screen.container.querySelectorAll("[data-background-task]")).toHaveLength(0);
+  });
+
+  // The same id becomes active again: no inherited 正在停止, and its stop button works.
+  setup([subagent({ id: NodeId.make("agent-1"), title: "复审 PR" })]);
+  await vi.waitFor(() => {
+    expect(screen.container.querySelector("[data-background-task]")?.textContent).not.toContain(
+      "正在停止",
+    );
+  });
+  const stop = screen.getByRole("button", { name: "停止 复审 PR" }).element();
+  expect(stop).not.toBeDisabled();
+});
+
+it("keeps six Chinese characters plus the ellipsis of title at real widths", async () => {
   setup([
     subagent({
       id: NodeId.make("long-1"),
@@ -307,24 +390,35 @@ it("keeps at least six Chinese characters of title visible at 1024 and 390 width
     }),
   ]);
 
+  const assertTitles = (container: HTMLElement) => {
+    const rows = [...container.querySelectorAll("[data-background-task]")];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      // Six 14px Chinese characters (84px) plus the ellipsis.
+      expect(getComputedStyle(row.querySelector(".t")!).minWidth).toBe("98px");
+      const titleEl = row.querySelector(".t .x")!;
+      expect(titleEl.getBoundingClientRect().width).toBeGreaterThanOrEqual(98);
+      expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+    }
+  };
+
   try {
     for (const [width, height] of [
       [1024, 768],
       [390, 844],
     ] as const) {
       await page.viewport(width, height);
+      // No fixed-width wrapper: the section lays out at the viewport's own width.
       await using screen = await render(<Section />);
+      assertTitles(screen.container as HTMLElement);
       const rows = [...screen.container.querySelectorAll("[data-background-task]")];
-      expect(rows).toHaveLength(2);
-      for (const row of rows) {
-        const titleEl = row.querySelector(".t .x")!;
-        expect(titleEl.getBoundingClientRect().width).toBeGreaterThanOrEqual(84);
-        expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
-      }
       const heading = screen.container.querySelector("#thread-details-tasks-heading")!;
       expect(heading.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
       expect(rows[1]!.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
     }
+    // The 280px popover card is the narrowest real container the section lives in.
+    await using card = await render(<Section width={280} />);
+    assertTitles(card.container as HTMLElement);
   } finally {
     await page.viewport(1440, 900);
   }

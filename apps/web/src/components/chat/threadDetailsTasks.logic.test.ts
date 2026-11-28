@@ -15,6 +15,7 @@ import {
   backgroundWorkRowsFromSubagents,
   backgroundWorkSecondLine,
   backgroundWorkSilenceMinutes,
+  backgroundWorkRowStatusWord,
   backgroundWorkStatusWord,
   presentBackgroundWorkSection,
   type BackgroundWorkRowInput,
@@ -33,7 +34,8 @@ function row(
   return {
     source: "subagent",
     title: patch.id,
-    driver: null,
+    agentName: null,
+    statusLabel: null,
     status: "running",
     startedAt: null,
     completedAt: null,
@@ -105,7 +107,7 @@ describe("background work status words", () => {
     ["failed", "出错了", true],
     ["cancelled", "已停止", false],
     ["interrupted", "已停止", false],
-    ["mystery", "空闲", false],
+    ["mystery", "", false],
   ] as const)("reads %s as %s", (status, label, failed) => {
     expect(backgroundWorkStatusWord(status)).toEqual({ label, failed });
   });
@@ -136,7 +138,7 @@ describe("background work rows", () => {
     expect(built).toMatchObject({
       id: "subagent:node-1",
       title: "修登录",
-      driver: "claudeAgent",
+      agentName: "Claude",
       status: "running",
       progress: "在改 login.ts",
       lastOutputAtMs: null,
@@ -188,12 +190,12 @@ describe("background work rows", () => {
       status: "running",
       itemId: "item-1",
     } as OrchestrationV2PendingBackgroundTask;
-    const [built] = backgroundWorkRowsFromCommands([task], ProviderDriverKind.make("claudeAgent"));
+    const [built] = backgroundWorkRowsFromCommands([task], "Claude");
     expect(built).toMatchObject({
       id: "command:task-1",
       source: "command",
       title: "pnpm check",
-      driver: "claudeAgent",
+      agentName: "Claude",
       lastOutputAtMs: null,
       stop: null,
     });
@@ -216,10 +218,14 @@ describe("background work rows", () => {
     };
     const rows = backgroundWorkRowsFromChildren([child, needsAnswer], new Set(["child-1"]));
     expect(rows.map((entry) => entry.id)).toEqual(["child:child-2"]);
-    expect(rows[0]).toMatchObject({ status: "needs_answer", lastOutputAtMs: null, driver: null });
+    expect(rows[0]).toMatchObject({
+      status: "needs_answer",
+      lastOutputAtMs: null,
+      agentName: null,
+    });
   });
 
-  it("maps unknown child phase to unknown (空闲) without relabelling", () => {
+  it("maps unknown child phase to unknown without inventing a status word", () => {
     const [built] = backgroundWorkRowsFromChildren(
       [
         {
@@ -232,6 +238,75 @@ describe("background work rows", () => {
       new Set(),
     );
     expect(built).toMatchObject({ title: "后台任务", status: "unknown", progress: null });
+  });
+
+  it("maps a failed child to 出错了 instead of 等空位", () => {
+    const [built] = backgroundWorkRowsFromChildren(
+      [
+        {
+          threadId: ThreadId.make("child-failed"),
+          title: "跑测试",
+          phase: "卡住",
+          activity: "失败",
+          reason: "失败",
+        },
+      ],
+      new Set(),
+    );
+    expect(built?.status).toBe("failed");
+    expect(backgroundWorkRowStatusWord(built!).label).toBe("出错了");
+  });
+
+  it.each(["超时", "没动静"] as const)(
+    "shows the server's %s reason verbatim instead of 等空位",
+    (reason) => {
+      const [built] = backgroundWorkRowsFromChildren(
+        [
+          {
+            threadId: ThreadId.make("child-stuck"),
+            title: "跑测试",
+            phase: "卡住",
+            activity: reason,
+            reason,
+          },
+        ],
+        new Set(),
+      );
+      const word = backgroundWorkRowStatusWord(built!);
+      expect(word.label).toBe(reason);
+      expect(word.label).not.toBe("等空位");
+      expect(word.failed).toBe(false);
+    },
+  );
+
+  it("never invents 空闲 or 等空位 for an unknown child phase", () => {
+    const [withReason] = backgroundWorkRowsFromChildren(
+      [
+        {
+          threadId: ThreadId.make("child-unknown"),
+          title: "跑测试",
+          phase: "别的",
+          activity: "",
+          reason: "在跑",
+        },
+      ],
+      new Set(),
+    );
+    expect(backgroundWorkRowStatusWord(withReason!).label).toBe("在跑");
+    const [noReason] = backgroundWorkRowsFromChildren(
+      [
+        {
+          threadId: ThreadId.make("child-blank"),
+          title: "跑测试",
+          phase: "别的",
+          activity: "",
+        },
+      ],
+      new Set(),
+    );
+    const label = backgroundWorkRowStatusWord(noReason!).label;
+    expect(label).not.toBe("空闲");
+    expect(label).not.toBe("等空位");
   });
 });
 

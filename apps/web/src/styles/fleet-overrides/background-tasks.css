@@ -30,12 +30,13 @@
   padding: 0 8px;
 }
 
-/* The design's task grid: type icon | title (min 6 chars at 14px) | agent + status + elapsed + stop. */
+/* The design's task grid: type icon | title | agent + status + elapsed + stop.
+   The title minimum fits six 14px Chinese characters (84px) plus the ellipsis (~14px). */
 [data-thread-details-tasks] .fa-task {
   --fa-hv: linear-gradient(var(--fa-hover), var(--fa-hover));
 
   display: grid;
-  grid-template-columns: 16px minmax(84px, 1fr) auto;
+  grid-template-columns: 16px minmax(98px, 1fr) auto;
   column-gap: 8px;
   align-items: center;
   min-height: 32px;
@@ -83,7 +84,7 @@
 
 [data-thread-details-tasks] .fa-task .t {
   display: flex;
-  min-width: 84px;
+  min-width: 98px;
   align-items: center;
   gap: 4px;
   font-size: 14px;

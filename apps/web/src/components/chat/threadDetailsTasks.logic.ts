@@ -1,8 +1,8 @@
+import { PROVIDER_DISPLAY_NAMES } from "@t3tools/contracts";
 import type {
   NodeId,
   OrchestrationV2PendingBackgroundTask,
   OrchestrationV2Subagent,
-  ProviderDriverKind,
   ThreadId,
 } from "@t3tools/contracts";
 import {
@@ -43,8 +43,8 @@ export interface BackgroundWorkRowInput {
   readonly id: string;
   readonly source: BackgroundWorkSource;
   readonly title: string;
-  /** The provider driving this row; its display name seeds the agent slot. */
-  readonly driver: ProviderDriverKind | null;
+  /** Display name of the agent behind the row (the session's own agent for command rows). */
+  readonly agentName: string | null;
   readonly status: string;
   /** ISO strings, or null when the roster keeps none. */
   readonly startedAt: string | null;
@@ -56,6 +56,8 @@ export interface BackgroundWorkRowInput {
    * timestamp, so the silence line is omitted rather than guessed.
    */
   readonly lastOutputAtMs: number | null;
+  /** Raw server reason shown as the status word when no table word fits; never a guessed label. */
+  readonly statusLabel: string | null;
   /** Set on a finished row whose outcome names a reason, so that reason can be marked. */
   readonly errorReason: string | null;
   /** Target for the Stop button, or null when the contract cannot stop this row individually. */
@@ -83,7 +85,16 @@ const STATUS_WORDS: Readonly<Record<string, BackgroundWorkStatusWord>> = {
 };
 
 export function backgroundWorkStatusWord(status: string): BackgroundWorkStatusWord {
-  return STATUS_WORDS[status] ?? { label: "空闲", failed: false };
+  // Unknown statuses show no word rather than an invented one.
+  return STATUS_WORDS[status] ?? { label: "", failed: false };
+}
+
+/** The word a row displays: the server's own reason when present, else the status table. */
+export function backgroundWorkRowStatusWord(
+  row: Pick<BackgroundWorkRowInput, "status" | "statusLabel">,
+): BackgroundWorkStatusWord {
+  const word = backgroundWorkStatusWord(row.status);
+  return row.statusLabel !== null ? { ...word, label: row.statusLabel } : word;
 }
 
 export function isActiveBackgroundWork(status: string): boolean {
@@ -193,12 +204,13 @@ export function backgroundWorkRowsFromSubagents(
       id: `subagent:${subagent.id}`,
       source: "subagent" as const,
       title: rowTitle("subagent", subagent.title ?? subagent.prompt),
-      driver: subagent.driver,
+      agentName: PROVIDER_DISPLAY_NAMES[subagent.driver] ?? subagent.driver,
       status: subagent.status,
       startedAt: isoOrNull(subagent.startedAt),
       completedAt: isoOrNull(subagent.completedAt),
       progress: failed && resultText !== null ? resultText : (subagent.progress ?? null),
       lastOutputAtMs: null,
+      statusLabel: null,
       errorReason: failed ? resultText : null,
       stop,
       childThreadId: subagent.childThreadId,
@@ -211,9 +223,15 @@ export function backgroundWorkRowsFromSubagents(
  * Contracts carry no per-command stop RPC and no last-output timestamp (output streams on expand
  * without chunk timestamps), so both stay `null` rather than targeting the main turn or guessing.
  */
+/**
+ * Command rows from the provider thread's background roster, pending and already finished.
+ * The agent slot shows the session's own agent name, matching the sidebar and composer.
+ * Contracts carry no per-command stop RPC and no last-output timestamp (output streams on expand
+ * without chunk timestamps), so both stay `null` rather than targeting the main turn or guessing.
+ */
 export function backgroundWorkRowsFromCommands(
   tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>,
-  sessionDriver: ProviderDriverKind | null,
+  sessionAgentName: string | null,
 ): ReadonlyArray<BackgroundWorkRowInput> {
   const seen = new Set<string>();
   const rows: BackgroundWorkRowInput[] = [];
@@ -225,7 +243,8 @@ export function backgroundWorkRowsFromCommands(
       id: `command:${task.taskId}`,
       source: "command",
       title: rowTitle("command", task.description ?? task.command),
-      driver: sessionDriver,
+      agentName: sessionAgentName,
+      statusLabel: null,
       status: task.status ?? "running",
       startedAt: isoOrNull(task.startedAt),
       completedAt: isoOrNull(task.completedAt),
@@ -248,16 +267,25 @@ export interface BackgroundWorkChildSession {
   readonly reason?: string;
 }
 
-function childPhaseStatus(child: BackgroundWorkChildSession): string {
-  if (child.phase === "在做") return "running";
-  if (child.phase === "做完") return "completed";
+function childPhaseStatus(child: BackgroundWorkChildSession): {
+  readonly status: string;
+  readonly statusLabel: string | null;
+} {
+  if (child.phase === "在做") return { status: "running", statusLabel: null };
+  if (child.phase === "做完") return { status: "completed", statusLabel: null };
   if (child.phase === "卡住") {
     if (child.needsYou) {
-      return child.reason?.startsWith("等你批准") ? "needs_approval" : "needs_answer";
+      return {
+        status: child.reason?.startsWith("等你批准") ? "needs_approval" : "needs_answer",
+        statusLabel: null,
+      };
     }
-    return "waiting";
+    if (child.reason === "失败") return { status: "failed", statusLabel: null };
+    // 超时、没动静 and other stuck reasons stay active and show the server's reason verbatim;
+    // the section does not turn them into a queue or failure conclusion.
+    return { status: "waiting", statusLabel: child.reason?.trim() || null };
   }
-  return "unknown";
+  return { status: "unknown", statusLabel: child.reason?.trim() || null };
 }
 
 /**
@@ -270,20 +298,24 @@ export function backgroundWorkRowsFromChildren(
 ): ReadonlyArray<BackgroundWorkRowInput> {
   return children
     .filter((child) => !alreadyShownThreadIds.has(child.threadId))
-    .map((child) => ({
-      id: `child:${child.threadId}`,
-      source: "child" as const,
-      title: rowTitle("child", child.title ?? undefined),
-      driver: null,
-      status: childPhaseStatus(child),
-      startedAt: null,
-      completedAt: null,
-      progress: child.activity.trim() || null,
-      lastOutputAtMs: null,
-      errorReason: null,
-      stop: null,
-      childThreadId: child.threadId,
-    }));
+    .map((child) => {
+      const phase = childPhaseStatus(child);
+      return {
+        id: `child:${child.threadId}`,
+        source: "child" as const,
+        title: rowTitle("child", child.title ?? undefined),
+        agentName: null,
+        status: phase.status,
+        statusLabel: phase.statusLabel,
+        startedAt: null,
+        completedAt: null,
+        progress: child.activity.trim() || null,
+        lastOutputAtMs: null,
+        errorReason: null,
+        stop: null,
+        childThreadId: child.threadId,
+      };
+    });
 }
 
 export interface BackgroundWorkSectionModel {

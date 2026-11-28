@@ -7,12 +7,15 @@ import { BotIcon, MessagesSquareIcon, SquareIcon, TerminalIcon } from "lucide-re
 import { useState, type ReactNode } from "react";
 
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { providerInstanceInitials } from "@t3tools/client-runtime/state/provider-instance-display";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { RuntimeSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
 
 import { useNowMinute } from "../../hooks/useNowMinute";
+import { deriveProviderInstanceEntries } from "../../providerInstances";
 import { deriveThreadPendingBackgroundTasks } from "../ChatView.logic";
 import { useThreadProjection } from "../../state/entities";
+import { useEnvironmentProviders } from "../../state/environments";
 import { useEnvironmentQuery } from "../../state/query";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { threadEnvironment } from "../../state/threads";
@@ -26,8 +29,8 @@ import {
   backgroundWorkRowsFromChildren,
   backgroundWorkRowsFromCommands,
   backgroundWorkRowsFromSubagents,
+  backgroundWorkRowStatusWord,
   backgroundWorkSecondLine,
-  backgroundWorkStatusWord,
   isActiveBackgroundWork,
   presentBackgroundWorkSection,
   BACKGROUND_WORK_SCROLL_AFTER,
@@ -53,9 +56,10 @@ const SOURCE_ICONS = {
 } as const;
 
 function agentSlotInitial(row: BackgroundWorkRowInput): string | null {
-  if (row.driver === null) return null;
-  const name = PROVIDER_DISPLAY_NAMES[row.driver];
-  return name !== undefined && name.length > 0 ? name.charAt(0).toLocaleUpperCase() : null;
+  if (row.agentName === null) return null;
+  // The same initials the sidebar and composer draw for this agent.
+  const initials = providerInstanceInitials(row.agentName);
+  return initials.length > 0 ? initials : null;
 }
 
 function statusDotClass(row: BackgroundWorkRowInput): string {
@@ -142,11 +146,11 @@ function BackgroundTaskRow(props: {
   const { row } = props;
   const nowMinute = useNowMinute();
   const nowMs = Date.parse(`${nowMinute}:00.000Z`);
-  const status = backgroundWorkStatusWord(row.status);
+  const status = backgroundWorkRowStatusWord(row);
   const secondLine = backgroundWorkSecondLine(row, nowMs);
   const active = isActiveBackgroundWork(row.status);
   const stopping = active && props.stopping;
-  const statusText = stopping ? "正在停止" : row.status === "running" ? null : status.label;
+  const statusText = stopping ? "正在停止" : row.status === "running" ? null : status.label || null;
   const TypeIcon = SOURCE_ICONS[row.source];
   const initial = agentSlotInitial(row);
   const secondLineNodes: ReactNode[] = [];
@@ -252,6 +256,7 @@ export function ThreadDetailsTasks(props: {
   );
   const [stoppingIds, setStoppingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [completedOpen, setCompletedOpen] = useState(false);
+  const providersByEnvironment = useEnvironmentProviders();
 
   // The same roster the composer banner reads, so the count here and there agree.
   const pendingTasks = deriveThreadPendingBackgroundTasks(projection);
@@ -263,17 +268,22 @@ export function ThreadDetailsTasks(props: {
   );
   const children = childrenQuery.data?.children ?? [];
 
-  if (projection === null) return null;
-
   const sessionDriver =
-    projection.providerThreads.find(
+    projection?.providerThreads.find(
       (entry) => entry.id === projection.thread.activeProviderThreadId,
     )?.driver ??
-    projection.providerThreads.at(-1)?.driver ??
-    projection.providerSessions.at(-1)?.driver ??
+    projection?.providerThreads.at(-1)?.driver ??
+    projection?.providerSessions.at(-1)?.driver ??
     null;
+  const providers = providersByEnvironment.get(props.environmentId) ?? [];
+  const sessionInstanceEntry = deriveProviderInstanceEntries(providers).find(
+    (entry) => entry.instanceId === projection?.thread.providerInstanceId,
+  );
+  const sessionAgentName =
+    sessionInstanceEntry?.displayName ??
+    (sessionDriver !== null ? (PROVIDER_DISPLAY_NAMES[sessionDriver] ?? sessionDriver) : null);
 
-  const subagentRows = backgroundWorkRowsFromSubagents(projection.subagents, {
+  const subagentRows = backgroundWorkRowsFromSubagents(projection?.subagents ?? [], {
     canOperateWorkflow,
   });
   const shownChildThreadIds = new Set(
@@ -282,13 +292,16 @@ export function ThreadDetailsTasks(props: {
       .filter((id): id is NonNullable<typeof id> => id !== null)
       .map(String),
   );
-  const finishedCommandTasks = deriveCompletedBackgroundWork({
-    providerThreads: projection.providerThreads,
-    activeProviderThreadId: projection.thread.activeProviderThreadId,
-  });
+  const finishedCommandTasks =
+    projection === null
+      ? []
+      : deriveCompletedBackgroundWork({
+          providerThreads: projection.providerThreads,
+          activeProviderThreadId: projection.thread.activeProviderThreadId,
+        });
   const commandRows = backgroundWorkRowsFromCommands(
     [...pendingTasks, ...finishedCommandTasks],
-    sessionDriver,
+    sessionAgentName,
   );
   const childRows = backgroundWorkRowsFromChildren(
     children.map(childSessionOf),
@@ -296,6 +309,21 @@ export function ThreadDetailsTasks(props: {
   );
   const section = presentBackgroundWorkSection([...subagentRows, ...commandRows, ...childRows]);
   const visibleRows = [...section.active, ...section.failed];
+
+  const activeRowKey = section.active.map((row) => row.id).join("\n");
+  // Stop markers end with the row's active state; a later row reusing the id must not inherit
+  // 正在停止. Pruned during render (the derived-state pattern), not in an effect.
+  const [prunedActiveKey, setPrunedActiveKey] = useState(activeRowKey);
+  if (prunedActiveKey !== activeRowKey) {
+    setPrunedActiveKey(activeRowKey);
+    const activeIds = new Set(section.active.map((row) => row.id));
+    setStoppingIds((prev) => {
+      const next = new Set([...prev].filter((id) => activeIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }
+
+  if (projection === null) return null;
 
   const markStopping = (id: string) =>
     setStoppingIds((prev) => {
