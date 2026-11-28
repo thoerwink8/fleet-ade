@@ -2,7 +2,6 @@ import { NodeId, ProviderDriverKind, ProviderInstanceId, ThreadId } from "@t3too
 import type {
   OrchestrationV2PendingBackgroundTask,
   OrchestrationV2Subagent,
-  OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
@@ -41,8 +40,7 @@ function row(
     progress: null,
     lastOutputAtMs: null,
     errorReason: null,
-    subagentId: null,
-    stopThreadId: null,
+    stop: null,
     childThreadId: null,
     ...patch,
   };
@@ -99,13 +97,15 @@ describe("background work error words", () => {
 describe("background work status words", () => {
   it.each([
     ["running", "运行中", false],
-    ["pending", "运行中", false],
-    ["waiting", "等待中", false],
+    ["pending", "等空位", false],
+    ["waiting", "等空位", false],
+    ["needs_approval", "等你批准", false],
+    ["needs_answer", "等你回答", false],
     ["completed", "已完成", false],
     ["failed", "出错了", true],
     ["cancelled", "已停止", false],
     ["interrupted", "已停止", false],
-    ["mystery", "未知", false],
+    ["mystery", "空闲", false],
   ] as const)("reads %s as %s", (status, label, failed) => {
     expect(backgroundWorkStatusWord(status)).toEqual({ label, failed });
   });
@@ -115,6 +115,9 @@ describe("background work rows", () => {
   const subagent = {
     id: NodeId.make("node-1"),
     threadId: ThreadId.make("parent"),
+    runId: "run-1",
+    origin: "provider_native",
+    nativeTaskRef: { strength: "strong", nativeId: "native-1" },
     title: "Subagent: 修登录",
     prompt: "修登录跳转",
     status: "running",
@@ -126,9 +129,9 @@ describe("background work rows", () => {
     childThreadId: ThreadId.make("child-1"),
     driver: ProviderDriverKind.make("claudeAgent"),
     providerInstanceId: ProviderInstanceId.make("provider"),
-  } as OrchestrationV2Subagent;
+  } as unknown as OrchestrationV2Subagent;
 
-  it("builds a subagent row without inventing a last-output time", () => {
+  it("builds a stoppable Claude native subagent row without inventing a last-output time", () => {
     const [built] = backgroundWorkRowsFromSubagents([subagent]);
     expect(built).toMatchObject({
       id: "subagent:node-1",
@@ -138,8 +141,33 @@ describe("background work rows", () => {
       progress: "在改 login.ts",
       lastOutputAtMs: null,
       errorReason: null,
-      subagentId: "node-1",
+      stop: { kind: "subagent", threadId: "parent", subagentId: "node-1" },
       childThreadId: "child-1",
+    });
+  });
+
+  it("disables stopping for Codex native subagents and uses stopWorkflow for workflows", () => {
+    const [codexNative] = backgroundWorkRowsFromSubagents([
+      { ...subagent, driver: ProviderDriverKind.make("codex") },
+    ]);
+    expect(codexNative?.stop).toBeNull();
+
+    const workflowAgent = {
+      ...subagent,
+      workflow: { name: "复审流", phases: [], agents: [] },
+    } as unknown as OrchestrationV2Subagent;
+    const [noPerm] = backgroundWorkRowsFromSubagents([workflowAgent], {
+      canOperateWorkflow: false,
+    });
+    expect(noPerm?.stop).toBeNull();
+
+    const [withPerm] = backgroundWorkRowsFromSubagents([workflowAgent], {
+      canOperateWorkflow: true,
+    });
+    expect(withPerm?.stop).toEqual({
+      kind: "workflow",
+      threadId: "parent",
+      subagentId: "node-1",
     });
   });
 
@@ -149,9 +177,10 @@ describe("background work rows", () => {
     ]);
     expect(built?.errorReason).toBe("找不到模块");
     expect(built?.status).toBe("failed");
+    expect(built?.stop).toBeNull();
   });
 
-  it("reads a command's last output from its turn item", () => {
+  it("builds command rows with the session driver, no stop target, and no guessed output time", () => {
     const task = {
       taskId: "task-1",
       kind: "command",
@@ -159,39 +188,38 @@ describe("background work rows", () => {
       status: "running",
       itemId: "item-1",
     } as OrchestrationV2PendingBackgroundTask;
-    const turnItem = {
-      id: "item-1",
-      type: "command_execution",
-      updatedAt: at(NOW - 9 * MINUTE),
-      completedAt: null,
-    } as OrchestrationV2TurnItem;
-    const [built] = backgroundWorkRowsFromCommands([task], [turnItem], ThreadId.make("parent"));
+    const [built] = backgroundWorkRowsFromCommands([task], ProviderDriverKind.make("claudeAgent"));
     expect(built).toMatchObject({
       id: "command:task-1",
       source: "command",
       title: "pnpm check",
-      driver: null,
-      lastOutputAtMs: NOW - 9 * MINUTE,
-      stopThreadId: "parent",
-      subagentId: null,
+      driver: "claudeAgent",
+      lastOutputAtMs: null,
+      stop: null,
     });
-    expect(backgroundWorkSilenceMinutes(built?.lastOutputAtMs ?? null, NOW)).toBe(9);
   });
 
-  it("skips a child session that already has a subagent row", () => {
+  it("skips a child session that already has a subagent row and maps 卡住 needsYou states", () => {
     const child = {
       threadId: ThreadId.make("child-1"),
       title: "修登录",
       phase: "在做",
       activity: "在改 login.ts",
     };
-    const other = { ...child, threadId: ThreadId.make("child-2"), title: "写测试" };
-    const rows = backgroundWorkRowsFromChildren([child, other], new Set(["child-1"]));
+    const needsAnswer = {
+      threadId: ThreadId.make("child-2"),
+      title: "写测试",
+      phase: "卡住",
+      activity: "确认分支",
+      needsYou: true,
+      reason: "等你回答",
+    };
+    const rows = backgroundWorkRowsFromChildren([child, needsAnswer], new Set(["child-1"]));
     expect(rows.map((entry) => entry.id)).toEqual(["child:child-2"]);
-    expect(rows[0]).toMatchObject({ status: "running", lastOutputAtMs: null });
+    expect(rows[0]).toMatchObject({ status: "needs_answer", lastOutputAtMs: null, driver: null });
   });
 
-  it("does not relabel a child phase it does not know", () => {
+  it("maps unknown child phase to unknown (空闲) without relabelling", () => {
     const [built] = backgroundWorkRowsFromChildren(
       [
         {
@@ -226,12 +254,14 @@ describe("background work section", () => {
     expect(section.droppedCompleted).toBe(3);
   });
 
-  it("treats a failed row as finished, not active", () => {
+  it("keeps failed rows uncollapsed outside completed", () => {
     const section = presentBackgroundWorkSection([
       row({ id: "ok" }),
       row({ id: "bad", status: "failed" }),
+      row({ id: "done", status: "completed" }),
     ]);
     expect(section.active.map((entry) => entry.id)).toEqual(["ok"]);
-    expect(section.completed.map((entry) => entry.id)).toEqual(["bad"]);
+    expect(section.failed.map((entry) => entry.id)).toEqual(["bad"]);
+    expect(section.completed.map((entry) => entry.id)).toEqual(["done"]);
   });
 });

@@ -6,6 +6,7 @@ import type {
   OrchestrationV2Subagent,
   OrchestrationV2SubagentWorkflow,
   OrchestrationV2TurnItem,
+  ProviderDriverKind,
 } from "@t3tools/contracts";
 import { isOrchestrationV2WorkActive, isProviderNativeSubagentThread } from "@t3tools/contracts";
 
@@ -91,6 +92,50 @@ export function isTerminalSubagentStatus(status: RuntimeSubagentStatus): boolean
 
 export function isActiveSubagentStatus(status: RuntimeSubagentStatus): boolean {
   return isOrchestrationV2WorkActive(status);
+}
+
+export interface SubagentStopEligibilityInput {
+  readonly origin: OrchestrationV2Subagent["origin"];
+  readonly driver: ProviderDriverKind;
+  readonly runId: OrchestrationV2Subagent["runId"];
+  readonly nativeTaskRef: OrchestrationV2Subagent["nativeTaskRef"];
+  readonly nativeStatus: string;
+  readonly status: string;
+  readonly startedAt: unknown;
+}
+
+export function canStopSubagent(agent: SubagentStopEligibilityInput | null | undefined): boolean {
+  if (!agent) return false;
+  const nativeActive =
+    agent.nativeStatus === "pending" ||
+    agent.nativeStatus === "running" ||
+    agent.nativeStatus === "waiting";
+  const statusActive =
+    agent.status === "pending" || agent.status === "running" || agent.status === "waiting";
+  const nativeStoppable =
+    agent.origin === "provider_native" &&
+    agent.driver === "claudeAgent" &&
+    agent.runId != null &&
+    agent.nativeTaskRef?.strength === "strong" &&
+    agent.nativeTaskRef.nativeId !== null &&
+    nativeActive;
+  return (
+    (agent.origin === "app_owned" || nativeStoppable) && Boolean(agent.startedAt) && statusActive
+  );
+}
+
+export function canStopSubagentWorkflow(input: {
+  readonly canOperateWorkflow: boolean;
+  readonly workflowStatus: string | undefined;
+  readonly origin: OrchestrationV2Subagent["origin"] | undefined;
+  readonly driver: ProviderDriverKind | undefined;
+}): boolean {
+  return (
+    input.canOperateWorkflow &&
+    input.workflowStatus === "running" &&
+    input.origin === "provider_native" &&
+    input.driver === "claudeAgent"
+  );
 }
 
 export function isLiveSubagentTurnItem(item: OrchestrationV2TurnItem): boolean {

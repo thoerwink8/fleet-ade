@@ -1,10 +1,14 @@
 import type {
+  NodeId,
   OrchestrationV2PendingBackgroundTask,
   OrchestrationV2Subagent,
-  OrchestrationV2TurnItem,
   ProviderDriverKind,
   ThreadId,
 } from "@t3tools/contracts";
+import {
+  canStopSubagent,
+  canStopSubagentWorkflow,
+} from "@t3tools/client-runtime/state/subagentRuntime";
 import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
 import { commandDisplayText } from "@t3tools/client-runtime/work-log/command-label";
 import * as DateTime from "effect/DateTime";
@@ -14,7 +18,7 @@ import * as DateTime from "effect/DateTime";
  * Only formats existing fields; never fetches or guesses silence without a real output timestamp.
  */
 
-/** Active rows beyond this scroll inside the section instead of growing the column. */
+/** Active (and visible failed) rows beyond this scroll inside the section instead of growing the column. */
 export const BACKGROUND_WORK_SCROLL_AFTER = 6;
 /** Finished rows kept for the session, newest first; older ones leave the section. */
 export const BACKGROUND_WORK_COMPLETED_CAP = 20;
@@ -25,9 +29,15 @@ const ACTIVE_STATUSES: Readonly<Record<string, true>> = {
   pending: true,
   running: true,
   waiting: true,
+  needs_approval: true,
+  needs_answer: true,
 };
 
 export type BackgroundWorkSource = "subagent" | "command" | "child";
+
+export type BackgroundWorkStopTarget =
+  | { readonly kind: "subagent"; readonly threadId: ThreadId; readonly subagentId: NodeId }
+  | { readonly kind: "workflow"; readonly threadId: ThreadId; readonly subagentId: NodeId };
 
 export interface BackgroundWorkRowInput {
   readonly id: string;
@@ -48,10 +58,8 @@ export interface BackgroundWorkRowInput {
   readonly lastOutputAtMs: number | null;
   /** Set on a finished row whose outcome names a reason, so that reason can be marked. */
   readonly errorReason: string | null;
-  /** The subagent a Stop targets. Absent for commands and for a child with no subagent row. */
-  readonly subagentId: string | null;
-  /** The thread a Stop interrupts. A command stops the session thread itself. */
-  readonly stopThreadId: ThreadId | null;
+  /** Target for the Stop button, or null when the contract cannot stop this row individually. */
+  readonly stop: BackgroundWorkStopTarget | null;
   /** The child session a row click opens when one exists. */
   readonly childThreadId: ThreadId | null;
 }
@@ -63,9 +71,11 @@ export interface BackgroundWorkStatusWord {
 }
 
 const STATUS_WORDS: Readonly<Record<string, BackgroundWorkStatusWord>> = {
-  pending: { label: "运行中", failed: false },
+  pending: { label: "等空位", failed: false },
   running: { label: "运行中", failed: false },
-  waiting: { label: "等待中", failed: false },
+  waiting: { label: "等空位", failed: false },
+  needs_approval: { label: "等你批准", failed: false },
+  needs_answer: { label: "等你回答", failed: false },
   completed: { label: "已完成", failed: false },
   failed: { label: "出错了", failed: true },
   cancelled: { label: "已停止", failed: false },
@@ -73,7 +83,7 @@ const STATUS_WORDS: Readonly<Record<string, BackgroundWorkStatusWord>> = {
 };
 
 export function backgroundWorkStatusWord(status: string): BackgroundWorkStatusWord {
-  return STATUS_WORDS[status] ?? { label: "未知", failed: false };
+  return STATUS_WORDS[status] ?? { label: "空闲", failed: false };
 }
 
 export function isActiveBackgroundWork(status: string): boolean {
@@ -141,16 +151,44 @@ function isoOrNull(value: DateTime.Utc | null | undefined): string | null {
 
 /**
  * Subagent rows. `updatedAt` changes on every status write, not only on output, so it is not a
- * last-output time; the silence line stays off rather than guessed.
+ * last-output time; the silence line stays off rather than guessed. Stop eligibility matches
+ * `ThreadRelationshipsControl` (Codex native subagents cannot be stopped; workflows use `stopWorkflow`).
  */
 export function backgroundWorkRowsFromSubagents(
   subagents: ReadonlyArray<OrchestrationV2Subagent>,
+  options?: { readonly canOperateWorkflow?: boolean },
 ): ReadonlyArray<BackgroundWorkRowInput> {
+  const canOperateWorkflow = options?.canOperateWorkflow ?? false;
   return subagents.map((subagent) => {
     // A failed row reads its reason instead of the last progress, so the reason is what the
     // second line can mark.
     const failed = subagent.status === "failed";
     const resultText = subagent.result?.trim() || null;
+    let stop: BackgroundWorkStopTarget | null = null;
+    if (subagent.workflow !== undefined) {
+      if (
+        canStopSubagentWorkflow({
+          canOperateWorkflow,
+          workflowStatus: subagent.status,
+          origin: subagent.origin,
+          driver: subagent.driver,
+        })
+      ) {
+        stop = { kind: "workflow", threadId: subagent.threadId, subagentId: subagent.id };
+      }
+    } else if (
+      canStopSubagent({
+        origin: subagent.origin,
+        driver: subagent.driver,
+        runId: subagent.runId,
+        nativeTaskRef: subagent.nativeTaskRef,
+        nativeStatus: subagent.status,
+        status: subagent.status,
+        startedAt: subagent.startedAt,
+      })
+    ) {
+      stop = { kind: "subagent", threadId: subagent.threadId, subagentId: subagent.id };
+    }
     return {
       id: `subagent:${subagent.id}`,
       source: "subagent" as const,
@@ -162,31 +200,20 @@ export function backgroundWorkRowsFromSubagents(
       progress: failed && resultText !== null ? resultText : (subagent.progress ?? null),
       lastOutputAtMs: null,
       errorReason: failed ? resultText : null,
-      subagentId: subagent.id,
-      stopThreadId: subagent.threadId,
+      stop,
       childThreadId: subagent.childThreadId,
     };
   });
 }
-function turnItemOutputAtMs(
-  task: OrchestrationV2PendingBackgroundTask,
-  turnItems: ReadonlyArray<OrchestrationV2TurnItem>,
-): number | null {
-  const item = turnItems.findLast((candidate) =>
-    task.itemId === undefined
-      ? (candidate.nativeItemRef?.nativeId || candidate.id) === task.taskId
-      : candidate.id === task.itemId,
-  );
-  if (item === undefined) return null;
-  const stamp = item.completedAt ?? item.updatedAt;
-  return DateTime.toEpochMillis(stamp);
-}
 
-/** Command rows from the provider thread's background roster, pending and already finished. */
+/**
+ * Command rows from the provider thread's background roster, pending and already finished.
+ * Contracts carry no per-command stop RPC and no last-output timestamp (output streams on expand
+ * without chunk timestamps), so both stay `null` rather than targeting the main turn or guessing.
+ */
 export function backgroundWorkRowsFromCommands(
   tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>,
-  turnItems: ReadonlyArray<OrchestrationV2TurnItem>,
-  sessionThreadId: ThreadId,
+  sessionDriver: ProviderDriverKind | null,
 ): ReadonlyArray<BackgroundWorkRowInput> {
   const seen = new Set<string>();
   const rows: BackgroundWorkRowInput[] = [];
@@ -198,15 +225,14 @@ export function backgroundWorkRowsFromCommands(
       id: `command:${task.taskId}`,
       source: "command",
       title: rowTitle("command", task.description ?? task.command),
-      driver: null,
+      driver: sessionDriver,
       status: task.status ?? "running",
       startedAt: isoOrNull(task.startedAt),
       completedAt: isoOrNull(task.completedAt),
       progress: null,
-      lastOutputAtMs: turnItemOutputAtMs(task, turnItems),
+      lastOutputAtMs: null,
       errorReason: null,
-      subagentId: null,
-      stopThreadId: sessionThreadId,
+      stop: null,
       childThreadId: null,
     });
   }
@@ -218,19 +244,25 @@ export interface BackgroundWorkChildSession {
   readonly title: string | null;
   readonly phase: string;
   readonly activity: string;
+  readonly needsYou?: boolean;
+  readonly reason?: string;
 }
 
-const CHILD_PHASE_STATUS: Readonly<Record<string, string>> = {
-  在做: "running",
-  卡住: "waiting",
-  做完: "completed",
-};
+function childPhaseStatus(child: BackgroundWorkChildSession): string {
+  if (child.phase === "在做") return "running";
+  if (child.phase === "做完") return "completed";
+  if (child.phase === "卡住") {
+    if (child.needsYou) {
+      return child.reason?.startsWith("等你批准") ? "needs_approval" : "needs_answer";
+    }
+    return "waiting";
+  }
+  return "unknown";
+}
 
 /**
  * Child sessions the two rosters above do not already show. A child that is itself a subagent is
- * one row, not two. The summary's phase words are its own vocabulary, so the status falls back to
- * 未知 rather than relabelling them. The summary keeps no per-row output stamp, so the silence
- * line stays off for child rows.
+ * one row, not two. The summary keeps no per-row output stamp, so the silence line stays off.
  */
 export function backgroundWorkRowsFromChildren(
   children: ReadonlyArray<BackgroundWorkChildSession>,
@@ -243,21 +275,22 @@ export function backgroundWorkRowsFromChildren(
       source: "child" as const,
       title: rowTitle("child", child.title ?? undefined),
       driver: null,
-      status: CHILD_PHASE_STATUS[child.phase] ?? "unknown",
+      status: childPhaseStatus(child),
       startedAt: null,
       completedAt: null,
       progress: child.activity.trim() || null,
       lastOutputAtMs: null,
       errorReason: null,
-      subagentId: null,
-      stopThreadId: null,
+      stop: null,
       childThreadId: child.threadId,
     }));
 }
 
 export interface BackgroundWorkSectionModel {
   readonly active: ReadonlyArray<BackgroundWorkRowInput>;
-  /** Finished rows kept for the session, newest end first. */
+  /** Errored rows stay uncollapsed in the main list so failures remain visible immediately. */
+  readonly failed: ReadonlyArray<BackgroundWorkRowInput>;
+  /** Non-failed finished rows kept for the session, newest end first. */
   readonly completed: ReadonlyArray<BackgroundWorkRowInput>;
   /** Finished rows past the cap; counted but not rendered. */
   readonly droppedCompleted: number;
@@ -267,14 +300,18 @@ function byRecency(left: BackgroundWorkRowInput, right: BackgroundWorkRowInput):
   return Date.parse(right.completedAt ?? "") - Date.parse(left.completedAt ?? "");
 }
 
-/** Splits the gathered rows into the scrolling active list and the collapsed finished list. */
+/** Splits the gathered rows into active, uncollapsed failed, and collapsed finished lists. */
 export function presentBackgroundWorkSection(
   rows: ReadonlyArray<BackgroundWorkRowInput>,
 ): BackgroundWorkSectionModel {
   const active = rows.filter((row) => isActiveBackgroundWork(row.status));
-  const finished = rows.filter((row) => !isActiveBackgroundWork(row.status)).sort(byRecency);
+  const failed = rows.filter((row) => row.status === "failed").sort(byRecency);
+  const finished = rows
+    .filter((row) => !isActiveBackgroundWork(row.status) && row.status !== "failed")
+    .sort(byRecency);
   return {
     active,
+    failed,
     completed: finished.slice(0, BACKGROUND_WORK_COMPLETED_CAP),
     droppedCompleted: Math.max(0, finished.length - BACKGROUND_WORK_COMPLETED_CAP),
   };

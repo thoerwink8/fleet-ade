@@ -1,4 +1,5 @@
-import type { ChildSummaryListItem, EnvironmentId, NodeId, ThreadId } from "@t3tools/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import type { ChildSummaryListItem, EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { PROVIDER_DISPLAY_NAMES } from "@t3tools/contracts";
 import { deriveCompletedBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { useNavigate } from "@tanstack/react-router";
@@ -27,6 +28,7 @@ import {
   backgroundWorkRowsFromSubagents,
   backgroundWorkSecondLine,
   backgroundWorkStatusWord,
+  isActiveBackgroundWork,
   presentBackgroundWorkSection,
   BACKGROUND_WORK_SCROLL_AFTER,
   type BackgroundWorkRowInput,
@@ -39,6 +41,8 @@ function childSessionOf(item: ChildSummaryListItem) {
     title: item.title ?? null,
     phase: item.phase,
     activity: item.activity,
+    needsYou: item.needsYou,
+    reason: item.reason,
   };
 }
 
@@ -49,13 +53,9 @@ const SOURCE_ICONS = {
 } as const;
 
 function agentSlotInitial(row: BackgroundWorkRowInput): string | null {
-  if (row.driver !== null) {
-    const name = PROVIDER_DISPLAY_NAMES[row.driver];
-    if (name !== undefined && name.length > 0) return name.charAt(0).toLocaleUpperCase();
-  }
-  // Only a child session has no provider of its own; the title initial still says whose row it is.
-  const letter = row.title.trim().charAt(0);
-  return letter.length === 0 ? null : letter.toLocaleUpperCase();
+  if (row.driver === null) return null;
+  const name = PROVIDER_DISPLAY_NAMES[row.driver];
+  return name !== undefined && name.length > 0 ? name.charAt(0).toLocaleUpperCase() : null;
 }
 
 function statusDotClass(row: BackgroundWorkRowInput): string {
@@ -64,6 +64,8 @@ function statusDotClass(row: BackgroundWorkRowInput): string {
     case "pending":
       return "fa-dot fa-dot--running";
     case "waiting":
+    case "needs_approval":
+    case "needs_answer":
       return "fa-dot fa-dot--ring";
     case "failed":
       return "fa-dot fa-dot--error";
@@ -76,36 +78,40 @@ function BackgroundTaskStopButton(props: {
   readonly row: BackgroundWorkRowInput;
   readonly environmentId: EnvironmentId;
   readonly stopping: boolean;
-  readonly onStoppingChange: (id: string | null) => void;
+  readonly onStoppingStart: (id: string) => void;
+  readonly onStoppingClear: (id: string) => void;
 }) {
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
+  const stopWorkflow = useAtomCommand(orchestrationEnvironment.stopWorkflow, {
+    reportFailure: false,
+  });
 
-  if (props.row.stopThreadId === null) return null;
+  const { stop: target } = props.row;
+  if (target === null) return null;
 
   const stop = async (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (props.stopping || props.row.stopThreadId === null) return;
-    props.onStoppingChange(props.row.id);
-    const input =
-      props.row.subagentId === null
-        ? { threadId: props.row.stopThreadId }
-        : {
-            threadId: props.row.stopThreadId,
-            subagentId: props.row.subagentId as NodeId,
-          };
-    const result = await interruptTurn({
-      environmentId: props.environmentId,
-      input,
-    });
-    props.onStoppingChange(null);
+    if (props.stopping) return;
+    props.onStoppingStart(props.row.id);
+    const result =
+      target.kind === "workflow"
+        ? await stopWorkflow({
+            environmentId: props.environmentId,
+            input: { threadId: target.threadId, subagentId: target.subagentId },
+          })
+        : await interruptTurn({
+            environmentId: props.environmentId,
+            input: { threadId: target.threadId, subagentId: target.subagentId },
+          });
     if (result._tag === "Failure") {
-      // The row's live roster still shows the work running, so the word rolls itself back;
-      // the toast carries the reason the server gave.
+      // Failed stops roll back immediately; successful stops stay in "正在停止" until the
+      // projection removes the row from active status.
+      props.onStoppingClear(props.row.id);
       const failure = squashAtomCommandFailure(result);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法停止后台任务",
+          title: target.kind === "workflow" ? "无法停止工作流" : "无法停止后台任务",
           description: failure instanceof Error ? failure.message : "这条后台任务还在运行。",
         }),
       );
@@ -120,7 +126,7 @@ function BackgroundTaskStopButton(props: {
       disabled={props.stopping}
       onClick={(event) => void stop(event)}
     >
-      <SquareIcon className="fa-ic" aria-hidden />
+      <SquareIcon className="fa-ic fill-current" aria-hidden />
     </button>
   );
 }
@@ -128,8 +134,9 @@ function BackgroundTaskStopButton(props: {
 function BackgroundTaskRow(props: {
   readonly row: BackgroundWorkRowInput;
   readonly environmentId: EnvironmentId;
-  readonly stoppingId: string | null;
-  readonly onStoppingChange: (id: string | null) => void;
+  readonly stopping: boolean;
+  readonly onStoppingStart: (id: string) => void;
+  readonly onStoppingClear: (id: string) => void;
   readonly onOpen: (row: BackgroundWorkRowInput) => void;
 }) {
   const { row } = props;
@@ -137,10 +144,13 @@ function BackgroundTaskRow(props: {
   const nowMs = Date.parse(`${nowMinute}:00.000Z`);
   const status = backgroundWorkStatusWord(row.status);
   const secondLine = backgroundWorkSecondLine(row, nowMs);
-  const stopping = props.stoppingId === row.id;
-  const active = row.status === "pending" || row.status === "running" || row.status === "waiting";
+  const active = isActiveBackgroundWork(row.status);
+  const stopping = active && props.stopping;
+  const statusText = stopping ? "正在停止" : row.status === "running" ? null : status.label;
   const TypeIcon = SOURCE_ICONS[row.source];
+  const initial = agentSlotInitial(row);
   const secondLineNodes: ReactNode[] = [];
+  const secondLineFull = secondLine?.map((segment) => segment.text).join("") ?? "";
   if (secondLine !== null) {
     let offset = 0;
     for (const segment of secondLine) {
@@ -180,13 +190,17 @@ function BackgroundTaskRow(props: {
           </Tooltip>
         </span>
         <span className="end">
-          <span className="fa-agent" aria-hidden>
-            {agentSlotInitial(row)}
-            <span className={statusDotClass(row)} />
-          </span>
-          <span className={cn("st", status.failed && "is-bad")}>
-            {stopping ? "正在停止" : status.label}
-          </span>
+          {initial !== null ? (
+            <span className="fa-agent" aria-hidden>
+              {initial}
+              <span className={statusDotClass(row)} />
+            </span>
+          ) : (
+            <span className={statusDotClass(row)} aria-hidden />
+          )}
+          {statusText !== null ? (
+            <span className={cn("st", !stopping && status.failed && "is-bad")}>{statusText}</span>
+          ) : null}
           {row.startedAt !== null ? (
             <span className="tm">
               <AgentElapsed
@@ -206,20 +220,25 @@ function BackgroundTaskRow(props: {
               row={row}
               environmentId={props.environmentId}
               stopping={stopping}
-              onStoppingChange={props.onStoppingChange}
+              onStoppingStart={props.onStoppingStart}
+              onStoppingClear={props.onStoppingClear}
             />
           ) : null}
         </span>
-        {secondLineNodes.length > 0 ? <span className="sub">{secondLineNodes}</span> : null}
+        {secondLineNodes.length > 0 ? (
+          <Tooltip>
+            <TooltipTrigger render={<span className="sub" />}>{secondLineNodes}</TooltipTrigger>
+            <TooltipPopup side="top">{secondLineFull}</TooltipPopup>
+          </Tooltip>
+        ) : null}
       </div>
     </li>
   );
 }
 
 /**
- * The 后台任务 section: active background work for this session, finished entries folded into a
- * count. It reads the thread's subagent roster, its provider-thread background commands, and its
- * child-session summaries; it never asks the server for anything the projection already knows.
+ * The 后台任务 section: active and errored background work for this session, with non-failed
+ * finished entries folded into a count. Reads the thread projection and child summaries directly.
  */
 export function ThreadDetailsTasks(props: {
   readonly environmentId: EnvironmentId;
@@ -228,7 +247,10 @@ export function ThreadDetailsTasks(props: {
   const threadProjection = useThreadProjection(scopeThreadRef(props.environmentId, props.threadId));
   const projection = threadProjection?.projection ?? null;
   const navigate = useNavigate();
-  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const canOperateWorkflow = useAtomValue(
+    orchestrationEnvironment.stopWorkflow.permissionAtom(props.environmentId),
+  );
+  const [stoppingIds, setStoppingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [completedOpen, setCompletedOpen] = useState(false);
 
   // The same roster the composer banner reads, so the count here and there agree.
@@ -243,7 +265,17 @@ export function ThreadDetailsTasks(props: {
 
   if (projection === null) return null;
 
-  const subagentRows = backgroundWorkRowsFromSubagents(projection.subagents);
+  const sessionDriver =
+    projection.providerThreads.find(
+      (entry) => entry.id === projection.thread.activeProviderThreadId,
+    )?.driver ??
+    projection.providerThreads.at(-1)?.driver ??
+    projection.providerSessions.at(-1)?.driver ??
+    null;
+
+  const subagentRows = backgroundWorkRowsFromSubagents(projection.subagents, {
+    canOperateWorkflow,
+  });
   const shownChildThreadIds = new Set(
     subagentRows
       .map((row) => row.childThreadId)
@@ -256,14 +288,30 @@ export function ThreadDetailsTasks(props: {
   });
   const commandRows = backgroundWorkRowsFromCommands(
     [...pendingTasks, ...finishedCommandTasks],
-    projection.turnItems,
-    props.threadId,
+    sessionDriver,
   );
   const childRows = backgroundWorkRowsFromChildren(
     children.map(childSessionOf),
     shownChildThreadIds,
   );
   const section = presentBackgroundWorkSection([...subagentRows, ...commandRows, ...childRows]);
+  const visibleRows = [...section.active, ...section.failed];
+
+  const markStopping = (id: string) =>
+    setStoppingIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+
+  const clearStopping = (id: string) =>
+    setStoppingIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
   const openRow = (row: BackgroundWorkRowInput) => {
     // The detail pane lands with the next slice; a child session is already a place worth opening.
@@ -274,22 +322,23 @@ export function ThreadDetailsTasks(props: {
     });
   };
 
-  const scrollable = section.active.length > BACKGROUND_WORK_SCROLL_AFTER;
-  const completedCount = section.completed.length + section.droppedCompleted;
+  const scrollable = visibleRows.length > BACKGROUND_WORK_SCROLL_AFTER;
+  const completedCount = section.completed.length;
 
   let rows: ReactNode;
-  if (section.active.length === 0 && completedCount === 0) {
+  if (visibleRows.length === 0 && completedCount === 0) {
     rows = <li className="note">没有后台任务</li>;
   } else {
     rows = (
       <>
-        {section.active.map((row) => (
+        {visibleRows.map((row) => (
           <BackgroundTaskRow
             key={row.id}
             row={row}
             environmentId={props.environmentId}
-            stoppingId={stoppingId}
-            onStoppingChange={setStoppingId}
+            stopping={stoppingIds.has(row.id)}
+            onStoppingStart={markStopping}
+            onStoppingClear={clearStopping}
             onOpen={openRow}
           />
         ))}
@@ -301,8 +350,9 @@ export function ThreadDetailsTasks(props: {
                     key={row.id}
                     row={row}
                     environmentId={props.environmentId}
-                    stoppingId={stoppingId}
-                    onStoppingChange={setStoppingId}
+                    stopping={false}
+                    onStoppingStart={markStopping}
+                    onStoppingClear={clearStopping}
                     onOpen={openRow}
                   />
                 ))
@@ -310,7 +360,7 @@ export function ThreadDetailsTasks(props: {
             <li>
               <button
                 type="button"
-                className="note"
+                className="note ade-touch-target"
                 data-completed-count
                 aria-expanded={completedOpen}
                 onClick={() => setCompletedOpen((open) => !open)}

@@ -9,6 +9,7 @@ import {
   ThreadId,
   type OrchestrationV2Subagent,
 } from "@t3tools/contracts";
+import { useSyncExternalStore } from "react";
 import { expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 
@@ -16,14 +17,30 @@ import "~/index.css";
 
 const state = vi.hoisted(() => ({
   projection: null as unknown,
+  version: 0,
+  listeners: new Set<() => void>(),
   children: [] as unknown[],
-  interruptCalls: [] as Array<{ environmentId: string; input: unknown }>,
-  interruptResult: "failure" as "failure" | "pending",
+  canOperateWorkflow: true,
+  commandCalls: [] as Array<{ command: unknown; environmentId: string; input: unknown }>,
+  commandResult: "failure" as "failure" | "success" | "pending",
+}));
+
+vi.mock(import("@effect/atom-react"), async (original) => ({
+  ...(await original()),
+  useAtomValue: (() => state.canOperateWorkflow) as never,
 }));
 
 vi.mock(import("../../state/entities"), () => ({
-  useThreadProjection: ((ref: unknown) =>
-    ref === null ? null : { projection: state.projection }) as never,
+  useThreadProjection: ((ref: unknown) => {
+    useSyncExternalStore(
+      (listener) => {
+        state.listeners.add(listener);
+        return () => state.listeners.delete(listener);
+      },
+      () => state.version,
+    );
+    return ref === null ? null : { projection: state.projection };
+  }) as never,
 }));
 
 vi.mock(import("../../state/query"), async (original) => ({
@@ -39,18 +56,23 @@ vi.mock(import("../../state/query"), async (original) => ({
 }));
 
 vi.mock(import("../../state/use-atom-command"), () => ({
-  useAtomCommand: (() => {
+  useAtomCommand: ((command: unknown) => {
     return (target: { environmentId: string; input: unknown }) => {
-      state.interruptCalls.push(target);
-      if (state.interruptResult === "pending") {
+      state.commandCalls.push({ command, ...target });
+      if (state.commandResult === "pending") {
         return new Promise(() => {});
+      }
+      if (state.commandResult === "success") {
+        return Promise.resolve(AsyncResult.success(undefined));
       }
       return Promise.resolve(AsyncResult.failure(Cause.fail(new Error("这条命令还在写入。"))));
     };
   }) as never,
 }));
 
-import { fakeTimers, render } from "../../../test/render";
+import { orchestrationEnvironment } from "../../state/orchestration";
+import { threadEnvironment } from "../../state/threads";
+import { render } from "../../../test/render";
 import { makeThreadProjectionFixture } from "../../test-fixtures";
 import { ToastProvider } from "../ui/toast";
 import { ThreadDetailsTasks } from "./ThreadDetailsTasks";
@@ -69,10 +91,11 @@ function subagent(
 ): OrchestrationV2Subagent {
   return {
     threadId,
-    runId: null,
+    runId: "run-1",
     parentNodeId: NodeId.make("root"),
     origin: "provider_native",
     createdBy: "agent",
+    nativeTaskRef: { strength: "strong", nativeId: `native-${patch.id}` },
     driver: ProviderDriverKind.make("claudeAgent"),
     providerInstanceId: ProviderInstanceId.make("provider"),
     providerThreadId: null,
@@ -86,7 +109,7 @@ function subagent(
     completedAt: null,
     updatedAt: at(NOW - MINUTE),
     ...patch,
-  } as OrchestrationV2Subagent;
+  } as unknown as OrchestrationV2Subagent;
 }
 
 function setup(
@@ -95,10 +118,12 @@ function setup(
     readonly providerThreads?: ReadonlyArray<unknown>;
     readonly turnItems?: ReadonlyArray<unknown>;
     readonly children?: ReadonlyArray<unknown>;
+    readonly canOperateWorkflow?: boolean;
   },
 ) {
-  state.interruptCalls = [];
-  state.interruptResult = "failure";
+  state.commandCalls = [];
+  state.commandResult = "failure";
+  state.canOperateWorkflow = extra?.canOperateWorkflow ?? true;
   state.children = [...(extra?.children ?? [])];
   const projection = makeThreadProjectionFixture();
   state.projection = {
@@ -110,20 +135,30 @@ function setup(
     providerThreads: [...(extra?.providerThreads ?? [])],
     turnItems: [...(extra?.turnItems ?? [])],
   };
+  state.version += 1;
+  for (const listener of state.listeners) listener();
 }
 
 function Section() {
   return (
     <ToastProvider timeout={0}>
-      <ThreadDetailsTasks environmentId={environmentId} threadId={threadId} />
+      <div className="w-70">
+        <ThreadDetailsTasks environmentId={environmentId} threadId={threadId} />
+      </div>
     </ToastProvider>
   );
 }
 
-it("keeps a single-line row at 32px and a progress row at 52px with a 14px title", async () => {
+it("keeps a single-line row at 32px and a progress row at 52px with 14px title and notes", async () => {
   setup([
     subagent({ id: NodeId.make("one"), title: "盘点子会话数据" }),
     subagent({ id: NodeId.make("two"), title: "复审 PR", progress: "在改 login.ts" }),
+    subagent({
+      id: NodeId.make("done"),
+      title: "修好了登录",
+      status: "completed",
+      completedAt: at(NOW - MINUTE),
+    }),
   ]);
   await using screen = await render(<Section />);
 
@@ -136,58 +171,54 @@ it("keeps a single-line row at 32px and a progress row at 52px with a 14px title
   expect(title).not.toBeNull();
   expect(getComputedStyle(title!).fontSize).toBe("14px");
   expect(getComputedStyle(title!).whiteSpace).toBe("nowrap");
+
+  // Running rows hide the redundant 运行中 status text; the static green dot stays.
+  expect(rows[0]!.textContent).not.toContain("运行中");
+  expect(rows[0]!.querySelector(".fa-dot--running")).not.toBeNull();
+
+  const completedToggle = screen.getByRole("button", { name: /已完成 1/ }).element();
+  expect(getComputedStyle(completedToggle).fontSize).toBe("14px");
 });
 
-it("shows the silence note only for a command quiet longer than five minutes", async () => {
-  using _timers = fakeTimers();
-  vi.setSystemTime(NOW);
-  setup([], {
-    providerThreads: [
-      {
-        id: "provider-thread-1",
-        providerInstanceId: "codex",
-        pendingBackgroundTasks: [
-          {
-            taskId: "task-1",
-            kind: "command",
-            description: "pnpm check",
-            status: "running",
-            itemId: "item-1",
-          },
-          {
-            taskId: "task-2",
-            kind: "command",
-            description: "vite dev",
-            status: "running",
-            itemId: "item-2",
-          },
-        ],
-      },
+it("shows no stop button on commands or Codex native subagents and uses session avatar for commands", async () => {
+  setup(
+    [
+      subagent({
+        id: NodeId.make("codex-native"),
+        title: "Codex 子代理",
+        driver: "codex" as never,
+      }),
     ],
-    turnItems: [
-      {
-        id: "item-1",
-        type: "command_execution",
-        updatedAt: at(NOW - 8 * MINUTE - 1),
-        completedAt: null,
-      },
-      {
-        id: "item-2",
-        type: "command_execution",
-        updatedAt: at(NOW - 2 * MINUTE - 1),
-        completedAt: null,
-      },
-    ],
-  });
+    {
+      providerThreads: [
+        {
+          id: "provider-thread-1",
+          driver: "claudeAgent",
+          providerInstanceId: "claude",
+          pendingBackgroundTasks: [
+            {
+              taskId: "task-1",
+              kind: "command",
+              description: "sleep 300",
+              status: "running",
+              startedAt: at(NOW - 8 * MINUTE),
+              itemId: "item-1",
+            },
+          ],
+        },
+      ],
+    },
+  );
   await using screen = await render(<Section />);
 
-  const rows = screen.container.querySelectorAll("[data-background-task]");
+  const rows = [...screen.container.querySelectorAll("[data-background-task]")];
   expect(rows).toHaveLength(2);
-  expect(rows[0]?.textContent).toContain("已 8 分钟无输出");
-  const quietRow = [...screen.container.querySelectorAll("[data-background-task]")].find((row) =>
-    row.textContent?.includes("vite dev"),
-  );
-  expect(quietRow?.textContent).not.toContain("无输出");
+  expect(screen.container.querySelectorAll(".fa-icon-btn")).toHaveLength(0);
+
+  const commandRow = rows.find((entry) => entry.textContent?.includes("sleep 300"));
+  expect(commandRow).toBeDefined();
+  // Uses the session driver's initial (Claude -> C), never the command title's initial ("S").
+  expect(commandRow!.querySelector(".fa-agent")?.textContent).toBe("C");
 });
 
 it("dispatches a stop for the row's subagent and rolls back with the reason on failure", async () => {
@@ -196,35 +227,110 @@ it("dispatches a stop for the row's subagent and rolls back with the reason on f
 
   await screen.getByRole("button", { name: "停止 复审 PR" }).click();
 
-  expect(state.interruptCalls).toHaveLength(1);
-  expect(state.interruptCalls[0]).toEqual({
+  expect(state.commandCalls).toHaveLength(1);
+  expect(state.commandCalls[0]).toEqual({
+    command: threadEnvironment.interruptTurn,
     environmentId: "environment",
     input: { threadId: "thread", subagentId: "agent-1" },
   });
   await expect.element(page.getByText("无法停止后台任务")).toBeVisible();
   await expect.element(page.getByText("这条命令还在写入。")).toBeVisible();
-  // The failure rolls the row back to its roster status word.
   const row = screen.container.querySelector("[data-background-task]");
-  expect(row?.textContent).toContain("运行中");
   expect(row?.textContent).not.toContain("正在停止");
 });
 
-it("reads 正在停止 while the stop is in flight", async () => {
-  setup([subagent({ id: NodeId.make("agent-1"), title: "复审 PR" })]);
-  state.interruptResult = "pending";
+it("dispatches stopWorkflow for workflow subagents", async () => {
+  setup([
+    subagent({
+      id: NodeId.make("wf-1"),
+      title: "并行核验流",
+      workflow: { name: "并行核验流", phases: [], agents: [] } as never,
+    }),
+  ]);
+  await using screen = await render(<Section />);
+
+  await screen.getByRole("button", { name: "停止 并行核验流" }).click();
+  expect(state.commandCalls).toEqual([
+    {
+      command: orchestrationEnvironment.stopWorkflow,
+      environmentId: "environment",
+      input: { threadId: "thread", subagentId: "wf-1" },
+    },
+  ]);
+});
+
+it("keeps 正在停止 across multiple rows until each row leaves active status", async () => {
+  setup([
+    subagent({ id: NodeId.make("agent-1"), title: "复审 PR" }),
+    subagent({ id: NodeId.make("agent-2"), title: "跑集成测试" }),
+  ]);
+  state.commandResult = "success";
   await using screen = await render(<Section />);
 
   await screen.getByRole("button", { name: "停止 复审 PR" }).click();
+  await screen.getByRole("button", { name: "停止 跑集成测试" }).click();
 
-  const row = screen.container.querySelector("[data-background-task]");
-  expect(row?.textContent).toContain("正在停止");
-  expect(
-    (screen.getByRole("button", { name: "正在停止" }).element() as HTMLButtonElement).disabled,
-  ).toBe(true);
-  expect(state.interruptCalls).toHaveLength(1);
+  const rows = screen.container.querySelectorAll("[data-background-task]");
+  expect(rows[0]?.textContent).toContain("正在停止");
+  expect(rows[1]?.textContent).toContain("正在停止");
+  expect(screen.container.querySelectorAll("button[aria-label='正在停止']")).toHaveLength(2);
+
+  // Once the projection moves agent-1 out of active status, it leaves the active list cleanly.
+  setup([
+    subagent({
+      id: NodeId.make("agent-1"),
+      title: "复审 PR",
+      status: "cancelled",
+      completedAt: at(NOW),
+    }),
+    subagent({ id: NodeId.make("agent-2"), title: "跑集成测试" }),
+  ]);
+
+  await vi.waitFor(() => {
+    const activeRows = screen.container.querySelectorAll("[data-background-task]");
+    expect(activeRows).toHaveLength(1);
+    expect(activeRows[0]?.textContent).toContain("跑集成测试");
+    expect(activeRows[0]?.textContent).toContain("正在停止");
+  });
 });
 
-it("caps the active list's height once more than six rows are running", async () => {
+it("keeps at least six Chinese characters of title visible at 1024 and 390 widths", async () => {
+  setup([
+    subagent({
+      id: NodeId.make("long-1"),
+      title: "长标题至少要露六个汉字才行",
+    }),
+    subagent({
+      id: NodeId.make("long-2"),
+      title: "正在等待批准的长标题也不能被挤没",
+      status: "waiting",
+    }),
+  ]);
+
+  try {
+    for (const [width, height] of [
+      [1024, 768],
+      [390, 844],
+    ] as const) {
+      await page.viewport(width, height);
+      await using screen = await render(<Section />);
+      const rows = [...screen.container.querySelectorAll("[data-background-task]")];
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        const titleEl = row.querySelector(".t .x")!;
+        expect(titleEl.getBoundingClientRect().width).toBeGreaterThanOrEqual(84);
+        expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+      }
+      const heading = screen.container.querySelector("#thread-details-tasks-heading")!;
+      expect(heading.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
+      expect(rows[1]!.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
+    }
+  } finally {
+    await page.viewport(1440, 900);
+  }
+});
+
+it("caps the active list height past six rows while keeping heading and first three rows in the fold", async () => {
   setup(
     Array.from({ length: 7 }, (_, index) =>
       subagent({ id: NodeId.make(`agent-${index}`), title: `任务 ${index}` }),
@@ -236,7 +342,15 @@ it("caps the active list's height once more than six rows are running", async ()
   expect(list).not.toBeNull();
   expect(list!.classList.contains("is-scrollable")).toBe(true);
   expect(getComputedStyle(list!).maxHeight).toBe("192px");
-  expect(screen.container.querySelectorAll("[data-background-task]")).toHaveLength(7);
+  const rows = [...screen.container.querySelectorAll("[data-background-task]")];
+  expect(rows).toHaveLength(7);
+
+  const heading = screen.container.querySelector("#thread-details-tasks-heading")!;
+  const listRect = list!.getBoundingClientRect();
+  expect(heading.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+  for (const row of rows.slice(0, 3)) {
+    expect(row.getBoundingClientRect().bottom).toBeLessThanOrEqual(listRect.bottom);
+  }
 });
 
 it("fits all rows inside the section when six or fewer are running", async () => {
@@ -251,15 +365,17 @@ it("fits all rows inside the section when six or fewer are running", async () =>
   expect(list!.classList.contains("is-scrollable")).toBe(false);
 });
 
-it("folds finished work into 已完成 N and expands it on click", async () => {
+it("keeps failed rows visible, matches 已完成 N to expanded rows, and marks only error words red", async () => {
   setup([
     subagent({ id: NodeId.make("agent-live"), title: "还在跑" }),
-    subagent({
-      id: NodeId.make("agent-done"),
-      title: "修好了登录",
-      status: "completed",
-      completedAt: at(NOW - 2 * MINUTE),
-    }),
+    ...Array.from({ length: 22 }, (_, index) =>
+      subagent({
+        id: NodeId.make(`agent-done-${index}`),
+        title: `完成任务 ${index}`,
+        status: "completed",
+        completedAt: at(NOW - (index + 2) * MINUTE),
+      }),
+    ),
     subagent({
       id: NodeId.make("agent-failed"),
       title: "没修好的构建",
@@ -270,25 +386,28 @@ it("folds finished work into 已完成 N and expands it on click", async () => {
   ]);
   await using screen = await render(<Section />);
 
-  const toggle = screen.getByRole("button", { name: /已完成 2/ });
-  await expect.element(toggle).toBeVisible();
-  expect(screen.container.querySelectorAll("[data-background-task]")).toHaveLength(1);
-
-  await toggle.click();
-  expect(screen.container.querySelectorAll("[data-background-task]")).toHaveLength(3);
-  // The failed row's reason is the only red-marked text on its second line.
-  const failedRow = [...screen.container.querySelectorAll("[data-background-task]")].find((row) =>
-    row.textContent?.includes("没修好的构建"),
-  );
+  // Active + failed are both visible before expanding completed work.
+  const initialRows = [...screen.container.querySelectorAll("[data-background-task]")];
+  expect(initialRows).toHaveLength(2);
+  const failedRow = initialRows.find((row) => row.textContent?.includes("没修好的构建"));
   expect(failedRow?.textContent).toContain("出错了");
-  const badSegment = failedRow?.querySelector(".sub .bad");
-  expect(badSegment?.textContent).toBe("找不到模块");
+  expect(failedRow?.querySelector(".sub .bad")?.textContent).toBe("找不到模块");
+
+  // Completed count matches the capped 20 expanded rows (not 22).
+  const toggle = screen.getByRole("button", { name: "已完成 20" });
+  await expect.element(toggle).toBeVisible();
+  await toggle.click();
+  expect(screen.container.querySelectorAll("[data-background-task]")).toHaveLength(22);
 });
 
-it("shows the one-line empty state when nothing runs and nothing finished", async () => {
+it("shows the 14/20 empty state when nothing runs and nothing finished", async () => {
   setup([]);
   await using screen = await render(<Section />);
 
-  await expect.element(page.getByText("没有后台任务")).toBeVisible();
+  const empty = page.getByText("没有后台任务");
+  await expect.element(empty).toBeVisible();
+  const style = getComputedStyle(empty.element());
+  expect(style.fontSize).toBe("14px");
+  expect(style.lineHeight).toBe("20px");
   expect(screen.container.querySelector("[data-thread-details-tasks]")).not.toBeNull();
 });
