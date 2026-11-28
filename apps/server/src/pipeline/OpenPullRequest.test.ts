@@ -587,6 +587,8 @@ const openerLayer = (input: {
     readonly stdoutTruncated: boolean;
     readonly stderrTruncated: boolean;
   }>;
+  readonly pushTarget?: { readonly remoteName: string; readonly branchName: string } | null;
+  readonly calls?: Ref.Ref<ReadonlyArray<ReadonlyArray<string>>>;
 }) =>
   layerOpener.pipe(
     Layer.provide(
@@ -602,44 +604,48 @@ const openerLayer = (input: {
     ),
     Layer.provide(
       Layer.succeed(GitVcsDriver.GitVcsDriver, {
+        resolvePushTarget: (
+          _cwd: string,
+          current: { readonly branch: string; readonly hasUpstream: boolean },
+        ) =>
+          Effect.succeed(
+            input.pushTarget === undefined
+              ? { remoteName: "origin", branchName: current.branch }
+              : input.pushTarget,
+          ),
         execute:
           input.execute ??
           ((entry: { readonly args: ReadonlyArray<string> }) => {
             const args = entry.args;
+            const record =
+              input.calls === undefined
+                ? Effect.void
+                : Ref.update(input.calls, (items) => [...items, args]);
+            const respond = (result: {
+              readonly exitCode: number | null;
+              readonly stdout: string;
+            }) =>
+              record.pipe(
+                Effect.as({
+                  stdoutTruncated: false,
+                  stderrTruncated: false,
+                  stderr: "",
+                  ...result,
+                }),
+              );
             if (args[0] === "ls-remote") {
-              return Effect.succeed({
-                exitCode: 0,
-                stdout: input.lsRemote ?? "",
-                stderr: "",
-                stdoutTruncated: false,
-                stderrTruncated: false,
-              });
+              return respond({ exitCode: 0, stdout: input.lsRemote ?? "" });
             }
             if (args[0] === "merge-base") {
-              return Effect.succeed({
-                exitCode: input.ancestor ?? 0,
-                stdout: "",
-                stderr: "",
-                stdoutTruncated: false,
-                stderrTruncated: false,
-              });
+              return respond({ exitCode: input.ancestor ?? 0, stdout: "" });
+            }
+            if (args[0] === "rev-parse") {
+              return respond({ exitCode: 0, stdout: `origin/${BRANCH}` });
             }
             if (args[0] === "config") {
-              return Effect.succeed({
-                exitCode: 1,
-                stdout: "",
-                stderr: "",
-                stdoutTruncated: false,
-                stderrTruncated: false,
-              });
+              return respond({ exitCode: 1, stdout: "" });
             }
-            return Effect.succeed({
-              exitCode: 0,
-              stdout: input.subjects ?? "",
-              stderr: "",
-              stdoutTruncated: false,
-              stderrTruncated: false,
-            });
+            return respond({ exitCode: 0, stdout: input.subjects ?? "" });
           }),
       } as unknown as GitVcsDriver.GitVcsDriver["Service"]),
     ),
@@ -748,6 +754,7 @@ describe("PullRequestOpener", () => {
     Effect.gen(function* () {
       const actions = yield* Ref.make<ReadonlyArray<string>>([]);
       const created = yield* Ref.make<ReadonlyArray<string>>([]);
+      const calls = yield* Ref.make<ReadonlyArray<ReadonlyArray<string>>>([]);
       yield* Effect.gen(function* () {
         const opener = yield* PullRequestOpener;
         const error = yield* opener
@@ -764,11 +771,56 @@ describe("PullRequestOpener", () => {
         assert.match(error.detail, /fast-forward/i);
         assert.deepStrictEqual(yield* Ref.get(actions), []);
         assert.deepStrictEqual(yield* Ref.get(created), []);
+        const mergeBase = (yield* Ref.get(calls)).find((args) => args[0] === "merge-base");
+        assert.deepStrictEqual(mergeBase, [
+          "merge-base",
+          "--is-ancestor",
+          "dddddddddddddddddddddddddddddddddddddddd",
+          "HEAD",
+        ]);
       }).pipe(
         Effect.provide(
           openerLayer({
             actions,
             created,
+            calls,
+            lsRemote: `dddddddddddddddddddddddddddddddddddddddd\trefs/heads/${BRANCH}\n`,
+            ancestor: 1,
+            listed: Effect.succeed([changeRequest(21, SHA)]),
+            onCreate: () => Effect.die("should not create"),
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("checks the push target the push resolution reports, not branch config", () =>
+    Effect.gen(function* () {
+      const actions = yield* Ref.make<ReadonlyArray<string>>([]);
+      const created = yield* Ref.make<ReadonlyArray<string>>([]);
+      const calls = yield* Ref.make<ReadonlyArray<ReadonlyArray<string>>>([]);
+      yield* Effect.gen(function* () {
+        const opener = yield* PullRequestOpener;
+        const error = yield* opener
+          .open({
+            cwd: "/wt/6",
+            branch: BRANCH,
+            title: "fix tests",
+            issueBody: issue(6).body,
+            headSha: SHA,
+            claimKey,
+          })
+          .pipe(Effect.flip);
+        assert.strictEqual(error._tag, "PullRequestOpenError");
+        const lsRemote = (yield* Ref.get(calls)).find((args) => args[0] === "ls-remote");
+        assert.deepStrictEqual(lsRemote, ["ls-remote", "upstream", `refs/heads/${BRANCH}`]);
+      }).pipe(
+        Effect.provide(
+          openerLayer({
+            actions,
+            created,
+            calls,
+            pushTarget: { remoteName: "upstream", branchName: BRANCH },
             lsRemote: `dddddddddddddddddddddddddddddddddddddddd\trefs/heads/${BRANCH}\n`,
             ancestor: 1,
             listed: Effect.succeed([changeRequest(21, SHA)]),

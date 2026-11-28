@@ -202,27 +202,30 @@ const makeOpener = Effect.gen(function* () {
       changes: acceptanceItems(draft.issueBody),
       verification: recordedChecks(logged.stdout.split("\u0000")),
     });
-    const remoteConfig = yield* driver
+    const upstream = yield* driver
       .execute({
-        operation: "OpenPullRequest.pushRemote",
+        operation: "OpenPullRequest.upstream",
         cwd: draft.cwd,
-        args: ["config", "--get", `branch.${draft.branch}.remote`],
+        args: ["rev-parse", "--abbrev-ref", `${draft.branch}@{upstream}`],
         allowNonZeroExit: true,
       })
       .pipe(Effect.orElseSucceed(() => null));
-    const remoteName =
-      remoteConfig !== null && remoteConfig.exitCode === 0 && remoteConfig.stdout.trim().length > 0
-        ? remoteConfig.stdout.trim()
-        : "origin";
-    if (remoteName !== ".") {
+    const target = yield* driver
+      .resolvePushTarget(draft.cwd, {
+        branch: draft.branch,
+        hasUpstream: upstream !== null && upstream.exitCode === 0,
+      })
+      .pipe(Effect.orElseSucceed(() => null));
+    if (target !== null) {
       // Refuse before pushing: the remote head must be an ancestor of HEAD. Git itself
       // also rejects a non-fast-forward push; this turns that rejection into a
-      // structured error without touching the remote.
+      // structured error without touching the remote. The target is the one the push
+      // resolution reports, so pushRemote/pushDefault and publish renames are honored.
       const lsRemote = yield* driver
         .execute({
           operation: "OpenPullRequest.remoteHead",
           cwd: draft.cwd,
-          args: ["ls-remote", remoteName, `refs/heads/${draft.branch}`],
+          args: ["ls-remote", target.remoteName, `refs/heads/${target.branchName}`],
           allowNonZeroExit: true,
         })
         .pipe(Effect.mapError((error) => failOpen(error.message)));
@@ -241,7 +244,7 @@ const makeOpener = Effect.gen(function* () {
           .pipe(Effect.mapError((error) => failOpen(error.message)));
         if (ancestor.exitCode !== 0) {
           return yield* failOpen(
-            `push refused: ${remoteName}/${draft.branch} is not an ancestor of HEAD; the push would not fast-forward`,
+            `push refused: ${target.remoteName}/${target.branchName} is not an ancestor of HEAD; the push would not fast-forward`,
           );
         }
       }

@@ -80,7 +80,8 @@ interface PipelinePatch {
 
 interface FakeGit {
   readonly branches: Set<string>;
-  readonly checkouts: Map<string, string>;
+  /** branch → checkout; prunable means the directory is gone but the registration remains. */
+  readonly checkouts: Map<string, { readonly path: string; readonly prunable: boolean }>;
 }
 
 class FakeWorktreeError extends Schema.TaggedError<FakeWorktreeError>()("FakeWorktreeError", {
@@ -156,10 +157,14 @@ const sessionLayer = (
       }
       const checkedOut = fake.checkouts.get(branch);
       if (checkedOut !== undefined) {
-        return Effect.fail(new FakeWorktreeError({ detail: `fatal: '${branch}' is already used` }));
+        return Effect.fail(
+          new FakeWorktreeError({
+            detail: `fatal: '${branch}' is already used by worktree at '${checkedOut.path}'`,
+          }),
+        );
       }
       fake.branches.add(branch);
-      fake.checkouts.set(branch, path);
+      fake.checkouts.set(branch, { path, prunable: false });
       return Ref.update(created, (current) => [...current, branch]).pipe(
         Effect.as({ worktree: { path, refName: branch } }),
       );
@@ -172,13 +177,27 @@ const sessionLayer = (
       if (args[0] === "worktree" && args[1] === "list") {
         const records = [...fake.checkouts.entries()]
           .map(
-            ([branch, path]) =>
-              `worktree ${path}\0head 0000000000000000000000000000000000000000\0branch refs/heads/${branch}\0`,
+            ([branch, checkout]) =>
+              `worktree ${checkout.path}\0head 0000000000000000000000000000000000000000\0branch refs/heads/${branch}\0` +
+              (checkout.prunable ? "prunable gitdir file points to non-existent location\0" : ""),
           )
           .join("\0");
         return Effect.succeed({
           exitCode: 0,
           stdout: `${records}\0`,
+          stderr: "",
+          stdoutTruncated: false,
+          stderrTruncated: false,
+        });
+      }
+      if (args[0] === "worktree" && args[1] === "remove") {
+        const target = args[args.length - 1];
+        for (const [branch, checkout] of fake.checkouts) {
+          if (checkout.path === target) fake.checkouts.delete(branch);
+        }
+        return Effect.succeed({
+          exitCode: 0,
+          stdout: "",
           stderr: "",
           stdoutTruncated: false,
           stderrTruncated: false,
@@ -511,6 +530,38 @@ describe("DispatchSession", () => {
         assert.strictEqual(session?.branch, branch);
         assert.strictEqual(session?.worktreePath, `/worktrees/${branch}`);
         assert.deepEqual(yield* Ref.get(created), [branch]);
+      }),
+    ),
+  );
+
+  it.effect("认领后改掉单标题，派发仍用原标题的分支", () =>
+    run(enabled, [issue(5)], ({ opened, visible }) =>
+      Effect.gen(function* () {
+        yield* (yield* PipelineRuns).tick;
+        // The issue title can be edited after the run was claimed; the branch must not move.
+        yield* Ref.set(visible, [issue(5, "renamed title")]);
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        const branch = DispatchSession.sessionBranch(5, "fix tests");
+        const session = (yield* Ref.get(opened))[0];
+        assert.strictEqual(session?.branch, branch);
+        const runRow = (yield* (yield* PipelineRuns).list).runs[0];
+        assert.strictEqual(DispatchSession.sessionBranch(5, runRow?.title ?? ""), branch);
+      }),
+    ),
+  );
+
+  it.effect("登记还在目录已删的工作树不复用，清掉登记后重新建树", () =>
+    run(enabled, [issue(5)], ({ created, opened, git }) =>
+      Effect.gen(function* () {
+        const branch = DispatchSession.sessionBranch(5, "fix tests");
+        git.branches.add(branch);
+        git.checkouts.set(branch, { path: `/worktrees/${branch}`, prunable: true });
+        yield* (yield* PipelineRuns).tick;
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        const session = (yield* Ref.get(opened))[0];
+        assert.strictEqual(session?.branch, branch);
+        assert.deepEqual(yield* Ref.get(created), [branch]);
+        assert.strictEqual(git.checkouts.get(branch)?.prunable, false);
       }),
     ),
   );

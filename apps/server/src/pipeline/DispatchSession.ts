@@ -99,8 +99,10 @@ export class SessionOpener extends Context.Service<SessionOpener, SessionOpenerS
 ) {}
 
 /** `git worktree list --porcelain -z`: records split on two NULs, fields on one. */
-const parseWorktreeCheckouts = (porcelain: string): ReadonlyMap<string, string> => {
-  const paths = new Map<string, string>();
+const parseWorktreeCheckouts = (
+  porcelain: string,
+): ReadonlyMap<string, { readonly path: string; readonly prunable: boolean }> => {
+  const paths = new Map<string, { readonly path: string; readonly prunable: boolean }>();
   for (const record of porcelain.split("\0\0")) {
     const fields = record.split("\0");
     const worktree = fields
@@ -115,7 +117,10 @@ const parseWorktreeCheckouts = (porcelain: string): ReadonlyMap<string, string> 
       branch !== undefined &&
       branch.length > 0
     ) {
-      paths.set(branch, worktree);
+      paths.set(branch, {
+        path: worktree,
+        prunable: fields.some((field) => field.startsWith("prunable")),
+      });
     }
   }
   return paths;
@@ -315,13 +320,24 @@ const make = Effect.gen(function* () {
     const checkouts =
       listed !== null && listed.exitCode === 0
         ? parseWorktreeCheckouts(listed.stdout)
-        : new Map<string, string>();
+        : new Map<string, { readonly path: string; readonly prunable: boolean }>();
     const occupied = checkouts.get(branch);
     let worktreePath: string;
-    if (occupied !== undefined) {
+    if (occupied !== undefined && !occupied.prunable) {
       // A redispatch finds the first attempt's checkout; reuse it so no work is discarded.
-      worktreePath = occupied;
+      worktreePath = occupied.path;
     } else {
+      if (occupied !== undefined) {
+        // The directory is gone but the registration still blocks `git worktree add`.
+        yield* driver
+          .execute({
+            operation: "DispatchSession.removeStaleWorktree",
+            cwd,
+            args: ["worktree", "remove", "--force", occupied.path],
+            allowNonZeroExit: true,
+          })
+          .pipe(Effect.orElseSucceed(() => null));
+      }
       const existing = yield* git
         .listLocalBranchNames(cwd)
         .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
