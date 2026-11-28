@@ -95,7 +95,10 @@ it.effect(
         const left = yield* open(filename);
         const right = yield* open(filename);
         const results = yield* Effect.all(
-          [left.terms.handover(FLEET, "coord-a", 0), right.terms.handover(FLEET, "coord-b", 0)],
+          [
+            left.terms.handover(FLEET, "coord-a", 0, null),
+            right.terms.handover(FLEET, "coord-b", 0, null),
+          ],
           { concurrency: "unbounded" },
         );
         expect(results.map((result) => result._tag).toSorted()).toEqual(["current", "stale"]);
@@ -214,10 +217,10 @@ it.effect("关掉数据库再用同一文件重开，read 仍是最大任期和�
       yield* Effect.scoped(
         Effect.gen(function* () {
           const { terms, sql } = yield* open(filename);
-          expect(yield* terms.handover(FLEET, "coord-a", 0)).toEqual(
+          expect(yield* terms.handover(FLEET, "coord-a", 0, null)).toEqual(
             CoordinatorTerm.HandoverResult.current({ term: 1, coordinatorId: "coord-a" }),
           );
-          expect(yield* terms.handover(FLEET, "coord-c", 0)).toEqual(
+          expect(yield* terms.handover(FLEET, "coord-c", 0, null)).toEqual(
             CoordinatorTerm.HandoverResult.stale({ term: 1, coordinatorId: "coord-a" }),
           );
           expect(yield* terms.observe(FLEET, 4, "coord-b")).toEqual(
@@ -235,4 +238,22 @@ it.effect("关掉数据库再用同一文件重开，read 仍是最大任期和�
       expect(yield* terms.read(FLEET)).toEqual({ term: 4, coordinatorId: "coord-b" });
     }),
   ).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect("同任期输给更大 ID 后按旧快照尝试交出被比较交换拒绝，库保持胜出者", () =>
+  Effect.gen(function* () {
+    const terms = yield* CoordinatorTerm.CoordinatorTerm;
+    // The writer's row sat at (3, coord-b); an exchange moved it onto the
+    // same-term winner before its handover compare-and-swap runs.
+    expect(yield* terms.observe(FLEET, 3, "coord-b")).toEqual(
+      CoordinatorTerm.ObserveResult.current({ term: 3, coordinatorId: "coord-b" }),
+    );
+    expect(yield* terms.observe(FLEET, 3, "coord-c")).toEqual(
+      CoordinatorTerm.ObserveResult.current({ term: 3, coordinatorId: "coord-c" }),
+    );
+    expect(yield* terms.handover(FLEET, "coord-d", 3, "coord-b")).toEqual(
+      CoordinatorTerm.HandoverResult.stale({ term: 3, coordinatorId: "coord-c" }),
+    );
+    expect(yield* terms.read(FLEET)).toEqual({ term: 3, coordinatorId: "coord-c" });
+  }).pipe(Effect.provide(memoryLayer)),
 );

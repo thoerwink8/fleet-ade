@@ -111,8 +111,8 @@ function makeSourceProjection(sourceRun: OrchestrationV2Run): OrchestrationV2Thr
 
 const planFork = (
   sourceRun: OrchestrationV2Run,
-  sourceProjection = makeSourceProjection(sourceRun),
-  options: { readonly sideChat?: boolean } = {},
+  sourceProjection: OrchestrationV2ThreadProjection = makeSourceProjection(sourceRun),
+  options: { readonly sideChat?: boolean; readonly carryWorkspace?: boolean } = {},
 ) =>
   Effect.gen(function* () {
     const service = yield* ThreadForkService.ThreadForkServiceV2;
@@ -277,6 +277,61 @@ it.effect("preserves pull request context without inheriting any watches", () =>
     assert.deepEqual(sourceProjection.thread.pullRequests, watchedLinks);
     assert.deepEqual(sourceProjection.thread.pullRequests[0]?.watch, watch);
     assert.deepEqual(sourceProjection.thread.pullRequests[1]?.watch, watch);
+  }),
+);
+
+it.effect("a rotation keeps the watches and pin a plain fork strips", () =>
+  Effect.gen(function* () {
+    const sourceRun = makeSourceRun("completed");
+    const watch = {
+      startedAt: DateTime.formatIso(sourceCreatedAt),
+      headSha: "source-head",
+      failedChecks: [] as Array<string>,
+      passed: false,
+      passedChecks: [] as Array<string>,
+      remarksThrough: DateTime.formatIso(snoozedAt),
+      remarkIds: [] as Array<string>,
+      conflicting: false,
+      wakes: 0,
+    };
+    const link = {
+      host: "github.com",
+      repository: "example/repo",
+      number: 7,
+      url: "https://github.com/example/repo/pull/7",
+      source: "agent" as const,
+      linkedAt: DateTime.formatIso(sourceCreatedAt),
+      snapshot: {
+        state: "open" as const,
+        title: "Watched pull request",
+        headBranch: "feature-1",
+        baseBranch: "main",
+        isDraft: false,
+        updatedAt: null,
+        syncedAt: DateTime.formatIso(snoozedAt),
+      },
+      watch,
+      stack: null,
+    };
+    const sourceProjection: OrchestrationV2ThreadProjection = {
+      ...makeSourceProjection(sourceRun),
+      thread: {
+        ...makeSourceThread(),
+        pullRequests: [link],
+        pinnedAt: snoozedAt,
+        pinOrderKey: "a0",
+      },
+    };
+    const result = yield* planFork(sourceRun, sourceProjection, { carryWorkspace: true });
+
+    assert.deepEqual(result.targetThread.pullRequests, [link]);
+    assert.deepEqual(result.targetThread.pullRequests?.[0]?.watch, watch);
+    assert.deepEqual(result.targetThread.pinnedAt, snoozedAt);
+    assert.equal(result.targetThread.pinOrderKey, "a0");
+    // Only the rotation carries them; the default path is still a fresh workspace.
+    const plain = yield* planFork(sourceRun, sourceProjection);
+    assert.deepEqual(plain.targetThread.pullRequests?.[0]?.watch ?? null, null);
+    assert.isNull(plain.targetThread.pinnedAt);
   }),
 );
 

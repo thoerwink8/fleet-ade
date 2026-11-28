@@ -384,7 +384,7 @@ it.effect("任期交给别的机器后续租和旧令牌完成回 503 且行不�
       0,
     );
     assert.strictEqual(
-      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "other-env", 0))._tag,
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "other-env", 0, null))._tag,
       "current",
     );
     const renewWrite = {
@@ -406,7 +406,7 @@ it.effect("任期交给别的机器后续租和旧令牌完成回 503 且行不�
       [{ lease_until: "9999-01-01T00:00:00.000Z" }],
     );
     assert.strictEqual(
-      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "pipeline-env", 1))._tag,
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "pipeline-env", 1, "other-env"))._tag,
       "current",
     );
     const renewed = yield* port.apply(renewWrite);
