@@ -40,6 +40,7 @@ const STRIPPED_REQUEST_HEADERS = new Set([
   "connection",
   "content-length",
   "cookie",
+  "dpop",
   "host",
   "keep-alive",
   "proxy-authenticate",
@@ -128,6 +129,24 @@ const routesFor = (
     const request = yield* HttpServerRequest.HttpServerRequest;
     yield* requireSession(scopeForMethod(request.method));
 
+    // The board is the only program this port may serve. An unknown listener means a
+    // squatter would run its HTML and scripts on this origin, so nothing is forwarded.
+    const identity = yield* board.verifyIdentity;
+    if (identity === "foreign") {
+      return yield* reject(
+        502,
+        "board_port_taken",
+        `端口 ${board.port} 被别的程序占用，转发已拦下。请关掉占用它的程序后重试`,
+      );
+    }
+    if (identity === "none") {
+      return yield* reject(
+        502,
+        "board_not_running",
+        "看板没在运行。先在机群页打开看板（会自动拉起），再刷新重试",
+      );
+    }
+
     const upstreamUrl = `http://127.0.0.1:${board.port}${suffix}${search}`;
     const method = request.method as
       | "GET"
@@ -145,17 +164,17 @@ const routesFor = (
         ? upstreamRequest
         : HttpClientRequest.setBody(upstreamRequest, HttpBody.stream(request.stream));
 
-    const upstream = yield* httpClient
-      .execute(withBody)
-      .pipe(
-        Effect.mapError(() =>
-          reject(
-            502,
-            "board_unreachable",
-            "看板没响应。先确认看板在运行（机群页会自动拉起），再刷新重试",
-          ),
+    const upstream = yield* httpClient.execute(withBody).pipe(
+      // A dead upstream means the cached identity is stale; re-prove before trusting again.
+      Effect.tapError(() => board.invalidateIdentity),
+      Effect.mapError(() =>
+        reject(
+          502,
+          "board_unreachable",
+          "看板没响应。先确认看板在运行（机群页会自动拉起），再刷新重试",
         ),
-      );
+      ),
+    );
 
     const headers = forwardHeaders(upstream.headers, STRIPPED_RESPONSE_HEADERS);
     // Event streams must reach the browser as they arrive; no-transform keeps the

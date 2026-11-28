@@ -72,7 +72,7 @@ interface Upstream {
   readonly sseRequestCount: () => number;
 }
 
-const listenUpstream = () =>
+const listenUpstream = (options?: { readonly appId?: string }) =>
   Effect.promise(() => {
     const { promise, resolve } = Promise.withResolvers<Upstream>();
     const hits: Upstream["hits"] = [];
@@ -82,6 +82,12 @@ const listenUpstream = () =>
     const server = NodeHttp.createServer((request, response) => {
       hits.push({ method: request.method ?? "", url: request.url, headers: request.headers });
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      // The proxy probes this to prove identity before forwarding anything.
+      if (url.pathname === "/api/health") {
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ app: options?.appId ?? "fleet-board" }));
+        return;
+      }
       if (url.pathname === "/api/events") {
         sseRequests += 1;
         response.writeHead(200, {
@@ -346,6 +352,50 @@ it.live("EventSource 流式透传：数据先到不等连接结束，前端断�
     yield* Effect.promise(() => upstream.sseClose);
   }).pipe(Effect.scoped),
 );
+it.live("认不出看板身份时回 502，被代理的请求一次都到不了上游", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(
+      listenUpstream({ appId: "squatter" }),
+      (fixture) => closeServer(fixture.server),
+    );
+    const { origin, client } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(response.status).toBe(502);
+    const body = (yield* response.json) as { error: { code: string } };
+    expect(body.error.code).toBe("board_port_taken");
+    // Only identity probes may reach the port; nothing the client asked for is forwarded.
+    expect(upstream.hits.length).toBeGreaterThan(0);
+    expect(upstream.hits.every((hit) => hit.url === "/api/health")).toBe(true);
+  }).pipe(Effect.scoped),
+);
+
+it.live("认出身份后健康检查只探一次，后续转发复用缓存", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+
+    const first = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(first.status).toBe(200);
+    const second = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(second.status).toBe(200);
+
+    expect(upstream.hits.filter((hit) => hit.url === "/api/health")).toHaveLength(1);
+    expect(upstream.hits.filter((hit) => hit.url === "/api/status")).toHaveLength(2);
+  }).pipe(Effect.scoped),
+);
 
 it.live("ensure 路由返回服务的结果", () =>
   Effect.gen(function* () {
@@ -357,6 +407,8 @@ it.live("ensure 路由返回服务的结果", () =>
     const { origin, client } = yield* serveFleetBoard(
       Layer.succeed(FleetBoardService.FleetBoardService, {
         ensure: Effect.succeed(ensureResult),
+        verifyIdentity: Effect.succeed("none" as const),
+        invalidateIdentity: Effect.void,
         port: 1,
       }),
     );

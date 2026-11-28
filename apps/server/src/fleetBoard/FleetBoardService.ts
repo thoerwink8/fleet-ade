@@ -53,6 +53,14 @@ export class FleetBoardService extends Context.Service<
      * is there. Never starts a second copy and never kills the board.
      */
     readonly ensure: Effect.Effect<FleetBoardEnsureResult>;
+    /**
+     * Proves the port serves the board before the proxy trusts it. Positive results
+     * are cached; a negative probe is re-checked every time, so a board taking the
+     * port back from a squatter recovers without a restart.
+     */
+    readonly verifyIdentity: Effect.Effect<FleetBoardProbeState>;
+    /** Drops the cached positive identity after the upstream stops answering. */
+    readonly invalidateIdentity: Effect.Effect<void>;
     readonly port: number;
   }
 >()("t3/fleetBoard/FleetBoardService") {}
@@ -202,8 +210,19 @@ const make = Effect.fn("FleetBoardService.make")(function* (options: FleetBoardS
 
   // Concurrent ensures must not double-spawn; serialized callers reuse the first one's launch.
   const semaphore = yield* Semaphore.make(1);
+  let identityVerified = false;
   return FleetBoardService.of({
     ensure: semaphore.withPermits(1)(ensureUnlocked()),
+    verifyIdentity: Effect.suspend(() => {
+      if (identityVerified) return Effect.succeed<FleetBoardProbeState>("running");
+      return Effect.map(probe(), (state) => {
+        if (state === "running") identityVerified = true;
+        return state;
+      });
+    }),
+    invalidateIdentity: Effect.sync(() => {
+      identityVerified = false;
+    }),
     port: options.port,
   });
 });
