@@ -290,13 +290,22 @@ fails with that reason.
 
 ## See what every computer is doing
 
-Open **机群** from the sidebar or the command palette to read, in one place, the
-work every linked computer has reported to this one: what each is working on,
-what is waiting for you, and what it last finished. The board reads only what
-this computer has recorded, so a computer that has not reported in shows its last
-known state rather than a live one. Finished threads stay on the board for 24
-hours, then drop off. Nothing on the board changes a computer; to act on a
-thread, open it from its row.
+Open **机群** from the sidebar or the command palette. It has two tabs:
+
+- **看板** shows the fleet board of the computer you pick, the same board its tray
+  icon opens, with every computer's live work. The board has to be installed on
+  that computer; when it is not, or its port is taken, or it fails to start, the
+  page says so and how to fix it. Opening the page starts the board when it is
+  installed but not running.
+- **租约任务** reads, in one place, the work every linked computer has reported to
+  the computer you pick: what each is working on, what is waiting for you, and
+  what it last finished. It reads only what that computer has recorded, so a
+  computer that has not reported in shows its last known state rather than a live
+  one. Finished threads stay listed for 24 hours, then drop off. Nothing there
+  changes a computer; to act on a thread, open it from its row.
+
+Both tabs follow the computer you pick, so a remote connection shows that
+computer's own board and its own recorded work.
 
 ## Manage or revoke access
 

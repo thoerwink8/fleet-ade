@@ -1358,10 +1358,12 @@ export const make = Effect.gen(function* () {
     authenticateHttpRequest,
     authenticateWebSocketUpgrade,
     issueWebSocketTicket,
-    verifyWebSocketTicket: (token, use) =>
-      verifyWebSocketTicketEffect(token, use).pipe(
-        Effect.provideService(SessionStore.SessionStore, sessions),
-      ),
+    verifyWebSocketTicket: Effect.fn("EnvironmentAuth.verifyWebSocketTicket")(
+      (token: string, use: AuthWebSocketTicketUse) =>
+        verifyWebSocketTicketEffect(token, use).pipe(
+          Effect.provideService(SessionStore.SessionStore, sessions),
+        ),
+    ),
     issueStartupPairingUrl,
     authenticateMcpClient,
     issueMcpClientSession,

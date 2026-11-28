@@ -130,7 +130,7 @@ vi.mock("~/hooks/useSettings", async (importOriginal) => ({
 it("syncs the row drawer with ?row and restores focus on back, Esc, and close button", async () => {
   await page.viewport(1280, 800);
   setup();
-  await using screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using screen = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   const router = screen.router;
   if (router === undefined) throw new Error("the test router is missing");
 
@@ -176,7 +176,7 @@ it("shows the missing-permission empty state when connection fails for orchestra
     summaryStatus: "loading",
   });
 
-  await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using _screen = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   await expect.element(page.getByText("这个连接没有读取会话的权限，看不到机群汇总")).toBeVisible();
 });
 
@@ -190,7 +190,7 @@ it("shows the disconnected source state instead of loading when offline and no r
     summaryStatus: "loading",
   });
 
-  await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using _screen = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   await expect.element(page.getByText("汇总电脑 远端机 连不上")).toBeVisible();
   await expect.element(page.getByText("连不上", { exact: true })).toBeVisible();
   await expect.element(page.getByRole("link", { name: "去连接" })).toBeVisible();
@@ -205,7 +205,7 @@ it("shows the read error retry state instead of missing-permission when session 
     summaryStatus: "loading",
   });
 
-  await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using _screen = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   await expect.element(page.getByText("读不到机群汇总")).toBeVisible();
   const retryButton = page.getByRole("button", { name: "重试" });
   await expect.element(retryButton).toBeVisible();
@@ -217,7 +217,9 @@ it("shows the read error retry state instead of missing-permission when session 
 it("clears q alongside filters when clicking 清除筛选", async () => {
   await page.viewport(1280, 800);
   setup();
-  await using screen = await render(<FleetBoardPage />, { router: "/fleet?q=不存在的词xyz999" });
+  await using screen = await render(<FleetBoardPage />, {
+    router: "/fleet?tab=tasks&q=不存在的词xyz999",
+  });
   const router = screen.router;
   if (router === undefined) throw new Error("the test router is missing");
 
@@ -231,7 +233,7 @@ it("clears q alongside filters when clicking 清除筛选", async () => {
 it("hides the loading badge and search box on zero-environment, forbidden, and read-error empty states", async () => {
   setup({ readableIds: [], rows: new Map(), summaryStatus: "loading" });
   mocks.environments = [];
-  await using screenZero = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using screenZero = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   await expect.element(page.getByText("还没有连上的电脑")).toBeVisible();
   await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
   await expect
@@ -247,7 +249,7 @@ it("hides the loading badge and search box on zero-environment, forbidden, and r
     rows: new Map(),
     summaryStatus: "loading",
   });
-  await using screenForbidden = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using screenForbidden = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   await expect.element(page.getByText("这个连接没有读取会话的权限，看不到机群汇总")).toBeVisible();
   await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
   await expect
@@ -262,7 +264,7 @@ it("hides the loading badge and search box on zero-environment, forbidden, and r
     rows: new Map(),
     summaryStatus: "loading",
   });
-  await using _screenError = await render(<FleetBoardPage />, { router: "/fleet" });
+  await using _screenError = await render(<FleetBoardPage />, { router: "/fleet?tab=tasks" });
   await expect.element(page.getByText("读不到机群汇总")).toBeVisible();
   await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
   await expect

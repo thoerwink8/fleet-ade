@@ -57,6 +57,7 @@ import {
   groupFleetRows,
   type FleetBoardStatus,
 } from "./FleetBoard.logic";
+import { FleetBoardEmbed } from "./FleetBoardEmbed";
 import { FleetBoardRow } from "./FleetBoardRow";
 import { FleetRowDetail } from "./FleetRowDetail";
 
@@ -67,6 +68,7 @@ export interface FleetSearch {
   readonly status?: FleetBoardStatus | undefined;
   readonly source?: EnvironmentId | undefined;
   readonly row?: string | undefined;
+  readonly tab?: "board" | "tasks" | undefined;
 }
 
 const STATUS_LABELS: Record<FleetBoardStatus, string> = {
@@ -229,6 +231,7 @@ function FleetBoardEmpty({
 
 export function FleetBoardPage() {
   const search = useFleetSearch();
+  const activeTab = search.tab ?? "board";
   const filterStatus = search.status;
   const router = useRouter();
   const navigate = useNavigate();
@@ -463,277 +466,323 @@ export function FleetBoardPage() {
           <AppRouteModalClose />
         </header>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-5 py-2 text-xs text-muted-foreground">
-          <span className="flex min-w-0 items-center gap-1">
-            汇总来自：
-            <FleetSourcePicker
-              sourceName={sourceName}
-              candidates={fleetSourceCandidates}
-              machineName={machineName}
-              selected={sourceEnvironmentId}
-              onSelect={(environmentId) => patchSearch({ source: environmentId })}
-            />
-          </span>
-          <span className="min-w-0">（只含这台电脑记下的活）</span>
-          {environments.length === 0 ? null : summary.status === "live" && sourceConnected ? (
-            <Badge variant="success">已连接</Badge>
-          ) : summary.status === "error" || summaryForbidden || sessionReadError ? (
-            <Badge variant="error">读不到</Badge>
-          ) : sourceDisconnected ? (
-            <Badge variant="warning">连不上</Badge>
-          ) : summary.status === "loading" || scopeLoading ? (
-            <Badge variant="secondary">正在读取</Badge>
-          ) : (
-            <Badge variant="warning">旧数据 · 正在更新</Badge>
-          )}
+        <div className="flex shrink-0 items-center border-b px-5 py-2">
+          <ToggleGroup
+            aria-label="机群页标签"
+            variant="segmented"
+            value={[activeTab]}
+            onValueChange={(value) => {
+              const next = value[0];
+              if (next === "board" || next === "tasks") void patchSearch({ tab: next });
+            }}
+          >
+            <Toggle value="board" size="sm" variant="outline">
+              看板
+            </Toggle>
+            <Toggle value="tasks" size="sm" variant="outline">
+              租约任务
+            </Toggle>
+          </ToggleGroup>
         </div>
 
-        {allRows.length > 0 ||
-        (environments.length > 0 &&
-          !summaryForbidden &&
-          !sessionReadError &&
-          !sourceDisconnected &&
-          summary.status !== "error") ? (
-          <>
-            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
-              <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8 sm:min-w-44 sm:max-w-72">
-                <InputGroupAddon>
-                  <SearchIcon aria-hidden />
-                </InputGroupAddon>
-                <InputGroupInput
-                  type="search"
-                  value={search.q ?? ""}
-                  onChange={(event) =>
-                    patchSearch({ q: event.currentTarget.value || undefined }, true)
-                  }
-                  placeholder="搜索标题或 # 单号"
-                  aria-label="搜索机群任务"
+        {activeTab === "board" ? (
+          <FleetBoardEmbed
+            environmentId={sourceEnvironmentId ?? fallbackSourceId}
+            machinePicker={
+              <span className="flex min-w-0 items-center gap-1">
+                看板来自：
+                <FleetSourcePicker
+                  sourceName={sourceName}
+                  candidates={fleetSourceCandidates}
+                  machineName={machineName}
+                  selected={sourceEnvironmentId}
+                  onSelect={(environmentId) => patchSearch({ source: environmentId })}
                 />
-              </InputGroup>
-              {isMobile ? (
-                machineFilterVisible || repoFilterVisible || activeFilterCount > 0 ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setFiltersOpen(true)}
-                    aria-label="筛选"
-                  >
-                    <SlidersHorizontalIcon aria-hidden />
-                    筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
-                  </Button>
-                ) : null
+              </span>
+            }
+          />
+        ) : (
+          <>
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-5 py-2 text-xs text-muted-foreground">
+              <span className="flex min-w-0 items-center gap-1">
+                汇总来自：
+                <FleetSourcePicker
+                  sourceName={sourceName}
+                  candidates={fleetSourceCandidates}
+                  machineName={machineName}
+                  selected={sourceEnvironmentId}
+                  onSelect={(environmentId) => patchSearch({ source: environmentId })}
+                />
+              </span>
+              <span className="min-w-0">（只含这台电脑记下的活）</span>
+              {environments.length === 0 ? null : summary.status === "live" && sourceConnected ? (
+                <Badge variant="success">已连接</Badge>
+              ) : summary.status === "error" || summaryForbidden || sessionReadError ? (
+                <Badge variant="error">读不到</Badge>
+              ) : sourceDisconnected ? (
+                <Badge variant="warning">连不上</Badge>
+              ) : summary.status === "loading" || scopeLoading ? (
+                <Badge variant="secondary">正在读取</Badge>
               ) : (
-                <>
-                  {statusChips}
-                  {machineFilter}
-                  {repoFilter}
-                </>
+                <Badge variant="warning">旧数据 · 正在更新</Badge>
               )}
             </div>
 
-            {isMobile ? (
-              <div className="flex shrink-0 border-b px-5 py-2">{statusChips}</div>
-            ) : null}
-          </>
-        ) : null}
+            {allRows.length > 0 ||
+            (environments.length > 0 &&
+              !summaryForbidden &&
+              !sessionReadError &&
+              !sourceDisconnected &&
+              summary.status !== "error") ? (
+              <>
+                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
+                  <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8 sm:min-w-44 sm:max-w-72">
+                    <InputGroupAddon>
+                      <SearchIcon aria-hidden />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      type="search"
+                      value={search.q ?? ""}
+                      onChange={(event) =>
+                        patchSearch({ q: event.currentTarget.value || undefined }, true)
+                      }
+                      placeholder="搜索标题或 # 单号"
+                      aria-label="搜索机群任务"
+                    />
+                  </InputGroup>
+                  {isMobile ? (
+                    machineFilterVisible || repoFilterVisible || activeFilterCount > 0 ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setFiltersOpen(true)}
+                        aria-label="筛选"
+                      >
+                        <SlidersHorizontalIcon aria-hidden />
+                        筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+                      </Button>
+                    ) : null
+                  ) : (
+                    <>
+                      {statusChips}
+                      {machineFilter}
+                      {repoFilter}
+                    </>
+                  )}
+                </div>
 
-        <ScrollArea className="min-h-0 flex-1">
-          <WorkspacePageContainer width="wide">
-            {allRows.length === 0 && environments.length === 0 ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title="还没有连上的电脑"
-                description="连上一台运行 Fleet ADE 的电脑后，这里会汇总它记下的各台电脑的活。"
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    render={<Link to="/settings/connections" />}
-                  >
-                    去连接
-                  </Button>
-                }
-              />
-            ) : allRows.length === 0 && scopeLoading ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title="正在读取"
-                description="第一次读取要等这台电脑把它记下的活送过来。"
-              />
-            ) : allRows.length === 0 && summaryForbidden ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title="这个连接没有读取会话的权限，看不到机群汇总"
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    render={<Link to="/settings/connections" />}
-                  >
-                    去设置
-                  </Button>
-                }
-              />
-            ) : allRows.length === 0 && sourceDisconnected ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title={`汇总电脑 ${sourceName} 连不上`}
-                description="连上这台电脑后，这里会显示它记下的各台电脑的活。"
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    render={<Link to="/settings/connections" />}
-                  >
-                    去连接
-                  </Button>
-                }
-              />
-            ) : allRows.length === 0 && (summary.status === "error" || sessionReadError) ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title="读不到机群汇总"
-                description="汇总读取失败，电脑恢复后重试。"
-                action={
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={retryPending}
-                    onClick={() => {
-                      setRetryPending(true);
-                      void Promise.resolve(sessionReadError ? retrySession() : retry()).finally(
-                        () => setRetryPending(false),
-                      );
-                    }}
-                  >
-                    <RefreshCwIcon aria-hidden />
-                    重试
-                  </Button>
-                }
-              />
-            ) : summary.status === "loading" && allRows.length === 0 ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title="正在读取"
-                description="第一次读取要等这台电脑把它记下的活送过来。"
-              />
-            ) : allRows.length === 0 ? (
-              <FleetBoardEmpty
-                icon={<MonitorIcon />}
-                title="这台汇总电脑上没有运行中或 24 小时内已完成的任务"
-              />
-            ) : groups.length === 0 ? (
-              <FleetBoardEmpty icon={<SearchIcon />} title="没有符合筛选的" action={clearFilters} />
-            ) : (
-              <div className="flex flex-col gap-6">
-                {groups.map((group) => {
-                  const rows = activeRows.get(group.environmentId) ?? { done: [], active: [] };
-                  const open = doneOpenIds.has(group.environmentId);
-                  const visibleDone = open ? rows.done.slice(0, doneLimit) : [];
-                  return (
-                    <section
-                      key={group.environmentId}
-                      aria-label={group.name}
-                      className="flex min-w-0 flex-col"
-                    >
-                      <div className="flex items-center gap-2 px-2 text-meta font-medium text-secondary-label">
-                        <MachineIcon
-                          serverConfig={serverConfigs.get(group.environmentId as EnvironmentId)}
-                        />
-                        <span className="min-w-0 truncate">{group.name}</span>
-                        <span className="h-px min-w-2 flex-1 bg-sidebar-border/50" aria-hidden />
-                        <span className="flex shrink-0 items-center gap-2 font-normal text-muted-foreground tabular-nums">
-                          {FLEET_BOARD_STATUSES.map((status) =>
-                            status !== "done" && group.counts[status] > 0 ? (
-                              <span key={status}>
-                                {STATUS_LABELS[status]} {group.counts[status]}
-                              </span>
-                            ) : null,
-                          )}
-                        </span>
-                        {group.counts.offline > 0 ? (
-                          <Badge variant="warning" title="连不上">
-                            连不上
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 flex flex-col">
-                        {rows.active.map((row) => {
-                          const key = fleetSummaryRowKey(row);
-                          return (
-                            <FleetBoardRow
-                              key={key}
-                              row={row}
-                              machineName={machineName(row.environmentId)}
-                              machineConnected={connectedIds.has(
-                                row.environmentId as EnvironmentId,
-                              )}
-                              now={now}
-                              selected={search.row === key}
-                              onSelect={handleOpenRow}
-                            />
+                {isMobile ? (
+                  <div className="flex shrink-0 border-b px-5 py-2">{statusChips}</div>
+                ) : null}
+              </>
+            ) : null}
+
+            <ScrollArea className="min-h-0 flex-1">
+              <WorkspacePageContainer width="wide">
+                {allRows.length === 0 && environments.length === 0 ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title="还没有连上的电脑"
+                    description="连上一台运行 Fleet ADE 的电脑后，这里会汇总它记下的各台电脑的活。"
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        render={<Link to="/settings/connections" />}
+                      >
+                        去连接
+                      </Button>
+                    }
+                  />
+                ) : allRows.length === 0 && scopeLoading ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title="正在读取"
+                    description="第一次读取要等这台电脑把它记下的活送过来。"
+                  />
+                ) : allRows.length === 0 && summaryForbidden ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title="这个连接没有读取会话的权限，看不到机群汇总"
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        render={<Link to="/settings/connections" />}
+                      >
+                        去设置
+                      </Button>
+                    }
+                  />
+                ) : allRows.length === 0 && sourceDisconnected ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title={`汇总电脑 ${sourceName} 连不上`}
+                    description="连上这台电脑后，这里会显示它记下的各台电脑的活。"
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        render={<Link to="/settings/connections" />}
+                      >
+                        去连接
+                      </Button>
+                    }
+                  />
+                ) : allRows.length === 0 && (summary.status === "error" || sessionReadError) ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title="读不到机群汇总"
+                    description="汇总读取失败，电脑恢复后重试。"
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={retryPending}
+                        onClick={() => {
+                          setRetryPending(true);
+                          void Promise.resolve(sessionReadError ? retrySession() : retry()).finally(
+                            () => setRetryPending(false),
                           );
-                        })}
-                      </div>
-                      {rows.done.length > 0 ? (
-                        <Collapsible
-                          open={open}
-                          onOpenChange={(nextOpen) => {
-                            const next = new Set(doneOpenIds);
-                            if (nextOpen) next.add(group.environmentId);
-                            else next.delete(group.environmentId);
-                            setDoneOpenIds(next);
-                          }}
+                        }}
+                      >
+                        <RefreshCwIcon aria-hidden />
+                        重试
+                      </Button>
+                    }
+                  />
+                ) : summary.status === "loading" && allRows.length === 0 ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title="正在读取"
+                    description="第一次读取要等这台电脑把它记下的活送过来。"
+                  />
+                ) : allRows.length === 0 ? (
+                  <FleetBoardEmpty
+                    icon={<MonitorIcon />}
+                    title="这台汇总电脑上没有运行中或 24 小时内已完成的任务"
+                  />
+                ) : groups.length === 0 ? (
+                  <FleetBoardEmpty
+                    icon={<SearchIcon />}
+                    title="没有符合筛选的"
+                    action={clearFilters}
+                  />
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    {groups.map((group) => {
+                      const rows = activeRows.get(group.environmentId) ?? { done: [], active: [] };
+                      const open = doneOpenIds.has(group.environmentId);
+                      const visibleDone = open ? rows.done.slice(0, doneLimit) : [];
+                      return (
+                        <section
+                          key={group.environmentId}
+                          aria-label={group.name}
+                          className="flex min-w-0 flex-col"
                         >
-                          <CollapsibleTrigger className="mt-1 flex w-full items-center gap-2 rounded-md px-2 text-meta text-muted-foreground hover:text-foreground">
-                            <ChevronDownIcon
-                              aria-hidden
-                              className={cn(
-                                "size-3 shrink-0 transition-transform",
-                                !open && "-rotate-90",
-                              )}
+                          <div className="flex items-center gap-2 px-2 text-meta font-medium text-secondary-label">
+                            <MachineIcon
+                              serverConfig={serverConfigs.get(group.environmentId as EnvironmentId)}
                             />
-                            已完成 {rows.done.length}
-                          </CollapsibleTrigger>
-                          <CollapsiblePanel>
-                            <div className="flex flex-col">
-                              {visibleDone.map((row) => {
-                                const key = fleetSummaryRowKey(row);
-                                return (
-                                  <FleetBoardRow
-                                    key={key}
-                                    row={row}
-                                    machineName={machineName(row.environmentId)}
-                                    machineConnected={connectedIds.has(
-                                      row.environmentId as EnvironmentId,
-                                    )}
-                                    now={now}
-                                    selected={search.row === key}
-                                    onSelect={handleOpenRow}
-                                  />
-                                );
-                              })}
-                              {open && rows.done.length > visibleDone.length ? (
-                                <Button
-                                  variant="muted"
-                                  size="sm"
-                                  className="self-start"
-                                  onClick={() => setDoneLimit((limit) => limit + 50)}
-                                >
-                                  再显示 50 条
-                                </Button>
-                              ) : null}
-                            </div>
-                          </CollapsiblePanel>
-                        </Collapsible>
-                      ) : null}
-                    </section>
-                  );
-                })}
-              </div>
-            )}
-          </WorkspacePageContainer>
-        </ScrollArea>
+                            <span className="min-w-0 truncate">{group.name}</span>
+                            <span
+                              className="h-px min-w-2 flex-1 bg-sidebar-border/50"
+                              aria-hidden
+                            />
+                            <span className="flex shrink-0 items-center gap-2 font-normal text-muted-foreground tabular-nums">
+                              {FLEET_BOARD_STATUSES.map((status) =>
+                                status !== "done" && group.counts[status] > 0 ? (
+                                  <span key={status}>
+                                    {STATUS_LABELS[status]} {group.counts[status]}
+                                  </span>
+                                ) : null,
+                              )}
+                            </span>
+                            {group.counts.offline > 0 ? (
+                              <Badge variant="warning" title="连不上">
+                                连不上
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 flex flex-col">
+                            {rows.active.map((row) => {
+                              const key = fleetSummaryRowKey(row);
+                              return (
+                                <FleetBoardRow
+                                  key={key}
+                                  row={row}
+                                  machineName={machineName(row.environmentId)}
+                                  machineConnected={connectedIds.has(
+                                    row.environmentId as EnvironmentId,
+                                  )}
+                                  now={now}
+                                  selected={search.row === key}
+                                  onSelect={handleOpenRow}
+                                />
+                              );
+                            })}
+                          </div>
+                          {rows.done.length > 0 ? (
+                            <Collapsible
+                              open={open}
+                              onOpenChange={(nextOpen) => {
+                                const next = new Set(doneOpenIds);
+                                if (nextOpen) next.add(group.environmentId);
+                                else next.delete(group.environmentId);
+                                setDoneOpenIds(next);
+                              }}
+                            >
+                              <CollapsibleTrigger className="mt-1 flex w-full items-center gap-2 rounded-md px-2 text-meta text-muted-foreground hover:text-foreground">
+                                <ChevronDownIcon
+                                  aria-hidden
+                                  className={cn(
+                                    "size-3 shrink-0 transition-transform",
+                                    !open && "-rotate-90",
+                                  )}
+                                />
+                                已完成 {rows.done.length}
+                              </CollapsibleTrigger>
+                              <CollapsiblePanel>
+                                <div className="flex flex-col">
+                                  {visibleDone.map((row) => {
+                                    const key = fleetSummaryRowKey(row);
+                                    return (
+                                      <FleetBoardRow
+                                        key={key}
+                                        row={row}
+                                        machineName={machineName(row.environmentId)}
+                                        machineConnected={connectedIds.has(
+                                          row.environmentId as EnvironmentId,
+                                        )}
+                                        now={now}
+                                        selected={search.row === key}
+                                        onSelect={handleOpenRow}
+                                      />
+                                    );
+                                  })}
+                                  {open && rows.done.length > visibleDone.length ? (
+                                    <Button
+                                      variant="muted"
+                                      size="sm"
+                                      className="self-start"
+                                      onClick={() => setDoneLimit((limit) => limit + 50)}
+                                    >
+                                      再显示 50 条
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </CollapsiblePanel>
+                            </Collapsible>
+                          ) : null}
+                        </section>
+                      );
+                    })}
+                  </div>
+                )}
+              </WorkspacePageContainer>
+            </ScrollArea>
+          </>
+        )}
       </div>
 
       <FleetRowDetail

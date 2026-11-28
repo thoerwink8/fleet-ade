@@ -26,6 +26,7 @@ export const Route = createFileRoute("/_chat/fleet")({
     source:
       typeof raw.source === "string" && raw.source ? (raw.source as EnvironmentId) : undefined,
     row: typeof raw.row === "string" && raw.row ? raw.row.slice(0, 512) : undefined,
+    tab: raw.tab === "board" || raw.tab === "tasks" ? raw.tab : undefined,
   }),
   component: FleetBoardPage,
 });
