@@ -50,11 +50,13 @@ export class CoordinatorTerm extends Context.Service<
       fleetId: string,
       term: number,
       coordinatorId: string,
+      caller?: { readonly environmentId: string },
     ) => Effect.Effect<ObserveResult, CoordinatorTermStorageError>;
     readonly handover: (
       fleetId: string,
       toCoordinatorId: string,
       expectedTerm: number,
+      expectedCoordinatorId: string | null,
     ) => Effect.Effect<HandoverResult, CoordinatorTermStorageError>;
   }
 >()("t3/ledger/coordinatorTerm") {}
@@ -106,7 +108,12 @@ const make = Effect.gen(function* () {
     fleetId: string,
     term: number,
     coordinatorId: string,
+    caller?: { readonly environmentId: string },
   ) {
+    const contention = {
+      ...(caller === undefined ? {} : { callerEnvironmentId: caller.environmentId }),
+      term,
+    };
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
@@ -136,7 +143,7 @@ const make = Effect.gen(function* () {
               yield* Effect.logWarning("coordinator term contended at equal term", {
                 storedCoordinatorId: stored.coordinatorId,
                 observedCoordinatorId: coordinatorId,
-                term,
+                ...contention,
                 outcome: "current",
               });
             }
@@ -151,7 +158,7 @@ const make = Effect.gen(function* () {
             yield* Effect.logWarning("coordinator term contended at equal term", {
               storedCoordinatorId: latest.coordinatorId,
               observedCoordinatorId: coordinatorId,
-              term,
+              ...contention,
               outcome: "stale",
             });
           }
@@ -165,15 +172,19 @@ const make = Effect.gen(function* () {
     fleetId: string,
     toCoordinatorId: string,
     expectedTerm: number,
+    expectedCoordinatorId: string | null,
   ) {
     const nextTerm = expectedTerm + 1;
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          // The coordinator id is part of the compare-and-swap: a machine that lost a
+          // same-term tie-break must not write the next term over the winner's row.
           const updated = yield* sql<{ readonly term: number }>`
             UPDATE fleet_coordinator_terms
             SET term = ${nextTerm}, coordinator_id = ${toCoordinatorId}
             WHERE fleet_id = ${fleetId} AND term = ${expectedTerm}
+              AND coordinator_id IS ${expectedCoordinatorId}
             RETURNING term
           `;
           if (updated[0] !== undefined) {

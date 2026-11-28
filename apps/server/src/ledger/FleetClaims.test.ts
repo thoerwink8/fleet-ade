@@ -572,7 +572,7 @@ it.effect("协调者是别的机器时领续还和心跳整次拒绝，交回本
       yield* sql`SELECT task_id, state, attempt, lease_until FROM node_claims ORDER BY task_id`;
 
     assert.strictEqual(
-      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0))._tag,
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0, null))._tag,
       "current",
     );
 
@@ -599,7 +599,7 @@ it.effect("协调者是别的机器时领续还和心跳整次拒绝，交回本
     assert.deepEqual(yield* sql`SELECT environment_id FROM fleet_environment_heartbeats`, []);
 
     assert.strictEqual(
-      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1))._tag,
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1, "node-b"))._tag,
       "current",
     );
     assert.strictEqual((yield* claims.renew(caller("node-a"), lease)).outcome, "renewed");
