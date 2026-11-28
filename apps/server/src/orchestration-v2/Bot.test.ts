@@ -1,4 +1,4 @@
-import { assert, it } from "@effect/vitest";
+import { assert, it, vi } from "@effect/vitest";
 import {
   BotId,
   CommandId,
@@ -36,6 +36,7 @@ import * as ProjectionStore from "./ProjectionStore.ts";
 import * as EffectWorker from "./EffectWorker.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProviderRuntimeRecoveryService from "./ProviderRuntimeRecoveryService.ts";
+import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import { queuedRunsInDeliveryOrder } from "./QueuedRunOrder.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 
@@ -1079,6 +1080,129 @@ it.effect(
         "queued",
       );
     }).pipe(Effect.provide(layerTest)),
+);
+it.effect(
+  "a crash that cut a running rotation opening holds the carried queue for the user",
+  () => {
+    const liveAdapter = {
+      instanceId,
+      driver,
+      getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
+      planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" as const }),
+      openSession: (input: { readonly providerSessionId: ProviderSessionId }) => {
+        const session: ProviderAdapter.ProviderAdapterV2SessionRuntime = {
+          instanceId,
+          driver,
+          providerSessionId: input.providerSessionId,
+          providerSession: {
+            id: input.providerSessionId,
+            driver,
+            providerInstanceId: instanceId,
+            status: "ready",
+            cwd: "/repo",
+            model: modelSelection.model,
+            capabilities: CodexProviderCapabilitiesV2,
+            extensionStatuses: [],
+            createdAt: DateTime.nowUnsafe(),
+            updatedAt: DateTime.nowUnsafe(),
+            lastError: null,
+          },
+          events: Stream.never,
+          ensureThread: (
+            ensureInput: Parameters<
+              ProviderAdapter.ProviderAdapterV2SessionRuntime["ensureThread"]
+            >[0],
+          ) => Effect.succeed(ensureInput.existingProviderThread),
+          resumeThread: (
+            resumeInput: Parameters<
+              ProviderAdapter.ProviderAdapterV2SessionRuntime["resumeThread"]
+            >[0],
+          ) => Effect.succeed(resumeInput.providerThread),
+          startTurn: () => Effect.void,
+          steerTurn: () => Effect.void,
+          interruptTurn: () => Effect.void,
+          unloadThread: () => Effect.void,
+          respondToRuntimeRequest: () => Effect.void,
+          readThreadSnapshot: () => Effect.die("readThreadSnapshot is unused in this test"),
+          rollbackThread: () => Effect.die("rollbackThread is unused in this test"),
+          forkThread: () => Effect.die("forkThread is unused in this test"),
+        } as unknown as ProviderAdapter.ProviderAdapterV2SessionRuntime;
+        return Effect.succeed(session);
+      },
+    } as unknown as ProviderAdapter.ProviderAdapterV2["Service"];
+    const layerLiveOpen = Layer.mergeAll(
+      layerDatabase,
+      ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+      ProviderReplayHarness.layerWithRegistry(
+        { name: "bot-rotate-crash-running" },
+        ProviderAdapterRegistry.layerFromAdapters([liveAdapter]),
+        { databaseLayer: layerDatabase, runEffectWorker: false },
+      ),
+    );
+    return Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const recovery = yield* ProviderRuntimeRecoveryService.ProviderRuntimeRecoveryService;
+      const alpha = ThreadId.make("thread:crashrun-a");
+      const bravo = ThreadId.make("thread:crashrun-b");
+      yield* createThread(orchestrator, alpha, "Crash running A");
+      yield* markCommander(orchestrator, alpha, "mark-crashrun-a");
+      yield* sendText(orchestrator, alpha, "crashrun-first", "first turn");
+      yield* queueText(orchestrator, alpha, "crashrun-q1", "queued 1");
+      yield* queueText(orchestrator, alpha, "crashrun-q2", "queued 2");
+      yield* finishRunsInFixture(projections, outbox, alpha);
+      yield* rotateSession(orchestrator, {
+        commandId: "rotate-crashrun",
+        markCommandId: "mark-crashrun-a",
+        threadId: alpha,
+        targetThreadId: bravo,
+      });
+      // The provider accepts the opening turn and the process dies while the turn is running:
+      // the handoff may already be consumed, so nothing about this crash is housekeeping.
+      yield* worker.drain();
+      const beforeCrash = yield* projections.getThreadProjection(bravo);
+      assert.equal(beforeCrash.runs.find((run) => run.rotationOpening === true)?.status, "running");
+      yield* outbox.reconcileAfterProcessLoss;
+      yield* recovery.reconcile("startup");
+      const bravoAfter = yield* projections.getThreadProjection(bravo);
+      const opening = bravoAfter.runs.find((run) => run.rotationOpening === true);
+      assert.equal(opening?.status, "cancelled");
+      const carried = queuedRunsInDeliveryOrder(bravoAfter);
+      assert.lengthOf(carried, 2);
+      assert.deepEqual(
+        carried.map((run) => run.queueHeld === true),
+        [true, true],
+      );
+      // The startup resume skips held work: nothing moves until the user decides.
+      yield* orchestrator.resumeQueuedRuns;
+      const bravoUnresumed = yield* projections.getThreadProjection(bravo);
+      assert.deepEqual(
+        queuedRunsInDeliveryOrder(bravoUnresumed).map((run) => run.userMessageId),
+        ["crashrun-q1", "crashrun-q2"].map((key) => MessageId.make(`message:${key}~${bravo}`)),
+      );
+      // queue.resume is the way out: the hold clears and the first carried run starts.
+      yield* orchestrator.dispatch({
+        type: "queue.resume",
+        commandId: CommandId.make("crashrun-resume"),
+        threadId: bravo,
+      });
+      const bravoResumed = yield* projections.getThreadProjection(bravo);
+      assert.equal(
+        bravoResumed.runs.find((run) => run.userMessageId === `message:crashrun-q1~${bravo}`)
+          ?.status,
+        "starting",
+      );
+      assert.deepEqual(
+        bravoResumed.runs
+          .filter((run) => run.userMessageId.startsWith("message:crashrun-"))
+          .map((run) => run.queueHeld === true),
+        [false, false],
+      );
+    }).pipe(Effect.provide(layerLiveOpen));
+  },
 );
 
 it.effect(
@@ -2986,8 +3110,8 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
   const targetTwo = ThreadId.make("thread:race-rotate-t2");
   const firstReadEntered = Deferred.makeUnsafe<void>();
   const firstReadRelease = Deferred.makeUnsafe<void>();
+  const secondLockAttempt = Deferred.makeUnsafe<void>();
   let gateArmed = false;
-  let alphaReads = 0;
   const layerGated = Layer.mergeAll(
     layerDatabase,
     ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
@@ -3000,11 +3124,10 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
         runEffectWorker: false,
         wrapProjectionStore: (store) => ({
           ...store,
-          getThread: (id) => {
-            if (id === alpha) alphaReads += 1;
-            if (!gateArmed || id !== alpha) return store.getThread(id);
+          getBot: (id) => {
+            if (!gateArmed || id !== BotId.make("bot:mark-race-rotate")) return store.getBot(id);
             gateArmed = false;
-            return store.getThread(id).pipe(
+            return store.getBot(id).pipe(
               Effect.tap(() => Deferred.succeed(firstReadEntered, undefined)),
               Effect.tap(() => Deferred.await(firstReadRelease)),
             );
@@ -3016,6 +3139,7 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
   return Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const executor = yield* ThreadCommandExecutor.ThreadCommandExecutor;
     yield* createThread(orchestrator, alpha, "Concurrent");
     yield* markCommander(orchestrator, alpha, "mark-race-rotate");
     gateArmed = true;
@@ -3026,31 +3150,42 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
       targetThreadId: targetOne,
     }).pipe(Effect.exit, Effect.forkChild);
     yield* Deferred.await(firstReadEntered);
-    const readsWhenFirstEntered = alphaReads;
-    const secondFiber = yield* rotateSession(orchestrator, {
-      commandId: "rotate-race-two",
-      markCommandId: "mark-race-rotate",
-      threadId: alpha,
-      targetThreadId: targetTwo,
-    }).pipe(Effect.exit, Effect.forkChild);
-    // The second rotation is dispatched and given its turn before the first read opens, yet
-    // nothing but the first has reached the thread's in-lock read: it really is waiting on the
-    // lock, not on a slow start.
-    yield* Effect.yieldNow;
-    assert.equal(alphaReads, readsWhenFirstEntered);
-    yield* Deferred.succeed(firstReadRelease, undefined);
-    const firstExit = yield* Fiber.join(firstFiber);
-    const secondExit = yield* Fiber.join(secondFiber);
-    assert.isTrue(Exit.isSuccess(firstExit));
-    assert.isTrue(Exit.isFailure(secondExit));
-    const winner = Exit.isSuccess(firstExit) ? targetOne : targetTwo;
-    const loser = Exit.isSuccess(firstExit) ? targetTwo : targetOne;
-    assert.equal(
-      (yield* projections.getBot(BotId.make("bot:mark-race-rotate")))?.currentThreadId,
-      winner,
-    );
-    assert.isNull(yield* projections.getThreadShell(loser));
-    yield* noReceipt("rotate-race-two");
+    // The first rotation is inside its critical section. Every alpha lock attempt from now on
+    // is the second rotation's: signalling before the lock proves the second reached the wait
+    // while the first still holds it — releasing before the signal deadlocks this test, so the
+    // ordering itself carries the proof.
+    const withLock = executor.withLock;
+    const spy = vi
+      .spyOn(executor, "withLock")
+      .mockImplementation((key, effect) =>
+        key === alpha
+          ? Deferred.succeed(secondLockAttempt, undefined).pipe(
+              Effect.andThen(withLock(key, effect)),
+            )
+          : withLock(key, effect),
+      );
+    yield* Effect.gen(function* () {
+      const secondFiber = yield* rotateSession(orchestrator, {
+        commandId: "rotate-race-two",
+        markCommandId: "mark-race-rotate",
+        threadId: alpha,
+        targetThreadId: targetTwo,
+      }).pipe(Effect.exit, Effect.forkChild);
+      yield* Deferred.await(secondLockAttempt);
+      yield* Deferred.succeed(firstReadRelease, undefined);
+      const firstExit = yield* Fiber.join(firstFiber);
+      const secondExit = yield* Fiber.join(secondFiber);
+      assert.isTrue(Exit.isSuccess(firstExit));
+      assert.isTrue(Exit.isFailure(secondExit));
+      const winner = Exit.isSuccess(firstExit) ? targetOne : targetTwo;
+      const loser = Exit.isSuccess(firstExit) ? targetTwo : targetOne;
+      assert.equal(
+        (yield* projections.getBot(BotId.make("bot:mark-race-rotate")))?.currentThreadId,
+        winner,
+      );
+      assert.isNull(yield* projections.getThreadShell(loser));
+      yield* noReceipt("rotate-race-two");
+    }).pipe(Effect.ensuring(Effect.sync(() => spy.mockRestore())));
   }).pipe(Effect.provide(layerGated));
 });
 

@@ -1925,3 +1925,63 @@ it.effect.each([
     }).pipe(Effect.provide(harness.layer));
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
+
+it.effect("a replayed rebind moves only what still binds the source thread", () =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-again-source");
+    const target = ThreadId.make("thread:rebind-again-target");
+    const harness = botHarness({
+      getThreadShell: () => Effect.succeed(threadShell(ProjectId.make("project:test"))),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      const firstInput = {
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      } as const;
+      yield* service.upsert({
+        ...firstInput,
+        id: ScheduledTaskId.make("task:rebind-first"),
+        threadId: source,
+      });
+      yield* service.upsert({
+        ...firstInput,
+        id: ScheduledTaskId.make("task:rebind-late"),
+        threadId: ThreadId.make("thread:rebind-elsewhere"),
+      });
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      // The rotation effect replays after the crash that followed its first execution: a task
+      // written back onto the sealed thread in between must still move, the already-moved one
+      // must not be copied twice, and a task bound elsewhere is not the rotation's to take.
+      yield* sql`UPDATE scheduled_tasks SET thread_id = ${source} WHERE task_id = ${"task:rebind-late"}`;
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      assert.deepEqual(
+        rows
+          .filter((row) => row.thread_id === target)
+          .map((row) => row.task_id)
+          .toSorted(),
+        ["task:rebind-first", "task:rebind-late"],
+      );
+      assert.lengthOf(
+        rows.filter((row) => row.task_id === "task:rebind-first"),
+        1,
+      );
+      assert.lengthOf(
+        rows.filter((row) => row.thread_id === source),
+        0,
+      );
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
