@@ -150,7 +150,7 @@ describe("derivePendingBackgroundWork", () => {
     expect(tasks).toEqual([
       {
         taskId: "cmd-new",
-        description: "still pending",
+        description: "npm test",
         kind: "command",
         status: "running",
       },
@@ -318,7 +318,7 @@ describe("derivePendingBackgroundWork", () => {
     expect(tasks).toEqual([
       {
         taskId: "cmd-null",
-        description: "orphan item",
+        description: "echo orphan",
         kind: "command",
         status: "running",
       },

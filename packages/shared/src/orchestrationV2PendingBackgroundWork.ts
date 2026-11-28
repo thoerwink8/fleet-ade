@@ -272,12 +272,13 @@ function isPersistentDynamicToolInput(input: unknown): boolean {
 }
 
 function descriptionFromTurnItem(item: PendingBackgroundWorkTurnItem): string | undefined {
-  if (typeof item.title === "string" && item.title.trim().length > 0) {
-    return item.title.trim();
-  }
+  // Command titles are the generic "已运行命令" summary, so the command itself names the row.
   if (item.type === "command_execution" && typeof item.input === "string") {
     const command = item.input.trim();
-    return command.length > 0 ? command : undefined;
+    if (command.length > 0) return command;
+  }
+  if (typeof item.title === "string" && item.title.trim().length > 0) {
+    return item.title.trim();
   }
   if (item.type === "dynamic_tool") {
     const toolName = Reflect.get(item, "toolName");
