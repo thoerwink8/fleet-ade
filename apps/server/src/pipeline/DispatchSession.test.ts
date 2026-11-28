@@ -228,7 +228,7 @@ const run = <E, R>(
   patch: PipelinePatch,
   issues: ReadonlyArray<PipelineIssue>,
   body: (handles: Handles) => Effect.Effect<void, E, R>,
-  options?: Parameters<typeof sessionLayer>[4],
+  options?: Parameters<typeof sessionLayer>[5],
 ) =>
   Effect.gen(function* () {
     const opened = yield* Ref.make<ReadonlyArray<DispatchSession.DispatchedSession>>([]);
