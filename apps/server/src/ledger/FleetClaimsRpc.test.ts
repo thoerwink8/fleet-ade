@@ -6,10 +6,12 @@ import {
   FleetClaimHeartbeatResult,
   FleetClaimLeaseResult,
   FleetTermExchangeResult,
+  FleetTermHandoverResult,
   type FleetClaimClaimInput,
   type FleetClaimHeartbeatInput,
   type FleetClaimLeaseInput,
   type FleetTermExchangeInput,
+  type FleetTermHandoverInput,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -30,15 +32,17 @@ import * as FleetClaims from "./FleetClaims.ts";
 const coordinator = descriptorOf("coordinator", "Coordinator");
 const nodeA = descriptorOf("node-a", "Node A");
 const nodeB = descriptorOf("node-b", "Node B");
+const nodeC = descriptorOf("node-c", "Node C");
+const nodeE = descriptorOf("node-e", "Node E");
 const limits = { runtimeMode: "auto" as const, interactionMode: "default" as const };
 
-const claimsLayer = (filename = ":memory:") =>
+const claimsLayer = (filename = ":memory:", fleetId?: string) =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       yield* sql`INSERT OR IGNORE INTO repos (owner, name) VALUES ('example', 'one'), ('other', 'repo')`;
     }),
-  ).pipe(Layer.provideMerge(FleetClaims.layerForTest(filename)));
+  ).pipe(Layer.provideMerge(FleetClaims.layerForTest(filename, fleetId)));
 
 const claim = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetClaimClaimInput) =>
   client.call({
@@ -490,6 +494,275 @@ it.effect("没互配的机器交换请求在身份验证处被拒，库不变", 
       expect(denied.code).toBe("orchestration_error");
       expect(denied.message).toContain("could not verify this environment's identity");
       expect(yield* readTerm(bLedger)).toEqual({ term: 8, coordinatorId: "node-b" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+/**
+ * One machine serving both fleet toolkits on its own ledger, as production does:
+ * term writes and lease writes share one file.
+ */
+const machineLayer = (descriptor: typeof nodeA, filename: string) =>
+  Layer.mergeAll(
+    McpHttpServer.layerFleetClaimsToolkit.pipe(
+      Layer.provide(claimsLayer(filename, descriptor.environmentId)),
+    ),
+    McpHttpServer.layerFleetCoordinatorToolkit.pipe(
+      Layer.provide(FleetCoordinator.layerForTest(filename)),
+    ),
+  );
+
+const serveMachine = (descriptor: typeof nodeA, filename: string) =>
+  Layer.build(Layer.fresh(NodeHttpServer.layerTest)).pipe(
+    Effect.flatMap((server) =>
+      servePeer(descriptor, machineLayer(descriptor, filename)).pipe(Effect.provideContext(server)),
+    ),
+  );
+
+const handoverCall = (
+  client: PeerMcpClient.PeerMcpClient["Service"],
+  environmentId: typeof nodeA.environmentId,
+  input: FleetTermHandoverInput = {},
+) =>
+  client.call({
+    environmentId,
+    tool: "fleet_term_handover",
+    arguments: input,
+    limits,
+    success: FleetTermHandoverResult,
+  });
+
+const claimAt = (
+  client: PeerMcpClient.PeerMcpClient["Service"],
+  environmentId: typeof nodeA.environmentId,
+  input: FleetClaimClaimInput,
+) =>
+  client.call({
+    environmentId,
+    tool: "fleet_claim",
+    arguments: input,
+    limits,
+    success: FleetClaimClaimResult,
+  });
+
+const readClaimsRows = (filename: string) =>
+  Effect.gen(function* () {
+    const context = yield* NodeSqliteClient.layer({ filename }).pipe(Layer.build);
+    const sql = Context.get(context, SqlClient.SqlClient);
+    return yield* sql<{
+      readonly fleet_id: string;
+      readonly repo: string;
+      readonly issue: number;
+      readonly task_id: string;
+      readonly claimed_by: string;
+      readonly holder_environment: string | null;
+      readonly lease_until: string;
+      readonly executor: string;
+      readonly state: string | null;
+      readonly fencing: string | null;
+      readonly attempt: number;
+      readonly claim_idempotency_key: string | null;
+      readonly renew_idempotency_key: string | null;
+      readonly renew_lease_until: string | null;
+      readonly release_idempotency_key: string | null;
+    }>`
+      SELECT fleet_id, repo, issue, task_id, claimed_by, holder_environment, lease_until, executor,
+        state, fencing, attempt, claim_idempotency_key, renew_idempotency_key, renew_lease_until,
+        release_idempotency_key
+      FROM node_claims
+      ORDER BY repo, issue, task_id
+    `;
+  });
+
+it.effect("协调者在线交出后旧机停写、新机接写，存量租约原样保留", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      const eLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 1, "node-a"))._tag).toBe("current");
+      const a = yield* serveMachine(nodeA, aLedger);
+      const b = yield* serveMachine(nodeB, bLedger);
+      const executor = yield* serveMachine(nodeE, eLedger);
+      yield* linkTo(executor.links, a);
+      yield* linkTo(a.links, executor);
+      yield* linkTo(executor.links, b);
+      yield* linkTo(b.links, executor);
+      yield* linkTo(b.links, a);
+      yield* linkTo(a.links, b);
+
+      const held = yield* claimAt(
+        executor.client,
+        nodeA.environmentId,
+        claimInput("example/one", "root", "e-root"),
+      );
+      expect(held.outcome).toBe("claimed");
+      const rowsBefore = yield* readClaimsRows(aLedger);
+      expect(rowsBefore).toHaveLength(1);
+
+      const result = yield* handoverCall(b.client, nodeA.environmentId);
+      expect(result).toEqual({ outcome: "handed-over", term: 2, coordinatorId: "node-b" });
+      expect(yield* readTerm(aLedger)).toEqual({ term: 2, coordinatorId: "node-b" });
+      expect(yield* readTerm(bLedger)).toEqual({ term: 2, coordinatorId: "node-b" });
+      expect(yield* readTerm(eLedger)).toEqual({ term: 2, coordinatorId: "node-b" });
+
+      const denied = yield* claimAt(
+        executor.client,
+        nodeA.environmentId,
+        claimInput("example/one", "after", "e-after"),
+      ).pipe(Effect.flip);
+      expect(denied.code).toBe("orchestration_error");
+      expect(denied.message).toContain("not the fleet coordinator");
+      expect(yield* readClaimsRows(aLedger)).toEqual(rowsBefore);
+
+      const fresh = yield* claimAt(
+        executor.client,
+        nodeB.environmentId,
+        claimInput("example/one", "fresh", "e-fresh"),
+      );
+      expect(fresh.outcome).toBe("claimed");
+      expect(yield* readClaimsRows(bLedger)).toHaveLength(1);
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("交出后任期加一，交给 ID 更小的机器也让旧快照持有者收敛", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const oldMachine = descriptorOf("node-z", "Old Coordinator");
+      const staleHolder = descriptorOf("node-m", "Stale Holder");
+      const oldLedger = yield* tempLedger;
+      const newLedger = yield* tempLedger;
+      const staleLedger = yield* tempLedger;
+      // The stale holder still believes (1, node-z); node-a is the smaller id and
+      // would lose a same-term tie-break, so the handover must bump the term.
+      expect((yield* writeTerm(oldLedger, 1, "node-z"))._tag).toBe("current");
+      expect((yield* writeTerm(staleLedger, 1, "node-z"))._tag).toBe("current");
+      const old = yield* serveMachine(oldMachine, oldLedger);
+      const newer = yield* serveMachine(nodeA, newLedger);
+      const holder = yield* serveMachine(staleHolder, staleLedger);
+      yield* linkTo(newer.links, old);
+      yield* linkTo(old.links, newer);
+      yield* linkTo(old.links, holder);
+      yield* linkTo(holder.links, old);
+      yield* linkTo(holder.links, newer);
+      yield* linkTo(newer.links, holder);
+
+      const result = yield* handoverCall(newer.client, oldMachine.environmentId);
+      expect(result).toEqual({ outcome: "handed-over", term: 2, coordinatorId: "node-a" });
+      expect(yield* readTerm(oldLedger)).toEqual({ term: 2, coordinatorId: "node-a" });
+      expect(yield* readTerm(newLedger)).toEqual({ term: 2, coordinatorId: "node-a" });
+      expect(yield* readTerm(staleLedger)).toEqual({ term: 2, coordinatorId: "node-a" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("两机同时请求交出只有一个成功，另一个得到过期快照并收敛到胜出者", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      const cLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 1, "node-a"))._tag).toBe("current");
+      const a = yield* serveMachine(nodeA, aLedger);
+      const b = yield* serveMachine(nodeB, bLedger);
+      const c = yield* serveMachine(nodeC, cLedger);
+      for (const [from, to] of [
+        [a, b],
+        [b, a],
+        [a, c],
+        [c, a],
+        [b, c],
+        [c, b],
+      ] as const) {
+        yield* linkTo(from.links, to);
+      }
+
+      const [toB, toC] = yield* Effect.all(
+        [handoverCall(b.client, nodeA.environmentId), handoverCall(c.client, nodeA.environmentId)],
+        { concurrency: "unbounded" },
+      );
+      const winner = [toB, toC].find((result) => result.outcome !== "stale");
+      const loser = [toB, toC].find((result) => result.outcome === "stale");
+      expect(winner?.outcome).toBe("handed-over");
+      expect(winner?.term).toBe(2);
+      expect(loser).toEqual({
+        outcome: "stale",
+        term: 2,
+        coordinatorId: winner!.coordinatorId,
+      });
+      for (const filename of [aLedger, bLedger, cLedger]) {
+        expect(yield* readTerm(filename)).toEqual({
+          term: 2,
+          coordinatorId: winner!.coordinatorId,
+        });
+      }
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("目标已知更大任期时交出返回过期，本机当场采纳该快照", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 1, "node-a"))._tag).toBe("current");
+      expect((yield* writeTerm(bLedger, 8, "node-b"))._tag).toBe("current");
+      const a = yield* serveMachine(nodeA, aLedger);
+      const b = yield* serveMachine(nodeB, bLedger);
+      yield* linkTo(b.links, a);
+      yield* linkTo(a.links, b);
+
+      const result = yield* handoverCall(b.client, nodeA.environmentId);
+      expect(result).toEqual({ outcome: "stale", term: 8, coordinatorId: "node-b" });
+      expect(yield* readTerm(aLedger)).toEqual({ term: 8, coordinatorId: "node-b" });
+      expect(yield* readTerm(bLedger)).toEqual({ term: 8, coordinatorId: "node-b" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("推送确认丢失后重复交出幂等：再推一次成功、任期不再推进", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 1, "node-a"))._tag).toBe("current");
+      const a = yield* serveMachine(nodeA, aLedger);
+      const b = yield* serveMachine(nodeB, bLedger);
+      yield* linkTo(b.links, a);
+      yield* linkTo(a.links, b);
+
+      const first = yield* handoverCall(b.client, nodeA.environmentId);
+      expect(first).toEqual({ outcome: "handed-over", term: 2, coordinatorId: "node-b" });
+      // As after a lost push confirmation: both already hold the new term. Asking
+      // again must not move the term or touch the target's row.
+      const second = yield* handoverCall(b.client, nodeA.environmentId);
+      expect(second).toEqual({ outcome: "handed-over", term: 2, coordinatorId: "node-b" });
+      expect(yield* readTerm(aLedger)).toEqual({ term: 2, coordinatorId: "node-b" });
+      expect(yield* readTerm(bLedger)).toEqual({ term: 2, coordinatorId: "node-b" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("配对机请求把协调者交给第三台机器被拒", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 1, "node-a"))._tag).toBe("current");
+      const a = yield* serveMachine(nodeA, aLedger);
+      const b = yield* serveMachine(nodeB, bLedger);
+      yield* linkTo(b.links, a);
+      yield* linkTo(a.links, b);
+
+      const denied = yield* handoverCall(b.client, nodeA.environmentId, {
+        target: nodeC.environmentId,
+      }).pipe(Effect.flip);
+      expect(denied.code).toBe("invalid_request");
+      expect(denied.message).toContain("node-c");
+      expect(denied.message).toContain("only ask the coordinator for itself");
+      expect(yield* readTerm(aLedger)).toEqual({ term: 1, coordinatorId: "node-a" });
+      expect(yield* readTerm(bLedger)).toEqual({ term: 0, coordinatorId: null });
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

@@ -3,22 +3,27 @@ import {
   FleetCoordinatorError,
   type FleetTermExchangeInput,
   type FleetTermExchangeResult,
+  FleetTermExchangeResult as FleetTermExchangeResultSchema,
+  type FleetTermHandoverResult,
 } from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
+import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import * as CoordinatorTerm from "./coordinatorTerm.ts";
 import * as LedgerDb from "./LedgerDb.ts";
 
 /**
- * Answers coordinator term exchanges with paired machines: adopts the larger
- * `(term, coordinatorId)` and replies with the converged snapshot, so the
- * caller adopts it in turn. `CoordinatorTerm` owns storage only.
+ * Term exchanges adopt the larger `(term, coordinatorId)` and reply with the
+ * converged snapshot. Handover commits the next term locally before pushing to
+ * the target, so this machine stops accepting fleet lease writes at the commit
+ * even when the push never lands. `CoordinatorTerm` owns storage only.
  */
 export class FleetCoordinator extends Context.Service<
   FleetCoordinator,
@@ -27,13 +32,31 @@ export class FleetCoordinator extends Context.Service<
       caller: { readonly environmentId: string },
       input: FleetTermExchangeInput,
     ) => Effect.Effect<FleetTermExchangeResult, FleetCoordinatorError>;
+    /** Hands the coordinator to a linked machine. Idempotent for a machine already handed to it. */
+    readonly handover: (
+      to: EnvironmentId,
+    ) => Effect.Effect<FleetTermHandoverResult, FleetCoordinatorError>;
+    /**
+     * A linked machine asking this one to hand the coordinator over. The target
+     * can only be the caller itself: handing to a third machine is refused.
+     */
+    readonly requestHandover: (
+      caller: { readonly environmentId: EnvironmentId },
+      target?: EnvironmentId,
+    ) => Effect.Effect<FleetTermHandoverResult, FleetCoordinatorError>;
+    /** The coordinator term as this machine last heard it. */
+    readonly current: Effect.Effect<FleetTermExchangeResult, FleetCoordinatorError>;
+    /** Machines a handover push failed to reach; the re-push loop drains this. */
+    readonly pendingPush: Effect.Effect<ReadonlyArray<EnvironmentId>, never>;
   }
 >()("t3/ledger/FleetCoordinator") {}
 
 const make = Effect.gen(function* () {
   const terms = yield* CoordinatorTerm.CoordinatorTerm;
   const links = yield* PeerLinks.PeerLinks;
+  const peerClient = yield* PeerMcpClient.PeerMcpClient;
   const environment = yield* ServerEnvironment.ServerEnvironment;
+  const pending = yield* Ref.make<ReadonlySet<EnvironmentId>>(new Set());
 
   const storageError = (cause: unknown) =>
     new FleetCoordinatorError({
@@ -41,6 +64,31 @@ const make = Effect.gen(function* () {
       message: "Coordinator term storage is unavailable.",
       cause,
     });
+  const linkError = (error: { readonly message: string; readonly cause?: unknown }) =>
+    storageError(error.cause !== undefined ? error.cause : new Error(error.message));
+
+  const snapshotOf = (snapshot: {
+    readonly term: number;
+    readonly coordinatorId: string | null;
+  }): FleetTermExchangeResult => ({
+    term: snapshot.term,
+    // Rows only ever hold environment ids this machine or a linked one wrote.
+    coordinatorId:
+      snapshot.coordinatorId === null ? null : EnvironmentId.make(snapshot.coordinatorId),
+  });
+
+  const readSnapshot = terms
+    .read(CoordinatorTerm.FLEET_TERM_KEY)
+    .pipe(Effect.mapError(storageError));
+
+  const adopt = (
+    term: number,
+    coordinatorId: EnvironmentId,
+    caller?: { readonly environmentId: string },
+  ) =>
+    terms
+      .observe(CoordinatorTerm.FLEET_TERM_KEY, term, coordinatorId, caller)
+      .pipe(Effect.mapError(storageError));
 
   const exchange = Effect.fn("FleetCoordinator.exchange")(function* (
     caller: { readonly environmentId: string },
@@ -49,30 +97,160 @@ const make = Effect.gen(function* () {
     const selfId = yield* environment.getEnvironmentId;
     const paired =
       input.coordinatorId === selfId ||
-      (yield* links.get(input.coordinatorId).pipe(
-        Effect.map(Option.isSome),
-        Effect.mapError((error) =>
-          storageError(error.cause !== undefined ? error.cause : new Error(error.message)),
-        ),
-      ));
+      (yield* links
+        .get(input.coordinatorId)
+        .pipe(Effect.map(Option.isSome), Effect.mapError(linkError)));
     if (!paired) {
       return yield* new FleetCoordinatorError({
         reason: "unknown-coordinator",
         message: `Coordinator ${input.coordinatorId} is neither this environment nor a linked one.`,
       });
     }
-    const observed = yield* terms
-      .observe(CoordinatorTerm.FLEET_TERM_KEY, input.term, input.coordinatorId)
-      .pipe(Effect.mapError(storageError));
+    return snapshotOf(yield* adopt(input.term, input.coordinatorId, caller));
+  });
+
+  /** Pushes the snapshot to one peer. Failure records it for the re-push loop. */
+  const pushTo = (
+    environmentId: EnvironmentId,
+    snapshot: { readonly term: number; readonly coordinatorId: EnvironmentId },
+    caller: { readonly environmentId: string },
+  ) =>
+    peerClient
+      .call({
+        environmentId,
+        tool: "fleet_term_exchange",
+        arguments: { term: snapshot.term, coordinatorId: snapshot.coordinatorId },
+        limits: { runtimeMode: "auto", interactionMode: "default" },
+        success: FleetTermExchangeResultSchema,
+      })
+      .pipe(
+        // The peer may know a larger term; adopting it is how the fleet converges.
+        Effect.tap((reply) =>
+          reply.coordinatorId === null || reply.term === 0
+            ? Effect.void
+            : adopt(reply.term, reply.coordinatorId, caller),
+        ),
+        Effect.tap(() =>
+          Ref.update(pending, (set) => {
+            const next = new Set(set);
+            next.delete(environmentId);
+            return next;
+          }),
+        ),
+        Effect.tapError((error) =>
+          Effect.all([
+            Ref.update(pending, (set) => new Set(set).add(environmentId)),
+            Effect.logWarning("coordinator term push failed", {
+              targetEnvironmentId: environmentId,
+              message: error.message,
+            }),
+          ]),
+        ),
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+
+  const handover = Effect.fn("FleetCoordinator.handover")(function* (to: EnvironmentId) {
+    const selfId = yield* environment.getEnvironmentId;
+    const linked = yield* links.get(to).pipe(Effect.mapError(linkError));
+    if (to === selfId || Option.isNone(linked)) {
+      return yield* new FleetCoordinatorError({
+        reason: "unknown-target",
+        message:
+          to === selfId
+            ? "This environment cannot hand the coordinator over to itself."
+            : `Cannot hand the coordinator to ${to}: this environment is not linked to it. Link it first.`,
+      });
+    }
+    const before = yield* readSnapshot;
+    let pushed: { readonly term: number; readonly coordinatorId: EnvironmentId };
+    if (before.coordinatorId === to) {
+      // Already handed to this machine: resume the push. A repeat after a lost
+      // confirmation lands here, so it ends as a success without touching the row.
+      pushed = { term: before.term, coordinatorId: to };
+    } else {
+      if (before.coordinatorId !== selfId) {
+        return { outcome: "stale" as const, ...snapshotOf(before) };
+      }
+      // Learn the target's term before moving ours: a target that knows a larger
+      // term turns this handover stale instead of diverging.
+      const offered = yield* peerClient
+        .call({
+          environmentId: to,
+          tool: "fleet_term_exchange",
+          arguments: { term: before.term, coordinatorId: selfId },
+          limits: { runtimeMode: "auto", interactionMode: "default" },
+          success: FleetTermExchangeResultSchema,
+        })
+        .pipe(
+          Effect.mapError(
+            (error) =>
+              new FleetCoordinatorError({
+                reason: "peer-unreachable",
+                message: `The handover target ${to} could not be asked its term: ${error.message}`,
+                cause: error,
+              }),
+          ),
+        );
+      if (offered.coordinatorId !== null && offered.term > 0) {
+        yield* adopt(offered.term, offered.coordinatorId, { environmentId: to });
+      }
+      const current = yield* readSnapshot;
+      if (current.coordinatorId === to && current.term === before.term + 1) {
+        // The exchange already moved the fleet onto the target, as when it had
+        // accepted a lost push of this very handover.
+        pushed = { term: current.term, coordinatorId: to };
+      } else {
+        if (current.coordinatorId !== selfId) {
+          return { outcome: "stale" as const, ...snapshotOf(current) };
+        }
+        const written = yield* terms
+          .handover(CoordinatorTerm.FLEET_TERM_KEY, to, current.term)
+          .pipe(Effect.mapError(storageError));
+        if (written._tag === "stale") {
+          return { outcome: "stale" as const, ...snapshotOf(written) };
+        }
+        // The term row committed here; fleet lease writes on this machine refuse
+        // from this moment. The push below only confirms what is already decided.
+        pushed = { term: written.term, coordinatorId: to };
+      }
+    }
+    const confirmed = yield* pushTo(to, pushed, { environmentId: selfId });
+    const others = yield* links.list.pipe(Effect.mapError(linkError));
+    // Best effort: every other paired machine learns the new term now. Failures
+    // land on the pending list the re-push loop drains.
+    yield* Effect.forEach(
+      others.filter((link) => link.environmentId !== to),
+      (link) => pushTo(link.environmentId, pushed, { environmentId: selfId }),
+      { concurrency: "unbounded", discard: true },
+    );
     return {
-      term: observed.term,
-      // Rows only ever hold environment ids this machine or a linked one wrote.
-      coordinatorId:
-        observed.coordinatorId === null ? null : EnvironmentId.make(observed.coordinatorId),
+      outcome: confirmed ? ("handed-over" as const) : ("handed-over-unconfirmed" as const),
+      term: pushed.term,
+      coordinatorId: pushed.coordinatorId,
     };
   });
 
-  return FleetCoordinator.of({ exchange });
+  const requestHandover = Effect.fn("FleetCoordinator.requestHandover")(function* (
+    caller: { readonly environmentId: EnvironmentId },
+    target?: EnvironmentId,
+  ) {
+    if (target !== undefined && target !== caller.environmentId) {
+      return yield* new FleetCoordinatorError({
+        reason: "third-party-target",
+        message: `A linked machine can only ask the coordinator for itself, not for ${target}.`,
+      });
+    }
+    return yield* handover(caller.environmentId);
+  });
+
+  return FleetCoordinator.of({
+    exchange,
+    handover,
+    requestHandover,
+    current: readSnapshot.pipe(Effect.map(snapshotOf)),
+    pendingPush: Ref.get(pending).pipe(Effect.map((set) => Array.from(set))),
+  });
 });
 
 export const layer = Layer.effect(FleetCoordinator, make).pipe(

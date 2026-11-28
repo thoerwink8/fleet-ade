@@ -50,6 +50,7 @@ export class CoordinatorTerm extends Context.Service<
       fleetId: string,
       term: number,
       coordinatorId: string,
+      caller?: { readonly environmentId: string },
     ) => Effect.Effect<ObserveResult, CoordinatorTermStorageError>;
     readonly handover: (
       fleetId: string,
@@ -106,7 +107,12 @@ const make = Effect.gen(function* () {
     fleetId: string,
     term: number,
     coordinatorId: string,
+    caller?: { readonly environmentId: string },
   ) {
+    const contention = {
+      ...(caller === undefined ? {} : { callerEnvironmentId: caller.environmentId }),
+      term,
+    };
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
@@ -136,7 +142,7 @@ const make = Effect.gen(function* () {
               yield* Effect.logWarning("coordinator term contended at equal term", {
                 storedCoordinatorId: stored.coordinatorId,
                 observedCoordinatorId: coordinatorId,
-                term,
+                ...contention,
                 outcome: "current",
               });
             }
@@ -151,7 +157,7 @@ const make = Effect.gen(function* () {
             yield* Effect.logWarning("coordinator term contended at equal term", {
               storedCoordinatorId: latest.coordinatorId,
               observedCoordinatorId: coordinatorId,
-              term,
+              ...contention,
               outcome: "stale",
             });
           }

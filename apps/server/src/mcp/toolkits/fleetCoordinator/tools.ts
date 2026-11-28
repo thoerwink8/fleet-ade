@@ -1,6 +1,8 @@
 import {
   FleetTermExchangeInput,
   FleetTermExchangeResult,
+  FleetTermHandoverInput,
+  FleetTermHandoverResult,
   OrchestratorMcpFailure,
 } from "@t3tools/contracts";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
@@ -23,4 +25,19 @@ const FleetTermExchangeTool = Tool.make("fleet_term_exchange", {
   .annotate(Tool.Idempotent, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
 
-export const FleetCoordinatorToolkit = Toolkit.make(FleetTermExchangeTool);
+const FleetTermHandoverTool = Tool.make("fleet_term_handover", {
+  description:
+    "Asks this environment to hand the fleet coordinator over to the calling machine. The target can only be the caller itself.",
+  parameters: FleetTermHandoverInput,
+  success: FleetTermHandoverResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: [FleetCoordinator.FleetCoordinator, McpInvocationContext.McpInvocationContext],
+})
+  .annotate(Tool.Title, "Hand over the fleet coordinator")
+  .annotate(Tool.Readonly, false)
+  .annotate(Tool.Destructive, true)
+  .annotate(Tool.Idempotent, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
+
+export const FleetCoordinatorToolkit = Toolkit.make(FleetTermExchangeTool, FleetTermHandoverTool);
