@@ -46,7 +46,8 @@ export function idleCompactionWindow(
   readonly startMs: number;
   readonly endMs: number;
 } | null {
-  if (thread.deletedAt !== null || thread.archivedAt !== null) return null;
+  if (thread.deletedAt !== null || thread.archivedAt !== null || thread.rotatedTo != null)
+    return null;
   if (thread.settledAt !== null || thread.settledOverride === "settled") return null;
   if (thread.snoozedUntil != null && DateTime.toEpochMillis(thread.snoozedUntil) > nowMs)
     return null;

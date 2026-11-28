@@ -1,5 +1,6 @@
 import { assert, it } from "@effect/vitest";
 import {
+  BotId,
   CheckpointId,
   CheckpointRef,
   CheckpointScopeId,
@@ -1647,4 +1648,48 @@ it.effect("a native fork that fails before its last attempt still forks natively
     assert.equal(projection.contextTransfers[0]?.status, "consumed");
     assert.equal(projection.contextTransfers[0]?.resolution?.strategy, "native_fork");
   }),
+);
+
+it.effect("forking a read-only thread clears rotatedTo only on the new thread", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const source = ThreadId.make("rotated-fork-source");
+    const home = ThreadId.make("rotated-fork-home");
+    const child = ThreadId.make("rotated-fork-child");
+    yield* createParent(source);
+    yield* writeParentRun({
+      threadId: source,
+      runId: RunId.make("rotated-fork-run"),
+      ordinal: 1,
+      status: "completed",
+      text: "kept",
+      stable: true,
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.commander.mark",
+      commandId: CommandId.make("rotated-fork-mark"),
+      threadId: source,
+    });
+    yield* orchestrator.dispatch({
+      type: "bot.rotate-session",
+      commandId: CommandId.make("rotated-fork-rotate"),
+      botId: BotId.make("bot:rotated-fork-mark"),
+      threadId: source,
+      targetThreadId: home,
+      reason: "manual",
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("rotated-fork-fork"),
+      sourceThreadId: source,
+      targetThreadId: child,
+      sourcePoint: { type: "latest_stable" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const sourceAfter = yield* orchestrator.getThreadProjection(source);
+    const childAfter = yield* orchestrator.getThreadProjection(child);
+    assert.equal(sourceAfter.thread.rotatedTo?.threadId, home);
+    assert.isUndefined(childAfter.thread.rotatedTo);
+  }).pipe(Effect.provide(forkCases[0]!.layer)),
 );

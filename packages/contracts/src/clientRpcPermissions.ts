@@ -77,6 +77,7 @@ const CLIENT_GUARDED_COMMAND_SCOPES = {
   "bot.pause": AuthOrchestrationOperateScope,
   "bot.resume": AuthOrchestrationOperateScope,
   "bot.switch-thread": AuthOrchestrationOperateScope,
+  "bot.rotate-session": AuthOrchestrationOperateScope,
 } as const;
 
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);

@@ -204,6 +204,8 @@ function commandThreadIds(command: OrchestrationV2Command): ReadonlyArray<Thread
       return [command.threadId];
     case "bot.switch-thread":
       return [command.threadId, command.targetThreadId];
+    case "bot.rotate-session":
+      return [command.threadId, command.targetThreadId];
     case "thread.fork":
     case "thread.merge_back":
       return [command.sourceThreadId, command.targetThreadId];

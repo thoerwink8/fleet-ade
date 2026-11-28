@@ -223,6 +223,8 @@ export interface CommandPolicyV2Shape {
       readonly fromSpecificTurn: boolean;
       /** Later source runs are still active; providers cannot fork a thread mid-turn. */
       readonly sourceBusy: boolean;
+      /** Rotation transfers must not fall back to a native copy of the old session. */
+      readonly requiresPortable?: boolean;
     },
   ) => Effect.Effect<ForkExecutionPolicyV2, CommandPolicyV2Error>;
   readonly ensureRollback: (
@@ -391,7 +393,7 @@ const decideForkExecution: CommandPolicyV2Shape["decideForkExecution"] = (input)
     (!input.fromSpecificTurn || input.capabilities.threads.canForkFromTurn) &&
     input.capabilities.identity.nativeThreadIds === "strong";
 
-  if (canForkNatively) {
+  if (canForkNatively && input.requiresPortable !== true) {
     return Effect.succeed("native_fork");
   }
 
