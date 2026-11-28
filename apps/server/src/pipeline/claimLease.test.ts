@@ -19,6 +19,7 @@ import * as NodeClaims from "../ledger/nodeClaims.ts";
 import * as NodeReads from "../ledger/nodeReads.ts";
 import { EnvironmentId } from "@t3tools/contracts";
 import * as FleetClaims from "../ledger/FleetClaims.ts";
+import * as CoordinatorTerm from "../ledger/coordinatorTerm.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 
 import * as ServerSettings from "../serverSettings.ts";
@@ -359,6 +360,62 @@ it.effect("机群端口仍可释放旧 UUID 租约并续期旧记录", () =>
       200,
     );
     assert.strictEqual((yield* sql`SELECT issue FROM node_claims`).length, 0);
+  }).pipe(Effect.provide(fleetLayer)),
+);
+
+it.effect("任期交给别的机器后续租和旧令牌完成回 503 且行不变，交回后又能续", () =>
+  Effect.gen(function* () {
+    const port = yield* ClaimLeasePort;
+    const sql = yield* SqlClient.SqlClient;
+    const terms = yield* CoordinatorTerm.CoordinatorTerm;
+    yield* port.register(["example/one"]);
+    const token = "a14a2c4d-11aa-4aab-8ccd-123456789abc";
+    yield* NodeClaims.apply(
+      sql,
+      {
+        action: "claim",
+        repo: "example/one",
+        issue: 7,
+        title: "test",
+        claimedBy: "pipeline",
+        leaseUntil: "9999-01-01T00:00:00.000Z",
+        token,
+      },
+      0,
+    );
+    assert.strictEqual(
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "other-env", 0))._tag,
+      "current",
+    );
+    const renewWrite = {
+      action: "renew" as const,
+      repo: "example/one",
+      issue: 7,
+      leaseUntil: "9999-01-02T00:00:00.000Z",
+    };
+    const deniedRenew = yield* port.apply(renewWrite);
+    assert.strictEqual(deniedRenew.status, 503);
+    assert.strictEqual(deniedRenew.code, "local_claims_unreadable");
+    const deniedFinish = yield* releaseClaim(port, { repo: "example/one", issue: 7, token });
+    assert.strictEqual(deniedFinish.status, 503);
+    assert.strictEqual(deniedFinish.code, "local_claims_unreadable");
+    assert.deepEqual(
+      yield* sql<{ readonly lease_until: string }>`
+        SELECT lease_until FROM node_claims WHERE issue = 7
+      `,
+      [{ lease_until: "9999-01-01T00:00:00.000Z" }],
+    );
+    assert.strictEqual(
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "pipeline-env", 1))._tag,
+      "current",
+    );
+    const renewed = yield* port.apply(renewWrite);
+    assert.strictEqual(renewed.status, 200);
+    assert.strictEqual(
+      (yield* releaseClaim(port, { repo: "example/one", issue: 7, token })).status,
+      200,
+    );
+    assert.deepEqual(yield* sql`SELECT issue FROM node_claims`, []);
   }).pipe(Effect.provide(fleetLayer)),
 );
 

@@ -308,6 +308,7 @@ it.effect("协调者换成别的机器后远程调用解出拒绝码和提示，
       expect(deniedRenew.message).toContain("not the fleet coordinator");
       const deniedRelease = yield* release(aClient, lease).pipe(Effect.flip);
       expect(deniedRelease.code).toBe("orchestration_error");
+      expect(deniedRelease.message).toContain("not the fleet coordinator");
       const deniedHeartbeat = yield* heartbeat(aClient, {
         sequence: 1,
         leases: [
