@@ -7,6 +7,7 @@ import {
   type FleetClaimClaimInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Queue from "effect/Queue";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -402,27 +403,59 @@ it.effect("旧协调者可达、交出回包丢在超时时接管仍按本机任
       expect((yield* writeTerm(bLedger, 3, "node-a"))._tag).toBe("current");
       const aMachine = yield* serveMachine(nodeA, aLedger);
       const bMachine = yield* serveMachine(nodeB, bLedger);
-      const dExchangeSeen = yield* Queue.unbounded<void>();
-      const dMachine = yield* serveNeverMachine(nodeD, dExchangeSeen);
+      const dMachine = yield* serveMachine(nodeD, ":memory:");
       yield* linkTo(bMachine.links, aMachine);
       yield* linkTo(aMachine.links, bMachine);
       yield* linkTo(bMachine.links, dMachine);
       yield* linkTo(dMachine.links, bMachine);
       yield* linkTo(aMachine.links, dMachine);
       yield* linkTo(dMachine.links, aMachine);
-      const bContext = yield* coordinatorOnPeer(bMachine, bLedger);
+      // The handover call goes out for real but its reply never comes back, so
+      // the takeover wait ends empty-handed the way a lost answer leaves it. The
+      // completed call is also the witness that the row already moved: the
+      // coordinator answers only after every push it will ever make.
+      const handoverDone = yield* Deferred.make<void>();
+      const swallowingClient = PeerMcpClient.PeerMcpClient.of({
+        call: (input) => {
+          if (input.tool === "fleet_term_handover") {
+            return bMachine.client
+              .call(input)
+              .pipe(
+                Effect.ensuring(Deferred.succeed(handoverDone, undefined)),
+                Effect.forkDetach,
+                Effect.andThen(Effect.never),
+              );
+          }
+          return bMachine.client.call(input);
+        },
+      });
+      const bContext = yield* FleetCoordinator.layerForTest(bLedger).pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(
+            Layer.succeed(PeerLinks.PeerLinks, bMachine.links),
+            Layer.succeed(PeerMcpClient.PeerMcpClient, swallowingClient),
+            Layer.succeed(ServerEnvironment.ServerEnvironment, {
+              getEnvironmentId: Ref.get(bMachine.descriptor).pipe(
+                Effect.map((current) => current.environmentId),
+              ),
+              getDescriptor: Ref.get(bMachine.descriptor),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
       const bCoordinator = Context.get(bContext, FleetCoordinator.FleetCoordinator);
 
+      // The third machine goes silent: revoked sessions fail every linked call
+      // the same way an unreachable machine does, without retrying.
+      for (const session of yield* dMachine.linkedSessions) {
+        yield* dMachine.auth.revokeSession(session.sessionId);
+      }
+
       const fiber = yield* bCoordinator.takeover({ force: false }).pipe(Effect.forkChild);
-      // The exchange round stalls on the silent machine; its three-second
-      // timeout is the only thing the round waits on.
-      yield* Queue.take(dExchangeSeen);
-      yield* TestClock.adjust("3 seconds");
-      // The push to this machine commits before the push to the silent one
-      // starts, and that second push holds the handover reply until its own
-      // three-second timeout: the ten-second handover wait expires first, so
-      // the takeover decides from the row the push already wrote.
-      yield* Queue.take(dExchangeSeen);
+      // Once the swallowed call finishes on the coordinator, this machine's row
+      // is already written; only the ten-second wait is still open.
+      yield* Deferred.await(handoverDone);
       yield* TestClock.adjust("10 seconds");
       expect(yield* Fiber.join(fiber)).toEqual({
         outcome: "taken-over",
