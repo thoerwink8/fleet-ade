@@ -72,6 +72,8 @@ export class FleetClaims extends Context.Service<
       recordEnvironmentHeartbeat?: boolean,
       sessionId?: string,
     ) => Effect.Effect<FleetClaimHeartbeatResult, FleetClaimsError>;
+    /** Reject when another machine holds the coordinator term. Compose inside the write transaction. */
+    readonly requireCoordinator: Effect.Effect<void, FleetClaimsError>;
   }
 >()("t3/ledger/FleetClaims") {}
 
@@ -82,25 +84,28 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
   const fleetId = yield* environment.getEnvironmentId;
   yield* NodeReads.migrate;
 
-  // Read inside the write transaction so a handover cannot slip between the check and the write.
-  const requireCoordinator = terms.read(CoordinatorTerm.FLEET_TERM_KEY).pipe(
-    Effect.flatMap((snapshot) =>
-      snapshot.term > 0 && snapshot.coordinatorId !== fleetId
-        ? Effect.fail(
-            new FleetClaimsError({
-              reason: "not-coordinator",
-              message: `This environment is not the fleet coordinator; the coordinator is ${snapshot.coordinatorId}.`,
-            }),
-          )
-        : Effect.void,
-    ),
-  );
   const storageError = (cause: unknown) =>
     new FleetClaimsError({
       reason: "storage",
       message: "Fleet claims storage is unavailable.",
       cause,
     });
+  // Read inside the write transaction so a handover cannot slip between the check and the write.
+  const requireCoordinator: Effect.Effect<void, FleetClaimsError> = terms
+    .read(CoordinatorTerm.FLEET_TERM_KEY)
+    .pipe(
+      Effect.mapError(storageError),
+      Effect.flatMap((snapshot) =>
+        snapshot.term > 0 && snapshot.coordinatorId !== fleetId
+          ? Effect.fail(
+              new FleetClaimsError({
+                reason: "not-coordinator",
+                message: `This environment is not the fleet coordinator; the coordinator is ${snapshot.coordinatorId}.`,
+              }),
+            )
+          : Effect.void,
+      ),
+    );
   const asFleetClaimsError = (error: unknown) =>
     isFleetClaimsError(error) ? error : storageError(error);
   const canonicalRepo = Effect.fn("FleetClaims.canonicalRepo")(function* (repo: string) {
@@ -427,7 +432,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     return { sequence: input.sequence, results };
   });
 
-  return FleetClaims.of({ claim, renew, release, heartbeat });
+  return FleetClaims.of({ claim, renew, release, heartbeat, requireCoordinator });
 });
 
 /** Same service on the caller's ambient SqlClient: one connection per ledger. */
