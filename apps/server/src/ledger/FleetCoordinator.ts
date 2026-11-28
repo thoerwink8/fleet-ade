@@ -7,6 +7,7 @@ import {
   type FleetTermHandoverResult,
   FleetTermHandoverResult as FleetTermHandoverResultSchema,
   type FleetTermTakeoverResult,
+  type PeerLink,
 } from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Context from "effect/Context";
@@ -19,6 +20,7 @@ import * as Ref from "effect/Ref";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
+import { forkParked } from "../serverActivation.ts";
 import * as CoordinatorTerm from "./coordinatorTerm.ts";
 import * as LedgerDb from "./LedgerDb.ts";
 
@@ -163,6 +165,43 @@ const make = Effect.gen(function* () {
         Effect.as(true),
         Effect.orElseSucceed(() => false),
       );
+  /**
+   * One pairwise term exchange: sends this machine's row, adopts the larger
+   * snapshot the peer replies with. Answers `true` when the peer answered at
+   * all; adoption failures are logged, not raised, since convergence retries.
+   */
+  const exchangeWith = Effect.fn("FleetCoordinator.exchangeWith")(function* (
+    peerEnvironmentId: EnvironmentId,
+    caller: { readonly environmentId: string },
+  ) {
+    const selfId = yield* environment.getEnvironmentId;
+    const local = yield* readSnapshot;
+    const reply = yield* peerClient
+      .call({
+        environmentId: peerEnvironmentId,
+        tool: "fleet_term_exchange",
+        arguments: {
+          term: local.term,
+          coordinatorId: local.coordinatorId ?? selfId,
+        },
+        limits: { runtimeMode: "auto", interactionMode: "default" },
+        success: FleetTermExchangeResultSchema,
+      })
+      .pipe(Effect.timeoutOption(Duration.seconds(3)), Effect.orElseSucceed(Option.none));
+    if (Option.isNone(reply)) return false;
+    if (reply.value.coordinatorId !== null && reply.value.term > 0) {
+      yield* adopt(reply.value.term, reply.value.coordinatorId, caller).pipe(
+        Effect.tapError((error) =>
+          Effect.logWarning("coordinator term adoption failed", {
+            peerEnvironmentId,
+            message: error.message,
+          }),
+        ),
+        Effect.catch(() => Effect.void),
+      );
+    }
+    return true;
+  });
 
   const handover = Effect.fn("FleetCoordinator.handover")(function* (to: EnvironmentId) {
     const selfId = yield* environment.getEnvironmentId;
@@ -276,33 +315,8 @@ const make = Effect.gen(function* () {
     const peers = yield* links.list.pipe(Effect.mapError(linkError));
     const answered = new Set<string>();
     for (const peer of peers) {
-      const local = yield* readSnapshot;
-      const reply = yield* peerClient
-        .call({
-          environmentId: peer.environmentId,
-          tool: "fleet_term_exchange",
-          arguments: {
-            term: local.term,
-            coordinatorId: local.coordinatorId ?? selfId,
-          },
-          limits: { runtimeMode: "auto", interactionMode: "default" },
-          success: FleetTermExchangeResultSchema,
-        })
-        .pipe(Effect.timeoutOption(Duration.seconds(3)), Effect.orElseSucceed(Option.none));
-      if (Option.isNone(reply)) continue;
-      answered.add(peer.environmentId);
-      if (reply.value.coordinatorId !== null && reply.value.term > 0) {
-        yield* adopt(reply.value.term, reply.value.coordinatorId, {
-          environmentId: peer.environmentId,
-        }).pipe(
-          Effect.tapError((error) =>
-            Effect.logWarning("coordinator term adoption during takeover failed", {
-              peerEnvironmentId: peer.environmentId,
-              message: error.message,
-            }),
-          ),
-          Effect.catch(() => Effect.void),
-        );
+      if (yield* exchangeWith(peer.environmentId, { environmentId: peer.environmentId })) {
+        answered.add(peer.environmentId);
       }
     }
     const known = yield* readSnapshot;
@@ -378,6 +392,52 @@ const make = Effect.gen(function* () {
     }
     return yield* handover(caller.environmentId);
   });
+
+  // Boot convergence is synchronous in construction: every lease write the
+  // server later serves has the pairwise exchange round behind it, so peers
+  // that missed a push while this process was down learn the term now.
+  // Failures only skip a peer; they must not stop the boot.
+  {
+    const peers = yield* links.list.pipe(
+      Effect.mapError(linkError),
+      Effect.catch((error) =>
+        Effect.logWarning("coordinator term boot exchange skipped: links unreadable", {
+          message: error.message,
+        }).pipe(Effect.as([] as ReadonlyArray<PeerLink>)),
+      ),
+    );
+    yield* Effect.forEach(
+      peers,
+      (peer) => exchangeWith(peer.environmentId, { environmentId: peer.environmentId }),
+      { concurrency: "unbounded", discard: true },
+    );
+  }
+
+  // Machines a handover or takeover push failed to reach owe one re-push of
+  // the current row every 30 seconds; a delivered push removes them. The
+  // first round waits one interval: construction just exchanged with
+  // everyone reachable.
+  yield* forkParked(
+    Effect.gen(function* () {
+      const owed = yield* Ref.get(pending);
+      if (owed.size === 0) return;
+      const snapshot = yield* readSnapshot;
+      if (snapshot.coordinatorId === null) return;
+      // Rows only ever hold environment ids this machine or a linked one wrote.
+      const coordinatorId = EnvironmentId.make(snapshot.coordinatorId);
+      yield* Effect.forEach(
+        owed,
+        (environmentId) => pushTo(environmentId, { term: snapshot.term, coordinatorId }),
+        { concurrency: "unbounded", discard: true },
+      );
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.logWarning("coordinator term re-push round failed", { message: error.message }),
+      ),
+      (iteration) => Effect.sleep(Duration.seconds(30)).pipe(Effect.andThen(iteration)),
+      Effect.forever,
+    ),
+  );
 
   return FleetCoordinator.of({
     exchange,

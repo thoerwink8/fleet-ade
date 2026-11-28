@@ -226,7 +226,12 @@ const fleetWriter = (
       return { status: 409, code: "not_claimed" } as const;
     }).pipe(
       Effect.catch((error: FleetClaimsError) =>
-        Effect.logError("Failed to apply fleet claim", error).pipe(
+        // After a handover every renewal round hits not-coordinator until the
+        // executors re-register: an expected refusal, not a failure.
+        (error.reason === "not-coordinator"
+          ? Effect.logWarning("Failed to apply fleet claim", error)
+          : Effect.logError("Failed to apply fleet claim", error)
+        ).pipe(
           Effect.as(
             error.reason === "unknown-repo"
               ? ({ status: 404, code: "unknown_repo" } as const)
