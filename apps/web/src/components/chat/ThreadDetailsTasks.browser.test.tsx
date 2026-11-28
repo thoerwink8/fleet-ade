@@ -9,7 +9,7 @@ import {
   ThreadId,
   type OrchestrationV2Subagent,
 } from "@t3tools/contracts";
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type CSSProperties } from "react";
 import { expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 
@@ -153,10 +153,21 @@ function setup(
   for (const listener of state.listeners) listener();
 }
 
-function Section(props?: { readonly width?: number }) {
+function Section(props?: { readonly anchorWidth?: number }) {
   return (
     <ToastProvider timeout={0}>
-      <div style={props?.width === undefined ? undefined : { width: props.width }}>
+      <div
+        data-background-task-card
+        style={
+          props?.anchorWidth === undefined
+            ? undefined
+            : ({
+                "--anchor-width": `${props.anchorWidth}px`,
+                width:
+                  "min(calc(var(--thread-details-panel-width) + 16px), calc(var(--anchor-width) - 8px))",
+              } as CSSProperties)
+        }
+      >
         <ThreadDetailsTasks environmentId={environmentId} threadId={threadId} />
       </div>
     </ToastProvider>
@@ -390,7 +401,12 @@ it("keeps six Chinese characters plus the ellipsis of title at real widths", asy
     }),
   ]);
 
-  const assertTitles = (container: HTMLElement) => {
+  const assertRowsFit = (container: HTMLElement) => {
+    const card = container.querySelector("[data-background-task-card]")!;
+    const cardBounds = card.getBoundingClientRect();
+    // Same formula as the panel Popover positioner: min(280 + 16, anchor width - 8).
+    expect(cardBounds.width).toBe(208);
+    expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
     const rows = [...container.querySelectorAll("[data-background-task]")];
     expect(rows).toHaveLength(2);
     for (const row of rows) {
@@ -399,6 +415,10 @@ it("keeps six Chinese characters plus the ellipsis of title at real widths", asy
       const titleEl = row.querySelector(".t .x")!;
       expect(titleEl.getBoundingClientRect().width).toBeGreaterThanOrEqual(98);
       expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+      const elapsed = row.querySelector(".tm")!;
+      const elapsedBounds = elapsed.getBoundingClientRect();
+      expect(elapsedBounds.left).toBeGreaterThanOrEqual(cardBounds.left);
+      expect(elapsedBounds.right).toBeLessThanOrEqual(cardBounds.right);
     }
   };
 
@@ -408,17 +428,14 @@ it("keeps six Chinese characters plus the ellipsis of title at real widths", asy
       [390, 844],
     ] as const) {
       await page.viewport(width, height);
-      // No fixed-width wrapper: the section lays out at the viewport's own width.
-      await using screen = await render(<Section />);
-      assertTitles(screen.container as HTMLElement);
+      // The real overview trigger is 216px wide, producing a 208px popup card.
+      await using screen = await render(<Section anchorWidth={216} />);
+      assertRowsFit(screen.container as HTMLElement);
       const rows = [...screen.container.querySelectorAll("[data-background-task]")];
       const heading = screen.container.querySelector("#thread-details-tasks-heading")!;
       expect(heading.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
       expect(rows[1]!.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
     }
-    // The 280px popover card is the narrowest real container the section lives in.
-    await using card = await render(<Section width={280} />);
-    assertTitles(card.container as HTMLElement);
   } finally {
     await page.viewport(1440, 900);
   }
