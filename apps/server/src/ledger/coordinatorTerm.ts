@@ -10,6 +10,9 @@ type TermSnapshot = {
   readonly coordinatorId: string | null;
 };
 
+/** One fleet has one coordinator term row, addressed by this key on every machine. */
+export const FLEET_TERM_KEY = "fleet";
+
 export type ObserveResult = Data.TaggedEnum<{
   current: TermSnapshot;
   stale: TermSnapshot;
@@ -26,7 +29,7 @@ export type HandoverResult = Data.TaggedEnum<{
 }>;
 export const HandoverResult = Data.taggedEnum<HandoverResult>();
 
-class CoordinatorTermStorageError extends Schema.TaggedError<
+export class CoordinatorTermStorageError extends Schema.TaggedError<
   CoordinatorTermStorageError,
   { readonly brand: unique symbol }
 >()("CoordinatorTermStorageError", {

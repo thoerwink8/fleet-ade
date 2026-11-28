@@ -9,13 +9,16 @@ import {
   type FleetClaimLeaseInput,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as TestClock from "effect/testing/TestClock";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import { descriptorOf, linkTo, servePeer } from "../peer/PeerLinks.testkit.ts";
+import * as CoordinatorTerm from "./coordinatorTerm.ts";
 import * as FleetClaims from "./FleetClaims.ts";
 
 const coordinator = descriptorOf("coordinator", "Coordinator");
@@ -23,12 +26,13 @@ const nodeA = descriptorOf("node-a", "Node A");
 const nodeB = descriptorOf("node-b", "Node B");
 const limits = { runtimeMode: "auto" as const, interactionMode: "default" as const };
 
-const claimsLayer = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql`INSERT INTO repos (owner, name) VALUES ('example', 'one'), ('other', 'repo')`;
-  }),
-).pipe(Layer.provideMerge(FleetClaims.layerForTest()));
+const claimsLayer = (filename = ":memory:") =>
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`INSERT OR IGNORE INTO repos (owner, name) VALUES ('example', 'one'), ('other', 'repo')`;
+    }),
+  ).pipe(Layer.provideMerge(FleetClaims.layerForTest(filename)));
 
 const claim = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetClaimClaimInput) =>
   client.call({
@@ -37,6 +41,15 @@ const claim = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetClaim
     arguments: input,
     limits,
     success: FleetClaimClaimResult,
+  });
+
+const renew = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetClaimLeaseInput) =>
+  client.call({
+    environmentId: coordinator.environmentId,
+    tool: "fleet_renew",
+    arguments: input,
+    limits,
+    success: FleetClaimLeaseResult,
   });
 
 const release = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetClaimLeaseInput) =>
@@ -67,13 +80,12 @@ const claimInput = (repo: string, taskId: string, idempotencyKey: string) => ({
   idempotencyKey,
 });
 
-const serveApart = (descriptor: typeof coordinator) =>
+const serveApart = (descriptor: typeof coordinator, claims = claimsLayer()) =>
   Layer.build(Layer.fresh(NodeHttpServer.layerTest)).pipe(
     Effect.flatMap((server) =>
-      servePeer(
-        descriptor,
-        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
-      ).pipe(Effect.provideContext(server)),
+      servePeer(descriptor, McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claims))).pipe(
+        Effect.provideContext(server),
+      ),
     ),
   );
 
@@ -82,7 +94,7 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签�
     Effect.gen(function* () {
       const peer = yield* servePeer(
         coordinator,
-        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
+        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer())),
       );
       const a = yield* serveApart(nodeA);
       const b = yield* serveApart(nodeB);
@@ -221,7 +233,7 @@ it.effect("协调者按服务端时钟判定过期租约的心跳", () =>
     Effect.gen(function* () {
       const peer = yield* servePeer(
         coordinator,
-        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
+        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer())),
       );
       const a = yield* serveApart(nodeA);
       yield* linkTo(a.links, peer);
@@ -247,6 +259,81 @@ it.effect("协调者按服务端时钟判定过期租约的心跳", () =>
       const taken = yield* claim(aClient, claimInput("example/one", "root", "a-root-2"));
       expect(taken.outcome).toBe("claimed");
       expect(taken.claim?.attempt).toBe(2);
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("协调者换成别的机器后远程调用解出拒绝码和提示，交回后恢复写入", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "fleet-claims-rpc-" });
+      const fileClaims = claimsLayer(path.join(directory, "ledger.sqlite"));
+      const peer = yield* servePeer(
+        coordinator,
+        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(fileClaims)),
+      );
+      const a = yield* serveApart(nodeA);
+      yield* linkTo(a.links, peer);
+      yield* linkTo(peer.links, a);
+      const aClient = a.client;
+
+      const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
+      expect(held.outcome).toBe("claimed");
+
+      // The term table lives in the coordinator's file ledger, so a term write through a
+      // second connection lands exactly where the coordinator reads it.
+      yield* Effect.gen(function* () {
+        const terms = yield* CoordinatorTerm.CoordinatorTerm;
+        expect((yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-a", 0))._tag).toBe(
+          "current",
+        );
+      }).pipe(Effect.provide(fileClaims));
+
+      const lease = {
+        ...claimInput("example/one", "root", "a-renew"),
+        attempt: held.claim!.attempt,
+        fencing: held.claim!.fencing,
+      };
+      const deniedClaim = yield* claim(
+        aClient,
+        claimInput("example/one", "child-1", "a-child"),
+      ).pipe(Effect.flip);
+      expect(deniedClaim.code).toBe("orchestration_error");
+      expect(deniedClaim.message).toContain("not the fleet coordinator");
+      expect(deniedClaim.message).toContain("current coordinator only");
+      const deniedRenew = yield* renew(aClient, lease).pipe(Effect.flip);
+      expect(deniedRenew.code).toBe("orchestration_error");
+      expect(deniedRenew.message).toContain("not the fleet coordinator");
+      const deniedRelease = yield* release(aClient, lease).pipe(Effect.flip);
+      expect(deniedRelease.code).toBe("orchestration_error");
+      const deniedHeartbeat = yield* heartbeat(aClient, {
+        sequence: 1,
+        leases: [
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "root",
+            attempt: held.claim!.attempt,
+            fencing: held.claim!.fencing,
+          },
+        ],
+      }).pipe(Effect.flip);
+      expect(deniedHeartbeat.code).toBe("orchestration_error");
+      expect(deniedHeartbeat.message).toContain("not the fleet coordinator");
+
+      yield* Effect.gen(function* () {
+        const terms = yield* CoordinatorTerm.CoordinatorTerm;
+        expect((yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1))._tag).toBe(
+          "current",
+        );
+      }).pipe(Effect.provide(fileClaims));
+
+      expect((yield* renew(aClient, lease)).outcome).toBe("renewed");
+      expect((yield* claim(aClient, claimInput("example/one", "child-1", "a-child"))).outcome).toBe(
+        "claimed",
+      );
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

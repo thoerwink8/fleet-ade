@@ -19,6 +19,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import * as CoordinatorTerm from "./coordinatorTerm.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
@@ -76,16 +77,32 @@ export class FleetClaims extends Context.Service<
 
 const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
   const sql = yield* SqlClient.SqlClient;
+  const terms = yield* CoordinatorTerm.CoordinatorTerm;
   const environment = yield* ServerEnvironment.ServerEnvironmentIdentity;
   const fleetId = yield* environment.getEnvironmentId;
   yield* NodeReads.migrate;
 
+  // Read inside the write transaction so a handover cannot slip between the check and the write.
+  const requireCoordinator = terms.read(CoordinatorTerm.FLEET_TERM_KEY).pipe(
+    Effect.flatMap((snapshot) =>
+      snapshot.term > 0 && snapshot.coordinatorId !== fleetId
+        ? Effect.fail(
+            new FleetClaimsError({
+              reason: "not-coordinator",
+              message: `This environment is not the fleet coordinator; the coordinator is ${snapshot.coordinatorId}.`,
+            }),
+          )
+        : Effect.void,
+    ),
+  );
   const storageError = (cause: unknown) =>
     new FleetClaimsError({
       reason: "storage",
       message: "Fleet claims storage is unavailable.",
       cause,
     });
+  const asFleetClaimsError = (error: unknown) =>
+    isFleetClaimsError(error) ? error : storageError(error);
   const canonicalRepo = Effect.fn("FleetClaims.canonicalRepo")(function* (repo: string) {
     if (!NodeClaims.REPO.test(repo)) {
       return yield* new FleetClaimsError({
@@ -164,6 +181,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          yield* requireCoordinator;
           const current = (yield* read(key))[0];
           const active =
             current !== undefined &&
@@ -219,7 +237,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
           };
         }),
       )
-      .pipe(Effect.mapError(storageError));
+      .pipe(Effect.mapError(asFleetClaimsError));
   });
 
   const renew = Effect.fn("FleetClaims.renew")(function* (
@@ -233,6 +251,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          yield* requireCoordinator;
           const current = (yield* read(key))[0];
           const matches =
             current !== undefined &&
@@ -270,7 +289,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
           };
         }),
       )
-      .pipe(Effect.mapError(storageError));
+      .pipe(Effect.mapError(asFleetClaimsError));
   });
 
   const release = Effect.fn("FleetClaims.release")(function* (
@@ -282,6 +301,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          yield* requireCoordinator;
           const current = (yield* read(key))[0];
           const matches =
             current !== undefined &&
@@ -301,7 +321,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
           return { outcome: "released" as const, claim: null };
         }),
       )
-      .pipe(Effect.mapError(storageError));
+      .pipe(Effect.mapError(asFleetClaimsError));
   });
 
   const heartbeat = Effect.fn("FleetClaims.heartbeat")(function* (
@@ -316,6 +336,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     const results = yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          yield* requireCoordinator;
           if (recordEnvironmentHeartbeat) {
             yield* sql`
               INSERT INTO fleet_environment_heartbeats (environment_id, last_seen)
@@ -402,7 +423,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
           return decided;
         }),
       )
-      .pipe(Effect.mapError((error) => (isFleetClaimsError(error) ? error : storageError(error))));
+      .pipe(Effect.mapError(asFleetClaimsError));
     return { sequence: input.sequence, results };
   });
 
@@ -410,7 +431,9 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
 });
 
 /** Same service on the caller's ambient SqlClient: one connection per ledger. */
-export const layerShared = Layer.effect(FleetClaims, make(FLEET_LEASE_TTL_MS));
+export const layerShared = Layer.effect(FleetClaims, make(FLEET_LEASE_TTL_MS)).pipe(
+  Layer.provideMerge(CoordinatorTerm.layer),
+);
 
 export const layer = layerShared.pipe(Layer.provide(LedgerDb.layer));
 
@@ -420,6 +443,7 @@ export const layerForTest = (
   leaseTtlMs = FLEET_LEASE_TTL_MS,
 ) =>
   Layer.effect(FleetClaims, make(leaseTtlMs)).pipe(
+    Layer.provideMerge(CoordinatorTerm.layer),
     Layer.provide(
       Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
         getEnvironmentId: Effect.succeed(EnvironmentId.make(fleetId)),

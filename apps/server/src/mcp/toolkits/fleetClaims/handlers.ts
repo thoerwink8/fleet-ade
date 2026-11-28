@@ -27,7 +27,10 @@ const missingLinkedEnvironment = () =>
 const fromFleetClaimsError = (error: FleetClaimsError) =>
   new OrchestratorMcpFailure({
     code: error.reason === "unknown-repo" ? "invalid_request" : "orchestration_error",
-    message: error.message,
+    message:
+      error.reason === "not-coordinator"
+        ? `${error.message} Fleet lease writes are accepted by the current coordinator only.`
+        : error.message,
   });
 
 const handlers = {
