@@ -239,9 +239,9 @@ it("shows no stop button on commands or Codex native subagents and uses session 
 
   const commandRow = rows.find((entry) => entry.textContent?.includes("sleep 300"));
   expect(commandRow).toBeDefined();
-  // The session agent's own initials, exactly as the sidebar draws "Replay (dev)" -> RD;
+  // The session agent's own initial, the same letter the sidebar draws for "Replay (dev)";
   // never the command title's initial ("S") or the driver's.
-  expect(commandRow!.querySelector(".fa-agent")?.textContent).toBe("RD");
+  expect(commandRow!.querySelector(".fa-agent")?.textContent).toBe("R");
 });
 
 it("falls back to the driver display name when the session instance is not listed", async () => {
@@ -267,7 +267,7 @@ it("falls back to the driver display name when the session instance is not liste
   await using screen = await render(<Section />);
 
   const commandRow = screen.container.querySelector("[data-background-task]");
-  expect(commandRow?.querySelector(".fa-agent")?.textContent).toBe("CL");
+  expect(commandRow?.querySelector(".fa-agent")?.textContent).toBe("C");
 });
 
 it("dispatches a stop for the row's subagent and rolls back with the reason on failure", async () => {

@@ -57,9 +57,8 @@ const SOURCE_ICONS = {
 
 function agentSlotInitial(row: BackgroundWorkRowInput): string | null {
   if (row.agentName === null) return null;
-  // The same initials the sidebar and composer draw for this agent.
-  const initials = providerInstanceInitials(row.agentName);
-  return initials.length > 0 ? initials : null;
+  // The session agent's first initial, the same letter the sidebar thread rows draw.
+  return Array.from(providerInstanceInitials(row.agentName))[0] ?? null;
 }
 
 function statusDotClass(row: BackgroundWorkRowInput): string {
