@@ -39,6 +39,7 @@ const identityTools: Record<string, true> = {
   fleet_renew: true,
   fleet_release: true,
   fleet_heartbeat: true,
+  fleet_term_exchange: true,
   fleet_summary_report: true,
 };
 

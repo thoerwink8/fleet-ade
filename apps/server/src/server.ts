@@ -145,6 +145,7 @@ import { ScheduledTaskWebhookOrigin } from "./scheduledTasks/ScheduledTaskServic
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as LedgerNotes from "./ledger/notes.ts";
 import * as FleetClaims from "./ledger/FleetClaims.ts";
+import * as FleetCoordinator from "./ledger/FleetCoordinator.ts";
 import * as FleetHeartbeat from "./ledger/FleetHeartbeat.ts";
 import * as FleetSummaryReporter from "./ledger/FleetSummaryReporter.ts";
 import * as Scheduler from "./scheduling/Scheduler.ts";
@@ -765,6 +766,7 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PeerMcpClient.layer),
   Layer.provide(PeerLinks.layer),
   Layer.provide(FleetClaims.layer),
+  Layer.provide(FleetCoordinator.layer),
   Layer.provide(layerFleetSummaryReporter),
   Layer.provide(layerServerSettings),
   Layer.provide(PipelineSupervision.layer),

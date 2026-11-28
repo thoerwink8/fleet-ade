@@ -16,7 +16,6 @@ export const FLEET_TERM_KEY = "fleet";
 export type ObserveResult = Data.TaggedEnum<{
   current: TermSnapshot;
   stale: TermSnapshot;
-  conflict: TermSnapshot;
 }>;
 export const ObserveResult = Data.taggedEnum<ObserveResult>();
 
@@ -70,19 +69,6 @@ const snapshotOf = (row: TermRow | undefined): TermSnapshot =>
     ? { term: 0, coordinatorId: null }
     : { term: row.term, coordinatorId: row.coordinator_id };
 
-const observeUnchanged = (
-  stored: TermSnapshot,
-  term: number,
-  coordinatorId: string,
-): ObserveResult | undefined => {
-  // Term 0 means there is no coordinator yet, so it never conflicts and is never adopted.
-  if (term < stored.term || (term === 0 && stored.term === 0)) return ObserveResult.stale(stored);
-  if (term > stored.term) return undefined;
-  return coordinatorId === stored.coordinatorId
-    ? ObserveResult.current(stored)
-    : ObserveResult.conflict(stored);
-};
-
 const migrate = Effect.fn("CoordinatorTerm.migrate")(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql.withTransaction(
@@ -125,32 +111,51 @@ const make = Effect.gen(function* () {
       .withTransaction(
         Effect.gen(function* () {
           const stored = snapshotOf(yield* load(fleetId));
-          const unchanged = observeUnchanged(stored, term, coordinatorId);
-          if (unchanged !== undefined) return unchanged;
-          const written =
-            stored.coordinatorId === null
-              ? yield* sql<{ readonly term: number }>`
-                  INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id)
-                  SELECT ${fleetId}, ${term}, ${coordinatorId}
-                  WHERE NOT EXISTS (
-                    SELECT 1 FROM fleet_coordinator_terms WHERE fleet_id = ${fleetId}
-                  )
-                  RETURNING term
-                `
-              : yield* sql<{ readonly term: number }>`
-                  UPDATE fleet_coordinator_terms
-                  SET term = ${term}, coordinator_id = ${coordinatorId}
-                  WHERE fleet_id = ${fleetId} AND term < ${term}
-                  RETURNING term
-                `;
-          if (written[0] !== undefined) return ObserveResult.current({ term, coordinatorId });
+          // Term 0 means there is no coordinator yet, so it is never adopted.
+          if (term === 0 && stored.term === 0) return ObserveResult.stale(stored);
+          if (stored.term === term && stored.coordinatorId === coordinatorId) {
+            return ObserveResult.current(stored);
+          }
+          // Ties on term are broken by coordinator id inside the compare-and-swap, for
+          // eventual convergence only; JavaScript string order does not match SQLite's.
+          const written = yield* sql<{ readonly term: number }>`
+            INSERT INTO fleet_coordinator_terms (fleet_id, term, coordinator_id)
+            VALUES (${fleetId}, ${term}, ${coordinatorId})
+            ON CONFLICT(fleet_id) DO UPDATE SET
+              term = excluded.term,
+              coordinator_id = excluded.coordinator_id
+            WHERE fleet_coordinator_terms.term < excluded.term
+              OR (
+                fleet_coordinator_terms.term = excluded.term
+                AND fleet_coordinator_terms.coordinator_id < excluded.coordinator_id
+              )
+            RETURNING term
+          `;
+          if (written[0] !== undefined) {
+            if (stored.term === term && stored.coordinatorId !== coordinatorId) {
+              yield* Effect.logWarning("coordinator term contended at equal term", {
+                storedCoordinatorId: stored.coordinatorId,
+                observedCoordinatorId: coordinatorId,
+                term,
+                outcome: "current",
+              });
+            }
+            return ObserveResult.current({ term, coordinatorId });
+          }
+          // The failed compare-and-swap already holds the write lock, so this row is the one it refused.
           const latest = snapshotOf(yield* load(fleetId));
-          const raced = observeUnchanged(latest, term, coordinatorId);
-          if (raced !== undefined) return raced;
-          return yield* new CoordinatorTermStorageError({
-            fleetId,
-            cause: new Error("Coordinator term compare-and-swap did not persist."),
-          });
+          if (latest.term === term && latest.coordinatorId === coordinatorId) {
+            return ObserveResult.current(latest);
+          }
+          if (latest.term === term && latest.coordinatorId !== coordinatorId) {
+            yield* Effect.logWarning("coordinator term contended at equal term", {
+              storedCoordinatorId: latest.coordinatorId,
+              observedCoordinatorId: coordinatorId,
+              term,
+              outcome: "stale",
+            });
+          }
+          return ObserveResult.stale(latest);
         }),
       )
       .pipe(Effect.mapError(guard(fleetId)));

@@ -42,6 +42,8 @@ import * as OrchestratorHandlers from "./toolkits/orchestrator/handlers.ts";
 import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
 import * as FleetClaimsHandlers from "./toolkits/fleetClaims/handlers.ts";
 import { FleetClaimsToolkit } from "./toolkits/fleetClaims/tools.ts";
+import * as FleetCoordinatorHandlers from "./toolkits/fleetCoordinator/handlers.ts";
+import { FleetCoordinatorToolkit } from "./toolkits/fleetCoordinator/tools.ts";
 import * as FleetSummaryHandlers from "./toolkits/fleetSummary/handlers.ts";
 import { FleetSummaryToolkit } from "./toolkits/fleetSummary/tools.ts";
 import * as WorktreeHandlers from "./toolkits/worktree/handlers.ts";
@@ -585,6 +587,10 @@ export const layerFleetClaimsToolkit = toolkitRegistration(
   FleetClaimsToolkit,
   FleetClaimsHandlers.layer,
 );
+export const layerFleetCoordinatorToolkit = toolkitRegistration(
+  FleetCoordinatorToolkit,
+  FleetCoordinatorHandlers.layer,
+);
 export const layerFleetSummaryToolkit = toolkitRegistration(
   FleetSummaryToolkit,
   FleetSummaryHandlers.layer,
@@ -697,5 +703,11 @@ export const layerToolSearch = Layer.mergeAll(
 ).pipe(Layer.provide(layerToolExposure));
 
 export const layer = layerMcpTransport(
-  Layer.mergeAll(layerTools, layerFleetClaimsToolkit, layerFleetSummaryToolkit, layerToolSearch),
+  Layer.mergeAll(
+    layerTools,
+    layerFleetClaimsToolkit,
+    layerFleetCoordinatorToolkit,
+    layerFleetSummaryToolkit,
+    layerToolSearch,
+  ),
 );
