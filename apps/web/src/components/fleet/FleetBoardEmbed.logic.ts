@@ -73,7 +73,7 @@ export type FleetBoardEmbedResolution =
  */
 export function resolveFleetBoardEmbed(
   ensure: FleetBoardEnsureResult,
-  connection: Omit<FleetBoardEmbedInput, "ticket">,
+  connection: FleetBoardEmbedInput,
 ): FleetBoardEmbedResolution {
   if (ensure.status !== "running") {
     return { kind: "unavailable", status: ensure.status, detail: ensure.detail };

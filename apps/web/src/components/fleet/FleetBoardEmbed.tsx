@@ -15,6 +15,7 @@ import { Button } from "../ui/button";
 import {
   fleetBoardEmbedUrl,
   fleetBoardRenewalDelayMs,
+  resolveFleetBoardEmbed,
   type FleetBoardEmbedTicket,
 } from "./FleetBoardEmbed.logic";
 
@@ -80,24 +81,29 @@ async function loadEmbed(
   if ("_tag" in ensured) {
     return { kind: "unreachable", message: null };
   }
-  if (ensured.status !== "running") {
-    return { kind: "unavailable", status: ensured.status, detail: ensured.detail };
+  const connectionInput = {
+    httpBaseUrl: connection.httpBaseUrl,
+    appOrigin: window.location.origin,
+    authorization: connection.authorization,
+  };
+  const withoutTicket = resolveFleetBoardEmbed(ensured, connectionInput);
+  if (withoutTicket.kind === "unavailable") {
+    return {
+      kind: "unavailable",
+      status: withoutTicket.status,
+      detail: withoutTicket.detail,
+    };
   }
-  if (connection.authorization === null) {
-    return { kind: "ready", src: "/fleet-board/", ticket: null };
+  if (withoutTicket.kind === "ready") {
+    return { kind: "ready", src: withoutTicket.src, ticket: null };
   }
   const minted = await mintFleetBoardTicket(connection);
   if ("_tag" in minted) {
     return { kind: "unreachable", message: null };
   }
-  const url = fleetBoardEmbedUrl({
-    httpBaseUrl: connection.httpBaseUrl,
-    appOrigin: window.location.origin,
-    authorization: connection.authorization,
-    ticket: minted,
-  });
-  if (url === null) return { kind: "unreachable", message: null };
-  return { kind: "ready", src: url.src, ticket: minted };
+  const withTicket = resolveFleetBoardEmbed(ensured, { ...connectionInput, ticket: minted });
+  if (withTicket.kind !== "ready") return { kind: "unreachable", message: null };
+  return { kind: "ready", src: withTicket.src, ticket: minted };
 }
 
 export function FleetBoardEmbed({
