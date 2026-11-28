@@ -572,7 +572,7 @@ it.effect("协调者是别的机器时领续还和心跳整次拒绝，交回本
       yield* sql`SELECT task_id, state, attempt, lease_until FROM node_claims ORDER BY task_id`;
 
     assert.strictEqual(
-      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0))._tag,
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "node-b", 0, null))._tag,
       "current",
     );
 
@@ -599,7 +599,7 @@ it.effect("协调者是别的机器时领续还和心跳整次拒绝，交回本
     assert.deepEqual(yield* sql`SELECT environment_id FROM fleet_environment_heartbeats`, []);
 
     assert.strictEqual(
-      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1))._tag,
+      (yield* terms.handover(CoordinatorTerm.FLEET_TERM_KEY, "coordinator", 1, "node-b"))._tag,
       "current",
     );
     assert.strictEqual((yield* claims.renew(caller("node-a"), lease)).outcome, "renewed");
@@ -607,5 +607,57 @@ it.effect("协调者是别的机器时领续还和心跳整次拒绝，交回本
       (yield* claims.claim(caller("node-a"), input("child-1", "claim-child"))).outcome,
       "claimed",
     );
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
+it.effect("心跳带更大任期续期被拒且任期行不变，不带任期的心跳照常续", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const terms = yield* CoordinatorTerm.CoordinatorTerm;
+    assert.strictEqual(
+      (yield* terms.observe(CoordinatorTerm.FLEET_TERM_KEY, 1, "coordinator"))._tag,
+      "current",
+    );
+    const claimed = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
+    assert.strictEqual(claimed.outcome, "claimed");
+
+    // The heartbeating machine heard of term 5 somewhere this machine never
+    // did. The renewal is refused in the same transaction, and the hint is
+    // not durable: the row cannot be rewritten by a heartbeat.
+    const newer = beat("node-b", [{ taskId: "root", attempt: 1 }]);
+    const refused = yield* claims
+      .heartbeat("node-b", { ...newer.input, term: 5 })
+      .pipe(Effect.flip);
+    assert.strictEqual(refused.reason, "not-coordinator");
+    assert.deepEqual(yield* terms.read(CoordinatorTerm.FLEET_TERM_KEY), {
+      term: 1,
+      coordinatorId: "coordinator",
+    });
+
+    const renewed = yield* claims.heartbeat("node-a", newer.input);
+    assert.strictEqual(renewed.results[0]?.outcome, "renewed");
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
+it.effect("心跳带相同任期不被发送方名字的平局裁决顶掉协调者", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const terms = yield* CoordinatorTerm.CoordinatorTerm;
+    assert.strictEqual(
+      (yield* terms.observe(CoordinatorTerm.FLEET_TERM_KEY, 1, "coordinator"))._tag,
+      "current",
+    );
+    const claimed = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
+    assert.strictEqual(claimed.outcome, "claimed");
+
+    // node-a sorts after coordinator; observing its id at the same term would
+    // win the tie-break and refuse every heartbeat from then on.
+    const equal = beat("node-a", [{ taskId: "root", attempt: 1 }]);
+    const result = yield* claims.heartbeat("node-a", { ...equal.input, term: 1 });
+    assert.strictEqual(result.results[0]?.outcome, "renewed");
+    assert.deepEqual(yield* terms.read(CoordinatorTerm.FLEET_TERM_KEY), {
+      term: 1,
+      coordinatorId: "coordinator",
+    });
   }).pipe(Effect.provide(ledgerLayer)),
 );

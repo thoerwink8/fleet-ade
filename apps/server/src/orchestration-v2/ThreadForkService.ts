@@ -62,6 +62,11 @@ export interface ThreadForkServiceV2Shape {
     readonly sideChat?: boolean;
     readonly createdBy: OrchestrationV2Actor;
     readonly creationSource: OrchestrationV2CreationSource;
+    /**
+     * Rotation keeps the thread's operational attachments on the new thread: PR watches and the
+     * pin. A user fork drops them, since watching stays the source thread's responsibility.
+     */
+    readonly carryWorkspace?: boolean;
     /** Rotation sets this so the first turn cannot native-fork. */
     readonly requiresPortable?: boolean;
     /**
@@ -117,10 +122,11 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
       } = input.sourceProjection.thread;
       const targetThread: OrchestrationV2AppThread = {
         ...inherited,
-        // PR context follows the conversation; watching remains the source thread's responsibility.
-        pullRequests: input.sourceProjection.thread.pullRequests?.map(
-          ({ watch: _watch, ...link }) => link,
-        ),
+        // PR context follows the conversation; a user fork leaves watching with the source.
+        pullRequests:
+          input.carryWorkspace === true
+            ? input.sourceProjection.thread.pullRequests
+            : input.sourceProjection.thread.pullRequests?.map(({ watch: _watch, ...link }) => link),
         createdBy: input.createdBy,
         creationSource: input.creationSource,
         id: input.targetThreadId,
@@ -146,8 +152,8 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
         snoozedUntil: null,
         snoozedAt: null,
         lastSnoozeWakeAt: null,
-        pinnedAt: null,
-        pinOrderKey: null,
+        pinnedAt: input.carryWorkspace === true ? (inherited.pinnedAt ?? null) : null,
+        pinOrderKey: input.carryWorkspace === true ? (inherited.pinOrderKey ?? null) : null,
         activeOrderKey: null,
         autoSettleDisabledAt: null,
         // A guest link belongs to the thread it was made for.

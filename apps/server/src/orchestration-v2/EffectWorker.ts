@@ -567,6 +567,22 @@ export const layerExecutor: Layer.Layer<
                   }),
               ),
             );
+          case "scheduled-tasks.rebind":
+            return resourceCleanup
+              .rebindScheduledTasks({
+                sourceThreadId: effect.threadId,
+                targetThreadId: effect.request.targetThreadId,
+              })
+              .pipe(
+                Effect.mapError(
+                  (cause) =>
+                    new OrchestrationEffectExecutionError({
+                      effectId: effect.id,
+                      effectType: effect.request.type,
+                      cause,
+                    }),
+                ),
+              );
           case "terminal.cleanup":
             return resourceCleanup
               .cleanupTerminals(effect.threadId, effect.request.keepHistory)

@@ -33,6 +33,8 @@ import * as ServerConfig from "./config.ts";
 import { withUntracedRequests } from "./http.ts";
 import * as ServerHttp from "./http.ts";
 import * as FleetEngineHttp from "./fleetEngine/http.ts";
+import * as FleetBoardHttp from "./fleetBoard/http.ts";
+import * as FleetBoardService from "./fleetBoard/FleetBoardService.ts";
 import {
   guardHttpResponseWriteErrors,
   keepIdleConnections,
@@ -742,6 +744,7 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerHttp.layerAssetRoute,
     ServerHttp.layerAttachmentUploadRoute,
     LedgerNotes.routeLayer,
+    FleetBoardHttp.layer.pipe(Layer.provide(FleetBoardService.layerLive)),
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
   ),

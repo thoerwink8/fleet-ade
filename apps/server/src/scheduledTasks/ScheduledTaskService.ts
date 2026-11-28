@@ -257,6 +257,11 @@ export class ScheduledTaskService extends Context.Service<
     ) => Effect.Effect<ScheduledTaskUndoDeleteResult, ScheduledTaskError>;
     /** Deletes only tasks that still target this thread, including their webhook deliveries. */
     readonly deleteForThread: (threadId: ThreadId) => Effect.Effect<void, ScheduledTaskError>;
+    /** Moves tasks bound to the source thread onto the target; bot-bound tasks follow their bot, so they stay out. */
+    readonly rebindThread: (input: {
+      readonly sourceThreadId: ThreadId;
+      readonly targetThreadId: ThreadId;
+    }) => Effect.Effect<void, ScheduledTaskError>;
     /** Points tasks bound to these threads at the project the threads moved to. */
     readonly moveThreadTasks: (input: {
       readonly threadIds: ReadonlyArray<ThreadId>;
@@ -1977,6 +1982,50 @@ export const layer = Layer.effect(
       if (removed.length > 0) yield* notifyChanged;
     });
 
+    // The effect a rotation enqueues runs after its commit, so the target may be gone by then:
+    // a deleted target means the work moved nowhere usable, and the tasks die with it. Bot-bound
+    // tasks never bind by thread; their dispatch reads the bot's current thread instead.
+    const rebindThread: ScheduledTaskService["Service"]["rebindThread"] = Effect.fn(
+      "ScheduledTaskService.rebindThread",
+    )(function* (input) {
+      // Both reads feed a deletion decision: an error means retry, never absence — swallowing
+      // either once deleted every task the target ever had.
+      const targetDeleted = yield* threadManagement
+        .getThreadShell(input.targetThreadId)
+        .pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not read the rebind target thread.", { cause }),
+          ),
+        );
+      const targetIsTrash =
+        targetDeleted?.deletedAt != null &&
+        (yield* sql<{ readonly present: number }>`
+          SELECT EXISTS (
+            SELECT 1 FROM orchestration_v2_projection_thread_trash
+            WHERE thread_id = ${input.targetThreadId}
+          ) AS present
+        `.pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not read the rebind target's trash record.", { cause }),
+          ),
+        ))[0]?.present === 1;
+      const rebound = yield* sql<{ task_id: ScheduledTaskId }>`
+        UPDATE scheduled_tasks SET thread_id = ${input.targetThreadId}
+        WHERE thread_id = ${input.sourceThreadId} AND bot_id IS NULL
+        RETURNING task_id
+      `.pipe(
+        Effect.mapError((cause) =>
+          taskError("Could not rebind the thread's schedule tasks.", { cause }),
+        ),
+      );
+      // The cleanup does not depend on this execution moving rows: a replay after a crash that
+      // already moved them rebinds nothing, and the stranded rows still die with their thread.
+      if (targetDeleted === null || (targetDeleted.deletedAt != null && !targetIsTrash)) {
+        yield* deleteForThread(input.targetThreadId);
+      }
+      if (rebound.length > 0) yield* notifyChanged;
+    });
+
     const moveThreadTasks: ScheduledTaskService["Service"]["moveThreadTasks"] = Effect.fn(
       "ScheduledTaskService.moveThreadTasks",
     )(function* (input) {
@@ -2922,6 +2971,7 @@ export const layer = Layer.effect(
       delete: deleteTask,
       undoDelete: undoDeleteTask,
       deleteForThread,
+      rebindThread,
       moveThreadTasks,
       runNow,
       rotateWebhookToken,

@@ -55,6 +55,13 @@ export type FleetClaimHeartbeatItem = typeof FleetClaimHeartbeatItem.Type;
 export const FleetClaimHeartbeatInput = Schema.Struct({
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
   leases: Schema.Array(FleetClaimHeartbeatItem),
+  /**
+   * The newest coordinator term the heartbeating machine has heard of. Optional:
+   * older clients never send it. The coordinator observes a strictly larger one
+   * inside the renewal transaction, so a machine that fell behind refuses the
+   * renewal instead of extending leases for a term it lost.
+   */
+  term: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
 export type FleetClaimHeartbeatInput = typeof FleetClaimHeartbeatInput.Type;
 

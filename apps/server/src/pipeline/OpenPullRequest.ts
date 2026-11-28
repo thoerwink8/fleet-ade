@@ -202,6 +202,53 @@ const makeOpener = Effect.gen(function* () {
       changes: acceptanceItems(draft.issueBody),
       verification: recordedChecks(logged.stdout.split("\u0000")),
     });
+    const upstream = yield* driver
+      .execute({
+        operation: "OpenPullRequest.upstream",
+        cwd: draft.cwd,
+        args: ["rev-parse", "--abbrev-ref", `${draft.branch}@{upstream}`],
+        allowNonZeroExit: true,
+      })
+      .pipe(Effect.orElseSucceed(() => null));
+    const target = yield* driver
+      .resolvePushTarget(draft.cwd, {
+        branch: draft.branch,
+        hasUpstream: upstream !== null && upstream.exitCode === 0,
+      })
+      .pipe(Effect.orElseSucceed(() => null));
+    if (target !== null) {
+      // Refuse before pushing: the remote head must be an ancestor of HEAD. Git itself
+      // also rejects a non-fast-forward push; this turns that rejection into a
+      // structured error without touching the remote. The target is the one the push
+      // resolution reports, so pushRemote/pushDefault and publish renames are honored.
+      const lsRemote = yield* driver
+        .execute({
+          operation: "OpenPullRequest.remoteHead",
+          cwd: draft.cwd,
+          args: ["ls-remote", target.remoteName, `refs/heads/${target.branchName}`],
+          allowNonZeroExit: true,
+        })
+        .pipe(Effect.mapError((error) => failOpen(error.message)));
+      if (lsRemote.exitCode !== 0) {
+        return yield* failOpen("the remote branch head was not read");
+      }
+      const remoteSha = lsRemote.stdout.split("\n")[0]?.split(/\s+/)[0] ?? "";
+      if (/^[0-9a-f]{40,64}$/i.test(remoteSha)) {
+        const ancestor = yield* driver
+          .execute({
+            operation: "OpenPullRequest.isAncestor",
+            cwd: draft.cwd,
+            args: ["merge-base", "--is-ancestor", remoteSha, "HEAD"],
+            allowNonZeroExit: true,
+          })
+          .pipe(Effect.mapError((error) => failOpen(error.message)));
+        if (ancestor.exitCode !== 0) {
+          return yield* failOpen(
+            `push refused: ${target.remoteName}/${target.branchName} is not an ancestor of HEAD; the push would not fast-forward`,
+          );
+        }
+      }
+    }
     const pushedBranch = yield* git
       .runStackedAction({
         actionId: `pipeline-pr-${draft.branch}`,

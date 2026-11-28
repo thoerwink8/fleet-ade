@@ -2544,6 +2544,14 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                         Effect.flatMap(encodeJsonUnknown),
                       ),
                     ),
+                    // The merge failing quietly would drop the rotation: the thread reopens
+                    // for writes while its successor still believes it owns the bot.
+                    Effect.tapError((cause) =>
+                      Effect.logWarning(
+                        "Could not preserve a rotated thread's successor in a metadata merge",
+                        { threadId: event.payload.id, cause },
+                      ),
+                    ),
                     Effect.orElseSucceed(() => payloadJson),
                   );
                   payloadJson = merged;

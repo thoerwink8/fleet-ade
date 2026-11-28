@@ -341,6 +341,22 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     const results = yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          // Fencing this renewal is atomic only inside the transaction; the
+          // write rolls back with the refusal, so a heartbeat stops renewals
+          // but never rewrites the durable row. Equal terms are not observed:
+          // the sender is not the tie-break winner it reports.
+          if (input.term !== undefined) {
+            const stored = yield* terms
+              .read(CoordinatorTerm.FLEET_TERM_KEY)
+              .pipe(Effect.mapError(storageError));
+            if (input.term > stored.term) {
+              yield* terms
+                .observe(CoordinatorTerm.FLEET_TERM_KEY, input.term, environmentId, {
+                  environmentId,
+                })
+                .pipe(Effect.mapError(storageError));
+            }
+          }
           yield* requireCoordinator;
           if (recordEnvironmentHeartbeat) {
             yield* sql`
