@@ -23,7 +23,7 @@ describe("fleetBoardEmbedUrl", () => {
     expect(
       fleetBoardEmbedUrl({
         httpBaseUrl: "http://192.168.1.5:4100",
-        appOrigin: "https://app.t3.codes",
+        appOrigin: "https://client.example",
         authorization: "token",
         ticket: { token: "abc.def", expiresAtEpochMs: 0 },
       }),
@@ -37,7 +37,7 @@ describe("fleetBoardEmbedUrl", () => {
     expect(
       fleetBoardEmbedUrl({
         httpBaseUrl: "http://192.168.1.5:4100/",
-        appOrigin: "https://app.t3.codes",
+        appOrigin: "https://client.example",
         authorization: "token",
         ticket: { token: "abc.def", expiresAtEpochMs: 0 },
       }),
@@ -51,7 +51,7 @@ describe("fleetBoardEmbedUrl", () => {
     expect(
       fleetBoardEmbedUrl({
         httpBaseUrl: "http://192.168.1.5:4100",
-        appOrigin: "https://app.t3.codes",
+        appOrigin: "https://client.example",
         authorization: "token",
       }),
     ).toBeNull();
@@ -107,7 +107,7 @@ describe("resolveFleetBoardEmbed", () => {
         { status: "running", detail: null, checkedAt: "2026-11-29T00:00:00.000Z" },
         {
           httpBaseUrl: "http://192.168.1.5:4100",
-          appOrigin: "https://app.t3.codes",
+          appOrigin: "https://client.example",
           authorization: "token",
         },
       ),
