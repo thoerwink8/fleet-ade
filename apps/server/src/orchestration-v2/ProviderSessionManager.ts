@@ -2936,14 +2936,21 @@ export const layerWithOptions = (
                       const current = (yield* Ref.get(sessions)).get(
                         sessionKey(entry.runtime.providerSessionId),
                       );
-                      if (
-                        current?.runtime !== entry.runtime ||
-                        ((event.type === "provider_thread.updated" ||
-                          (event.type === "turn_item.updated" &&
-                            event.turnItem.type === "command_execution")) &&
-                          !current.attachedThreadIds.has(threadId))
-                      )
-                        return;
+                      if (current?.runtime !== entry.runtime) return;
+                      const artifactEvent =
+                        event.type === "provider_thread.updated" ||
+                        (event.type === "turn_item.updated" &&
+                          event.turnItem.type === "command_execution");
+                      if (artifactEvent && !current.attachedThreadIds.has(threadId)) {
+                        // Only a rotated thread still renders the sealed transcript these rows
+                        // feed; any other detach leaves nobody to read them.
+                        const rotated = yield* Effect.option(
+                          projectionStore
+                            .getThread(threadId)
+                            .pipe(Effect.map((thread) => thread.rotatedTo != null)),
+                        );
+                        if (!Option.getOrElse(rotated, () => false)) return;
+                      }
                       yield* providerEventIngestor
                         .ingestNormalized({
                           providerSessionId: entry.runtime.providerSessionId,

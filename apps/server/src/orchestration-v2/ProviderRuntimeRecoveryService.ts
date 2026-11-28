@@ -418,12 +418,13 @@ export const make = Effect.gen(function* () {
       }
       runs = runs.filter((run) => !retryableRunIds.has(run.id));
       // User work the crash cut holds the queue for a user's decision. A rotation opening is
-      // housekeeping: when it is all that died, the carried queue resumes on its own through
-      // resumeQueuedRuns instead of waiting for queue.resume.
+      // housekeeping only while it never got off the ground: a running or waiting opening may
+      // already have consumed the handoff at the provider, so the carried queue behind it is
+      // user work again and waits for queue.resume like any cut turn.
       const housekeepingOnly =
         runs.length > 0 &&
         retryableRuns.length === 0 &&
-        runs.every((run) => run.rotationOpening === true);
+        runs.every((run) => run.rotationOpening === true && run.status === "starting");
       const heldRuns = [
         ...retryableRuns,
         ...queuedRunsInDeliveryOrder({ runs: queuedRuns, messages: queuedMessages }),

@@ -1861,3 +1861,256 @@ it.effect("rejects a task that names both a bot and a thread, and one whose bot 
     }).pipe(Effect.provide(harness.layer));
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
+
+it.effect.each([
+  {
+    name: "a live target receives thread-bound tasks while bot-bound tasks stay put",
+    targetShell: "live" as const,
+    expectSurviving: ["task:rebind-thread", "task:rebind-bot"],
+    expectOnTarget: ["task:rebind-thread"],
+  },
+  {
+    name: "a target deleted past the trash cannot keep the work, so the moved tasks die with it",
+    targetShell: "tombstone" as const,
+    expectSurviving: ["task:rebind-bot"],
+    expectOnTarget: [],
+  },
+])("$name", ({ targetShell, expectSurviving, expectOnTarget }) =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-source");
+    const target = ThreadId.make("thread:rebind-target");
+    const harness = botHarness({
+      getThreadShell: (threadId) =>
+        Effect.succeed(
+          threadId === target
+            ? targetShell === "live"
+              ? threadShell(ProjectId.make("project:test"))
+              : threadShell(ProjectId.make("project:test"), { deletedAt: "2026-11-20T00:00:00Z" })
+            : threadShell(ProjectId.make("project:test")),
+        ),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      yield* service.upsert({
+        id: ScheduledTaskId.make("task:rebind-thread"),
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        threadId: source,
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      });
+      const { task: botTask } = yield* service.upsert(botTaskInput("task:rebind-bot"));
+      // The rotation that enqueues the rebind seals the old thread, so the bot's last-run
+      // record can point at it; the binding must still not move.
+      yield* sql`UPDATE scheduled_tasks SET thread_id = ${source} WHERE task_id = ${botTask.id}`;
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      const surviving = (yield* service.list()).tasks;
+      assert.deepEqual(surviving.map((listed) => listed.id).toSorted(), expectSurviving.toSorted());
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      const onTarget = rows
+        .filter((row) => row.thread_id === target)
+        .map((row) => row.task_id)
+        .toSorted();
+      assert.deepEqual(onTarget, expectOnTarget.toSorted());
+      assert.deepEqual(rows.find((row) => row.task_id === botTask.id)?.thread_id ?? null, source);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("a replayed rebind moves only what still binds the source thread", () =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-again-source");
+    const target = ThreadId.make("thread:rebind-again-target");
+    const harness = botHarness({
+      getThreadShell: () => Effect.succeed(threadShell(ProjectId.make("project:test"))),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      const firstInput = {
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      } as const;
+      yield* service.upsert({
+        ...firstInput,
+        id: ScheduledTaskId.make("task:rebind-first"),
+        threadId: source,
+      });
+      yield* service.upsert({
+        ...firstInput,
+        id: ScheduledTaskId.make("task:rebind-late"),
+        threadId: ThreadId.make("thread:rebind-elsewhere"),
+      });
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      // The rotation effect replays after the crash that followed its first execution: a task
+      // written back onto the sealed thread in between must still move, the already-moved one
+      // must not be copied twice, and a task bound elsewhere is not the rotation's to take.
+      yield* sql`UPDATE scheduled_tasks SET thread_id = ${source} WHERE task_id = ${"task:rebind-late"}`;
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      assert.deepEqual(
+        rows
+          .filter((row) => row.thread_id === target)
+          .map((row) => row.task_id)
+          .toSorted(),
+        ["task:rebind-first", "task:rebind-late"],
+      );
+      assert.lengthOf(
+        rows.filter((row) => row.task_id === "task:rebind-first"),
+        1,
+      );
+      assert.lengthOf(
+        rows.filter((row) => row.thread_id === source),
+        0,
+      );
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("a rebind that cannot read the target thread fails instead of deleting anything", () =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-failread-source");
+    const target = ThreadId.make("thread:rebind-failread-target");
+    const harness = botHarness({
+      getThreadShell: (threadId) =>
+        threadId === target
+          ? Effect.fail(new Error("simulated shell read failure") as never)
+          : Effect.succeed(threadShell(ProjectId.make("project:test"))),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      yield* service.upsert({
+        id: ScheduledTaskId.make("task:rebind-failread"),
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        threadId: source,
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      });
+      const failed = yield* service
+        .rebindThread({ sourceThreadId: source, targetThreadId: target })
+        .pipe(Effect.flip);
+      assert.equal(failed._tag, "ScheduledTaskError");
+      // A read error is a retryable failure, never a deletion: the row binds the source still.
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      assert.deepEqual(rows, [{ task_id: "task:rebind-failread", thread_id: source }]);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("a rebind that cannot read the trash projection fails instead of deleting anything", () =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-failtrash-source");
+    const target = ThreadId.make("thread:rebind-failtrash-target");
+    const harness = botHarness({
+      getThreadShell: (threadId) =>
+        Effect.succeed(
+          threadId === target
+            ? threadShell(ProjectId.make("project:test"), { deletedAt: "2026-11-20T00:00:00Z" })
+            : threadShell(ProjectId.make("project:test")),
+        ),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      yield* service.upsert({
+        id: ScheduledTaskId.make("task:rebind-failtrash"),
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        threadId: source,
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      });
+      // The trash read hits a missing table: exactly the kind of storage error that must fail
+      // the effect for a retry, not read as "not in the trash".
+      yield* sql`ALTER TABLE orchestration_v2_projection_thread_trash RENAME TO thread_trash_aside`;
+      const failed = yield* service
+        .rebindThread({ sourceThreadId: source, targetThreadId: target })
+        .pipe(Effect.flip);
+      assert.equal(failed._tag, "ScheduledTaskError");
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      assert.deepEqual(rows, [{ task_id: "task:rebind-failtrash", thread_id: source }]);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("a replayed rebind deletes tasks that already moved onto a deleted target", () =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-strand-source");
+    const target = ThreadId.make("thread:rebind-strand-target");
+    const targetShellState = Ref.makeUnsafe(threadShell(ProjectId.make("project:test")));
+    const harness = botHarness({
+      getThreadShell: (threadId) =>
+        threadId === target
+          ? Ref.get(targetShellState)
+          : Effect.succeed(threadShell(ProjectId.make("project:test"))),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      yield* service.upsert({
+        id: ScheduledTaskId.make("task:rebind-stranded"),
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        threadId: source,
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      });
+      // The first execution moves the task; the process dies before the cleanup it owed the
+      // target, which is permanently deleted in the meantime. The replayed execution moves
+      // nothing, and the stranded row must still die with its thread.
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      yield* Ref.set(
+        targetShellState,
+        threadShell(ProjectId.make("project:test"), { deletedAt: "2026-11-20T00:00:00Z" }),
+      );
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      assert.lengthOf(rows, 0);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
