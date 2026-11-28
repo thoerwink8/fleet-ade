@@ -1945,6 +1945,19 @@ it.effect("rotate-session carries queued messages in delivery order behind the o
       3,
     );
 
+    // Thread-bound tasks are not the orchestrator's to move: the rotation hands the rebind to
+    // the outbox, where it runs after commit and can be replayed on its own.
+    const rebind = yield* outbox.get(
+      `effect:rotate-migrate:scheduled-tasks.rebind:${bravo}` as never,
+    );
+    assert.isTrue(Option.isSome(rebind));
+    if (Option.isSome(rebind)) {
+      assert.deepEqual(rebind.value.request, {
+        type: "scheduled-tasks.rebind",
+        targetThreadId: bravo,
+      });
+    }
+
     // The opening finishes first; then the queue advances in the same delivery order when the
     // system itself starts the head, the way a settling turn does.
     const advanceQueue = (commandId: string) =>
@@ -2760,6 +2773,68 @@ it.effect(
     }).pipe(Effect.provide(layerTest)),
 );
 
+it.effect("rotate-session adopts a pending fork transfer as its handoff and supersedes it", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const alpha = ThreadId.make("thread:pendfork-a");
+    const bravo = ThreadId.make("thread:pendfork-b");
+    yield* createThread(orchestrator, alpha, "Pending fork");
+    yield* markCommander(orchestrator, alpha, "mark-pendfork-a");
+    yield* seedForkableTurn(projections, { threadId: alpha, key: "pendfork-a" });
+    // This thread is itself an unconsumed fork: its handoff arrived from zulu and never ran.
+    const now = yield* DateTime.now;
+    yield* projections.apply({
+      id: EventId.make("event:pendfork-transfer"),
+      type: "context-transfer.created",
+      threadId: alpha,
+      occurredAt: now,
+      payload: {
+        id: ContextTransferId.make("transfer:pendfork"),
+        type: "fork",
+        sourceThreadId: ThreadId.make("thread:pendfork-zulu"),
+        targetThreadId: alpha,
+        sourcePoint: {
+          threadId: ThreadId.make("thread:pendfork-zulu"),
+          runId: RunId.make("run:pendfork-z"),
+        },
+        basePoint: null,
+        sourceProviderInstanceId: instanceId,
+        targetProviderInstanceId: null,
+        targetRunId: null,
+        status: "pending",
+        resolution: null,
+        createdBy: "user",
+        error: null,
+        createdAt: now,
+        updatedAt: now,
+        consumedAt: null,
+      },
+    });
+    yield* rotateSession(orchestrator, {
+      commandId: "rotate-pendfork",
+      markCommandId: "mark-pendfork-a",
+      threadId: alpha,
+      targetThreadId: bravo,
+    });
+    // The fork handoff this thread never consumed is superseded with it: the rotation has a
+    // real run to hand off, so it re-summarizes instead of carrying the stale one forward.
+    const alphaTransfers = (yield* projections.getThreadProjection(alpha)).contextTransfers;
+    assert.equal(
+      alphaTransfers.find(
+        (candidate) => candidate.id === ContextTransferId.make("transfer:pendfork"),
+      )?.status,
+      "superseded",
+    );
+    const bravoTransfers = (yield* projections.getThreadProjection(bravo)).contextTransfers;
+    assert.lengthOf(bravoTransfers, 1);
+    const carried = bravoTransfers[0]!;
+    assert.equal(carried.status, "consumed");
+    assert.equal(carried.sourceThreadId, alpha);
+    assert.equal(carried.sourcePoint.runId, RunId.make("run:pendfork-a"));
+  }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect("a message accepted before rotation replays in place instead of forwarding", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
@@ -2912,6 +2987,7 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
   const firstReadEntered = Deferred.makeUnsafe<void>();
   const firstReadRelease = Deferred.makeUnsafe<void>();
   let gateArmed = false;
+  let alphaReads = 0;
   const layerGated = Layer.mergeAll(
     layerDatabase,
     ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
@@ -2925,6 +3001,7 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
         wrapProjectionStore: (store) => ({
           ...store,
           getThread: (id) => {
+            if (id === alpha) alphaReads += 1;
             if (!gateArmed || id !== alpha) return store.getThread(id);
             gateArmed = false;
             return store.getThread(id).pipe(
@@ -2949,12 +3026,18 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
       targetThreadId: targetOne,
     }).pipe(Effect.exit, Effect.forkChild);
     yield* Deferred.await(firstReadEntered);
+    const readsWhenFirstEntered = alphaReads;
     const secondFiber = yield* rotateSession(orchestrator, {
       commandId: "rotate-race-two",
       markCommandId: "mark-race-rotate",
       threadId: alpha,
       targetThreadId: targetTwo,
     }).pipe(Effect.exit, Effect.forkChild);
+    // The second rotation is dispatched and given its turn before the first read opens, yet
+    // nothing but the first has reached the thread's in-lock read: it really is waiting on the
+    // lock, not on a slow start.
+    yield* Effect.yieldNow;
+    assert.equal(alphaReads, readsWhenFirstEntered);
     yield* Deferred.succeed(firstReadRelease, undefined);
     const firstExit = yield* Fiber.join(firstFiber);
     const secondExit = yield* Fiber.join(secondFiber);

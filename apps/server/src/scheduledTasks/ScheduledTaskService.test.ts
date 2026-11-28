@@ -1861,3 +1861,67 @@ it.effect("rejects a task that names both a bot and a thread, and one whose bot 
     }).pipe(Effect.provide(harness.layer));
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
+
+it.effect.each([
+  {
+    name: "a live target receives thread-bound tasks while bot-bound tasks stay put",
+    targetShell: "live" as const,
+    expectSurviving: ["task:rebind-thread", "task:rebind-bot"],
+    expectOnTarget: ["task:rebind-thread"],
+  },
+  {
+    name: "a target deleted past the trash cannot keep the work, so the moved tasks die with it",
+    targetShell: "tombstone" as const,
+    expectSurviving: ["task:rebind-bot"],
+    expectOnTarget: [],
+  },
+])("$name", ({ targetShell, expectSurviving, expectOnTarget }) =>
+  Effect.gen(function* () {
+    const source = ThreadId.make("thread:rebind-source");
+    const target = ThreadId.make("thread:rebind-target");
+    const harness = botHarness({
+      getThreadShell: (threadId) =>
+        Effect.succeed(
+          threadId === target
+            ? targetShell === "live"
+              ? threadShell(ProjectId.make("project:test"))
+              : threadShell(ProjectId.make("project:test"), { deletedAt: "2026-11-20T00:00:00Z" })
+            : threadShell(ProjectId.make("project:test")),
+        ),
+    });
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertBot(sql, { id: "bot:watcher", threadId: "thread:alpha" });
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      yield* service.upsert({
+        id: ScheduledTaskId.make("task:rebind-thread"),
+        title: "Thread bound",
+        prompt: "Run",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId: ProjectId.make("project:test"),
+        threadId: source,
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      });
+      const { task: botTask } = yield* service.upsert(botTaskInput("task:rebind-bot"));
+      // The rotation that enqueues the rebind seals the old thread, so the bot's last-run
+      // record can point at it; the binding must still not move.
+      yield* sql`UPDATE scheduled_tasks SET thread_id = ${source} WHERE task_id = ${botTask.id}`;
+      yield* service.rebindThread({ sourceThreadId: source, targetThreadId: target });
+      const surviving = (yield* service.list()).tasks;
+      assert.deepEqual(surviving.map((listed) => listed.id).toSorted(), expectSurviving.toSorted());
+      const rows = yield* sql<{ task_id: string; thread_id: string | null }>`
+        SELECT task_id, thread_id FROM scheduled_tasks
+      `;
+      const onTarget = rows
+        .filter((row) => row.thread_id === target)
+        .map((row) => row.task_id)
+        .toSorted();
+      assert.deepEqual(onTarget, expectOnTarget.toSorted());
+      assert.deepEqual(rows.find((row) => row.task_id === botTask.id)?.thread_id ?? null, source);
+    }).pipe(Effect.provide(harness.layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);

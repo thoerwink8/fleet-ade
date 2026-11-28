@@ -5,6 +5,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
+  BotId,
   EnvironmentId,
   MessageId,
   type ModelSelection,
@@ -6095,6 +6096,144 @@ it.effect(
         assert.deepEqual(
           (yield* projectionStore.getThreadProjection(threadId)).providerSessions,
           before.providerSessions,
+        );
+      }).pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 60_000 })));
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+);
+
+it.effect.each([
+  { rotated: true, expectOutput: true },
+  { rotated: false, expectOutput: false },
+] as const)(
+  "late background output lands on a detached thread only when it rotated (rotated: $rotated)",
+  ({ rotated, expectOutput }) =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      yield* Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        const now = yield* DateTime.now;
+        const projectId = yield* idAllocator.allocate.project({
+          fixtureName: "provider-session-manager-rotation-tail",
+        });
+        const rotatedThreadId = yield* idAllocator.allocate.thread({
+          fixtureName: "rotation-tail-source",
+          projectId,
+        });
+        const keepAliveThreadId = yield* idAllocator.allocate.thread({
+          fixtureName: "rotation-tail-keepalive",
+          projectId,
+        });
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId: rotatedThreadId,
+        });
+        const providerThread = makeProviderThread({
+          idAllocator,
+          threadId: rotatedThreadId,
+          providerSessionId,
+          now,
+        });
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: rotatedThreadId, now }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: keepAliveThreadId, now }),
+          ],
+        });
+        yield* manager.open({
+          threadId: rotatedThreadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        yield* manager.open({
+          threadId: keepAliveThreadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        // The rotation commits; its detach effect runs before the provider drains the tail of
+        // a background command it still owes this thread.
+        const rotatedShell = yield* projectionStore.getThread(rotatedThreadId);
+        yield* eventSink.write({
+          events: [
+            {
+              id: yield* idAllocator.allocate.event({ threadId: rotatedThreadId }),
+              type: "thread.metadata-updated",
+              threadId: rotatedThreadId,
+              providerInstanceId: modelSelection.instanceId,
+              occurredAt: now,
+              payload: rotated
+                ? {
+                    ...rotatedShell,
+                    rotatedTo: {
+                      threadId: ThreadId.make("thread:rotation-tail-successor"),
+                      botId: BotId.make("bot:rotation-tail"),
+                      rotatedAt: now,
+                    },
+                  }
+                : rotatedShell,
+            },
+          ],
+        });
+        yield* manager.detach({ providerSessionId, threadId: rotatedThreadId });
+
+        const shellId = "sh_late";
+        const output = "tail output the user still reads";
+        const adapterEvents = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId));
+        assert.isDefined(adapterEvents);
+        yield* Queue.offer(adapterEvents!, {
+          type: "turn_item.updated",
+          driver: CODEX_DRIVER,
+          sessionScoped: true,
+          turnItem: {
+            id: idAllocator.derive.turnItemFromProviderItem({
+              driver: CODEX_DRIVER,
+              nativeItemId: shellId,
+            }),
+            threadId: rotatedThreadId,
+            runId: null,
+            nodeId: null,
+            providerThreadId: providerThread.id,
+            providerTurnId: null,
+            nativeItemRef: { driver: CODEX_DRIVER, nativeId: shellId, strength: "strong" as const },
+            parentItemId: null,
+            ordinal: 0,
+            status: "completed" as const,
+            title: null,
+            startedAt: now,
+            completedAt: now,
+            updatedAt: now,
+            type: "command_execution" as const,
+            input: "echo late",
+            output,
+          },
+        });
+        // Artifact ingestion is permit-ordered per session, so the provider-thread update for
+        // the still-attached thread is stored only after the artifact's verdict is final.
+        const keepAliveProviderThread = makeProviderThread({
+          idAllocator,
+          threadId: keepAliveThreadId,
+          providerSessionId,
+          now,
+        });
+        yield* Queue.offer(adapterEvents!, {
+          type: "provider_thread.updated",
+          driver: CODEX_DRIVER,
+          providerThread: keepAliveProviderThread,
+          sessionScoped: true,
+        });
+        yield* eventSink.stream({ threadId: keepAliveThreadId, afterSequence: 0 }).pipe(
+          Stream.filter((stored) => stored.event.type === "provider-thread.updated"),
+          Stream.take(1),
+          Stream.runDrain,
+        );
+        const outputItems = (yield* projectionStore.getThreadProjection(rotatedThreadId)).turnItems;
+        assert.equal(
+          outputItems.some((item) => item.type === "command_execution"),
+          expectOutput,
         );
       }).pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 60_000 })));
     }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),

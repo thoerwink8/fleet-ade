@@ -4424,18 +4424,19 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const strandedOpeningRunIds = new Set(
       projection.runs.filter((run) => isRotationOpeningRun(run)).map((run) => run.id),
     );
-    const inheritedTransfers =
-      sourceRun !== null
-        ? []
-        : projection.contextTransfers.filter(
-            (candidate) =>
-              candidate.type === "fork" &&
-              candidate.targetThreadId === projection.thread.id &&
-              (candidate.status === "pending" ||
-                (candidate.status === "consumed" &&
-                  candidate.targetRunId !== null &&
-                  strandedOpeningRunIds.has(candidate.targetRunId))),
-          );
+    // An open fork transfer on the rotated thread can never be consumed where it was written,
+    // so it is always superseded below, with or without a live fork source. Only when nothing
+    // else can seed the handoff does the rotation adopt it instead of re-summarizing.
+    const supersededTransfers = projection.contextTransfers.filter(
+      (candidate) =>
+        candidate.type === "fork" &&
+        candidate.targetThreadId === projection.thread.id &&
+        (candidate.status === "pending" ||
+          (candidate.status === "consumed" &&
+            candidate.targetRunId !== null &&
+            strandedOpeningRunIds.has(candidate.targetRunId))),
+    );
+    const inheritedTransfers = sourceRun !== null ? [] : supersededTransfers;
     const inheritedTransfer = latestContextTransfer(inheritedTransfers);
     const sourceProviderThread =
       sourceRun === null ? undefined : providerThreadForRun(projection, sourceRun);
@@ -4484,7 +4485,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       occurredAt: now,
       payload: targetThread,
     });
-    for (const superseded of inheritedTransfers) {
+    for (const superseded of supersededTransfers) {
       yield* emitEvent({
         type: "context-transfer.updated",
         threadId: command.threadId,
@@ -4666,6 +4667,21 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         },
       ]);
     }
+    // Thread-bound tasks followed the bot onto the new thread, but the table is not the
+    // orchestrator's to write: the rebind runs after commit like the detaches do, and a
+    // failed one can be replayed without rolling the rotation itself back.
+    yield* Ref.update(effects, (existing) => [
+      ...existing,
+      {
+        id: `effect:${command.commandId}:scheduled-tasks.rebind:${command.targetThreadId}`,
+        commandId: command.commandId,
+        threadId: command.threadId,
+        request: {
+          type: "scheduled-tasks.rebind" as const,
+          targetThreadId: command.targetThreadId,
+        },
+      },
+    ]);
     return cancelOpeningTurnStarts;
   });
 

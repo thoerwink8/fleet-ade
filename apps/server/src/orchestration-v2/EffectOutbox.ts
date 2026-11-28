@@ -109,6 +109,10 @@ export const OrchestrationEffectRequestV2 = Schema.Union([
     type: Schema.Literal("scheduled-tasks.cleanup"),
   }),
   Schema.Struct({
+    type: Schema.Literal("scheduled-tasks.rebind"),
+    targetThreadId: ThreadId,
+  }),
+  Schema.Struct({
     type: Schema.Literal("terminal.cleanup"),
     keepHistory: Schema.optional(Schema.Boolean),
   }),
@@ -144,6 +148,7 @@ export const REPLAY_SAFE_EFFECT_TYPES_AFTER_PROCESS_LOSS = [
   "provider-thread.rollback",
   "checkpoint.capture",
   "scheduled-tasks.cleanup",
+  "scheduled-tasks.rebind",
   "terminal.cleanup",
   "preview.cleanup",
   "attachment.cleanup",
