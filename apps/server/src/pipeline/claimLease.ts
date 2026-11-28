@@ -164,6 +164,21 @@ const fleetWriter = (
 ) =>
   Effect.fn("claimLease.fleetApply")(function* (write: ClaimWrite) {
     const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+    // The legacy writer has no term check, so the guard runs in the same transaction as the write.
+    const fencedLegacy = (legacyWrite: ClaimWrite) =>
+      sql
+        .withTransaction(
+          Effect.gen(function* () {
+            yield* claims.requireCoordinator;
+            return yield* writer(sql)(legacyWrite);
+          }),
+        )
+        .pipe(
+          Effect.catchTags({
+            SqlError: (cause) =>
+              Effect.logError("Failed to read local claims", cause).pipe(Effect.as(unavailable)),
+          }),
+        );
     return yield* Effect.gen(function* () {
       if (write.action === "claim") {
         const claimed = yield* claims.claim(
@@ -186,7 +201,7 @@ const fleetWriter = (
           leaseToken: encodeLeaseToken(claimed.claim),
         } as const;
       }
-      if (write.action === "renew") return yield* writer(sql)(write);
+      if (write.action === "renew") return yield* fencedLegacy(write);
       if (write.action === "finish") {
         const claim = yield* Effect.try({
           try: () => decodeLeaseToken(write.token),
@@ -194,7 +209,7 @@ const fleetWriter = (
         }).pipe(Effect.option);
         if (Option.isNone(claim)) {
           // Rows claimed before the fleet switch still release through the legacy writer.
-          return yield* writer(sql)(write);
+          return yield* fencedLegacy(write);
         }
         const released = yield* claims.release(caller, {
           repo: write.repo,

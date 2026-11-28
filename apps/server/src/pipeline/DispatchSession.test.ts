@@ -31,6 +31,7 @@ import { EnvironmentId } from "@t3tools/contracts";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as FleetClaims from "../ledger/FleetClaims.ts";
 import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
+import * as CoordinatorTerm from "../ledger/coordinatorTerm.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 
 const MODEL: ModelSelection = { instanceId: ProviderInstanceId.make("test-model"), model: "test" };
@@ -88,8 +89,10 @@ const sessionLayer = (
   created: Ref.Ref<ReadonlyArray<string>>,
   options?: {
     readonly claims?: Layer.Layer<
-      ClaimLease.ClaimLeasePort | FleetClaims.FleetClaims,
-      MigrationError.MigrationError | SqlError.SqlError,
+      ClaimLease.ClaimLeasePort | CoordinatorTerm.CoordinatorTerm | FleetClaims.FleetClaims,
+      | CoordinatorTerm.CoordinatorTermStorageError
+      | MigrationError.MigrationError
+      | SqlError.SqlError,
       SqlClient.SqlClient
     >;
     readonly reporter?: Layer.Layer<FleetSummaryReporter.FleetSummaryReporter>;

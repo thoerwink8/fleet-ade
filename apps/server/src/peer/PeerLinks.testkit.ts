@@ -132,6 +132,7 @@ export const servePeer = <E, R>(
         Layer.mergeAll(
           Layer.succeed(PeerMcpClient.PeerMcpClient, peerClient),
           Layer.succeed(PeerChallengeRegistry.PeerChallengeRegistry, challenges),
+          Layer.succeed(PeerLinks.PeerLinks, links),
         ),
       ),
       Layer.provide(layerEnvironment),
