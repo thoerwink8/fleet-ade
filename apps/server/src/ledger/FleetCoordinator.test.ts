@@ -7,7 +7,7 @@ import {
   type FleetClaimClaimInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
-import * as Deferred from "effect/Deferred";
+import * as Queue from "effect/Queue";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
@@ -365,10 +365,10 @@ const nodeD = descriptorOf("node-d", "Node D");
 
 /**
  * A machine whose coordinator service accepts connections but never answers a
- * term exchange. Its ledger file can still be written directly, so it can pose
- * as a coordinator that went silent after the write.
+ * term exchange. Every exchange it receives is signalled on the queue, so a
+ * test can pace virtual time against them.
  */
-const serveNeverMachine = (descriptor: typeof nodeA, exchangeSeen: Deferred.Deferred<void>) =>
+const serveNeverMachine = (descriptor: typeof nodeA, exchangeSeen: Queue.Queue<void>) =>
   Layer.build(Layer.fresh(NodeHttpServer.layerTest)).pipe(
     Effect.flatMap((server) =>
       servePeer(
@@ -379,7 +379,7 @@ const serveNeverMachine = (descriptor: typeof nodeA, exchangeSeen: Deferred.Defe
               FleetCoordinator.FleetCoordinator,
               FleetCoordinator.FleetCoordinator.of({
                 exchange: () =>
-                  Deferred.succeed(exchangeSeen, undefined).pipe(Effect.andThen(Effect.never)),
+                  Queue.offer(exchangeSeen, undefined).pipe(Effect.andThen(Effect.never)),
                 handover: () => Effect.never,
                 requestHandover: () => Effect.never,
                 takeover: () => Effect.never,
@@ -393,36 +393,42 @@ const serveNeverMachine = (descriptor: typeof nodeA, exchangeSeen: Deferred.Defe
     ),
   );
 
-it.effect("旧协调者可达、第三台配对机离线时接管仍走在线交出", () =>
+it.effect("旧协调者可达、交出回包丢在超时时接管仍按本机任期行定胜负", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const aLedger = yield* tempLedger;
       const bLedger = yield* tempLedger;
-      const dLedger = yield* tempLedger;
       expect((yield* writeTerm(aLedger, 3, "node-a"))._tag).toBe("current");
       expect((yield* writeTerm(bLedger, 3, "node-a"))._tag).toBe("current");
       const aMachine = yield* serveMachine(nodeA, aLedger);
       const bMachine = yield* serveMachine(nodeB, bLedger);
-      const dMachine = yield* serveMachine(nodeD, dLedger);
+      const dExchangeSeen = yield* Queue.unbounded<void>();
+      const dMachine = yield* serveNeverMachine(nodeD, dExchangeSeen);
       yield* linkTo(bMachine.links, aMachine);
       yield* linkTo(aMachine.links, bMachine);
       yield* linkTo(bMachine.links, dMachine);
       yield* linkTo(dMachine.links, bMachine);
       yield* linkTo(aMachine.links, dMachine);
       yield* linkTo(dMachine.links, aMachine);
-      // The third machine goes silent: revoked sessions fail every linked call
-      // the same way an unreachable machine does, without retrying.
-      for (const session of yield* dMachine.linkedSessions) {
-        yield* dMachine.auth.revokeSession(session.sessionId);
-      }
       const bContext = yield* coordinatorOnPeer(bMachine, bLedger);
       const bCoordinator = Context.get(bContext, FleetCoordinator.FleetCoordinator);
 
-      // The coordinator hands over while its best-effort push to the dead third
-      // machine fails in the background; the takeover reads its own row instead
-      // of trusting the handover reply.
-      const taken = yield* bCoordinator.takeover({ force: false });
-      expect(taken).toEqual({ outcome: "taken-over", term: 4, coordinatorId: "node-b" });
+      const fiber = yield* bCoordinator.takeover({ force: false }).pipe(Effect.forkChild);
+      // The exchange round stalls on the silent machine; its three-second
+      // timeout is the only thing the round waits on.
+      yield* Queue.take(dExchangeSeen);
+      yield* TestClock.adjust("3 seconds");
+      // The push to this machine commits before the push to the silent one
+      // starts, and that second push holds the handover reply until its own
+      // three-second timeout: the ten-second handover wait expires first, so
+      // the takeover decides from the row the push already wrote.
+      yield* Queue.take(dExchangeSeen);
+      yield* TestClock.adjust("10 seconds");
+      expect(yield* Fiber.join(fiber)).toEqual({
+        outcome: "taken-over",
+        term: 4,
+        coordinatorId: "node-b",
+      });
       expect(yield* readTerm(bLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
       expect(yield* readTerm(aLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
     }),
@@ -434,7 +440,7 @@ it.effect("旧协调者交换轮不应答就不调交出，直接要确认", () 
     Effect.gen(function* () {
       const bLedger = yield* tempLedger;
       expect((yield* writeTerm(bLedger, 5, "node-a"))._tag).toBe("current");
-      const exchangeSeen = yield* Deferred.make<void>();
+      const exchangeSeen = yield* Queue.unbounded<void>();
       const aMachine = yield* serveNeverMachine(nodeA, exchangeSeen);
       const bMachine = yield* serveMachine(nodeB, bLedger);
       yield* linkTo(bMachine.links, aMachine);
@@ -468,7 +474,7 @@ it.effect("旧协调者交换轮不应答就不调交出，直接要确认", () 
       const bCoordinator = Context.get(bContext, FleetCoordinator.FleetCoordinator);
 
       const fiber = yield* bCoordinator.takeover({ force: false }).pipe(Effect.forkChild);
-      yield* Deferred.await(exchangeSeen);
+      yield* Queue.take(exchangeSeen);
       yield* TestClock.adjust("5 seconds");
       expect(yield* Fiber.join(fiber)).toEqual({
         outcome: "needs-confirmation",

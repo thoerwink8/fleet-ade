@@ -58,7 +58,7 @@ export class FleetCoordinator extends Context.Service<
     }) => Effect.Effect<FleetTermTakeoverResult, FleetCoordinatorError>;
     /** The coordinator term as this machine last heard it. */
     readonly current: Effect.Effect<FleetTermExchangeResult, FleetCoordinatorError>;
-    /** Machines a handover push failed to reach; the re-push loop drains this. */
+    /** Machines a handover push failed to reach; a later version's re-push loop reads this. */
     readonly pendingPush: Effect.Effect<ReadonlyArray<EnvironmentId>, never>;
   }
 >()("t3/ledger/FleetCoordinator") {}
@@ -121,7 +121,7 @@ const make = Effect.gen(function* () {
     return snapshotOf(yield* adopt(input.term, input.coordinatorId, caller));
   });
 
-  /** Pushes the snapshot to one peer. Failure records it for the re-push loop. */
+  /** Pushes the snapshot to one peer. Failure records it for a later version's re-push loop. */
   const pushTo = (
     environmentId: EnvironmentId,
     snapshot: { readonly term: number; readonly coordinatorId: EnvironmentId },
@@ -253,7 +253,7 @@ const make = Effect.gen(function* () {
     const confirmed = yield* pushTo(to, pushed);
     const others = yield* links.list.pipe(Effect.mapError(linkError));
     // Best effort: every other paired machine learns the new term now. Failures
-    // land on the pending list the re-push loop drains.
+    // land on the pending list a later version's re-push loop reads.
     yield* Effect.forEach(
       others.filter((link) => link.environmentId !== to),
       (link) => pushTo(link.environmentId, pushed),
@@ -294,7 +294,15 @@ const make = Effect.gen(function* () {
       if (reply.value.coordinatorId !== null && reply.value.term > 0) {
         yield* adopt(reply.value.term, reply.value.coordinatorId, {
           environmentId: peer.environmentId,
-        }).pipe(Effect.catch(() => Effect.void));
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logWarning("coordinator term adoption during takeover failed", {
+              peerEnvironmentId: peer.environmentId,
+              message: error.message,
+            }),
+          ),
+          Effect.catch(() => Effect.void),
+        );
       }
     }
     const known = yield* readSnapshot;
