@@ -306,6 +306,7 @@ function scheduledTaskSummary(task: ScheduledTask, mayRun: boolean): Orchestrato
     enabled: task.enabled,
     projectId: task.projectId,
     boundThreadId: task.threadId,
+    boundBotId: task.botId ?? null,
     freshSession: scheduledTaskThreadMode(task) === "fresh_session",
     schedule: task.schedule,
     nextRunAt: task.nextRunAt,
@@ -2210,6 +2211,12 @@ const make = Effect.gen(function* () {
             : "bindToCurrentThread binds to this thread, which belongs to a different project.",
         );
       }
+      if (input.botId != null && input.bindToCurrentThread === true) {
+        return yield* failure(
+          "invalid_request",
+          "A task binds a bot or a thread, not both: leave out bindToCurrentThread.",
+        );
+      }
       const modelSelection =
         parent?.thread.modelSelection ?? (yield* projectDefaultModelSelection(project));
       const derivedTitle = input.prompt.split("\n")[0]?.trim() ?? "";
@@ -2221,7 +2228,13 @@ const make = Effect.gen(function* () {
         enabled: input.enabled ?? true,
         schedule: input.schedule,
         projectId,
-        threadId: bindToCurrentThread && parent !== undefined ? parent.thread.id : null,
+        threadId:
+          input.botId != null
+            ? null
+            : bindToCurrentThread && parent !== undefined
+              ? parent.thread.id
+              : null,
+        ...(input.botId === undefined ? {} : { botId: input.botId }),
         threadMode: input.freshSession
           ? "fresh_session"
           : bindToCurrentThread
@@ -2301,17 +2314,39 @@ const make = Effect.gen(function* () {
             "To move this task to a new thread with fresh sessions, first unbind it with bindToCurrentThread: false, then set freshSession: true in a second call.",
           );
         }
+        if (input.botId != null && input.bindToCurrentThread === true) {
+          return yield* failure(
+            "invalid_request",
+            "A task binds a bot or a thread, not both: leave out bindToCurrentThread.",
+          );
+        }
+        // The binding resolves in one place: bot input wins, thread input rebinds,
+        // and with neither the task keeps what it has. A bot-bound task's stored
+        // thread is a run record, so keeping it must pass undefined, not the record.
+        const bindingBot =
+          input.botId !== undefined
+            ? input.botId
+            : input.bindToCurrentThread !== undefined
+              ? null
+              : (existing.botId ?? null);
         const threadId =
-          input.bindToCurrentThread === undefined
-            ? existing.threadId
-            : input.bindToCurrentThread && parent !== undefined
-              ? parent.thread.id
-              : null;
-        // Reset the workspace only when the binding flips, so unbinding cannot leave runs in the shared checkout.
+          input.botId !== undefined
+            ? null
+            : input.bindToCurrentThread === undefined
+              ? bindingBot !== null
+                ? undefined
+                : existing.threadId
+              : input.bindToCurrentThread && parent !== undefined
+                ? parent.thread.id
+                : null;
+        // Reset the workspace only when the thread binding flips, so unbinding cannot
+        // leave runs in the shared checkout. Bot work never touched the checkout.
         const workspaceStrategy =
-          (threadId === null) === (existing.threadId === null)
+          bindingBot !== null
             ? existing.workspaceStrategy
-            : yield* scheduledTaskWorkspaceStrategy(threadId !== null, existing.projectId);
+            : (threadId ?? null) === ((existing.botId ?? null) !== null ? null : existing.threadId)
+              ? existing.workspaceStrategy
+              : yield* scheduledTaskWorkspaceStrategy(threadId != null, existing.projectId);
         const upsertInput: ScheduledTaskUpsertInput = {
           id: existing.id,
           title: input.title ?? existing.title,
@@ -2320,6 +2355,7 @@ const make = Effect.gen(function* () {
           schedule: input.schedule ?? existing.schedule,
           projectId: existing.projectId,
           threadId,
+          botId: bindingBot,
           threadMode:
             input.freshSession === undefined && input.bindToCurrentThread === undefined
               ? scheduledTaskThreadMode(existing)

@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import {
+  BotId,
   CommandId,
   ForwardCompatibleArray,
   IsoDateTime,
@@ -247,6 +248,11 @@ export const ScheduledTask = Schema.Struct({
   projectId: ProjectId,
   threadId: Schema.NullOr(ThreadId),
   threadMode: Schema.optional(ScheduledTaskThreadMode),
+  /**
+   * The bot this task wakes. Absent on servers before bot binding. A bot-bound task
+   * resolves its thread at run time, so `threadId` only records where the last run went.
+   */
+  botId: Schema.optional(Schema.NullOr(BotId)),
   workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
@@ -286,6 +292,12 @@ export const ScheduledTaskUpsertInput = Schema.Struct({
   schedule: ScheduledTaskUpsertSchedule,
   projectId: ProjectId,
   threadId: Schema.optional(Schema.NullOr(ThreadId)),
+  /**
+   * Bind the task to a bot instead of a thread: each run posts to the bot's current
+   * thread, a paused bot is skipped, and one bot never runs two wakes at once. Mutually
+   * exclusive with `threadId`. Null unbinds; omitted keeps the stored binding.
+   */
+  botId: Schema.optional(Schema.NullOr(BotId)),
   /** Omitted: keep the stored mode, or derive it from `threadId` for a new or rebound task. */
   threadMode: Schema.optional(ScheduledTaskThreadMode),
   workspaceStrategy: OrchestrationV2ThreadLaunchWorkspaceStrategy,
