@@ -751,8 +751,7 @@ export const OrchestratorMcpScheduleTaskInput = Schema.Struct({
   ),
   botId: Schema.optional(
     Schema.NullOr(BotId).annotate({
-      description:
-        "Wake this bot instead: each run posts to the bot's current thread, follows it across threads, and a paused bot is skipped. Null unbinds. Cannot combine with bindToCurrentThread.",
+      description: "Wake this bot on its current thread instead of a bound one; null unbinds.",
     }),
   ),
   clientRequestId: Schema.optional(OrchestratorMcpClientRequestId),
