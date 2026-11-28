@@ -39,6 +39,7 @@
 @import "@fleet/design/styles/status-tag.css" layer(fleet);
 @import "@fleet/design/styles/thread-row.css" layer(fleet);
 @import "./styles/fleet-overrides/thread-row.css" layer(fleet);
+@import "./styles/fleet-overrides/background-tasks.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
