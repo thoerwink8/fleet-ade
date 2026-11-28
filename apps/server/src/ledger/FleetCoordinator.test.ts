@@ -476,9 +476,6 @@ it.effect("旧协调者交换轮不应答就不调交出，直接要确认", () 
       const exchangeSeen = yield* Queue.unbounded<void>();
       const aMachine = yield* serveNeverMachine(nodeA, exchangeSeen);
       const bMachine = yield* serveMachine(nodeB, bLedger);
-      yield* linkTo(bMachine.links, aMachine);
-      yield* linkTo(aMachine.links, bMachine);
-
       // Count the handover calls this machine makes; the coordinator never
       // answered its exchange, so it must not be asked to hand over at all.
       let handoverCalls = 0;
@@ -505,6 +502,12 @@ it.effect("旧协调者交换轮不应答就不调交出，直接要确认", () 
         Layer.build,
       );
       const bCoordinator = Context.get(bContext, FleetCoordinator.FleetCoordinator);
+      // Linking to the never-answering coordinator happens only now: the
+      // construction-time exchange round just finished, and waiting on that
+      // machine would have hung it. The takeover re-reads the links at call
+      // time, so linking afterwards changes nothing it observes.
+      yield* linkTo(bMachine.links, aMachine);
+      yield* linkTo(aMachine.links, bMachine);
 
       const fiber = yield* bCoordinator.takeover({ force: false }).pipe(Effect.forkChild);
       yield* Queue.take(exchangeSeen);
@@ -516,6 +519,177 @@ it.effect("旧协调者交换轮不应答就不调交出，直接要确认", () 
       });
       expect(handoverCalls).toBe(0);
       expect(yield* readTerm(bLedger)).toEqual({ term: 5, coordinatorId: "node-a" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("推不到的机器回来后 30 秒重推到新任期，之后它领单被拒", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      const cLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 3, "node-a"))._tag).toBe("current");
+      expect((yield* writeTerm(bLedger, 3, "node-a"))._tag).toBe("current");
+      const aMachine = yield* serveMachine(nodeA, aLedger);
+      const bMachine = yield* serveMachine(nodeB, bLedger);
+      const cMachine = yield* serveMachine(nodeC, cLedger);
+      const dMachine = yield* serveMachine(nodeD, ":memory:");
+      for (const machine of [aMachine, bMachine, cMachine, dMachine]) {
+        for (const other of [aMachine, bMachine, cMachine, dMachine]) {
+          if (machine !== other) yield* linkTo(machine.links, other);
+        }
+      }
+      for (const machine of [cMachine, dMachine]) {
+        for (const session of yield* machine.linkedSessions) {
+          yield* machine.auth.revokeSession(session.sessionId);
+        }
+      }
+
+      // A 30-second clock jump fires the loop's own 3-second push timeouts
+      // before the real network answers, so the witness paces the clock: it
+      // completes after the round's real RPC to the returned machine, when
+      // the loop is back in its sleep.
+      const roundDone = yield* Deferred.make<void>();
+      let armed = false;
+      const witnessingClient = PeerMcpClient.PeerMcpClient.of({
+        call: (input) =>
+          aMachine.client
+            .call(input)
+            .pipe(
+              Effect.tap(() =>
+                armed &&
+                input.environmentId === nodeC.environmentId &&
+                input.tool === "fleet_term_exchange"
+                  ? Deferred.succeed(roundDone, undefined)
+                  : Effect.void,
+              ),
+            ),
+      });
+      const aContext = yield* FleetCoordinator.layerForTest(aLedger).pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(
+            Layer.succeed(PeerLinks.PeerLinks, aMachine.links),
+            Layer.succeed(PeerMcpClient.PeerMcpClient, witnessingClient),
+            Layer.succeed(ServerEnvironment.ServerEnvironment, {
+              getEnvironmentId: Ref.get(aMachine.descriptor).pipe(
+                Effect.map((current) => current.environmentId),
+              ),
+              getDescriptor: Ref.get(aMachine.descriptor),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const aCoordinator = Context.get(aContext, FleetCoordinator.FleetCoordinator);
+
+      const handed = yield* aCoordinator.handover(nodeB.environmentId);
+      expect(handed).toEqual({ outcome: "handed-over", term: 4, coordinatorId: "node-b" });
+      expect((yield* aCoordinator.pendingPush).toSorted()).toEqual(["node-c", "node-d"]);
+      // Neither the construction-time exchange nor the handover push reached it.
+      expect(yield* readTerm(cLedger)).toEqual({ term: 0, coordinatorId: null });
+
+      // The third machine comes back; the fourth stays dead. A fresh pairing
+      // token reaches the third the way its network return does.
+      yield* linkTo(aMachine.links, cMachine);
+      armed = true;
+      yield* TestClock.adjust("30 seconds");
+      yield* Deferred.await(roundDone);
+      // The dead machine's push times out 3 seconds into the round.
+      yield* TestClock.adjust("5 seconds");
+
+      expect(yield* readTerm(cLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
+      expect(yield* aCoordinator.pendingPush).toEqual(["node-d"]);
+      const denied = yield* claimAt(
+        aMachine.client,
+        nodeC.environmentId,
+        "repush-task",
+        "repush-denied",
+      ).pipe(Effect.flip);
+      expect(denied.code).toBe("orchestration_error");
+      expect(denied.message).toContain("not the fleet coordinator");
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("开机交换拉到更大任期后本机领单被拒", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      // Both machines restart after a handover they never saw: this machine
+      // still believes itself the coordinator.
+      expect((yield* writeTerm(aLedger, 3, "node-a"))._tag).toBe("current");
+      expect((yield* writeTerm(bLedger, 4, "node-b"))._tag).toBe("current");
+      const aMachine = yield* serveMachine(nodeA, aLedger);
+      const bMachine = yield* serveMachine(nodeB, bLedger);
+      yield* linkTo(aMachine.links, bMachine);
+      yield* linkTo(bMachine.links, aMachine);
+
+      // Building the service is the boot: construction returns only after the
+      // exchange round, so the adopted row is already written here.
+      const aContext = yield* coordinatorOnPeer(aMachine, aLedger);
+      const aCoordinator = Context.get(aContext, FleetCoordinator.FleetCoordinator);
+      expect(yield* aCoordinator.current).toEqual({ term: 4, coordinatorId: "node-b" });
+      expect(yield* readTerm(aLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
+
+      const denied = yield* claimAt(
+        bMachine.client,
+        nodeA.environmentId,
+        "boot-pull-task",
+        "boot-pull-denied",
+      ).pipe(Effect.flip);
+      expect(denied.code).toBe("orchestration_error");
+      expect(denied.message).toContain("not the fleet coordinator");
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("重启后名单为空时开机交换把任期推给所有配对机", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const aLedger = yield* tempLedger;
+      const bLedger = yield* tempLedger;
+      const cLedger = yield* tempLedger;
+      expect((yield* writeTerm(aLedger, 3, "node-a"))._tag).toBe("current");
+      expect((yield* writeTerm(bLedger, 3, "node-a"))._tag).toBe("current");
+      const aMachine = yield* serveMachine(nodeA, aLedger);
+      const bMachine = yield* serveMachine(nodeB, bLedger);
+      const cMachine = yield* serveMachine(nodeC, cLedger);
+      for (const [from, to] of [
+        [aMachine, bMachine],
+        [bMachine, aMachine],
+        [aMachine, cMachine],
+        [cMachine, aMachine],
+        [bMachine, cMachine],
+        [cMachine, bMachine],
+      ] as const) {
+        yield* linkTo(from.links, to);
+      }
+      for (const session of yield* cMachine.linkedSessions) {
+        yield* cMachine.auth.revokeSession(session.sessionId);
+      }
+      const firstContext = yield* coordinatorOnPeer(aMachine, aLedger);
+      const firstCoordinator = Context.get(firstContext, FleetCoordinator.FleetCoordinator);
+      const handed = yield* firstCoordinator.handover(nodeB.environmentId);
+      expect(handed).toEqual({ outcome: "handed-over", term: 4, coordinatorId: "node-b" });
+      expect(yield* readTerm(cLedger)).toEqual({ term: 0, coordinatorId: null });
+
+      // This machine restarts: a fresh coordinator service has an empty
+      // re-push list, and the construction-time exchange round is the only
+      // thing that can still tell the third machine.
+      yield* linkTo(aMachine.links, cMachine);
+      yield* coordinatorOnPeer(aMachine, aLedger);
+
+      expect(yield* readTerm(cLedger)).toEqual({ term: 4, coordinatorId: "node-b" });
+      const denied = yield* claimAt(
+        aMachine.client,
+        nodeC.environmentId,
+        "boot-push-task",
+        "boot-push-denied",
+      ).pipe(Effect.flip);
+      expect(denied.code).toBe("orchestration_error");
+      expect(denied.message).toContain("not the fleet coordinator");
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
