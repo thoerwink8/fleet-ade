@@ -32,10 +32,14 @@ class FleetBoardRequestRejected extends Schema.TaggedError<FleetBoardRequestReje
 const reject = (status: number, code: string, message: string) =>
   new FleetBoardRequestRejected({ status, code, message });
 
-// Hop-by-hop headers must not cross a proxy; the platforms set their own.
+// Hop-by-hop headers must not cross a proxy; the platforms set their own. The board
+// itself is unauthenticated on loopback, so cookie and authorization must never reach
+// it (or anything else squatting on its port) through this proxy.
 const STRIPPED_REQUEST_HEADERS = new Set([
+  "authorization",
   "connection",
   "content-length",
+  "cookie",
   "host",
   "keep-alive",
   "proxy-authenticate",
@@ -45,11 +49,13 @@ const STRIPPED_REQUEST_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
+// set-cookie is not hop-by-hop, but the board must not plant cookies on this origin.
 const STRIPPED_RESPONSE_HEADERS = new Set([
   "connection",
   "keep-alive",
   "proxy-authenticate",
   "proxy-authorization",
+  "set-cookie",
   "te",
   "trailer",
   "transfer-encoding",
@@ -91,7 +97,7 @@ const routesFor = (
   board: FleetBoardService.FleetBoardService["Service"],
   httpClient: HttpClient.HttpClient,
 ) => {
-  /** Login only: the board proxy carries no per-scope capability beyond reaching it. */
+  /** Reads need orchestration:read; anything that writes through the proxy needs orchestration:operate. */
   const requireSession = Effect.fn("FleetBoardHttp.requireSession")(function* (
     scope: typeof AuthOrchestrationReadScope | typeof AuthOrchestrationOperateScope,
   ) {
@@ -196,7 +202,8 @@ const routesFor = (
   );
 
   return Layer.mergeAll(
-    HttpRouter.add("GET", FLEET_BOARD_ENSURE_PATH, ensureRoute),
+    // POST because ensure may launch the board process; GETs must stay side-effect free.
+    HttpRouter.add("POST", FLEET_BOARD_ENSURE_PATH, ensureRoute),
     // find-my-way wildcard mounts also cover the bare prefix path, so /fleet-board
     // (the redirect target) needs no separate registration.
     HttpRouter.add("*", `${FLEET_BOARD_ROUTE_PREFIX}/*`, proxyRoute),

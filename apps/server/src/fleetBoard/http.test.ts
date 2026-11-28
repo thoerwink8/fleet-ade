@@ -62,7 +62,11 @@ const closeServer = (server: NodeHttp.Server) =>
 
 interface Upstream {
   readonly server: NodeHttp.Server;
-  readonly hits: Array<{ method: string; url: string | undefined }>;
+  readonly hits: Array<{
+    method: string;
+    url: string | undefined;
+    headers: NodeHttp.IncomingHttpHeaders;
+  }>;
   readonly bodies: Array<string>;
   readonly sseClose: Promise<void>;
   readonly sseRequestCount: () => number;
@@ -76,7 +80,7 @@ const listenUpstream = () =>
     const sseClosed = Promise.withResolvers<void>();
     let sseRequests = 0;
     const server = NodeHttp.createServer((request, response) => {
-      hits.push({ method: request.method ?? "", url: request.url });
+      hits.push({ method: request.method ?? "", url: request.url, headers: request.headers });
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
       if (url.pathname === "/api/events") {
         sseRequests += 1;
@@ -100,6 +104,7 @@ const listenUpstream = () =>
       }
       if (url.pathname === "/api/status") {
         response.setHeader("content-type", "application/json");
+        response.setHeader("set-cookie", "board-session=squatter; Path=/");
         response.end(JSON.stringify({ ok: true, query: url.search }));
         return;
       }
@@ -180,8 +185,9 @@ it.live("没登录访问 /fleet-board/* 和 ensure 都回 401，转发不触上�
 
     const nested = yield* client.execute(HttpClientRequest.get(`${origin}/fleet-board/api/status`));
     expect(nested.status).toBe(401);
-
-    const ensure = yield* client.execute(HttpClientRequest.get(`${origin}/api/fleet-board/ensure`));
+    const ensure = yield* client.execute(
+      HttpClientRequest.post(`${origin}/api/fleet-board/ensure`),
+    );
     expect(ensure.status).toBe(401);
 
     expect(upstream.hits.length).toBe(hitsBefore);
@@ -253,6 +259,48 @@ it.live("POST 带体透传到上游", () =>
   }).pipe(Effect.scoped),
 );
 
+it.live("登录 cookie 和 authorization 不透给上游，上游的 set-cookie 不透回客户端", () =>
+  Effect.gen(function* () {
+    const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const { origin, client } = yield* serveFleetBoard(
+      testBoardService(nodePortOf(upstream.server)),
+    );
+
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, {
+        headers: { authorization: TEST_AUTHORIZATION, cookie: "session=victim" },
+      }),
+    );
+    expect(response.status).toBe(200);
+
+    const hit = upstream.hits.find((entry) => entry.url === "/api/status");
+    expect(hit).toBeDefined();
+    expect(hit?.headers["authorization"]).toBeUndefined();
+    expect(hit?.headers["cookie"]).toBeUndefined();
+
+    // fetch hides set-cookie in Headers; a raw socket sees what a browser would receive.
+    const rawHeaders = yield* Effect.promise(() => {
+      const {
+        promise,
+        resolve,
+        reject: rejectHeaders,
+      } = Promise.withResolvers<NodeHttp.IncomingHttpHeaders>();
+      const raw = NodeHttp.get(`${origin}/fleet-board/api/status`, {
+        headers: { authorization: TEST_AUTHORIZATION },
+      });
+      raw.on("response", (message) => {
+        message.resume();
+        resolve(message.headers);
+      });
+      raw.on("error", rejectHeaders);
+      return promise;
+    });
+    expect(rawHeaders["set-cookie"]).toBeUndefined();
+  }).pipe(Effect.scoped),
+);
+
 it.live("/fleet-board 重定向到带斜杠的地址", () =>
   Effect.gen(function* () {
     const upstream = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
@@ -314,9 +362,15 @@ it.live("ensure 路由返回服务的结果", () =>
     );
 
     const response = yield* client.execute(
-      HttpClientRequest.get(`${origin}/api/fleet-board/ensure`, authed),
+      HttpClientRequest.post(`${origin}/api/fleet-board/ensure`, authed),
     );
     expect(response.status).toBe(200);
     expect(yield* response.json).toEqual(ensureResult);
+
+    // GET no longer matches: launching a process is a side effect, so ensure is POST-only.
+    const getEnsure = yield* client.execute(
+      HttpClientRequest.get(`${origin}/api/fleet-board/ensure`, authed),
+    );
+    expect(getEnsure.status).toBe(404);
   }).pipe(Effect.scoped),
 );
