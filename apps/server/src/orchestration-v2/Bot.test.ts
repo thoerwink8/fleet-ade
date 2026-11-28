@@ -3155,15 +3155,14 @@ it.effect("two concurrent rotations of one bot commit exactly one thread", () =>
     // while the first still holds it — releasing before the signal deadlocks this test, so the
     // ordering itself carries the proof.
     const withLock = executor.withLock;
-    const spy = vi
-      .spyOn(executor, "withLock")
-      .mockImplementation((key, effect) =>
-        key === alpha
-          ? Deferred.succeed(secondLockAttempt, undefined).pipe(
-              Effect.andThen(withLock(key, effect)),
-            )
-          : withLock(key, effect),
-      );
+    const observeLock: ThreadCommandExecutor.ThreadCommandExecutor["Service"]["withLock"] = (
+      key,
+      effect,
+    ) =>
+      key === alpha
+        ? Deferred.succeed(secondLockAttempt, undefined).pipe(Effect.andThen(withLock(key, effect)))
+        : withLock(key, effect);
+    const spy = vi.spyOn(executor, "withLock").mockImplementation(observeLock);
     yield* Effect.gen(function* () {
       const secondFiber = yield* rotateSession(orchestrator, {
         commandId: "rotate-race-two",
