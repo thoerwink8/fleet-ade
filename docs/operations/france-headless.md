@@ -126,3 +126,7 @@ sudo bash /var/lib/fleet-ade/app/scripts/deploy/france-update.sh <新的40位提
   journalctl -u fleet-ade.service --since "24 hours ago" --no-pager \
     | grep -Ei 't3\.codes|t3coderelay\.com' || echo "zero upstream hits"
   ```
+
+## 8. 协调者交接
+
+配对机之间可以交出机群协调者；交出返回 `handed-over-unconfirmed` 表示本机任期已改、但目标机没确认收到。未确认的目标机靠下一次任期交换收敛；自动重推和开机互拉由后续版本提供，目前没有。若旧协调者此后永久不可用（磁盘坏、退役），直接在新协调者所在机器上 `force` 接管即可，不需要人工修任期表。交出和接管的调用入口由后续版本提供，目前只有配对机之间的内部调用。

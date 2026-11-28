@@ -23,6 +23,10 @@ export class ResourceCleanupError extends Schema.TaggedError<ResourceCleanupErro
 
 export class ResourceCleanupService extends Context.Reference<{
   readonly cleanupScheduledTasks: (threadId: ThreadId) => Effect.Effect<void, ResourceCleanupError>;
+  readonly rebindScheduledTasks: (input: {
+    readonly sourceThreadId: ThreadId;
+    readonly targetThreadId: ThreadId;
+  }) => Effect.Effect<void, ResourceCleanupError>;
   readonly cleanupTerminals: (
     threadId: string,
     keepHistory?: boolean,
@@ -35,6 +39,7 @@ export class ResourceCleanupService extends Context.Reference<{
 }>("t3/orchestration-v2/ResourceCleanupService", {
   defaultValue: () => ({
     cleanupScheduledTasks: () => Effect.void,
+    rebindScheduledTasks: () => Effect.void,
     cleanupTerminals: () => Effect.void,
     cleanupPreviews: () => Effect.void,
     cleanupAttachments: () => Effect.void,
@@ -61,6 +66,20 @@ export const layer = Layer.effect(
             ),
           );
       }),
+      rebindScheduledTasks: Effect.fn("ResourceCleanupService.rebindScheduledTasks")(
+        function (input: { readonly sourceThreadId: ThreadId; readonly targetThreadId: ThreadId }) {
+          return scheduledTasks.rebindThread(input).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ResourceCleanupError({
+                  operation: "scheduled-tasks",
+                  threadId: input.sourceThreadId,
+                  cause,
+                }),
+            ),
+          );
+        },
+      ),
       cleanupTerminals: Effect.fn("ResourceCleanupService.cleanupTerminals")(function (
         threadId: string,
         keepHistory?: boolean,

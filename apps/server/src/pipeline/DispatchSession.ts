@@ -22,6 +22,7 @@ import * as SqlError from "effect/sql/SqlError";
 
 import { forkParked } from "../serverActivation.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -97,6 +98,34 @@ export class SessionOpener extends Context.Service<SessionOpener, SessionOpenerS
   "t3/pipeline/DispatchSession/SessionOpener",
 ) {}
 
+/** `git worktree list --porcelain -z`: records split on two NULs, fields on one. */
+const parseWorktreeCheckouts = (
+  porcelain: string,
+): ReadonlyMap<string, { readonly path: string; readonly prunable: boolean }> => {
+  const paths = new Map<string, { readonly path: string; readonly prunable: boolean }>();
+  for (const record of porcelain.split("\0\0")) {
+    const fields = record.split("\0");
+    const worktree = fields
+      .find((field) => field.startsWith("worktree "))
+      ?.slice("worktree ".length);
+    const branch = fields
+      .find((field) => field.startsWith("branch refs/heads/"))
+      ?.slice("branch refs/heads/".length);
+    if (
+      worktree !== undefined &&
+      worktree.length > 0 &&
+      branch !== undefined &&
+      branch.length > 0
+    ) {
+      paths.set(branch, {
+        path: worktree,
+        prunable: fields.some((field) => field.startsWith("prunable")),
+      });
+    }
+  }
+  return paths;
+};
+
 const decodeOpenRuns = Schema.decodeUnknownEffect(Schema.Array(OpenRunRow));
 
 const matchesRepository = (
@@ -136,6 +165,7 @@ const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const projects = yield* ProjectService.ProjectService;
   const git = yield* GitWorkflowService.GitWorkflowService;
+  const driver = yield* GitVcsDriver.GitVcsDriver;
   const opener = yield* SessionOpener;
   const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
 
@@ -275,22 +305,70 @@ const make = Effect.gen(function* () {
     }
     const project = yield* projectForRepository(repo.owner, repo.name);
     if (project === undefined) return yield* failed("no project for this repository");
-    const branch = sessionBranch(issue.number, issue.title, run.repository);
+    // The branch name comes from the run row, not the live issue title: the title can be
+    // edited after the run was claimed, and a redispatch must stay on its first branch.
+    const branch = sessionBranch(run.issueNumber, run.title, run.repository);
     const cwd = project.workspaceRoot;
-    const base = yield* git
-      .fetchWorktreeBaseCommit({ cwd, refName: "main" })
-      .pipe(Effect.orElseSucceed(() => null));
-    if (base === null) return yield* failed("remote base main is unavailable");
-    const created = yield* git
-      .createWorktree({
+    const listed = yield* driver
+      .execute({
+        operation: "DispatchSession.worktreeList",
         cwd,
-        refName: base.commitSha,
-        newRefName: branch,
-        baseRefName: `refs/remotes/${base.remoteRefName}`,
-        path: null,
+        args: ["worktree", "list", "--porcelain", "-z"],
+        allowNonZeroExit: true,
       })
-      .pipe(Effect.exit);
-    if (Exit.isFailure(created)) return yield* failed("worktree was not created");
+      .pipe(Effect.orElseSucceed(() => null));
+    const checkouts =
+      listed !== null && listed.exitCode === 0
+        ? parseWorktreeCheckouts(listed.stdout)
+        : new Map<string, { readonly path: string; readonly prunable: boolean }>();
+    const occupied = checkouts.get(branch);
+    let worktreePath: string;
+    if (occupied !== undefined && !occupied.prunable) {
+      // A redispatch finds the first attempt's checkout; reuse it so no work is discarded.
+      worktreePath = occupied.path;
+    } else {
+      if (occupied !== undefined) {
+        // The directory is gone but the registration still blocks `git worktree add`.
+        yield* driver
+          .execute({
+            operation: "DispatchSession.removeStaleWorktree",
+            cwd,
+            args: ["worktree", "remove", "--force", occupied.path],
+            allowNonZeroExit: true,
+          })
+          .pipe(Effect.orElseSucceed(() => null));
+      }
+      const existing = yield* git
+        .listLocalBranchNames(cwd)
+        .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+      if (existing.includes(branch)) {
+        const reused = yield* git
+          .createWorktree({
+            cwd,
+            refName: branch,
+            path: null,
+          })
+          .pipe(Effect.exit);
+        if (Exit.isFailure(reused)) return yield* failed("worktree was not created");
+        worktreePath = reused.value.worktree.path;
+      } else {
+        const base = yield* git
+          .fetchWorktreeBaseCommit({ cwd, refName: "main" })
+          .pipe(Effect.orElseSucceed(() => null));
+        if (base === null) return yield* failed("remote base main is unavailable");
+        const created = yield* git
+          .createWorktree({
+            cwd,
+            refName: base.commitSha,
+            newRefName: branch,
+            baseRefName: `refs/remotes/${base.remoteRefName}`,
+            path: null,
+          })
+          .pipe(Effect.exit);
+        if (Exit.isFailure(created)) return yield* failed("worktree was not created");
+        worktreePath = created.value.worktree.path;
+      }
+    }
     const threadId = ThreadId.make(
       `pipeline:${issue.number}:${run.id}${run.renewedOnce ? ":retry" : ""}`,
     );
@@ -299,7 +377,7 @@ const make = Effect.gen(function* () {
         threadId,
         projectId: project.id,
         branch,
-        worktreePath: created.value.worktree.path,
+        worktreePath,
         modelSelection: model,
         text: issue.body,
       })

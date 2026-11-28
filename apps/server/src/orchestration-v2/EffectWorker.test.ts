@@ -416,6 +416,38 @@ it.effect("forwards terminal cleanup keepHistory to the resource cleanup service
   }),
 );
 
+it.effect("forwards a scheduled-tasks rebind to the resource cleanup service", () =>
+  Effect.gen(function* () {
+    const calls = yield* Ref.make<
+      ReadonlyArray<{ readonly sourceThreadId: ThreadId; readonly targetThreadId: ThreadId }>
+    >([]);
+    const layer = layerExecutorFor({ events: yield* Ref.make<ReadonlyArray<string>>([]) }).pipe(
+      Layer.provide(
+        Layer.mock(ResourceCleanupService.ResourceCleanupService)({
+          rebindScheduledTasks: (input) => Ref.update(calls, (all) => [...all, input]),
+        }),
+      ),
+    );
+    yield* Effect.gen(function* () {
+      const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
+      const effect = restartEffect(yield* DateTime.now, { type: "detach" });
+      const targetThreadId = ThreadId.make("thread:rebind-target");
+      yield* executor.execute(
+        {
+          ...effect,
+          id: "effect:rebind",
+          request: { type: "scheduled-tasks.rebind", targetThreadId },
+        },
+        { willRetry: false },
+      );
+    }).pipe(Effect.provide(layer));
+
+    assert.deepEqual(yield* Ref.get(calls), [
+      { sourceThreadId: threadId, targetThreadId: ThreadId.make("thread:rebind-target") },
+    ]);
+  }),
+);
+
 it.effect("requeues a claim when a pre-execution worker check fails", () =>
   Effect.gen(function* () {
     const now = DateTime.formatIso(yield* DateTime.now);

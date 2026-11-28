@@ -1,4 +1,4 @@
-import { OrchestratorMcpFailure } from "@t3tools/contracts";
+import { EnvironmentId, OrchestratorMcpFailure } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
 import * as FleetCoordinator from "../../../ledger/FleetCoordinator.ts";
@@ -40,6 +40,34 @@ const handlers = {
             }),
         ),
       );
+    }),
+  ),
+  fleet_term_handover: McpToolAccess.writesForLinkedClient((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message:
+            "Update the linked environment to take the fleet coordinator over; it does not prove its environment identity.",
+        });
+      }
+      const coordinator = yield* FleetCoordinator.FleetCoordinator;
+      return yield* coordinator
+        .requestHandover({ environmentId: EnvironmentId.make(environmentId) }, input.target)
+        .pipe(
+          Effect.mapError(
+            (error) =>
+              new OrchestratorMcpFailure({
+                code:
+                  error.reason === "third-party-target" || error.reason === "unknown-target"
+                    ? "invalid_request"
+                    : "orchestration_error",
+                message: error.message,
+              }),
+          ),
+        );
     }),
   ),
 } satisfies McpToolAccess.Handlers<typeof FleetCoordinatorToolkit.tools>;
