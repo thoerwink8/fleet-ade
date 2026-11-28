@@ -12,6 +12,7 @@ import {
 import { expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Duration from "effect/Duration";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 import {
@@ -22,6 +23,7 @@ import {
   HttpRouter,
   HttpServer,
 } from "effect/http";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerHttp from "../http.ts";
@@ -72,9 +74,9 @@ interface Upstream {
   readonly sseRequestCount: () => number;
 }
 
-const listenUpstream = (options?: { readonly appId?: string }) =>
+const listenUpstream = (options?: { readonly appId?: string; readonly port?: number }) =>
   Effect.promise(() => {
-    const { promise, resolve } = Promise.withResolvers<Upstream>();
+    const { promise, resolve, reject } = Promise.withResolvers<Upstream>();
     const hits: Upstream["hits"] = [];
     const bodies: Array<string> = [];
     const sseClosed = Promise.withResolvers<void>();
@@ -117,7 +119,8 @@ const listenUpstream = (options?: { readonly appId?: string }) =>
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end("<html><body>board</body></html>");
     });
-    server.listen(0, "127.0.0.1", () =>
+    server.once("error", reject);
+    server.listen(options?.port ?? 0, "127.0.0.1", () =>
       resolve({
         server,
         hits,
@@ -394,6 +397,110 @@ it.live("认出身份后健康检查只探一次，后续转发复用缓存", ()
 
     expect(upstream.hits.filter((hit) => hit.url === "/api/health")).toHaveLength(1);
     expect(upstream.hits.filter((hit) => hit.url === "/api/status")).toHaveLength(2);
+  }).pipe(Effect.scoped),
+);
+
+it.live("看板退出后转发失败会作废缓存，接手端口的冒充者只被探活", () =>
+  Effect.gen(function* () {
+    const board = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const port = nodePortOf(board.server);
+    const { origin, client } = yield* serveFleetBoard(testBoardService(port));
+
+    const first = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(first.status).toBe(200);
+
+    // The board exits while idle; nothing invalidates the cache until a forwarding attempt fails.
+    yield* closeServer(board.server);
+    const dead = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(dead.status).toBe(502);
+    const deadBody = (yield* dead.json) as { error: { code: string } };
+    expect(deadBody.error.code).toBe("board_unreachable");
+
+    const squatter = yield* Effect.acquireRelease(
+      listenUpstream({ appId: "squatter", port }),
+      (fixture) => closeServer(fixture.server),
+    );
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(response.status).toBe(502);
+    const squatterBody = (yield* response.json) as { error: { code: string } };
+    expect(squatterBody.error.code).toBe("board_port_taken");
+    expect(squatter.hits.length).toBeGreaterThan(0);
+    expect(squatter.hits.every((hit) => hit.url === "/api/health")).toBe(true);
+  }).pipe(Effect.scoped),
+);
+
+it.effect("身份缓存过期后重新探活，过期窗口里接手端口的冒充者被拦", () =>
+  Effect.gen(function* () {
+    const board = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const port = nodePortOf(board.server);
+    const { origin, client } = yield* serveFleetBoard(testBoardService(port));
+
+    const first = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(first.status).toBe(200);
+
+    // Past the TTL the cached verdict no longer counts; the next forward re-probes the port.
+    yield* TestClock.adjust(Duration.seconds(30));
+    yield* closeServer(board.server);
+    const squatter = yield* Effect.acquireRelease(
+      listenUpstream({ appId: "squatter", port }),
+      (fixture) => closeServer(fixture.server),
+    );
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(response.status).toBe(502);
+    const expiredBody = (yield* response.json) as { error: { code: string } };
+    expect(expiredBody.error.code).toBe("board_port_taken");
+    expect(squatter.hits.length).toBeGreaterThan(0);
+    expect(squatter.hits.every((hit) => hit.url === "/api/health")).toBe(true);
+  }).pipe(Effect.scoped),
+);
+
+it.live("ensure 探到端口被占时同步清掉身份缓存，转发跟着拦下", () =>
+  Effect.gen(function* () {
+    const board = yield* Effect.acquireRelease(listenUpstream(), (fixture) =>
+      closeServer(fixture.server),
+    );
+    const port = nodePortOf(board.server);
+    const { origin, client } = yield* serveFleetBoard(testBoardService(port));
+
+    const first = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(first.status).toBe(200);
+
+    // The squatter takes the port before any forward fails, so only ensure's probe sees it.
+    yield* closeServer(board.server);
+    const squatter = yield* Effect.acquireRelease(
+      listenUpstream({ appId: "squatter", port }),
+      (fixture) => closeServer(fixture.server),
+    );
+    const ensureResponse = yield* client.execute(
+      HttpClientRequest.post(`${origin}/api/fleet-board/ensure`, authed),
+    );
+    expect(ensureResponse.status).toBe(200);
+    const ensured = (yield* ensureResponse.json) as { status: string };
+    expect(ensured.status).toBe("port-taken");
+
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${origin}/fleet-board/api/status`, authed),
+    );
+    expect(response.status).toBe(502);
+    const ensuredBody = (yield* response.json) as { error: { code: string } };
+    expect(ensuredBody.error.code).toBe("board_port_taken");
+    expect(squatter.hits.every((hit) => hit.url === "/api/health")).toBe(true);
   }).pipe(Effect.scoped),
 );
 

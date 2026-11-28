@@ -43,6 +43,8 @@ export interface FleetBoardServiceOptions {
   readonly launchTimeout?: Duration.Input;
   readonly probeTimeout?: Duration.Input;
   readonly pollInterval?: Duration.Input;
+  /** How long a positive identity verdict is trusted before re-probing. */
+  readonly identityTtl?: Duration.Input;
 }
 
 export class FleetBoardService extends Context.Service<
@@ -55,8 +57,8 @@ export class FleetBoardService extends Context.Service<
     readonly ensure: Effect.Effect<FleetBoardEnsureResult>;
     /**
      * Proves the port serves the board before the proxy trusts it. Positive results
-     * are cached; a negative probe is re-checked every time, so a board taking the
-     * port back from a squatter recovers without a restart.
+     * expire after identityTtl and negative probes drop the cache, so a squatter
+     * replacing an exited board never inherits a still-warm positive verdict.
      */
     readonly verifyIdentity: Effect.Effect<FleetBoardProbeState>;
     /** Drops the cached positive identity after the upstream stops answering. */
@@ -159,6 +161,19 @@ const make = Effect.fn("FleetBoardService.make")(function* (options: FleetBoardS
   const spawn = options.spawn ?? spawnLauncher;
   const dialTcp = options.dialTcp ?? dialTcpLoopback;
 
+  const identityTtl = options.identityTtl ?? Duration.seconds(10);
+
+  // A positive verdict is only trusted for identityTtl: the board exits when idle, and
+  // a stale positive would hand this origin to whoever takes the port next. Every probe
+  // refreshes the cache both ways, so ensure and verifyIdentity share one truth.
+  let identityVerifiedAt: number | null = null;
+
+  const probeAndCache = Effect.fnUntraced(function* () {
+    const state = yield* probe();
+    identityVerifiedAt = state === "running" ? (yield* DateTime.now).epochMilliseconds : null;
+    return state;
+  });
+
   const probe = () => probePort(httpClient, options.port, probeTimeout, dialTcp);
 
   const launchAndAwait = Effect.fn("FleetBoardService.launchAndAwait")(function* () {
@@ -185,7 +200,7 @@ const make = Effect.fn("FleetBoardService.make")(function* (options: FleetBoardS
     const deadline = (yield* DateTime.now).epochMilliseconds + Duration.toMillis(launchTimeout);
     for (;;) {
       yield* Effect.sleep(pollInterval);
-      const state = yield* probe();
+      const state = yield* probeAndCache();
       if (state === "running") return yield* ensureResult("running", null);
       if (state === "foreign") {
         return yield* ensureResult("port-taken", portTakenDetail(options.port));
@@ -200,7 +215,7 @@ const make = Effect.fn("FleetBoardService.make")(function* (options: FleetBoardS
   });
 
   const ensureUnlocked = Effect.fn("FleetBoardService.ensure")(function* () {
-    const first = yield* probe();
+    const first = yield* probeAndCache();
     if (first === "running") return yield* ensureResult("running", null);
     if (first === "foreign") {
       return yield* ensureResult("port-taken", portTakenDetail(options.port));
@@ -210,18 +225,17 @@ const make = Effect.fn("FleetBoardService.make")(function* (options: FleetBoardS
 
   // Concurrent ensures must not double-spawn; serialized callers reuse the first one's launch.
   const semaphore = yield* Semaphore.make(1);
-  let identityVerified = false;
   return FleetBoardService.of({
     ensure: semaphore.withPermits(1)(ensureUnlocked()),
-    verifyIdentity: Effect.suspend(() => {
-      if (identityVerified) return Effect.succeed<FleetBoardProbeState>("running");
-      return Effect.map(probe(), (state) => {
-        if (state === "running") identityVerified = true;
-        return state;
-      });
+    verifyIdentity: Effect.gen(function* () {
+      if (identityVerifiedAt !== null) {
+        const age = (yield* DateTime.now).epochMilliseconds - identityVerifiedAt;
+        if (age < Duration.toMillis(identityTtl)) return "running" as const;
+      }
+      return yield* probeAndCache();
     }),
     invalidateIdentity: Effect.sync(() => {
-      identityVerified = false;
+      identityVerifiedAt = null;
     }),
     port: options.port,
   });
