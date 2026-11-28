@@ -8,6 +8,8 @@
  */
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 import * as NodeReadline from "node:readline";
 
 interface LogicalFrame {
@@ -15,6 +17,9 @@ interface LogicalFrame {
   readonly method: string;
   readonly params?: unknown;
   readonly result?: unknown;
+  readonly error?:
+    | { readonly code: number; readonly message: string; readonly data?: unknown }
+    | undefined;
 }
 
 interface ReplayEntry {
@@ -36,6 +41,10 @@ export interface ReplayTurn {
   /** Frames the agent sends: session updates and agent-to-client requests. */
   readonly frames: ReadonlyArray<{ readonly frame: LogicalFrame; readonly afterMs?: number }>;
   readonly stopReason: string;
+  /** Set when the transcript ends the prompt with an error instead of a result. */
+  readonly error?:
+    | { readonly code: number; readonly message: string; readonly data?: unknown }
+    | undefined;
 }
 
 const FIXTURES = "../src/orchestration-v2/testkit/fixtures";
@@ -63,6 +72,11 @@ export const SCENARIOS = [
     id: "multi-turn",
     name: "Multi turn",
     file: `${FIXTURES}/multi_turn/registry_transcript.ndjson`,
+  },
+  {
+    id: "background-work",
+    name: "Background work",
+    file: "./dev-replay/background_work_transcript.ndjson",
   },
 ] as const;
 
@@ -96,7 +110,11 @@ function isReplayedFrame(frame: LogicalFrame): boolean {
 
 /** Splits a recorded transcript into the turns that follow each `session/prompt`. */
 export function parseReplayTurns(ndjson: string): ReadonlyArray<ReplayTurn> {
-  const turns: Array<{ frames: Array<ReplayTurn["frames"][number]>; stopReason: string }> = [];
+  const turns: Array<{
+    frames: Array<ReplayTurn["frames"][number]>;
+    stopReason: string;
+    error?: ReplayTurn["error"];
+  }> = [];
   // Frames after a prompt's response belong to background work, not to that turn.
   let turn: (typeof turns)[number] | undefined;
   for (const line of ndjson.split("\n")) {
@@ -117,6 +135,7 @@ export function parseReplayTurns(ndjson: string): ReadonlyArray<ReplayTurn> {
     if (frame.kind === "response" && frame.method === "session/prompt") {
       const stopReason = (frame.result as { stopReason?: unknown } | undefined)?.stopReason;
       if (typeof stopReason === "string") turn.stopReason = stopReason;
+      if (frame.error !== undefined) turn.error = frame.error;
       turn = undefined;
       continue;
     }
@@ -188,6 +207,43 @@ function runAgent(): void {
     string,
     { cwd: string; model: string; promptCount: number; cancel: (() => void) | undefined }
   >();
+  // A restart spawns a fresh agent process for the same thread; the transcript position
+  // and chosen scenario persist on disk so playback continues instead of restarting.
+  const stateDir = NodePath.join(NodeOS.tmpdir(), "t3-dev-replay-state");
+  const statePath = (sessionId: string) =>
+    NodePath.join(stateDir, `${sessionId.replaceAll(/[^a-zA-Z0-9-]/g, "_")}.json`);
+  const persistSession = (sessionId: string) => {
+    const session = sessions.get(sessionId);
+    if (session === undefined) return;
+    try {
+      NodeFS.mkdirSync(stateDir, { recursive: true });
+      NodeFS.writeFileSync(
+        statePath(sessionId),
+        JSON.stringify({ model: session.model, promptCount: session.promptCount }),
+      );
+    } catch {
+      // Replay state is best-effort; a lost file just restarts the transcript.
+    }
+  };
+  const restoreSession = (sessionId: string) => {
+    try {
+      const saved = JSON.parse(NodeFS.readFileSync(statePath(sessionId), "utf8")) as {
+        model?: unknown;
+        promptCount?: unknown;
+      };
+      const session = sessions.get(sessionId);
+      if (session === undefined) return;
+      if (
+        typeof saved.model === "string" &&
+        SCENARIOS.some((scenario) => scenario.id === saved.model)
+      ) {
+        session.model = saved.model;
+      }
+      if (typeof saved.promptCount === "number") session.promptCount = saved.promptCount;
+    } catch {
+      // No saved state: the transcript starts over.
+    }
+  };
   const pendingAgentRequests = new Map<string, (result: unknown) => void>();
   let nextAgentRequestId = 1;
 
@@ -279,6 +335,9 @@ function runAgent(): void {
           protocolVersion: 1,
           agentCapabilities: {
             loadSession: true,
+            // The probe only learns the scenario list from a disposable session, which
+            // it creates when the agent can delete it again.
+            sessionCapabilities: { delete: {} },
             promptCapabilities: { image: false, audio: false, embeddedContext: true },
           },
           authMethods: [],
@@ -292,10 +351,12 @@ function runAgent(): void {
           message.method === "session/load" ? String(params.sessionId) : NodeCrypto.randomUUID();
         const cwd = typeof params.cwd === "string" ? params.cwd : process.cwd();
         sessions.set(sessionId, { cwd, model: SCENARIOS[0].id, promptCount: 0, cancel: undefined });
+        if (message.method === "session/load") restoreSession(sessionId);
+        const session = sessions.get(sessionId)!;
         return {
           ...(message.method === "session/new" ? { sessionId } : {}),
           models: {
-            currentModelId: SCENARIOS[0].id,
+            currentModelId: session.model,
             availableModels: SCENARIOS.map((scenario) => ({
               modelId: scenario.id,
               name: scenario.name,
@@ -313,6 +374,7 @@ function runAgent(): void {
         if (session !== undefined && session.model !== params.modelId) {
           session.model = String(params.modelId);
           session.promptCount = 0;
+          persistSession(String(params.sessionId));
         }
         return {};
       }
@@ -323,6 +385,7 @@ function runAgent(): void {
         const turns = loadTurns(session.model);
         const turn = turns[session.promptCount % Math.max(turns.length, 1)];
         session.promptCount += 1;
+        persistSession(sessionId);
         const controller = new AbortController();
         session.cancel = () => controller.abort();
         let ended: "cancelled" | undefined;
@@ -330,6 +393,17 @@ function runAgent(): void {
           if (turn !== undefined) ended = await playTurn(sessionId, turn, controller.signal);
         } finally {
           session.cancel = undefined;
+        }
+        if (turn?.error !== undefined && !(controller.signal.aborted || ended === "cancelled")) {
+          const data = turn.error.data;
+          const detail =
+            data !== null &&
+            typeof data === "object" &&
+            "message" in data &&
+            typeof data.message === "string"
+              ? data.message
+              : turn.error.message;
+          throw Object.assign(new Error(detail), { code: turn.error.code, data: turn.error.data });
         }
         return {
           stopReason:
@@ -339,6 +413,7 @@ function runAgent(): void {
         };
       }
       case "session/close":
+      case "session/delete":
         sessions.get(String(params.sessionId))?.cancel?.();
         sessions.delete(String(params.sessionId));
         return {};

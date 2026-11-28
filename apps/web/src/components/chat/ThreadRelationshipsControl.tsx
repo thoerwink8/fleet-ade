@@ -8,6 +8,8 @@ import { SubagentTooltipContent } from "./SubagentTooltipContent";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
+  canStopSubagent,
+  canStopSubagentWorkflow,
   deriveWorkflowGroups,
   projectedSubagentsToRuntime,
   type RuntimeSubagent,
@@ -744,17 +746,7 @@ export function ThreadRelationshipsPanel(props: {
       projectedAgent === undefined ? undefined : workflowGroupsById.get(projectedAgent.id);
     const agent = workflowGroup ? projectedAgent : currentSubagent(projectedAgent, node?.thread);
     const failed = rowStatus === "failed" || rowStatus === "error";
-    const canStop =
-      agent &&
-      (agent.origin === "app_owned" ||
-        (agent.origin === "provider_native" &&
-          agent.driver === "claudeAgent" &&
-          agent.runId != null &&
-          agent.nativeTaskRef?.strength === "strong" &&
-          agent.nativeTaskRef.nativeId !== null &&
-          ["pending", "running", "waiting"].includes(agent.nativeStatus))) &&
-      agent.startedAt &&
-      ["pending", "running", "waiting"].includes(agent.status);
+    const canStop = canStopSubagent(agent);
     const threadTitle = relationshipThreadTitle({
       title:
         workflowGroup?.workflow.workflowName ??
@@ -772,11 +764,12 @@ export function ThreadRelationshipsPanel(props: {
         entry.instanceId === (agent?.providerInstanceId ?? node?.thread?.providerInstanceId),
     );
     const providerDriver = agent?.driver ?? provider?.driver;
-    const canStopWorkflow =
-      canOperateWorkflow &&
-      workflowGroup?.workflow.status === "running" &&
-      agent?.origin === "provider_native" &&
-      providerDriver === "claudeAgent";
+    const canStopWorkflow = canStopSubagentWorkflow({
+      canOperateWorkflow,
+      workflowStatus: workflowGroup?.workflow.status,
+      origin: agent?.origin,
+      driver: providerDriver,
+    });
     const trailingVisibilityClass = (workflowGroup ? canStopWorkflow : canStop)
       ? "group-hover:opacity-0 group-focus-within:opacity-0 pointer-coarse:opacity-0 [@media(hover:none)]:opacity-0"
       : "";

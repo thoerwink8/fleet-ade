@@ -1,0 +1,228 @@
+/* 后台任务 section in the session overview.
+ *
+ * The section and its rows follow the v2 session column (session-panel.css and task-row.css in
+ * @fleet/design, which the app does not import yet): sections split by hairlines with small
+ * 14/500 titles; rows are the design's task grid — 32px with one line, 52px with the progress
+ * line. The title never wraps and keeps a minimum width so narrow panels still read clearly.
+ * Running rows carry a static status dot, so nothing on the surface repaints continuously.
+ */
+
+.fa-sec[data-thread-details-tasks] {
+  container-type: inline-size;
+  min-width: 0;
+  max-width: 100%;
+  padding: 12px 0 8px;
+  border-bottom: 1px solid var(--fa-border);
+}
+
+[data-thread-details-tasks] .fa-sec__h {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--fa-fg);
+}
+
+[data-thread-details-tasks] .fa-sec__b {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px;
+}
+
+/* The design's task grid: type icon | title | agent + status + elapsed + stop.
+   The title minimum fits six 14px Chinese characters (84px) plus the ellipsis (~14px). */
+[data-thread-details-tasks] .fa-task {
+  --fa-hv: linear-gradient(var(--fa-hover), var(--fa-hover));
+
+  display: grid;
+  grid-template-columns: 16px minmax(98px, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 2px 8px;
+  border-block: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: 0;
+  user-select: none;
+}
+
+[data-thread-details-tasks] .fa-task:hover {
+  background-image: var(--fa-hv);
+}
+
+[data-thread-details-tasks] .fa-task:active {
+  background-image: var(--fa-hv), var(--fa-hv);
+}
+
+[data-thread-details-tasks] .fa-task:focus-visible {
+  outline: 2px solid var(--fa-focus-ring);
+  outline-offset: -2px;
+}
+
+/* Rows with a progress line grow to the 52px two-line height. */
+[data-thread-details-tasks] .fa-task:has(> .sub) {
+  min-height: 52px;
+  padding-block: 4px;
+}
+
+[data-thread-details-tasks] .fa-task > .ty {
+  display: inline-flex;
+  color: var(--fa-fg-muted);
+}
+
+[data-thread-details-tasks] .fa-task > .ty.is-bad {
+  color: var(--fa-danger);
+}
+
+[data-thread-details-tasks] .fa-task > .ty .fa-ic {
+  width: 16px;
+  height: 16px;
+}
+
+[data-thread-details-tasks] .fa-task .t {
+  display: flex;
+  min-width: 98px;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--fa-fg);
+}
+
+[data-thread-details-tasks] .fa-task .t .x {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+[data-thread-details-tasks] .fa-task .end {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+[data-thread-details-tasks] .fa-task .end .st {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--fa-fg-muted);
+}
+
+[data-thread-details-tasks] .fa-task .end .st.is-bad {
+  color: var(--fa-danger);
+}
+
+[data-thread-details-tasks] .fa-task .tm {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fa-fg-muted);
+  text-align: right;
+}
+
+[data-thread-details-tasks] .fa-task .fa-icon-btn {
+  width: 24px;
+  height: 24px;
+  margin-block: -2px;
+}
+
+[data-thread-details-tasks] .fa-task .fa-icon-btn .fa-ic {
+  width: 12px;
+  height: 12px;
+}
+
+[data-thread-details-tasks] .fa-task .sub {
+  grid-column: 2 / 4;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--fa-fg-muted);
+}
+
+/* Narrow inline panels and popup cards keep the full title; metadata takes its own line. */
+@container (max-width: 320px) {
+  [data-thread-details-tasks] .fa-task {
+    grid-template-columns: 16px minmax(98px, 1fr);
+  }
+
+  [data-thread-details-tasks] .fa-task .end {
+    grid-column: 2;
+    max-width: 100%;
+  }
+
+  [data-thread-details-tasks] .fa-task .end .st {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  [data-thread-details-tasks] .fa-task .sub {
+    grid-column: 2;
+  }
+}
+
+[data-thread-details-tasks] .fa-task .sub .bad {
+  color: var(--fa-danger);
+}
+
+/* The empty line and the finished-work toggle share the 14/20 quiet note style. */
+[data-thread-details-tasks] .note {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--fa-fg-muted);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+[data-thread-details-tasks] .note:hover {
+  background-image: var(--fa-hv, linear-gradient(var(--fa-hover), var(--fa-hover)));
+}
+
+[data-thread-details-tasks] li.note {
+  cursor: default;
+}
+
+/* Active rows beyond six scroll inside the section, so the column never stretches past them.
+   Six single-line rows fit exactly; taller two-line rows clip, which is what shows the scroll. */
+[data-thread-details-tasks] [data-background-task-list].is-scrollable {
+  max-height: 192px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Coarse pointers: the row, completed toggle, and stop control keep at least the 44px hit target. */
+@media (pointer: coarse) {
+  [data-thread-details-tasks] .fa-task {
+    min-height: 44px;
+  }
+
+  [data-thread-details-tasks] .fa-task:has(> .sub) {
+    min-height: 52px;
+  }
+
+  [data-thread-details-tasks] button.note {
+    min-height: 44px;
+  }
+}
